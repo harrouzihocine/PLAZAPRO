@@ -28,6 +28,12 @@ const routes = [
       { path: 'inventory', name: 'inventory', component: placeholder('Inventory', 'Phase 2') },
       { path: 'clients', name: 'clients', component: placeholder('Clients', 'Phase 3') },
       { path: 'payments', name: 'payments', component: placeholder('Payments', 'Phase 4') },
+      {
+        path: 'settings/lists',
+        name: 'settings.lists',
+        component: () => import('@/features/settings/views/ListsView.vue'),
+        meta: { permission: 'settings.manage' },
+      },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },
@@ -49,6 +55,9 @@ router.beforeEach(async (to) => {
   }
   if (to.name === 'login' && auth.isAuthenticated) {
     return { name: 'dashboard' }
+  }
+  if (to.meta.permission && !auth.can(to.meta.permission)) {
+    return { name: 'dashboard' } // lacks the required permission
   }
   return true
 })

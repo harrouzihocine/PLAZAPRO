@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import { useTheme } from '@/composables/useTheme'
 import { useAuthStore } from '@/features/settings/store'
@@ -7,12 +8,17 @@ const { isNight, toggle } = useTheme()
 const auth = useAuthStore()
 const router = useRouter()
 
-const nav = [
-  { to: '/', label: 'Dashboard', icon: '▦' },
-  { to: '/inventory', label: 'Inventory', icon: '▢' },
-  { to: '/clients', label: 'Clients', icon: '☺' },
-  { to: '/payments', label: 'Payments', icon: '$' },
-]
+// Nav is permission-filtered: entries with a `permission` only show to users who
+// hold it (the Settings admin is gated by settings.manage).
+const nav = computed(() =>
+  [
+    { to: '/', label: 'Dashboard', icon: '▦' },
+    { to: '/inventory', label: 'Inventory', icon: '▢' },
+    { to: '/clients', label: 'Clients', icon: '☺' },
+    { to: '/payments', label: 'Payments', icon: '$' },
+    { to: '/settings/lists', label: 'Settings', icon: '⚙', permission: 'settings.manage' },
+  ].filter((i) => !i.permission || auth.can(i.permission)),
+)
 
 async function logout() {
   await auth.logout()
