@@ -84,6 +84,17 @@ return [
             'report' => false,
         ],
 
+        // Private store for chat attachments (images, voice notes, files). Never
+        // public: served only through a participant-gated streaming endpoint (or
+        // a signed URL / CDN in production via CHAT_DRIVER=s3).
+        'chat' => [
+            'driver' => env('CHAT_DRIVER', 'local'),
+            'root' => storage_path('app/chat'),
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
     ],
 
     /*

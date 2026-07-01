@@ -58,6 +58,25 @@ const routes = [
         meta: { permission: 'clients.view' },
       },
       {
+        path: 'tasks',
+        name: 'tasks',
+        component: () => import('@/features/pipeline/views/TasksView.vue'),
+        meta: { permission: 'tasks.manage' },
+      },
+      {
+        path: 'chat',
+        name: 'chat',
+        component: () => import('@/features/collaboration/views/ChatView.vue'),
+        meta: { permission: 'chat.use' },
+      },
+      {
+        path: 'chat/:id',
+        name: 'chat.thread',
+        props: true,
+        component: () => import('@/features/collaboration/views/ThreadView.vue'),
+        meta: { permission: 'chat.use' },
+      },
+      {
         path: 'payments',
         name: 'payments',
         component: () => import('@/features/payments/views/PaymentsView.vue'),

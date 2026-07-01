@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Pipeline\Actions;
 
+use App\Modules\Pipeline\Events\VisitAssigned;
 use App\Modules\Pipeline\Models\Visit;
 
 /**
@@ -15,7 +16,7 @@ class ScheduleVisit
 {
     public function handle(array $data): Visit
     {
-        return Visit::create([
+        $visit = Visit::create([
             'client_id' => $data['client_id'],
             'client_project_id' => $data['client_project_id'] ?? null,
             'type' => $data['type'],
@@ -24,5 +25,10 @@ class ScheduleVisit
             'scheduled_at' => $data['scheduled_at'],
             'notes' => $data['notes'] ?? null,
         ]);
+
+        // Notify the assigned agent (Collaboration listens; Phase 5).
+        VisitAssigned::dispatch($visit);
+
+        return $visit;
     }
 }

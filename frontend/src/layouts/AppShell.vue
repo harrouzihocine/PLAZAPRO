@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import { useTheme } from '@/composables/useTheme'
 import { useAuthStore } from '@/features/settings/store'
+import NotificationBell from '@/features/collaboration/components/NotificationBell.vue'
 
 const { isNight, toggle } = useTheme()
 const auth = useAuthStore()
@@ -15,6 +16,8 @@ const nav = computed(() =>
     { to: '/', label: 'Dashboard', icon: '▦' },
     { to: '/inventory', label: 'Inventory', icon: '▢' },
     { to: '/clients', label: 'Clients', icon: '☺', permission: 'clients.view' },
+    { to: '/tasks', label: 'Tasks', icon: '✓', permission: 'tasks.manage' },
+    { to: '/chat', label: 'Chat', icon: '💬', permission: 'chat.use' },
     { to: '/payments', label: 'Payments', icon: '$', permission: 'versements.view' },
     { to: '/settings', label: 'Settings', icon: '⚙', permission: 'settings.manage' },
   ].filter((i) => !i.permission || auth.can(i.permission)),
@@ -32,6 +35,7 @@ async function logout() {
     <header class="flex h-14 items-center justify-between border-b border-border bg-surface px-4">
       <span class="font-semibold text-primary">PLAZA PRO</span>
       <div class="flex items-center gap-3">
+        <NotificationBell v-if="auth.can('notifications.view')" />
         <button
           class="min-h-[44px] min-w-[44px]"
           :aria-label="isNight ? 'Switch to day theme' : 'Switch to night theme'"

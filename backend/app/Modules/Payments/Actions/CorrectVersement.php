@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Payments\Actions;
 
+use App\Modules\Payments\Events\VersementRecorded;
 use App\Modules\Payments\Models\PaymentSchedule;
 use App\Modules\Payments\Models\Versement;
 use App\Modules\Payments\Support\Money;
@@ -26,7 +27,7 @@ class CorrectVersement
     {
         abort_unless($versement->isActive(), 422, 'Only an active versement can be corrected.');
 
-        return DB::transaction(function () use ($versement, $data) {
+        $replacement = DB::transaction(function () use ($versement, $data) {
             $originalAmount = (string) $versement->amount;
             $scheduleItemId = $versement->schedule_item_id;
 
@@ -57,5 +58,10 @@ class CorrectVersement
 
             return $replacement;
         });
+
+        // A correction is still a payment event — notify the owning agent.
+        VersementRecorded::dispatch($replacement);
+
+        return $replacement;
     }
 }

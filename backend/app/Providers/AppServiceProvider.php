@@ -6,6 +6,8 @@ namespace App\Providers;
 
 use App\Modules\Clients\Models\Client;
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Collaboration\Models\Conversation;
+use App\Modules\Collaboration\Models\Message;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Payments\Models\Document;
@@ -54,6 +56,8 @@ class AppServiceProvider extends ServiceProvider
             'payment_schedule' => PaymentSchedule::class,
             'versement' => Versement::class,
             'document' => Document::class,
+            'conversation' => Conversation::class,
+            'message' => Message::class,
         ]);
     }
 }

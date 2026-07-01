@@ -34,3 +34,25 @@ export const pipelineApi = {
     return data.data
   },
 }
+
+// Tasks (to-dos) backing the Phase 5 tasks board. All gated tasks.manage.
+export const tasksApi = {
+  async list(params = {}) {
+    const { data } = await useApi().get('/tasks', { params })
+    return data.data
+  },
+
+  async create(payload) {
+    const { data } = await useApi().post('/tasks', payload)
+    return data.data
+  },
+
+  async complete(id) {
+    const { data } = await useApi().post(`/tasks/${id}/complete`)
+    return data.data
+  },
+
+  cancel(id, reason) {
+    return useApi().delete(`/tasks/${id}`, { data: { reason } })
+  },
+}

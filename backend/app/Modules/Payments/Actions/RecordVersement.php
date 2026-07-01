@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Payments\Actions;
 
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Payments\Events\VersementRecorded;
 use App\Modules\Payments\Models\PaymentSchedule;
 use App\Modules\Payments\Models\Versement;
 use App\Modules\Settings\Models\User;
@@ -21,7 +22,7 @@ class RecordVersement
 
     public function handle(ClientProject $project, array $data, User $actor): Versement
     {
-        return DB::transaction(function () use ($project, $data, $actor) {
+        $versement = DB::transaction(function () use ($project, $data, $actor) {
             $versement = Versement::create([
                 'client_project_id' => $project->id,
                 'amount' => $data['amount'],
@@ -46,5 +47,10 @@ class RecordVersement
             // Return the created instance (not a refetch) so the API responds 201.
             return $versement;
         });
+
+        // Notify the deal's owning agent (Collaboration listens; Phase 5).
+        VersementRecorded::dispatch($versement);
+
+        return $versement;
     }
 }
