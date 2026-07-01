@@ -73,6 +73,17 @@ return [
             'report' => false,
         ],
 
+        // Private store for generated documents (receipts, contracts, quotes).
+        // Never public: served only through a permission-gated download endpoint
+        // (or a signed URL / CDN in production via DOCUMENTS_DRIVER=s3).
+        'documents' => [
+            'driver' => env('DOCUMENTS_DRIVER', 'local'),
+            'root' => storage_path('app/documents'),
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
     ],
 
     /*
