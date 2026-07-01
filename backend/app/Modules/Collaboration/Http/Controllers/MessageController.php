@@ -28,7 +28,7 @@ class MessageController extends Controller
         // Latest window, oldest-first for display. `before` (a message id) pages
         // backwards for "load older". Redacted messages are kept (shown deleted).
         $messages = $conversation->messages()
-            ->with(['author', 'attachments'])
+            ->with(['author', 'attachments', 'subject'])
             ->when($request->filled('before'), fn ($q) => $q->where('id', '<', $request->integer('before')))
             ->orderByDesc('id')
             ->limit(50)

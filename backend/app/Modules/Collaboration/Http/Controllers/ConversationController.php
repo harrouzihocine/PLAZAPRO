@@ -4,11 +4,19 @@ declare(strict_types=1);
 
 namespace App\Modules\Collaboration\Http\Controllers;
 
+use App\Modules\Collaboration\Actions\AddParticipants;
 use App\Modules\Collaboration\Actions\CreateConversation;
 use App\Modules\Collaboration\Actions\MarkConversationRead;
+use App\Modules\Collaboration\Actions\RemoveParticipant;
+use App\Modules\Collaboration\Actions\ShareRecord;
+use App\Modules\Collaboration\Enums\ConversationType;
+use App\Modules\Collaboration\Http\Requests\AddParticipantsRequest;
 use App\Modules\Collaboration\Http\Requests\CreateConversationRequest;
+use App\Modules\Collaboration\Http\Requests\ShareRecordRequest;
 use App\Modules\Collaboration\Http\Resources\ConversationResource;
+use App\Modules\Collaboration\Http\Resources\MessageResource;
 use App\Modules\Collaboration\Models\Conversation;
+use App\Modules\Collaboration\Support\SharedSubject;
 use App\Modules\Settings\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -57,6 +65,39 @@ class ConversationController extends Controller
         $action->handle($conversation, $request->user());
 
         return response()->json(['read' => true]);
+    }
+
+    /** Add members to a group (admin only — enforced in AddParticipantsRequest). */
+    public function addParticipants(AddParticipantsRequest $request, Conversation $conversation, AddParticipants $action): ConversationResource
+    {
+        $action->handle($conversation, $request->validated('user_ids'));
+
+        return new ConversationResource($conversation->fresh()->load(['participants', 'latestMessage.author']));
+    }
+
+    /** Remove a member (an admin removing someone, or a member leaving). Groups only. */
+    public function removeParticipant(Request $request, Conversation $conversation, User $user, RemoveParticipant $action): JsonResponse
+    {
+        $me = $request->user();
+
+        abort_unless($conversation->type === ConversationType::Group, 422, 'Only group participants can be managed.');
+        abort_unless($conversation->hasParticipant($me), 403);
+        abort_unless($user->id === $me->id || $conversation->isAdmin($me), 403);
+
+        $action->handle($conversation, $user->id);
+
+        return response()->json(['removed' => true]);
+    }
+
+    /** Share a record (client/deal/unit) into the conversation as a system message. */
+    public function share(ShareRecordRequest $request, Conversation $conversation, ShareRecord $action): MessageResource
+    {
+        $subject = SharedSubject::resolve($request->validated('subject_type'), $request->integer('subject_id'));
+        abort_if($subject === null, 404, 'Shared record not found.');
+
+        $message = $action->handle($conversation, $request->user(), $subject, $request->input('note'));
+
+        return new MessageResource($message->load(['author', 'attachments', 'subject']));
     }
 
     /**

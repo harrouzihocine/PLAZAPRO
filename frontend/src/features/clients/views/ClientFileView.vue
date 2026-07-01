@@ -5,10 +5,13 @@ import BaseCard from '@/components/base/BaseCard.vue'
 import DealsPanel from '@/features/clients/components/DealsPanel.vue'
 import DesirePanel from '@/features/clients/components/DesirePanel.vue'
 import { useClientsStore } from '@/features/clients/clientsStore'
+import { useAuthStore } from '@/features/settings/store'
+import ShareToChat from '@/features/collaboration/components/ShareToChat.vue'
 import TimelinePanel from '@/features/pipeline/components/TimelinePanel.vue'
 
 const props = defineProps({ id: { type: [String, Number], required: true } })
 const store = useClientsStore()
+const auth = useAuthStore()
 
 onMounted(() => store.load(props.id))
 </script>
@@ -32,6 +35,9 @@ onMounted(() => store.load(props.id))
           </span>
         </div>
         <p class="opacity-70">{{ store.current.phone }}<template v-if="store.current.email"> · {{ store.current.email }}</template></p>
+        <div v-if="auth.can('chat.use')" class="pt-1">
+          <ShareToChat subject-type="client" :subject-id="store.current.id" label="Share client to chat" />
+        </div>
       </div>
 
       <div class="grid gap-4 lg:grid-cols-3">

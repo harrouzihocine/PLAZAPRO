@@ -1,12 +1,25 @@
 <script setup>
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/features/settings/store'
 import { useChatStore } from '@/features/collaboration/chatStore'
 import MessageComposer from '@/features/collaboration/components/MessageComposer.vue'
 
 const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
 const store = useChatStore()
 const scroller = ref(null)
+const showInfo = ref(false)
+
+const isGroup = computed(() => store.active?.type === 'group')
+const iAmAdmin = computed(
+  () => store.active?.participants?.some((p) => p.id === auth.user?.id && p.role === 'admin') ?? false,
+)
+const nonParticipants = computed(() => {
+  const ids = new Set(store.active?.participants?.map((p) => p.id) ?? [])
+  return store.contacts.filter((c) => !ids.has(c.id))
+})
 
 async function load(id) {
   if (!id) return
@@ -23,6 +36,7 @@ function scrollToBottom() {
 
 watch(() => route.params.id, load, { immediate: true })
 watch(() => store.messages.length, scrollToBottom)
+onMounted(() => store.fetchContacts())
 
 async function sendText(body) {
   await store.sendText(body)
@@ -40,6 +54,20 @@ function remove(message) {
   }
 }
 
+async function addMember(userId) {
+  await store.addParticipants(store.activeId, [userId])
+}
+
+async function kick(userId) {
+  await store.removeParticipant(store.activeId, userId)
+}
+
+async function leave() {
+  if (!window.confirm('Leave this group?')) return
+  await store.removeParticipant(store.activeId, auth.user.id)
+  router.push('/chat')
+}
+
 onBeforeUnmount(() => store.unsubscribe())
 </script>
 
@@ -50,7 +78,43 @@ onBeforeUnmount(() => store.unsubscribe())
       <RouterLink to="/chat" class="min-h-[44px] px-2 py-2 md:hidden" aria-label="Back to inbox">
         ‹
       </RouterLink>
-      <h1 class="truncate text-lg font-semibold">{{ store.active?.title ?? 'Conversation' }}</h1>
+      <h1 class="flex-1 truncate text-lg font-semibold">{{ store.active?.title ?? 'Conversation' }}</h1>
+      <button v-if="isGroup" class="min-h-[44px] px-2 text-sm text-primary" @click="showInfo = !showInfo">
+        Group info
+      </button>
+    </div>
+
+    <!-- Group info / participants -->
+    <div v-if="isGroup && showInfo" class="border-b border-border p-3 text-sm">
+      <p class="mb-2 font-semibold">Participants</p>
+      <ul class="space-y-1">
+        <li v-for="p in store.active?.participants ?? []" :key="p.id" class="flex items-center justify-between">
+          <span>{{ p.name }} <span v-if="p.role === 'admin'" class="opacity-60">· admin</span></span>
+          <button
+            v-if="iAmAdmin && p.id !== auth.user?.id"
+            class="text-danger"
+            @click="kick(p.id)"
+          >
+            Remove
+          </button>
+        </li>
+      </ul>
+
+      <div v-if="iAmAdmin && nonParticipants.length" class="mt-3">
+        <p class="mb-1 font-semibold">Add member</p>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="u in nonParticipants"
+            :key="u.id"
+            class="rounded-token border border-border px-2 py-1 hover:bg-bg"
+            @click="addMember(u.id)"
+          >
+            + {{ u.name }}
+          </button>
+        </div>
+      </div>
+
+      <button class="mt-3 text-danger" @click="leave">Leave group</button>
     </div>
 
     <!-- Messages -->
@@ -79,16 +143,19 @@ onBeforeUnmount(() => store.unsubscribe())
                 class="mb-1 max-h-64 rounded-token"
               />
               <audio v-else-if="a.kind === 'voice'" :src="a.url" controls class="mb-1 w-56" />
-              <a
-                v-else
-                :href="a.url"
-                target="_blank"
-                rel="noopener"
-                class="mb-1 block underline"
-              >
+              <a v-else :href="a.url" target="_blank" rel="noopener" class="mb-1 block underline">
                 📎 Download file
               </a>
             </template>
+
+            <!-- Shared-record card (RBAC-gated server-side) -->
+            <div v-if="m.subject" class="mb-1 rounded-token border border-border bg-bg p-2 text-sm text-ink">
+              <span v-if="m.subject.restricted" class="opacity-70">🔒 A record was shared</span>
+              <RouterLink v-else :to="m.subject.link" class="flex items-center gap-2 text-primary">
+                📄 {{ m.subject.label }}
+              </RouterLink>
+            </div>
+
             <p v-if="m.body" class="whitespace-pre-wrap break-words text-sm">{{ m.body }}</p>
           </template>
 

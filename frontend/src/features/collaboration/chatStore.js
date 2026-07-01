@@ -110,6 +110,24 @@ export const useChatStore = defineStore('chat', {
       if (idx !== -1) this.messages[idx] = data.data
     },
 
+    async addParticipants(conversationId, userIds) {
+      const updated = await chatApi.addParticipants(conversationId, userIds)
+      const idx = this.conversations.findIndex((c) => c.id === conversationId)
+      if (idx !== -1) this.conversations[idx] = updated
+      return updated
+    },
+
+    async removeParticipant(conversationId, userId) {
+      await chatApi.removeParticipant(conversationId, userId)
+      await this.fetchConversations()
+    },
+
+    async shareRecord(conversationId, subjectType, subjectId, note = null) {
+      const message = await chatApi.shareRecord(conversationId, subjectType, subjectId, note)
+      if (this.activeId === conversationId) this.appendMessage(message)
+      return message
+    },
+
     // Live: subscribe to the open thread's private channel; append incoming
     // messages (deduped) and keep the thread marked read while it's open.
     subscribe(conversationId) {

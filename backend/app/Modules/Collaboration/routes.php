@@ -35,6 +35,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/conversations', [ConversationController::class, 'store']);
         Route::post('/conversations/{conversation}/read', [ConversationController::class, 'read']);
 
+        // Visibility & sharing.
+        Route::post('/conversations/{conversation}/participants', [ConversationController::class, 'addParticipants']);
+        Route::delete('/conversations/{conversation}/participants/{user}', [ConversationController::class, 'removeParticipant']);
+        Route::post('/conversations/{conversation}/share', [ConversationController::class, 'share']);
+
         Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index']);
         Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store']);
         Route::delete('/messages/{message}', [MessageController::class, 'destroy']);

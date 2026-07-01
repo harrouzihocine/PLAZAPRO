@@ -56,4 +56,24 @@ export const chatApi = {
   deleteMessage(messageId) {
     return useApi().delete(`/messages/${messageId}`)
   },
+
+  async addParticipants(conversationId, userIds) {
+    const { data } = await useApi().post(`/conversations/${conversationId}/participants`, {
+      user_ids: userIds,
+    })
+    return data.data
+  },
+
+  removeParticipant(conversationId, userId) {
+    return useApi().delete(`/conversations/${conversationId}/participants/${userId}`)
+  },
+
+  async shareRecord(conversationId, subjectType, subjectId, note = null) {
+    const { data } = await useApi().post(`/conversations/${conversationId}/share`, {
+      subject_type: subjectType,
+      subject_id: subjectId,
+      note,
+    })
+    return data.data
+  },
 }
