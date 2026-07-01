@@ -29,10 +29,23 @@ const routes = [
       { path: 'clients', name: 'clients', component: placeholder('Clients', 'Phase 3') },
       { path: 'payments', name: 'payments', component: placeholder('Payments', 'Phase 4') },
       {
-        path: 'settings/lists',
-        name: 'settings.lists',
-        component: () => import('@/features/settings/views/ListsView.vue'),
-        meta: { permission: 'settings.manage' },
+        path: 'settings',
+        component: () => import('@/features/settings/views/SettingsLayout.vue'),
+        children: [
+          { path: '', redirect: { name: 'settings.lists' } },
+          {
+            path: 'lists',
+            name: 'settings.lists',
+            component: () => import('@/features/settings/views/ListsView.vue'),
+            meta: { permission: 'settings.manage' },
+          },
+          {
+            path: 'departments',
+            name: 'settings.departments',
+            component: () => import('@/features/settings/views/DepartmentsView.vue'),
+            meta: { permission: 'settings.manage' },
+          },
+        ],
       },
     ],
   },

@@ -10,6 +10,7 @@ declare(strict_types=1);
 */
 
 use App\Modules\Settings\Http\Controllers\AuthController;
+use App\Modules\Settings\Http\Controllers\DepartmentController;
 use App\Modules\Settings\Http\Controllers\DynamicListController;
 use App\Modules\Settings\Http\Controllers\DynamicListItemController;
 use Illuminate\Support\Facades\Route;
@@ -28,6 +29,9 @@ Route::middleware('auth:sanctum')->group(function () {
     */
     Route::get('/dynamic-lists/{list}', [DynamicListController::class, 'show']);
 
+    // Departments — reference data any authenticated user can read (feeds pickers).
+    Route::get('/departments', [DepartmentController::class, 'index']);
+
     Route::middleware('can:settings.manage')->group(function () {
         Route::get('/dynamic-lists', [DynamicListController::class, 'index']);
         Route::post('/dynamic-lists', [DynamicListController::class, 'store']);
@@ -39,5 +43,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/dynamic-lists/{list}/items/reorder', [DynamicListItemController::class, 'reorder']);
         Route::put('/dynamic-lists/{list}/items/{item}', [DynamicListItemController::class, 'update']);
         Route::delete('/dynamic-lists/{list}/items/{item}', [DynamicListItemController::class, 'destroy']);
+
+        Route::post('/departments', [DepartmentController::class, 'store']);
+        Route::put('/departments/{department}', [DepartmentController::class, 'update']);
+        Route::delete('/departments/{department}', [DepartmentController::class, 'destroy']);
     });
 });

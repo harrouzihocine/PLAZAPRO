@@ -50,3 +50,25 @@ export const dynamicListsApi = {
     return useApi().post(`/dynamic-lists/${key}/items/reorder`, { order })
   },
 }
+
+// Departments admin. `list` is also usable anywhere a department picker is needed.
+export const departmentsApi = {
+  async list() {
+    const { data } = await useApi().get('/departments')
+    return data.data
+  },
+
+  async create(payload) {
+    const { data } = await useApi().post('/departments', payload)
+    return data.data
+  },
+
+  async update(id, payload) {
+    const { data } = await useApi().put(`/departments/${id}`, payload)
+    return data.data
+  },
+
+  cancel(id) {
+    return useApi().delete(`/departments/${id}`)
+  },
+}
