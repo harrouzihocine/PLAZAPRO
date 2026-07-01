@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
-import { useApi, getCsrf } from '@/composables/useApi'
+import { authApi } from '@/features/settings/api'
 
 // Authentication + current-user state (Sanctum SPA cookie mode). Holds no token.
+// Network calls live in api.js; this store only holds state and orchestrates them.
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
@@ -27,16 +28,13 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async login(email, password) {
-      await getCsrf()
-      const { data } = await useApi().post('/auth/login', { email, password })
-      this.setUser(data.data)
+      this.setUser(await authApi.login(email, password))
       return this.user
     },
 
     async fetchMe() {
       try {
-        const { data } = await useApi().get('/auth/me')
-        this.setUser(data.data)
+        this.setUser(await authApi.me())
       } catch {
         this.clear()
       } finally {
@@ -47,7 +45,7 @@ export const useAuthStore = defineStore('auth', {
 
     async logout() {
       try {
-        await useApi().post('/auth/logout')
+        await authApi.logout()
       } finally {
         this.clear()
       }
