@@ -45,6 +45,12 @@ const routes = [
             component: () => import('@/features/settings/views/DepartmentsView.vue'),
             meta: { permission: 'settings.manage' },
           },
+          {
+            path: 'roles',
+            name: 'settings.roles',
+            component: () => import('@/features/settings/views/RolesView.vue'),
+            meta: { permission: 'roles.manage' },
+          },
         ],
       },
     ],

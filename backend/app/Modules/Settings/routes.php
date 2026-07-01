@@ -13,6 +13,8 @@ use App\Modules\Settings\Http\Controllers\AuthController;
 use App\Modules\Settings\Http\Controllers\DepartmentController;
 use App\Modules\Settings\Http\Controllers\DynamicListController;
 use App\Modules\Settings\Http\Controllers\DynamicListItemController;
+use App\Modules\Settings\Http\Controllers\PermissionController;
+use App\Modules\Settings\Http\Controllers\RoleController;
 use Illuminate\Support\Facades\Route;
 
 // Authentication (Sanctum SPA cookie mode). Login is throttled.
@@ -32,6 +34,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Departments — reference data any authenticated user can read (feeds pickers).
     Route::get('/departments', [DepartmentController::class, 'index']);
 
+    // Roles — readable by any authed user (role/agent pickers); managed under roles.manage.
+    Route::get('/roles', [RoleController::class, 'index']);
+
     Route::middleware('can:settings.manage')->group(function () {
         Route::get('/dynamic-lists', [DynamicListController::class, 'index']);
         Route::post('/dynamic-lists', [DynamicListController::class, 'store']);
@@ -47,5 +52,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/departments', [DepartmentController::class, 'store']);
         Route::put('/departments/{department}', [DepartmentController::class, 'update']);
         Route::delete('/departments/{department}', [DepartmentController::class, 'destroy']);
+    });
+
+    Route::middleware('can:roles.manage')->group(function () {
+        Route::get('/permissions', [PermissionController::class, 'index']);
+        Route::post('/roles', [RoleController::class, 'store']);
+        Route::put('/roles/{role}', [RoleController::class, 'update']);
+        Route::delete('/roles/{role}', [RoleController::class, 'destroy']);
     });
 });
