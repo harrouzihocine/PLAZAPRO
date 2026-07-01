@@ -24,6 +24,9 @@ class AttachmentController extends Controller
         $message = $attachment->message()->with('conversation')->first();
 
         abort_if($message === null || $message->conversation === null, 404);
+        // A redacted (deleted) message withholds its files too — consistent with
+        // the resource hiding them.
+        abort_if($message->isCancelled(), 404);
         abort_unless($message->conversation->hasParticipant($request->user()), 403);
 
         return $this->stream($attachment->disk, $attachment->path, $attachment->mime_type, basename($attachment->path));

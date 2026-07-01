@@ -148,9 +148,15 @@ onBeforeUnmount(() => store.unsubscribe())
               </a>
             </template>
 
-            <!-- Shared-record card (RBAC-gated server-side) -->
-            <div v-if="m.subject" class="mb-1 rounded-token border border-border bg-bg p-2 text-sm text-ink">
-              <span v-if="m.subject.restricted" class="opacity-70">🔒 A record was shared</span>
+            <!-- Shared-record card (RBAC-gated server-side). A live-broadcast share
+                 carries subject_type but no per-user card, so fall back to generic. -->
+            <div
+              v-if="m.subject || m.subject_type"
+              class="mb-1 rounded-token border border-border bg-bg p-2 text-sm text-ink"
+            >
+              <span v-if="!m.subject || m.subject.restricted" class="opacity-70">
+                🔒 A record was shared
+              </span>
               <RouterLink v-else :to="m.subject.link" class="flex items-center gap-2 text-primary">
                 📄 {{ m.subject.label }}
               </RouterLink>

@@ -232,4 +232,23 @@ class ChatTest extends TestCase
         Sanctum::actingAs($me);
         $this->get("/api/v1/attachments/{$attachment->id}")->assertOk();
     }
+
+    public function test_a_redacted_messages_attachment_is_not_streamable(): void
+    {
+        Storage::fake('chat');
+        $me = $this->userWith();
+        $other = $this->userWith();
+        $conversation = $this->directBetween($me, $other);
+
+        $message = Message::factory()->create(['conversation_id' => $conversation->id, 'user_id' => $me->id]);
+        Storage::disk('chat')->put('attachments/y.jpg', 'bytes');
+        $attachment = MessageAttachment::factory()->create([
+            'message_id' => $message->id,
+            'path' => 'attachments/y.jpg',
+        ]);
+        $message->cancel('deleted');
+
+        Sanctum::actingAs($me);
+        $this->get("/api/v1/attachments/{$attachment->id}")->assertNotFound();
+    }
 }

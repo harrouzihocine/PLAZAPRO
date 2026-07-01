@@ -19,7 +19,7 @@ export const useNotificationsStore = defineStore('notifications', {
       try {
         const res = await notificationsApi.list()
         this.items = res.data
-        this.unreadCount = res.meta?.unread_count ?? 0
+        this.unreadCount = res.unread_count ?? 0
       } finally {
         this.loading = false
       }

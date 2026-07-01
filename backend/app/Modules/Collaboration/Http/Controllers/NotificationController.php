@@ -28,8 +28,9 @@ class NotificationController extends Controller
             )
             ->paginate(20);
 
+        // Top-level (not under `meta`) so the paginator's own meta is preserved.
         return NotificationResource::collection($notifications)
-            ->additional(['meta' => ['unread_count' => $user->unreadNotifications()->count()]]);
+            ->additional(['unread_count' => $user->unreadNotifications()->count()]);
     }
 
     public function read(Request $request, string $id): JsonResponse

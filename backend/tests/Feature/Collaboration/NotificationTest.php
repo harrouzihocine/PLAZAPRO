@@ -55,7 +55,7 @@ class NotificationTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.title', 'Mine')
-            ->assertJsonPath('meta.unread_count', 1);
+            ->assertJsonPath('unread_count', 1);
     }
 
     public function test_marking_a_notification_read_decrements_the_unread_count(): void

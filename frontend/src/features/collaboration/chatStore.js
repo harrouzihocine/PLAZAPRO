@@ -56,6 +56,9 @@ export const useChatStore = defineStore('chat', {
       this.activeId = conversationId
       this.loadingThread = true
       try {
+        // Ensure the inbox is loaded so the header/title resolves when the thread
+        // is opened directly (e.g. deep-linked from a notification).
+        if (!this.conversations.length) await this.fetchConversations()
         this.messages = await chatApi.messages(conversationId)
         await this.markRead(conversationId)
         this.subscribe(conversationId)

@@ -68,7 +68,15 @@ enum AttachmentKind: string
     /** @return list<string> */
     public static function voiceMimes(): array
     {
-        return ['audio/webm', 'audio/ogg', 'audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/x-wav'];
+        return [
+            'audio/webm', 'audio/ogg', 'audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/x-wav',
+            // Browser MediaRecorder produces webm/ogg *containers*; content-based
+            // MIME detection (libmagic) can report an audio-only recording as
+            // video/webm|ogg. Chat has no video kind and the file input excludes
+            // video, so treating these safe containers as voice makes voice notes
+            // reliable without opening a security hole.
+            'video/webm', 'video/ogg',
+        ];
     }
 
     /** @return list<string> */

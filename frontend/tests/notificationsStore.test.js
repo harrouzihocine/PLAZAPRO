@@ -25,7 +25,7 @@ describe('notificationsStore', () => {
   it('loads notifications and the unread count', async () => {
     list.mockResolvedValue({
       data: [{ id: 'a', title: 'Hi', read_at: null }],
-      meta: { unread_count: 1 },
+      unread_count: 1,
     })
     const store = useNotificationsStore()
     await store.fetch()
@@ -34,7 +34,7 @@ describe('notificationsStore', () => {
   })
 
   it('marks a single notification read and updates the badge', async () => {
-    list.mockResolvedValue({ data: [{ id: 'a', title: 'Hi', read_at: null }], meta: { unread_count: 1 } })
+    list.mockResolvedValue({ data: [{ id: 'a', title: 'Hi', read_at: null }], unread_count: 1 })
     markRead.mockResolvedValue({ unread_count: 0 })
     const store = useNotificationsStore()
     await store.fetch()
@@ -48,7 +48,7 @@ describe('notificationsStore', () => {
   it('does not call the API when the item is already read', async () => {
     list.mockResolvedValue({
       data: [{ id: 'a', title: 'Hi', read_at: '2026-07-05T00:00:00Z' }],
-      meta: { unread_count: 0 },
+      unread_count: 0,
     })
     const store = useNotificationsStore()
     await store.fetch()
