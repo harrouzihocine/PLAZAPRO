@@ -33,8 +33,11 @@ class RecordVersement
             ]);
 
             if (! empty($data['schedule_item_id'])) {
+                // Lock the instalment row so concurrent payments can't lose an
+                // update on paid_amount (money integrity, like ReserveUnit's hold).
                 $item = PaymentSchedule::query()->active()
                     ->where('client_project_id', $project->id)
+                    ->lockForUpdate()
                     ->findOrFail($data['schedule_item_id']);
 
                 $this->allocate->handle($item, (string) $versement->amount);

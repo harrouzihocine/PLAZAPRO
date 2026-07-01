@@ -25,7 +25,7 @@ class DocumentController extends Controller
     /** Stream the generated PDF from the private disk (permission-gated). */
     public function download(Document $document): Response
     {
-        abort_unless($document->isReady(), 425, 'The document is still being generated.');
+        abort_unless($document->isReady(), 409, 'The document is still being generated.');
 
         $disk = $document->disk;
         $storage = Storage::disk($disk);

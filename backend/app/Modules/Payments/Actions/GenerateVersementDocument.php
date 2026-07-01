@@ -40,7 +40,7 @@ class GenerateVersementDocument
 
             $number = $this->numbers->next($type);
 
-            return Document::create([
+            $document = Document::create([
                 'documentable_type' => $versement->getMorphClass(),
                 'documentable_id' => $versement->id,
                 'type' => $type->value,
@@ -54,11 +54,14 @@ class GenerateVersementDocument
                 'generated_at' => now(),
                 'meta' => $this->snapshot($versement, $number, $version),
             ]);
+
+            // Link the receipt to the versement atomically with its creation.
+            $versement->update(['document_id' => $document->id]);
+
+            return $document;
         });
 
-        // Link the receipt to the versement and render on the queue worker.
-        $versement->update(['document_id' => $document->id]);
-
+        // Render on the queue worker only after the row is committed.
         GenerateDocumentPdf::dispatch($document);
 
         return $document;

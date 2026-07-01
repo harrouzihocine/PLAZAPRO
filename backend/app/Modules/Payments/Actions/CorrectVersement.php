@@ -36,9 +36,10 @@ class CorrectVersement
             $changes['document_id'] = null;
             $reason = $data['reason'];
 
-            // Reverse the original allocation before superseding it.
+            // Reverse the original allocation before superseding it. Lock the
+            // instalment row so the paid_amount adjustment can't race other writes.
             if ($scheduleItemId !== null) {
-                $item = PaymentSchedule::query()->active()->find($scheduleItemId);
+                $item = PaymentSchedule::query()->active()->lockForUpdate()->find($scheduleItemId);
                 if ($item !== null) {
                     $this->allocate->handle($item, Money::sub('0', $originalAmount));
                 }
@@ -48,7 +49,7 @@ class CorrectVersement
 
             // Allocate the corrected amount to the same instalment (preserved by replicate()).
             if ($replacement->schedule_item_id !== null) {
-                $item = PaymentSchedule::query()->active()->find($replacement->schedule_item_id);
+                $item = PaymentSchedule::query()->active()->lockForUpdate()->find($replacement->schedule_item_id);
                 if ($item !== null) {
                     $this->allocate->handle($item, (string) $replacement->amount);
                 }
