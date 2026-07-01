@@ -25,7 +25,6 @@ class VisitController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $visits = Visit::query()
-            ->active()
             ->with(['agent', 'unit', 'outcome'])
             ->when($request->query('status') !== 'all', fn ($q) => $q->active())
             ->when($request->filled('client_id'), fn ($q) => $q->where('client_id', $request->integer('client_id')))

@@ -22,14 +22,20 @@ class CreateNextAction
     public function handle(Model $subject, ?Model $source, array $data): NextAction
     {
         return DB::transaction(function () use ($subject, $source, $data) {
-            NextAction::query()
+            // Close any prior open action so exactly one stays pending. Done per
+            // model (not a bulk update) so each transition is audited (LogsActivity).
+            $priorPending = NextAction::query()
                 ->pending()
                 ->where('subject_type', $subject->getMorphClass())
                 ->where('subject_id', $subject->getKey())
-                ->update([
+                ->get();
+
+            foreach ($priorPending as $prior) {
+                $prior->update([
                     'state' => NextActionState::Done->value,
                     'completed_at' => now(),
                 ]);
+            }
 
             return NextAction::create([
                 'subject_type' => $subject->getMorphClass(),

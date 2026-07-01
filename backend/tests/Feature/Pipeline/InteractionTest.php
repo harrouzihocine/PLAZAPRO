@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Pipeline;
 
 use App\Modules\Clients\Models\Client;
+use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Settings\Models\Permission;
@@ -155,6 +156,34 @@ class InteractionTest extends TestCase
         $this->assertNotNull($visit->fresh()->completed_at);
         $this->assertSame(1, NextAction::query()->pending()
             ->where('subject_type', 'client')->where('subject_id', $visit->client_id)->count());
+    }
+
+    public function test_logging_a_call_rejects_a_project_from_another_client(): void
+    {
+        $client = Client::factory()->create();
+        $otherProject = ClientProject::factory()->create(); // belongs to a different client
+        $agent = $this->agent();
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+
+        $this->postJson("/api/v1/clients/{$client->id}/calls", [
+            'direction' => 'outbound',
+            'client_project_id' => $otherProject->id,
+            'next_action' => $this->nextActionPayload($agent),
+        ])->assertStatus(422)->assertJsonValidationErrorFor('client_project_id');
+    }
+
+    public function test_scheduling_a_visit_rejects_a_project_from_another_client(): void
+    {
+        $client = Client::factory()->create();
+        $otherProject = ClientProject::factory()->create();
+        $agent = $this->agent();
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'visits.assign']));
+
+        $this->postJson('/api/v1/visits', [
+            'client_id' => $client->id, 'type' => 'office',
+            'client_project_id' => $otherProject->id,
+            'agent_id' => $agent->id, 'scheduled_at' => now()->addDay()->toDateTimeString(),
+        ])->assertStatus(422)->assertJsonValidationErrorFor('client_project_id');
     }
 
     public function test_logging_a_call_requires_calls_log(): void

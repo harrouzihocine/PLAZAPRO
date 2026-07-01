@@ -7,6 +7,7 @@ namespace App\Modules\Pipeline\Http\Requests;
 use App\Modules\Pipeline\Enums\VisitType;
 use App\Modules\Settings\Rules\IsAgentUser;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 
 /**
@@ -27,7 +28,11 @@ class ScheduleVisitRequest extends FormRequest
     {
         return [
             'client_id' => ['required', 'integer', 'exists:clients,id'],
-            'client_project_id' => ['nullable', 'integer', 'exists:client_projects,id'],
+            // A linked deal must belong to the visit's client.
+            'client_project_id' => [
+                'nullable', 'integer',
+                Rule::exists('client_projects', 'id')->where('client_id', $this->input('client_id')),
+            ],
             'type' => ['required', new Enum(VisitType::class)],
             'unit_id' => ['required_if:type,apartment', 'nullable', 'integer', 'exists:units,id'],
             'agent_id' => ['required', 'integer', new IsAgentUser],

@@ -68,6 +68,20 @@ class ReminderTest extends TestCase
         $this->assertSame(1, Reminder::query()->where('state', 'pending')->count());
     }
 
+    public function test_dispatch_cancels_a_reminder_whose_action_was_completed(): void
+    {
+        // An overdue action generates a reminder, then the action is completed
+        // before the dispatcher runs.
+        $action = NextAction::factory()->overdue()->create();
+        $reminder = Reminder::factory()->due()->create(['next_action_id' => $action->id]);
+        $action->update(['state' => 'done', 'completed_at' => now()]);
+
+        $sent = app(DispatchReminders::class)->handle();
+
+        $this->assertSame(0, $sent);
+        $this->assertSame('cancelled', $reminder->fresh()->state->value);
+    }
+
     public function test_the_scheduled_commands_run(): void
     {
         $this->artisan('actions:mark-overdue')->assertSuccessful();

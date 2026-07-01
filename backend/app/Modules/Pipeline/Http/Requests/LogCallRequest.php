@@ -7,6 +7,7 @@ namespace App\Modules\Pipeline\Http\Requests;
 use App\Modules\Pipeline\Enums\CallDirection;
 use App\Modules\Pipeline\Http\Requests\Concerns\ValidatesNextAction;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 
 class LogCallRequest extends FormRequest
@@ -24,7 +25,11 @@ class LogCallRequest extends FormRequest
     public function rules(): array
     {
         return array_merge([
-            'client_project_id' => ['nullable', 'integer', 'exists:client_projects,id'],
+            // A linked deal must belong to this client (route-bound).
+            'client_project_id' => [
+                'nullable', 'integer',
+                Rule::exists('client_projects', 'id')->where('client_id', $this->route('client')?->id),
+            ],
             'agent_id' => ['nullable', 'integer', 'exists:users,id'],
             'direction' => ['required', new Enum(CallDirection::class)],
             'outcome_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
