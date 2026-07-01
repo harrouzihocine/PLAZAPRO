@@ -41,9 +41,10 @@ class MessageResource extends JsonResource
             'subject_type' => $this->subject_type,
             'subject_id' => $this->subject_id,
             // The shared-record card — revealed only to participants whose RBAC
-            // permits viewing that record; others see it as restricted.
+            // permits viewing that record; others see it as restricted. Hidden
+            // once the message is redacted, like the body and attachments.
             'subject' => $this->when(
-                $this->subject_type !== null,
+                ! $redacted && $this->subject_type !== null,
                 fn () => $this->subjectCard($request),
             ),
             'is_mine' => $request->user()?->id === $this->user_id,

@@ -48,6 +48,23 @@ if added.
 
 ---
 
+## Implementation notes (as built)
+
+- **Transport = Laravel Reverb** (websockets). Broadcast auth via `/broadcasting/auth` + `routes/channels.php`
+  (`users.{id}` for notifications, `conversation.{id}` for messages — both participant/self checks, NOT Gate,
+  so the super‑admin shortcut can't widen them). Echo client in `frontend/src/composables/useEcho.js`. In dev
+  run `php artisan reverb:start` (or the `reverb` compose service, host port 8081); tests fake broadcasting.
+- **Notifications** use Laravel's own `notifications` table (not `BaseModel`). One generic `DomainNotification`
+  (database + broadcast) is raised by **domain events → queued Collaboration listeners**, keeping source
+  modules import‑free. Triggers: due reminders, assigned visits, new chat messages, recorded/corrected
+  payments, and **inventory desire‑match** — adding or repricing a unit alerts only the agents whose clients'
+  desires it fits (`Clients\Actions\MatchInventoryToDesires`, the inverse of the forward matcher).
+- **Chat** attachments reuse the inventory media hardening on a private `chat` disk; a "deleted" message is
+  redacted (cancelled), and a shared record's card is revealed only to participants whose RBAC permits it
+  (`SharedSubject` is the single source of truth).
+
+---
+
 ## Key rules to test
 
 - [ ] A user only sees conversations they participate in.
