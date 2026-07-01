@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Pipeline\Actions;
 
+use App\Modules\Pipeline\Events\VisitAssigned;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Settings\Models\User;
 
@@ -26,6 +27,11 @@ class AssignVisit
 
         $visit->update(['agent_id' => $agent->id]);
 
-        return $visit->fresh();
+        $fresh = $visit->fresh();
+
+        // Notify the newly assigned agent (Collaboration listens; Phase 5).
+        VisitAssigned::dispatch($fresh);
+
+        return $fresh;
     }
 }

@@ -19,6 +19,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    // Broadcast auth route (/broadcasting/auth, web middleware) + channel
+    // callbacks for Reverb. Phase 5 — see routes/channels.php.
+    ->withBroadcasting(__DIR__.'/../routes/channels.php')
     ->withCommands([
         // Modular commands (auto-discovery only covers app/Console).
         ExpireHolds::class,

@@ -6,13 +6,13 @@ namespace App\Modules\Pipeline\Actions;
 
 use App\Modules\Pipeline\Enums\NextActionState;
 use App\Modules\Pipeline\Enums\ReminderState;
+use App\Modules\Pipeline\Events\ReminderDue;
 use App\Modules\Pipeline\Models\Reminder;
 
 /**
- * Deliver due pending reminders. For the in_app channel this marks the reminder
- * sent — Phase 5 turns that into a Notification row for the action's assigned
- * agent. The email channel is deferred to Phase 7 infra. Runs every minute
- * (reminders:dispatch).
+ * Deliver due pending reminders: mark the reminder sent and raise a ReminderDue
+ * event so Collaboration notifies the action's assignee (Phase 5). The email
+ * channel is deferred to Phase 7 infra. Runs every minute (reminders:dispatch).
  */
 class DispatchReminders
 {
@@ -38,6 +38,9 @@ class DispatchReminders
                         'state' => ReminderState::Sent->value,
                         'sent_at' => now(),
                     ]);
+
+                    // Turn the reminder into an in-app notification for the assignee.
+                    ReminderDue::dispatch($reminder);
                     $count++;
                 }
             });

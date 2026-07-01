@@ -74,6 +74,16 @@ class User extends Authenticatable implements MustVerifyEmail
         return (bool) $this->role?->is_agent;
     }
 
+    /**
+     * Broadcast this user's notifications on a stable, opaque channel name
+     * (users.{id}) instead of the default namespaced class path. The matching
+     * auth callback lives in routes/channels.php.
+     */
+    public function receivesBroadcastNotificationsOn(): string
+    {
+        return 'users.'.$this->id;
+    }
+
     /** Hard delete is disabled — users are cancelled/deactivated, never removed. */
     public function delete(): bool
     {
