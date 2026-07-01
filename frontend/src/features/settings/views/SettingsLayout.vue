@@ -6,12 +6,13 @@ import { useAuthStore } from '@/features/settings/store'
 const auth = useAuthStore()
 
 // Sub-navigation for the Settings area. Each tab is gated by a permission so a
-// user only sees the screens they can use (Roles/Users arrive in later slices).
+// user only sees the screens they can use.
 const tabs = computed(() =>
   [
     { to: { name: 'settings.lists' }, label: 'Lists', permission: 'settings.manage' },
     { to: { name: 'settings.departments' }, label: 'Departments', permission: 'settings.manage' },
     { to: { name: 'settings.roles' }, label: 'Roles', permission: 'roles.manage' },
+    { to: { name: 'settings.users' }, label: 'Users', permission: 'users.manage' },
   ].filter((t) => !t.permission || auth.can(t.permission)),
 )
 </script>
