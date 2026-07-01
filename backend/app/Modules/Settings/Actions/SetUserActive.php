@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Settings\Actions;
+
+use App\Modules\Settings\Models\User;
+
+/**
+ * Activate or deactivate a user (`is_active`). Deactivating keeps the row and
+ * the login credentials intact — it only blocks access. An admin cannot
+ * deactivate their own account (no self-lockout).
+ */
+class SetUserActive
+{
+    public function handle(User $user, User $actor, bool $active): User
+    {
+        abort_if(
+            ! $active && $user->is($actor),
+            422,
+            'You cannot deactivate your own account.',
+        );
+
+        $user->update(['is_active' => $active]);
+
+        return $user->fresh(['role', 'department']);
+    }
+}

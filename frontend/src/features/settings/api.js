@@ -102,3 +102,30 @@ export const permissionsApi = {
     return data.data
   },
 }
+
+// Users admin (requires users.manage). Users are created with exactly one role,
+// then deactivated or cancelled — never deleted.
+export const usersApi = {
+  async list(params = {}) {
+    const { data } = await useApi().get('/users', { params })
+    return data.data
+  },
+
+  async create(payload) {
+    const { data } = await useApi().post('/users', payload)
+    return data.data
+  },
+
+  async update(id, payload) {
+    const { data } = await useApi().put(`/users/${id}`, payload)
+    return data.data
+  },
+
+  setActive(id, isActive) {
+    return useApi().put(`/users/${id}/active`, { is_active: isActive })
+  },
+
+  cancel(id) {
+    return useApi().delete(`/users/${id}`)
+  },
+}

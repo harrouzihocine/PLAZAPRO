@@ -15,6 +15,7 @@ use App\Modules\Settings\Http\Controllers\DynamicListController;
 use App\Modules\Settings\Http\Controllers\DynamicListItemController;
 use App\Modules\Settings\Http\Controllers\PermissionController;
 use App\Modules\Settings\Http\Controllers\RoleController;
+use App\Modules\Settings\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 // Authentication (Sanctum SPA cookie mode). Login is throttled.
@@ -59,5 +60,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/roles', [RoleController::class, 'store']);
         Route::put('/roles/{role}', [RoleController::class, 'update']);
         Route::delete('/roles/{role}', [RoleController::class, 'destroy']);
+    });
+
+    // Users — admin only. Created with exactly one role; deactivated or
+    // cancelled, never deleted.
+    Route::middleware('can:users.manage')->group(function () {
+        Route::get('/users', [UserController::class, 'index']);
+        Route::post('/users', [UserController::class, 'store']);
+        Route::put('/users/{user}', [UserController::class, 'update']);
+        Route::put('/users/{user}/active', [UserController::class, 'setActive']);
+        Route::delete('/users/{user}', [UserController::class, 'destroy']);
     });
 });
