@@ -10,3 +10,69 @@ declare(strict_types=1);
 | module's routes here, each guarded by auth:sanctum + a can:<permission>.
 | See docs/phase-0-foundations/07-modules-skeleton.md and 06-auth-and-rbac.md.
 */
+
+use App\Modules\Inventory\Http\Controllers\BoxController;
+use App\Modules\Inventory\Http\Controllers\LocationController;
+use App\Modules\Inventory\Http\Controllers\MediaController;
+use App\Modules\Inventory\Http\Controllers\ReservationController;
+use App\Modules\Inventory\Http\Controllers\StackingController;
+use App\Modules\Inventory\Http\Controllers\UnitController;
+use Illuminate\Support\Facades\Route;
+
+Route::middleware('auth:sanctum')->group(function () {
+    // Reads are open to anyone who can view inventory.
+    Route::middleware('can:units.view')->group(function () {
+        Route::get('/locations', [LocationController::class, 'index']);
+        Route::get('/locations/{location}', [LocationController::class, 'show']);
+
+        Route::get('/units', [UnitController::class, 'index']);
+        Route::get('/units/{unit}', [UnitController::class, 'show']);
+
+        Route::get('/locations/{location}/stacking', [StackingController::class, 'show']);
+
+        Route::get('/boxes', [BoxController::class, 'index']);
+
+        // Media: list + permission-gated streaming of the private files.
+        Route::get('/{mediableType}/{mediableId}/media', [MediaController::class, 'index'])
+            ->whereIn('mediableType', ['locations', 'units'])->whereNumber('mediableId');
+        Route::get('/media/{media}/file', [MediaController::class, 'file'])->name('media.file');
+        Route::get('/media/{media}/preview', [MediaController::class, 'preview'])->name('media.preview');
+    });
+
+    // Location writes require the dedicated locations.manage permission.
+    Route::middleware('can:locations.manage')->group(function () {
+        Route::post('/locations', [LocationController::class, 'store']);
+        Route::put('/locations/{location}', [LocationController::class, 'update']);
+        Route::delete('/locations/{location}', [LocationController::class, 'destroy']);
+    });
+
+    // Unit writes require units.manage. price/sale_status corrections go through
+    // /correct (HasVersions: cancel-and-duplicate).
+    Route::middleware('can:units.manage')->group(function () {
+        Route::post('/locations/{location}/units', [UnitController::class, 'store']);
+        Route::put('/units/{unit}', [UnitController::class, 'update']);
+        Route::post('/units/{unit}/correct', [UnitController::class, 'correct']);
+        Route::delete('/units/{unit}', [UnitController::class, 'destroy']);
+
+        Route::post('/locations/{location}/boxes', [BoxController::class, 'store']);
+        Route::put('/boxes/{box}', [BoxController::class, 'update']);
+        Route::delete('/boxes/{box}', [BoxController::class, 'destroy']);
+    });
+
+    // Media writes (upload / reorder / replace / remove) require media.manage.
+    Route::middleware('can:media.manage')->group(function () {
+        Route::post('/{mediableType}/{mediableId}/media', [MediaController::class, 'store'])
+            ->whereIn('mediableType', ['locations', 'units'])->whereNumber('mediableId');
+        Route::post('/{mediableType}/{mediableId}/media/reorder', [MediaController::class, 'reorder'])
+            ->whereIn('mediableType', ['locations', 'units'])->whereNumber('mediableId');
+        Route::post('/media/{media}/replace', [MediaController::class, 'replace']);
+        Route::delete('/media/{media}', [MediaController::class, 'destroy']);
+    });
+
+    // Reservation lifecycle (the 48h hold). Requires units.reserve.
+    Route::middleware('can:units.reserve')->group(function () {
+        Route::post('/units/{unit}/reserve', [ReservationController::class, 'reserve']);
+        Route::post('/reservations/{reservation}/release', [ReservationController::class, 'release']);
+        Route::post('/reservations/{reservation}/convert', [ReservationController::class, 'convert']);
+    });
+});

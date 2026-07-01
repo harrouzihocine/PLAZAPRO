@@ -62,6 +62,17 @@ return [
             'report' => false,
         ],
 
+        // Private media store. Files are never public: they are served through a
+        // permission-gated streaming endpoint (or, in production, a CDN/signed
+        // URL). In prod this points at S3/object storage via MEDIA_DISK=s3.
+        'media' => [
+            'driver' => env('MEDIA_DRIVER', 'local'),
+            'root' => storage_path('app/media'),
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
     ],
 
     /*

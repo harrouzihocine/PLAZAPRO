@@ -11,6 +11,8 @@ export default {
         'on-primary': 'var(--color-on-primary)',
         border: 'var(--color-border)',
         danger: 'var(--color-danger)',
+        success: 'var(--color-success)',
+        warning: 'var(--color-warning)',
       },
       borderRadius: { token: 'var(--radius)' },
     },
