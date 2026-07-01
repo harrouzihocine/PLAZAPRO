@@ -27,6 +27,16 @@ abstract class BaseModel extends Model
     use HasVersions;    // corrections create a new version, keep the old
     use LogsActivity;   // writes who/what/when to the audit log
 
+    /**
+     * New records start active in-memory too (mirrors the DB default), so a
+     * freshly-created model's resource reflects `status: active` without a reload.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'status' => 'active', // RecordStatus::Active
+    ];
+
     protected function casts(): array
     {
         return [

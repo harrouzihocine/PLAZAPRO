@@ -13,3 +13,8 @@ Artisan::command('inspire', function () {
 // Sweep expired 48h reservation holds. Requires a running scheduler in the
 // container (schedule:work, or cron calling schedule:run). See Phase 7.
 Schedule::command('holds:expire')->everyFiveMinutes()->withoutOverlapping();
+
+// Pipeline reminders: generate reminders for due/overdue next actions (hourly),
+// then dispatch the pending ones to their assigned agents (every minute).
+Schedule::command('actions:mark-overdue')->hourly()->withoutOverlapping();
+Schedule::command('reminders:dispatch')->everyMinute()->withoutOverlapping();

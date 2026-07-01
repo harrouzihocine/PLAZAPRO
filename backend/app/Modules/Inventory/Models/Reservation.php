@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Models;
 
 use App\Core\Models\BaseModel;
+use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Inventory\Enums\HoldStatus;
 use App\Modules\Settings\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -40,6 +41,12 @@ class Reservation extends BaseModel
     public function holder(): BelongsTo
     {
         return $this->belongsTo(User::class, 'held_by');
+    }
+
+    /** The deal this hold belongs to, if the agent linked one when reserving. */
+    public function clientProject(): BelongsTo
+    {
+        return $this->belongsTo(ClientProject::class);
     }
 
     public function scopeActiveHold(Builder $query): Builder

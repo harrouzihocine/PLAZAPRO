@@ -21,9 +21,14 @@ use Illuminate\Support\Facades\Route;
 // Authentication (Sanctum SPA cookie mode). Login is throttled.
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
+// Stateless Bearer-token login for mobile / external clients (same credentials
+// and RBAC as the SPA). Throttled like login. See docs/phase-8-mobile-push.md.
+Route::post('/auth/token', [AuthController::class, 'issueToken'])->middleware('throttle:login');
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::delete('/auth/token', [AuthController::class, 'revokeToken']); // mobile logout
 
     /*
     | Dynamic lists — the reusable dropdown backbone.
@@ -37,6 +42,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Roles — readable by any authed user (role/agent pickers); managed under roles.manage.
     Route::get('/roles', [RoleController::class, 'index']);
+
+    // Agents — active users whose role is_agent; feeds the assign-agent pickers
+    // (clients, visits). Reference data, readable by any authenticated user.
+    Route::get('/agents', [UserController::class, 'agents']);
 
     Route::middleware('can:settings.manage')->group(function () {
         Route::get('/dynamic-lists', [DynamicListController::class, 'index']);

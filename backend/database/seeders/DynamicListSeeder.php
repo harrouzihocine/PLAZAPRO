@@ -138,6 +138,18 @@ class DynamicListSeeder extends Seeder
                     ['label' => 'No-show', 'value' => 'no_show'],
                 ],
             ],
+            'call_outcomes' => [
+                'name' => 'Call Outcomes',
+                'description' => 'Result recorded after a phone call.',
+                'items' => [
+                    ['label' => 'Answered', 'value' => 'answered'],
+                    ['label' => 'No answer', 'value' => 'no_answer'],
+                    ['label' => 'Callback requested', 'value' => 'callback_requested'],
+                    ['label' => 'Interested', 'value' => 'interested'],
+                    ['label' => 'Not interested', 'value' => 'not_interested'],
+                    ['label' => 'Wrong number', 'value' => 'wrong_number'],
+                ],
+            ],
         ];
     }
 }

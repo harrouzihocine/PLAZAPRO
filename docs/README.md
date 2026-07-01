@@ -42,6 +42,7 @@ you need a specific pattern.
 | Phase 5 | [`phase-5-collaboration.md`](phase-5-collaboration.md) | Notifications, tasks page, chat (text/image/voice), visibility & sharing |
 | Phase 6 | [`phase-6-analytics-audit.md`](phase-6-analytics-audit.md) | Role dashboards, source ROI, unit intelligence, admin audit feed |
 | Phase 7 | [`phase-7-hardening-launch.md`](phase-7-hardening-launch.md) | Mobile polish, performance, security pass, backups, deploy |
+| Phase 8 *(add‑on)* | [`phase-8-mobile-push.md`](phase-8-mobile-push.md) | Native mobile app on the same API — token auth, device registration, FCM push |
 
 ### Cross‑cutting references
 

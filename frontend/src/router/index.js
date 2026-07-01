@@ -51,7 +51,19 @@ const routes = [
           },
         ],
       },
-      { path: 'clients', name: 'clients', component: placeholder('Clients', 'Phase 3') },
+      {
+        path: 'clients',
+        name: 'clients',
+        component: () => import('@/features/clients/views/ClientsView.vue'),
+        meta: { permission: 'clients.view' },
+      },
+      {
+        path: 'clients/:id',
+        name: 'clients.file',
+        props: true,
+        component: () => import('@/features/clients/views/ClientFileView.vue'),
+        meta: { permission: 'clients.view' },
+      },
       { path: 'payments', name: 'payments', component: placeholder('Payments', 'Phase 4') },
       {
         path: 'settings',

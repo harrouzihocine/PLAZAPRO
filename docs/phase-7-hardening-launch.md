@@ -71,4 +71,7 @@ tightened for security and performance. Keep configuration in environment variab
       audits clean, every route guarded.
 - [ ] Full regression: each phase's key rules pass in CI; app usable on phone + desktop in both themes.
 
+**Add‑on:** [`phase-8-mobile-push.md`](phase-8-mobile-push.md) — a native mobile app for field agents on
+the same API (token auth, push).
+
 **Back to:** [`README.md`](README.md) · [`testing-and-going-live.md`](testing-and-going-live.md)

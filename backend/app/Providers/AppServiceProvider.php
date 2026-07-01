@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Modules\Clients\Models\Client;
+use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
+use App\Modules\Pipeline\Models\Call;
+use App\Modules\Pipeline\Models\Visit;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
@@ -33,6 +37,10 @@ class AppServiceProvider extends ServiceProvider
         Relation::morphMap([
             'location' => Location::class,
             'unit' => Unit::class,
+            'client' => Client::class,
+            'client_project' => ClientProject::class,
+            'call' => Call::class,
+            'visit' => Visit::class,
         ]);
     }
 }

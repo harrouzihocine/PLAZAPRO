@@ -19,9 +19,9 @@ class ReserveUnitRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // client_projects arrives in Phase 3; until then this is an optional
-            // reference with no exists:-check (the FK is added later).
-            'client_project_id' => ['nullable', 'integer'],
+            // A hold may be tied to a deal; converting it then advances that deal
+            // to `won` (see ConvertReservation).
+            'client_project_id' => ['nullable', 'integer', 'exists:client_projects,id'],
         ];
     }
 }

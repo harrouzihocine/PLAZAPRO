@@ -37,6 +37,23 @@ class UserController extends Controller
         return UserResource::collection($users);
     }
 
+    /**
+     * Active agents only — feeds the "assign agent" pickers on clients and visits.
+     * Open to any authenticated user (reference data), like the other pickers.
+     */
+    public function agents(): AnonymousResourceCollection
+    {
+        $agents = User::query()
+            ->with('role')
+            ->active()
+            ->where('is_active', true)
+            ->whereHas('role', fn ($q) => $q->where('is_agent', true))
+            ->orderBy('name')
+            ->get();
+
+        return UserResource::collection($agents);
+    }
+
     public function store(StoreUserRequest $request, CreateUser $action): UserResource
     {
         return new UserResource($action->handle($request->validated()));
