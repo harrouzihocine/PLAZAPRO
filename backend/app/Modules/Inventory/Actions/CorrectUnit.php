@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Actions;
 
+use App\Modules\Inventory\Enums\SaleStatus;
+use App\Modules\Inventory\Events\UnitRepriced;
 use App\Modules\Inventory\Models\Unit;
 use Illuminate\Support\Arr;
 
@@ -19,6 +21,21 @@ class CorrectUnit
         $changes = Arr::only($data, ['price', 'sale_status']);
         $reason = $data['reason'] ?? 'Correction';
 
-        return $unit->supersedeWith($changes, $reason);
+        $originalPrice = (string) $unit->price;
+        $originalStatus = $unit->sale_status;
+
+        $replacement = $unit->supersedeWith($changes, $reason);
+
+        // Re-run the reverse desire-match only when the change could create new
+        // matches: the price moved, or the unit became available again.
+        $priceChanged = (string) $replacement->price !== $originalPrice;
+        $becameAvailable = $replacement->sale_status === SaleStatus::Available
+            && $originalStatus !== SaleStatus::Available;
+
+        if ($priceChanged || $becameAvailable) {
+            UnitRepriced::dispatch($replacement);
+        }
+
+        return $replacement;
     }
 }

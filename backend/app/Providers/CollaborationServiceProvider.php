@@ -5,9 +5,14 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Modules\Collaboration\Events\MessageSent;
+use App\Modules\Collaboration\Listeners\NotifyAgentsOfMatchingUnit;
 use App\Modules\Collaboration\Listeners\NotifyParticipantsOfMessage;
 use App\Modules\Collaboration\Listeners\SendDueReminderNotification;
+use App\Modules\Collaboration\Listeners\SendPaymentNotification;
 use App\Modules\Collaboration\Listeners\SendVisitAssignedNotification;
+use App\Modules\Inventory\Events\UnitPublished;
+use App\Modules\Inventory\Events\UnitRepriced;
+use App\Modules\Payments\Events\VersementRecorded;
 use App\Modules\Pipeline\Events\ReminderDue;
 use App\Modules\Pipeline\Events\VisitAssigned;
 use Illuminate\Support\Facades\Event;
@@ -29,6 +34,9 @@ class CollaborationServiceProvider extends ServiceProvider
         ReminderDue::class => [SendDueReminderNotification::class],
         VisitAssigned::class => [SendVisitAssignedNotification::class],
         MessageSent::class => [NotifyParticipantsOfMessage::class],
+        VersementRecorded::class => [SendPaymentNotification::class],
+        UnitPublished::class => [NotifyAgentsOfMatchingUnit::class],
+        UnitRepriced::class => [NotifyAgentsOfMatchingUnit::class],
     ];
 
     public function boot(): void
