@@ -52,7 +52,7 @@ class AuditController extends Controller
 
             $query->latest('id')->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $row) {
-                    fputcsv($out, [
+                    fputcsv($out, array_map($this->csvSafe(...), [
                         $row->id,
                         $row->created_at?->toIso8601String(),
                         $row->user_id,
@@ -62,7 +62,7 @@ class AuditController extends Controller
                         $row->subject_id,
                         $row->ip_address,
                         $row->changes !== null ? json_encode($row->changes) : '',
-                    ]);
+                    ]));
                 }
             });
 
@@ -70,6 +70,20 @@ class AuditController extends Controller
         }, 'audit-'.now()->format('Ymd-His').'.csv', [
             'Content-Type' => 'text/csv',
         ]);
+    }
+
+    /**
+     * Neutralise CSV formula injection: a cell that starts with =, +, -, or @ is
+     * treated as a formula by spreadsheet apps. Prefix such values with a quote so
+     * stored audit data can never execute when the export is opened.
+     */
+    private function csvSafe(mixed $value): mixed
+    {
+        if (is_string($value) && $value !== '' && in_array($value[0], ['=', '+', '-', '@'], true)) {
+            return "'".$value;
+        }
+
+        return $value;
     }
 
     /** The shared, read-only filter used by both index and export. */

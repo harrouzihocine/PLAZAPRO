@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Analytics;
 
 use App\Modules\Clients\Models\Client;
+use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Payments\Models\PaymentSchedule;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
@@ -35,11 +37,17 @@ class DashboardTest extends TestCase
         $agentA = $this->user(['dashboard.view'], isAgent: true);
         $agentB = $this->user(['dashboard.view'], isAgent: true);
 
-        Client::factory()->count(2)->create(['assigned_agent_id' => $agentA->id]);
-        Client::factory()->count(3)->create(['assigned_agent_id' => $agentB->id]);
+        $aClients = Client::factory()->count(2)->create(['assigned_agent_id' => $agentA->id]);
+        $bClients = Client::factory()->count(3)->create(['assigned_agent_id' => $agentB->id]);
 
         Visit::factory()->create(['agent_id' => $agentA->id, 'scheduled_at' => now()->addDay()]);
         Visit::factory()->count(2)->create(['agent_id' => $agentB->id, 'scheduled_at' => now()->addDay()]);
+
+        // A payment due on one of A's deals — plus one on B's, which must NOT leak.
+        $projectA = ClientProject::factory()->create(['client_id' => $aClients->first()->id]);
+        PaymentSchedule::factory()->create(['client_project_id' => $projectA->id, 'amount' => '1000.00']);
+        $projectB = ClientProject::factory()->create(['client_id' => $bClients->first()->id]);
+        PaymentSchedule::factory()->create(['client_project_id' => $projectB->id, 'amount' => '5000.00']);
 
         Sanctum::actingAs($agentA);
 
@@ -47,7 +55,9 @@ class DashboardTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.scope', 'agent')
             ->assertJsonPath('data.kpis.clients', 2)
-            ->assertJsonPath('data.kpis.upcoming_visits', 1);
+            ->assertJsonPath('data.kpis.upcoming_visits', 1)
+            ->assertJsonPath('data.kpis.payments_due.count', 1)
+            ->assertJsonPath('data.kpis.payments_due.amount', '1000.00');
     }
 
     public function test_a_manager_dashboard_sees_the_whole_company(): void

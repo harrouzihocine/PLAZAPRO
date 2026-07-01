@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Analytics;
 
+use App\Modules\Analytics\Models\ActivityLog;
 use App\Modules\Clients\Models\Client;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
@@ -54,6 +55,19 @@ class AuditExportTest extends TestCase
 
         // The export is itself an auditable action.
         $this->assertDatabaseHas('activity_log', ['action' => 'export']);
+    }
+
+    public function test_export_neutralises_csv_formula_injection(): void
+    {
+        // A stored value that a spreadsheet would treat as a formula.
+        ActivityLog::create(['action' => 'create', 'role_at_time' => '=cmd()']);
+
+        Sanctum::actingAs($this->user(['audit.view', 'audit.export']));
+
+        $csv = $this->get('/api/v1/audit/export')->streamedContent();
+
+        $this->assertStringContainsString("'=cmd()", $csv);
+        $this->assertStringNotContainsString(',=cmd()', $csv);
     }
 
     public function test_export_requires_the_export_permission(): void
