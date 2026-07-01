@@ -9,19 +9,28 @@ Shared standards are enforced, not just hoped for.
 
 **Backend (PHP):**
 
+Laravel ships **PHPUnit** and **Pint** by default — that's what this repo uses (the `tests/` are
+PHPUnit feature tests, run via `php artisan test`). Pest is a fine alternative if you prefer its
+syntax:
+
 ```bash
-docker compose exec app composer require --dev laravel/pint pestphp/pest pestphp/pest-plugin-laravel
-docker compose exec app php artisan pest:install   # if not already wired
+# Optional — only if you want Pest instead of PHPUnit:
+docker compose exec app composer require --dev pestphp/pest pestphp/pest-plugin-laravel
+docker compose exec app php artisan pest:install
 ```
 
-- **Laravel Pint** — PSR‑12 auto‑formatter. Config `backend/pint.json` (preset `laravel` or `psr12`).
-- **Pest** — feature/unit tests (PHPUnit under the hood).
+- **Laravel Pint** — PSR‑12 auto‑formatter. Config `backend/pint.json` (preset `laravel`,
+  `declare_strict_types` on). Run `./vendor/bin/pint` to fix, `--test` to check in CI.
+- **PHPUnit / Pest** — feature tests hitting the API; run with `php artisan test`.
 
 **Frontend (JS/Vue):**
 
 ```bash
-docker compose exec node npm install -D eslint prettier eslint-plugin-vue @vue/eslint-config-prettier vitest @vue/test-utils jsdom
+docker compose exec node npm install -D eslint@8 eslint-plugin-vue@9 eslint-config-prettier prettier vitest @vue/test-utils jsdom
 ```
+
+Config lives in `frontend/.eslintrc.cjs` (`eslint:recommended` + `plugin:vue/vue3-recommended` +
+`prettier` last) and `frontend/.prettierrc.json`.
 
 - **ESLint** — correctness; **Prettier** — formatting; **Vitest** — component/composable tests.
 

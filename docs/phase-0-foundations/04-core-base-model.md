@@ -162,10 +162,29 @@ trait LogsActivity
 
     public function logActivity(string $action, array $changes = []): void
     {
-        ActivityLog::record($action, $this, $changes);   // see Step 05
+        // Never write hidden attributes (passwords, tokens) into the audit log.
+        ActivityLog::record($action, $this, $this->scrubHiddenFromAudit($changes));
+    }
+
+    protected function scrubHiddenFromAudit(array $changes): array
+    {
+        $hidden = array_flip($this->getHidden());
+        if ($hidden === []) {
+            return $changes;
+        }
+        foreach (['before', 'after'] as $key) {
+            if (isset($changes[$key]) && is_array($changes[$key])) {
+                $changes[$key] = array_diff_key($changes[$key], $hidden);
+            }
+        }
+
+        return $changes;
     }
 }
 ```
+
+> **Security:** because models like `User` are auditable, `logActivity` strips the model's `$hidden`
+> attributes (password, `remember_token`) from every logged payload — secrets never reach the log.
 
 ## 6. The `HasVersions` trait (new version, not overwrite)
 
@@ -176,6 +195,7 @@ Keeps superseded versions instead of overwriting, for records that need full his
 // app/Core/Concerns/HasVersions.php
 namespace App\Core\Concerns;
 
+use App\Core\Enums\RecordStatus;
 use Illuminate\Support\Facades\DB;
 
 trait HasVersions
@@ -189,11 +209,17 @@ trait HasVersions
         return DB::transaction(function () use ($attributes, $reason) {
             $this->cancel($reason);                       // original -> cancelled (Cancellable)
 
-            $replacement = static::create(array_merge(
-                $this->replicate()->getAttributes(),
-                $attributes,
-                ['supersedes_id' => $this->getKey(), 'status' => 'active', 'cancellation_reason' => null],
-            ));
+            // Copy the original's internal state, apply the caller's corrections
+            // (respecting $fillable), then FORCE the system/versioning fields —
+            // status/supersedes_id are not fillable, so create() would drop them.
+            $replacement = $this->replicate();
+            $replacement->fill($attributes);
+            $replacement->forceFill([
+                'supersedes_id' => $this->getKey(),
+                'status'        => RecordStatus::Active->value,
+                'cancellation_reason' => null,
+            ]);
+            $replacement->saveQuietly();                  // logged explicitly as "duplicate", not "create"
 
             $replacement->logActivity('duplicate', ['supersedes_id' => $this->getKey(), 'reason' => $reason]);
 

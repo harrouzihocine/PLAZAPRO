@@ -29,6 +29,26 @@ trait LogsActivity
 
     public function logActivity(string $action, array $changes = []): void
     {
-        ActivityLog::record($action, $this, $changes);
+        ActivityLog::record($action, $this, $this->scrubHiddenFromAudit($changes));
+    }
+
+    /**
+     * Never write hidden attributes (passwords, tokens) into the audit log.
+     */
+    protected function scrubHiddenFromAudit(array $changes): array
+    {
+        $hidden = array_flip($this->getHidden());
+
+        if ($hidden === []) {
+            return $changes;
+        }
+
+        foreach (['before', 'after'] as $key) {
+            if (isset($changes[$key]) && is_array($changes[$key])) {
+                $changes[$key] = array_diff_key($changes[$key], $hidden);
+            }
+        }
+
+        return $changes;
     }
 }

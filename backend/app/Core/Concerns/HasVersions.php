@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Core\Concerns;
 
+use App\Core\Enums\RecordStatus;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\DB;
@@ -22,17 +23,18 @@ trait HasVersions
     public function supersedeWith(array $attributes, string $reason): static
     {
         return DB::transaction(function () use ($attributes, $reason) {
-            $this->cancel($reason); // original -> cancelled (Cancellable)
+            $this->cancel($reason); // original -> cancelled (Cancellable), logs "cancel"
 
-            $replacement = static::query()->create(array_merge(
-                $this->replicate()->getAttributes(),
-                $attributes,
-                [
-                    'supersedes_id' => $this->getKey(),
-                    'status' => 'active',
-                    'cancellation_reason' => null,
-                ],
-            ));
+            // Copy the original's internal state, apply the caller's corrections
+            // (respecting $fillable), then force the system/versioning fields.
+            $replacement = $this->replicate();
+            $replacement->fill($attributes);
+            $replacement->forceFill([
+                'supersedes_id' => $this->getKey(),
+                'status' => RecordStatus::Active->value,
+                'cancellation_reason' => null,
+            ]);
+            $replacement->saveQuietly(); // logged explicitly as "duplicate" below, not "create"
 
             $replacement->logActivity('duplicate', [
                 'supersedes_id' => $this->getKey(),

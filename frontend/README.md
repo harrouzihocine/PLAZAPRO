@@ -20,7 +20,7 @@ and [`09-theming-and-appshell.md`](../docs/phase-0-foundations/09-theming-and-ap
 - add `vite.config.js` with the `/api` + `/sanctum` proxy to `nginx`;
 - add the `useApi` wrapper (**Sanctum SPA cookie auth**, `withCredentials` + `withXSRFToken`, no token header);
 - add `tokens.css` (gold/white + gold/black), wire Tailwind to the CSS variables, and build `useTheme`
-  + the responsive `AppShell` (sidebar on desktop, bottom nav on mobile).
+    - the responsive `AppShell` (sidebar on desktop, bottom nav on mobile).
 
 ## Dev URLs
 

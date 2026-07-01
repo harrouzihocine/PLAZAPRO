@@ -1,0 +1,24 @@
+/* Design tokens — gold/white (day) + gold/black (night). Colour is never
+   hard-coded in a component; it always resolves to these CSS variables. */
+:root {
+  /* light: gold on white */
+  --color-bg: #ffffff;
+  --color-surface: #faf6e9;
+  --color-text: #1a1a1a;
+  --color-primary: #c9a227; /* gold */
+  --color-on-primary: #1a1a1a;
+  --color-border: #e7e0c8;
+  --color-danger: #b3261e;
+  --radius: 12px;
+}
+
+[data-theme='dark'] {
+  /* night: gold on black */
+  --color-bg: #111111;
+  --color-surface: #1c1c1c;
+  --color-text: #f0f0f0;
+  --color-primary: #c9a227; /* same gold */
+  --color-on-primary: #1a1a1a;
+  --color-border: #2c2c2c;
+  --color-danger: #f2b8b5;
+}

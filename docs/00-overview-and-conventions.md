@@ -144,18 +144,20 @@ See [`conventions/git-workflow.md`](conventions/git-workflow.md) for the full wo
 | Component | Version / choice | Notes |
 |-----------|------------------|-------|
 | PHP | **8.3** | inside the `app` container (php‑fpm) |
-| Laravel | **latest 11/12 LTS‑line** | API only; Sanctum for auth |
-| MySQL | **8.x** | persistent named volume `db-data` |
-| Node | **20 (alpine)** | Vite dev server + build |
-| Vue | **3** (Composition API, `<script setup>`) | Pinia + Vue Router |
+| Laravel | **13.x** (current stable) | API only; Sanctum SPA cookie auth |
+| MySQL | **8.x** (SQLite for tests) | persistent named volume `db-data`; tests run on in‑memory SQLite |
+| Node | **20** | Vite dev server + build |
+| Vue | **3.5** (Composition API, `<script setup>`) | Pinia + Vue Router |
+| Vite | **8.x** | dev server + build |
 | Tailwind CSS | **3.x** | wired to CSS design tokens |
+| Tests | **PHPUnit** (backend) · **Vitest** (frontend) | Pest is an allowed alternative; CI uses `php artisan test` |
+| Lint/format | **Pint** (PHP) · **ESLint 8 + eslint‑plugin‑vue 9 + Prettier** (JS/Vue) | configured in‑repo |
 | Redis | alpine | cache, queues, sessions |
 | Web server | Nginx (alpine) | reverse proxy on `:8080` |
 | Mail (dev) | Mailpit | catches dev e‑mails on `:8025` |
 
-> Pin exact versions in `composer.json` / `package.json` when Phase 0 is built, and record them in
-> [`phase-0-foundations/03-laravel-install.md`](phase-0-foundations/03-laravel-install.md) and
-> [`phase-0-foundations/08-vue-install.md`](phase-0-foundations/08-vue-install.md).
+> These are the versions the Phase 0 build was verified against (see the repo's `backend/composer.json`
+> and `frontend/package.json`). Laravel resolved to **13.x** as the current stable at build time.
 
 ---
 
