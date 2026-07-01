@@ -72,3 +72,33 @@ export const departmentsApi = {
     return useApi().delete(`/departments/${id}`)
   },
 }
+
+// Roles admin. `list` also feeds role/agent pickers elsewhere.
+export const rolesApi = {
+  async list() {
+    const { data } = await useApi().get('/roles')
+    return data.data
+  },
+
+  async create(payload) {
+    const { data } = await useApi().post('/roles', payload)
+    return data.data
+  },
+
+  async update(id, payload) {
+    const { data } = await useApi().put(`/roles/${id}`, payload)
+    return data.data
+  },
+
+  cancel(id) {
+    return useApi().delete(`/roles/${id}`)
+  },
+}
+
+// Read-only permission catalogue for the role matrix (requires roles.manage).
+export const permissionsApi = {
+  async list() {
+    const { data } = await useApi().get('/permissions')
+    return data.data
+  },
+}

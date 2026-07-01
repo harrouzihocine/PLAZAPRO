@@ -11,6 +11,7 @@ const tabs = computed(() =>
   [
     { to: { name: 'settings.lists' }, label: 'Lists', permission: 'settings.manage' },
     { to: { name: 'settings.departments' }, label: 'Departments', permission: 'settings.manage' },
+    { to: { name: 'settings.roles' }, label: 'Roles', permission: 'roles.manage' },
   ].filter((t) => !t.permission || auth.can(t.permission)),
 )
 </script>
