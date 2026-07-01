@@ -67,4 +67,42 @@ class TaskTest extends TestCase
 
         $this->postJson('/api/v1/tasks', ['title' => 'X'])->assertForbidden();
     }
+
+    public function test_scope_mine_returns_only_the_current_users_tasks(): void
+    {
+        $me = $this->userWithPermissions(['tasks.manage']);
+        Task::factory()->create(['assigned_to' => $me->id, 'title' => 'Mine']);
+        Task::factory()->create(['title' => 'Someone else']);
+        Sanctum::actingAs($me);
+
+        $this->getJson('/api/v1/tasks?scope=mine')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title', 'Mine');
+    }
+
+    public function test_overdue_filter_returns_only_past_due_open_tasks(): void
+    {
+        Task::factory()->create(['state' => 'open', 'due_at' => now()->subDay(), 'title' => 'Late']);
+        Task::factory()->create(['state' => 'open', 'due_at' => now()->addDay(), 'title' => 'Future']);
+        Task::factory()->create(['state' => 'done', 'due_at' => now()->subDay(), 'title' => 'Late but done']);
+        Sanctum::actingAs($this->userWithPermissions(['tasks.manage']));
+
+        $this->getJson('/api/v1/tasks?overdue=1')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title', 'Late');
+    }
+
+    public function test_priority_filter(): void
+    {
+        Task::factory()->create(['priority' => 'high', 'title' => 'Urgent']);
+        Task::factory()->create(['priority' => 'low', 'title' => 'Whenever']);
+        Sanctum::actingAs($this->userWithPermissions(['tasks.manage']));
+
+        $this->getJson('/api/v1/tasks?priority=high')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title', 'Urgent');
+    }
 }

@@ -58,6 +58,12 @@ const routes = [
         meta: { permission: 'clients.view' },
       },
       {
+        path: 'tasks',
+        name: 'tasks',
+        component: () => import('@/features/pipeline/views/TasksView.vue'),
+        meta: { permission: 'tasks.manage' },
+      },
+      {
         path: 'payments',
         name: 'payments',
         component: () => import('@/features/payments/views/PaymentsView.vue'),
