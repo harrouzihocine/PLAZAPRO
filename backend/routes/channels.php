@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Collaboration\Models\Conversation;
 use App\Modules\Settings\Models\User;
 use Illuminate\Support\Facades\Broadcast;
 
@@ -22,4 +23,13 @@ use Illuminate\Support\Facades\Broadcast;
 // on the namespaced class path.
 Broadcast::channel('users.{userId}', function (User $user, int $userId) {
     return $user->id === $userId;
+});
+
+// A conversation's live message stream. Only participants may subscribe — the
+// same visibility rule the HTTP endpoints enforce.
+Broadcast::channel('conversation.{conversationId}', function (User $user, int $conversationId) {
+    return Conversation::query()
+        ->whereKey($conversationId)
+        ->whereHas('participants', fn ($q) => $q->where('users.id', $user->id))
+        ->exists();
 });

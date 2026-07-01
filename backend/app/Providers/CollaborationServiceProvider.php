@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Modules\Collaboration\Events\MessageSent;
+use App\Modules\Collaboration\Listeners\NotifyParticipantsOfMessage;
 use App\Modules\Collaboration\Listeners\SendDueReminderNotification;
 use App\Modules\Collaboration\Listeners\SendVisitAssignedNotification;
 use App\Modules\Pipeline\Events\ReminderDue;
@@ -26,6 +28,7 @@ class CollaborationServiceProvider extends ServiceProvider
     private array $listen = [
         ReminderDue::class => [SendDueReminderNotification::class],
         VisitAssigned::class => [SendVisitAssignedNotification::class],
+        MessageSent::class => [NotifyParticipantsOfMessage::class],
     ];
 
     public function boot(): void

@@ -19,3 +19,41 @@ export const notificationsApi = {
     return data // { unread_count }
   },
 }
+
+// Chat: conversations, messages and attachments. All gated chat.use; per-thread
+// access is participant-scoped server-side.
+export const chatApi = {
+  async contacts() {
+    const { data } = await useApi().get('/chat/contacts')
+    return data.data
+  },
+
+  async conversations() {
+    const { data } = await useApi().get('/conversations')
+    return data.data
+  },
+
+  async createConversation(payload) {
+    const { data } = await useApi().post('/conversations', payload)
+    return data.data
+  },
+
+  async messages(conversationId, params = {}) {
+    const { data } = await useApi().get(`/conversations/${conversationId}/messages`, { params })
+    return data.data
+  },
+
+  // `payload` is a FormData (body and/or attachment + duration_ms) so files work.
+  async sendMessage(conversationId, payload) {
+    const { data } = await useApi().post(`/conversations/${conversationId}/messages`, payload)
+    return data.data
+  },
+
+  markRead(conversationId) {
+    return useApi().post(`/conversations/${conversationId}/read`)
+  },
+
+  deleteMessage(messageId) {
+    return useApi().delete(`/messages/${messageId}`)
+  },
+}

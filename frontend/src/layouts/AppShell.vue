@@ -17,6 +17,7 @@ const nav = computed(() =>
     { to: '/inventory', label: 'Inventory', icon: '▢' },
     { to: '/clients', label: 'Clients', icon: '☺', permission: 'clients.view' },
     { to: '/tasks', label: 'Tasks', icon: '✓', permission: 'tasks.manage' },
+    { to: '/chat', label: 'Chat', icon: '💬', permission: 'chat.use' },
     { to: '/payments', label: 'Payments', icon: '$', permission: 'versements.view' },
     { to: '/settings', label: 'Settings', icon: '⚙', permission: 'settings.manage' },
   ].filter((i) => !i.permission || auth.can(i.permission)),
