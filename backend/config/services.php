@@ -37,4 +37,10 @@ return [
         ],
     ],
 
+    // LibreOffice headless binary used to render PPTX -> PDF for inline preview.
+    // Installed in the queue-worker container; overridable per environment.
+    'libreoffice' => [
+        'bin' => env('SOFFICE_BIN', 'soffice'),
+    ],
+
 ];

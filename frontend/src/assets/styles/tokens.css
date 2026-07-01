@@ -9,6 +9,8 @@
   --color-on-primary: #1a1a1a;
   --color-border: #e7e0c8;
   --color-danger: #b3261e;
+  --color-success: #2e7d32;
+  --color-warning: #b5850b;
   --radius: 12px;
 }
 
@@ -21,4 +23,6 @@
   --color-on-primary: #1a1a1a;
   --color-border: #2c2c2c;
   --color-danger: #f2b8b5;
+  --color-success: #7bd88f;
+  --color-warning: #e6c260;
 }

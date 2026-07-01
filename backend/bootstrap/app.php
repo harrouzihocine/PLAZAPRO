@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\SecurityHeaders;
+use App\Modules\Inventory\Console\ExpireHolds;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,6 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withCommands([
+        ExpireHolds::class, // modular command (auto-discovery only covers app/Console)
+    ])
     ->withMiddleware(function (Middleware $middleware): void {
         // Sanctum SPA (cookie) auth for the first-party frontend.
         $middleware->statefulApi();

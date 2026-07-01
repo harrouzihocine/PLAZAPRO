@@ -25,7 +25,32 @@ const routes = [
         name: 'dashboard',
         component: () => import('@/features/analytics/views/DashboardView.vue'),
       },
-      { path: 'inventory', name: 'inventory', component: placeholder('Inventory', 'Phase 2') },
+      {
+        path: 'inventory',
+        component: () => import('@/features/inventory/views/InventoryView.vue'),
+        children: [
+          { path: '', redirect: { name: 'inventory.locations' } },
+          {
+            path: 'locations',
+            name: 'inventory.locations',
+            component: () => import('@/features/inventory/views/LocationsView.vue'),
+            meta: { permission: 'units.view' },
+          },
+          {
+            path: 'locations/:id',
+            name: 'inventory.location',
+            props: true,
+            component: () => import('@/features/inventory/views/LocationDetailView.vue'),
+            meta: { permission: 'units.view' },
+          },
+          {
+            path: 'units',
+            name: 'inventory.units',
+            component: () => import('@/features/inventory/views/UnitsView.vue'),
+            meta: { permission: 'units.view' },
+          },
+        ],
+      },
       { path: 'clients', name: 'clients', component: placeholder('Clients', 'Phase 3') },
       { path: 'payments', name: 'payments', component: placeholder('Payments', 'Phase 4') },
       {

@@ -20,7 +20,7 @@ class RbacSeeder extends Seeder
         // Settings / admin
         'users.manage', 'roles.manage', 'settings.manage', 'audit.view', 'audit.export',
         // Inventory
-        'units.view', 'units.reserve', 'units.manage', 'media.manage',
+        'locations.manage', 'units.view', 'units.reserve', 'units.manage', 'media.manage',
         // Clients & pipeline
         'clients.view', 'clients.create', 'clients.manage',
         'calls.log', 'visits.assign', 'visits.conduct', 'tasks.manage',
