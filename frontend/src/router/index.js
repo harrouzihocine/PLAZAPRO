@@ -83,6 +83,18 @@ const routes = [
         meta: { permission: 'versements.view' },
       },
       {
+        path: 'analytics',
+        name: 'analytics',
+        component: () => import('@/features/analytics/views/ReportsView.vue'),
+        meta: { permission: 'reports.view' },
+      },
+      {
+        path: 'audit',
+        name: 'audit',
+        component: () => import('@/features/analytics/views/AuditView.vue'),
+        meta: { permission: 'audit.view' },
+      },
+      {
         path: 'settings',
         component: () => import('@/features/settings/views/SettingsLayout.vue'),
         children: [

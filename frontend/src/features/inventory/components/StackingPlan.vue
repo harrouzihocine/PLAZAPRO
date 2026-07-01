@@ -2,6 +2,8 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import BaseCard from '@/components/base/BaseCard.vue'
 import { stackingApi } from '@/features/inventory/api'
+import { analyticsApi } from '@/features/analytics/api'
+import { useAuthStore } from '@/features/settings/store'
 
 const props = defineProps({
   locationId: { type: [String, Number], required: true },
@@ -11,6 +13,25 @@ const emit = defineEmits(['select'])
 const blocks = ref([])
 const loading = ref(false)
 const selected = ref(null)
+
+// Optional "interest heat" overlay (visits per unit) — manager/admin only. It
+// reuses the unit-intelligence report and is loaded lazily on first toggle.
+const auth = useAuthStore()
+const canReports = computed(() => auth.can('reports.view'))
+const showHeat = ref(false)
+const heat = ref({})
+
+async function loadHeat() {
+  const rows = await analyticsApi.units({ location_id: props.locationId })
+  heat.value = Object.fromEntries(rows.map((r) => [r.id, r.visits]))
+}
+function heatFor(id) {
+  return heat.value[id] ?? 0
+}
+async function toggleHeat() {
+  showHeat.value = !showHeat.value
+  if (showHeat.value && !Object.keys(heat.value).length) await loadHeat()
+}
 
 const cellClass = {
   available: 'bg-success/20 border-success/40 text-success',
@@ -62,7 +83,11 @@ onMounted(() => {
   ticker = setInterval(() => (now.value = Date.now()), 1000)
 })
 onUnmounted(() => clearInterval(ticker))
-watch(() => props.locationId, load)
+watch(() => props.locationId, () => {
+  heat.value = {}
+  load()
+  if (showHeat.value) loadHeat()
+})
 </script>
 
 <template>
@@ -73,6 +98,15 @@ watch(() => props.locationId, load)
         <span class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-sm bg-success/40"></span>available</span>
         <span class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-sm bg-warning/40"></span>reserved</span>
         <span class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded-sm bg-danger/40"></span>sold</span>
+        <button
+          v-if="canReports"
+          type="button"
+          class="rounded-token border border-border px-2 py-1"
+          :class="showHeat ? 'bg-primary text-on-primary' : ''"
+          @click="toggleHeat"
+        >
+          🔥 Interest
+        </button>
       </div>
     </div>
 
@@ -94,7 +128,7 @@ watch(() => props.locationId, load)
                 v-for="u in f.units"
                 :key="u.id"
                 type="button"
-                class="min-h-[44px] min-w-[44px] rounded-token border px-2 text-xs font-medium"
+                class="relative min-h-[44px] min-w-[44px] rounded-token border px-2 text-xs font-medium"
                 :class="[
                   cellClass[u.sale_status] ?? 'border-border',
                   selected?.id === u.id ? 'ring-2 ring-primary' : '',
@@ -103,6 +137,13 @@ watch(() => props.locationId, load)
                 @click="pick(u)"
               >
                 {{ u.reference }}
+                <span
+                  v-if="showHeat && heatFor(u.id) > 0"
+                  class="absolute -right-1 -top-1 rounded-full bg-primary px-1 text-[10px] font-semibold text-on-primary"
+                  :title="`${heatFor(u.id)} visits`"
+                >
+                  {{ heatFor(u.id) }}
+                </span>
               </button>
             </div>
           </div>
