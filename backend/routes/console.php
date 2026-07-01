@@ -18,3 +18,6 @@ Schedule::command('holds:expire')->everyFiveMinutes()->withoutOverlapping();
 // then dispatch the pending ones to their assigned agents (every minute).
 Schedule::command('actions:mark-overdue')->hourly()->withoutOverlapping();
 Schedule::command('reminders:dispatch')->everyMinute()->withoutOverlapping();
+
+// Flip past-due, unpaid payment-schedule instalments to overdue (daily).
+Schedule::command('schedules:mark-overdue')->dailyAt('00:15')->withoutOverlapping();

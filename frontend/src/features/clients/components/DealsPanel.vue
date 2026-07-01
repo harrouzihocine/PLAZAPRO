@@ -3,6 +3,7 @@ import { onMounted } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
 import { useClientsStore } from '@/features/clients/clientsStore'
+import PaymentsPanel from '@/features/payments/components/PaymentsPanel.vue'
 import { useAuthStore } from '@/features/settings/store'
 
 const props = defineProps({ clientId: { type: [String, Number], required: true } })
@@ -10,6 +11,7 @@ const store = useClientsStore()
 const auth = useAuthStore()
 
 const canManage = () => auth.can('clients.manage')
+const canViewPayments = () => auth.can('versements.view')
 
 // Stage → token-based badge classes, matching SaleStatusBadge's house style.
 const stageClass = {
@@ -46,30 +48,37 @@ function cancelDeal(project) {
     </div>
 
     <div class="space-y-2">
-      <div
-        v-for="p in store.projects"
-        :key="p.id"
-        class="flex flex-col gap-2 rounded-token border border-border p-2 sm:flex-row sm:items-center"
-      >
-        <div class="flex-1">
-          <span class="rounded-token px-2 py-0.5 text-xs font-medium" :class="stageClass[p.stage]">
-            {{ p.stage }}
-          </span>
-          <span v-if="p.unit" class="ml-2 text-sm">{{ p.unit.reference }}</span>
-          <span v-if="p.total_price" class="ml-2 text-sm opacity-70">{{ p.total_price }}</span>
+      <div v-for="p in store.projects" :key="p.id" class="rounded-token border border-border p-2">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div class="flex-1">
+            <span class="rounded-token px-2 py-0.5 text-xs font-medium" :class="stageClass[p.stage]">
+              {{ p.stage }}
+            </span>
+            <span v-if="p.unit" class="ml-2 text-sm">{{ p.unit.reference }}</span>
+            <span v-if="p.total_price" class="ml-2 text-sm opacity-70">{{ p.total_price }}</span>
+          </div>
+          <div v-if="canManage()" class="flex items-center gap-1">
+            <select
+              v-if="p.allowed_next.length"
+              :class="'rounded-token border border-border bg-bg px-2 py-1 text-sm text-ink'"
+              aria-label="Advance stage"
+              @change="advance(p, $event.target.value)"
+            >
+              <option value="">Advance…</option>
+              <option v-for="s in p.allowed_next" :key="s" :value="s">{{ s }}</option>
+            </select>
+            <BaseButton variant="ghost" @click="cancelDeal(p)">Remove</BaseButton>
+          </div>
         </div>
-        <div v-if="canManage()" class="flex items-center gap-1">
-          <select
-            v-if="p.allowed_next.length"
-            :class="'rounded-token border border-border bg-bg px-2 py-1 text-sm text-ink'"
-            aria-label="Advance stage"
-            @change="advance(p, $event.target.value)"
-          >
-            <option value="">Advance…</option>
-            <option v-for="s in p.allowed_next" :key="s" :value="s">{{ s }}</option>
-          </select>
-          <BaseButton variant="ghost" @click="cancelDeal(p)">Remove</BaseButton>
-        </div>
+
+        <!-- Payments (Phase 4): schedule + versements + receipts, per deal. Shown
+             once a deal has an agreed total price and the user can view payments. -->
+        <PaymentsPanel
+          v-if="canViewPayments() && p.total_price && p.status !== 'cancelled'"
+          :project-id="p.id"
+          :total-price="p.total_price"
+          class="mt-2"
+        />
       </div>
       <p v-if="!store.projects.length" class="py-2 text-sm opacity-60">No deals yet.</p>
     </div>

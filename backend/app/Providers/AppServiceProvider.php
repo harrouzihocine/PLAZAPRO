@@ -8,6 +8,11 @@ use App\Modules\Clients\Models\Client;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
+use App\Modules\Payments\Models\Document;
+use App\Modules\Payments\Models\PaymentSchedule;
+use App\Modules\Payments\Models\Versement;
+use App\Modules\Payments\Support\Contracts\PdfRenderer;
+use App\Modules\Payments\Support\DomPdfRenderer;
 use App\Modules\Pipeline\Models\Call;
 use App\Modules\Pipeline\Models\Visit;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -18,7 +23,12 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // Document generation renders Blade → PDF behind an interface so the
+        // renderer is swappable (dompdf now; headless-Chrome later).
+        $this->app->bind(
+            PdfRenderer::class,
+            DomPdfRenderer::class,
+        );
     }
 
     public function boot(): void
@@ -41,6 +51,9 @@ class AppServiceProvider extends ServiceProvider
             'client_project' => ClientProject::class,
             'call' => Call::class,
             'visit' => Visit::class,
+            'payment_schedule' => PaymentSchedule::class,
+            'versement' => Versement::class,
+            'document' => Document::class,
         ]);
     }
 }

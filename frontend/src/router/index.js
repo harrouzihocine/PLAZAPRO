@@ -1,12 +1,5 @@
-import { h } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
-import PhasePlaceholder from '@/components/PhasePlaceholder.vue'
 import { useAuthStore } from '@/features/settings/store'
-
-// Small helper to render a placeholder route until its phase is built.
-const placeholder = (title, phase) => ({
-  render: () => h(PhasePlaceholder, { title, phase }),
-})
 
 const routes = [
   {
@@ -64,7 +57,12 @@ const routes = [
         component: () => import('@/features/clients/views/ClientFileView.vue'),
         meta: { permission: 'clients.view' },
       },
-      { path: 'payments', name: 'payments', component: placeholder('Payments', 'Phase 4') },
+      {
+        path: 'payments',
+        name: 'payments',
+        component: () => import('@/features/payments/views/PaymentsView.vue'),
+        meta: { permission: 'versements.view' },
+      },
       {
         path: 'settings',
         component: () => import('@/features/settings/views/SettingsLayout.vue'),
