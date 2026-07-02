@@ -50,21 +50,22 @@ class AuditController extends Controller
             $out = fopen('php://output', 'w');
             fputcsv($out, $columns);
 
-            $query->latest('id')->chunk(500, function ($rows) use ($out) {
-                foreach ($rows as $row) {
-                    fputcsv($out, array_map($this->csvSafe(...), [
-                        $row->id,
-                        $row->created_at?->toIso8601String(),
-                        $row->user_id,
-                        $row->role_at_time,
-                        $row->action,
-                        $row->subject_type,
-                        $row->subject_id,
-                        $row->ip_address,
-                        $row->changes !== null ? json_encode($row->changes) : '',
-                    ]));
-                }
-            });
+            // Cursor-based iteration (by id) rather than offset chunking: safe to
+            // stream over the append-only log without skipping or duplicating rows
+            // if entries are written while the export runs. Chronological order.
+            foreach ($query->lazyById() as $row) {
+                fputcsv($out, array_map($this->csvSafe(...), [
+                    $row->id,
+                    $row->created_at?->toIso8601String(),
+                    $row->user_id,
+                    $row->role_at_time,
+                    $row->action,
+                    $row->subject_type,
+                    $row->subject_id,
+                    $row->ip_address,
+                    $row->changes !== null ? json_encode($row->changes) : '',
+                ]));
+            }
 
             fclose($out);
         }, 'audit-'.now()->format('Ymd-His').'.csv', [

@@ -8,6 +8,7 @@ import { formatMoney } from '@/features/payments/money'
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
 
 const tab = ref('roi') // roi | units
+const error = ref('')
 
 // --- Source ROI ---
 const roi = ref([])
@@ -16,11 +17,14 @@ const range = ref({ from: '', to: '' })
 
 async function loadRoi() {
   roiLoading.value = true
+  error.value = ''
   try {
     const params = {}
     if (range.value.from) params.from = range.value.from
     if (range.value.to) params.to = range.value.to
     roi.value = await analyticsApi.sourceRoi(params)
+  } catch {
+    error.value = 'Could not load the report. Please try again.'
   } finally {
     roiLoading.value = false
   }
@@ -32,8 +36,11 @@ const unitsLoading = ref(false)
 
 async function loadUnits() {
   unitsLoading.value = true
+  error.value = ''
   try {
     units.value = await analyticsApi.units()
+  } catch {
+    error.value = 'Could not load the report. Please try again.'
   } finally {
     unitsLoading.value = false
   }
@@ -59,6 +66,8 @@ onMounted(loadRoi)
         Unit intelligence
       </BaseButton>
     </div>
+
+    <p v-if="error" class="text-sm text-danger">{{ error }}</p>
 
     <!-- Source ROI -->
     <BaseCard v-show="tab === 'roi'">

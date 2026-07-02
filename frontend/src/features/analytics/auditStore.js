@@ -57,6 +57,7 @@ export const useAuditStore = defineStore('audit', {
     // the audit trail; here we just turn the returned Blob into a browser download.
     async exportCsv() {
       this.exporting = true
+      this.error = ''
       try {
         const blob = await auditApi.export(this.activeParams)
         const url = URL.createObjectURL(blob)
@@ -67,6 +68,8 @@ export const useAuditStore = defineStore('audit', {
         link.click()
         link.remove()
         URL.revokeObjectURL(url)
+      } catch (e) {
+        this.error = e.response?.data?.message ?? 'Could not export the audit feed.'
       } finally {
         this.exporting = false
       }

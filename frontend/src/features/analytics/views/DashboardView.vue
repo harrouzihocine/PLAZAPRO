@@ -11,6 +11,7 @@ const name = computed(() => auth.user?.name ?? 'there')
 const data = ref(null)
 const loading = ref(true)
 const denied = ref(false)
+const error = ref('')
 
 // Full class strings (not interpolated) so Tailwind's scanner keeps them.
 const stageStyles = {
@@ -34,6 +35,7 @@ onMounted(async () => {
     data.value = await analyticsApi.dashboard()
   } catch (e) {
     if (e.response?.status === 403) denied.value = true
+    else error.value = 'Could not load the dashboard. Please try again.'
   } finally {
     loading.value = false
   }
@@ -58,6 +60,10 @@ onMounted(async () => {
 
     <BaseCard v-else-if="denied">
       <p class="text-sm opacity-70">You don't have access to dashboard metrics.</p>
+    </BaseCard>
+
+    <BaseCard v-else-if="error">
+      <p class="text-sm text-danger">{{ error }}</p>
     </BaseCard>
 
     <template v-else-if="data">
