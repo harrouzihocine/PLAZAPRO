@@ -27,7 +27,7 @@ class RbacSeeder extends Seeder
         // Payments
         'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
         // Collaboration & analytics
-        'chat.use', 'notifications.view', 'dashboard.view',
+        'chat.use', 'notifications.view', 'dashboard.view', 'reports.view',
     ];
 
     public function run(): void
