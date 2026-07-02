@@ -2,10 +2,12 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
 import { useDynamicList } from '@/composables/useDynamicList'
 import { documentsApi, scheduleApi, versementsApi } from '@/features/payments/api'
 import { formatMoney } from '@/features/payments/money'
 import { useAuthStore } from '@/features/settings/store'
+import { toastError } from '@/composables/useConfirm'
 
 const props = defineProps({
   projectId: { type: [String, Number], required: true },
@@ -23,7 +25,6 @@ const schedule = ref([])
 const versements = ref([])
 const meta = ref({})
 const loading = ref(false)
-const error = ref('')
 
 const stateClass = {
   pending: 'bg-border text-ink',
@@ -33,12 +34,8 @@ const stateClass = {
   cancelled: 'bg-surface text-ink opacity-70',
 }
 
-const inputClass =
-  'w-full rounded-token border border-border bg-bg px-3 py-2 min-h-[44px] text-ink outline-none focus:border-primary'
-
 async function load() {
   loading.value = true
-  error.value = ''
   try {
     const [sched, vers] = await Promise.all([
       scheduleApi.get(props.projectId),
@@ -48,7 +45,7 @@ async function load() {
     versements.value = vers.items
     meta.value = vers.meta
   } catch (e) {
-    error.value = e.response?.data?.message ?? 'Failed to load payments.'
+    toastError(e.response?.data?.message ?? 'Failed to load payments.')
   } finally {
     loading.value = false
   }
@@ -75,13 +72,12 @@ function openBuilder() {
     : [{ due_date: '', amount: '' }]
 }
 async function saveSchedule() {
-  error.value = ''
   try {
     await scheduleApi.save(props.projectId, builder.rows)
     builder.open = false
     await load()
   } catch (e) {
-    error.value = e.response?.data?.message ?? 'Could not save the schedule.'
+    toastError(e.response?.data?.message ?? 'Could not save the schedule.')
   }
 }
 
@@ -105,7 +101,6 @@ function resetRecord() {
   })
 }
 async function recordPayment() {
-  error.value = ''
   try {
     const payload = {
       amount: recordForm.amount,
@@ -118,7 +113,7 @@ async function recordPayment() {
     resetRecord()
     await load()
   } catch (e) {
-    error.value = e.response?.data?.message ?? 'Could not record the payment.'
+    toastError(e.response?.data?.message ?? 'Could not record the payment.')
   }
 }
 
@@ -135,7 +130,6 @@ function startCorrect(v) {
   })
 }
 async function submitCorrect() {
-  error.value = ''
   try {
     await versementsApi.correct(correctForm.id, {
       amount: correctForm.amount,
@@ -147,13 +141,12 @@ async function submitCorrect() {
     correctForm.id = null
     await load()
   } catch (e) {
-    error.value = e.response?.data?.message ?? 'Could not correct the payment.'
+    toastError(e.response?.data?.message ?? 'Could not correct the payment.')
   }
 }
 
 /* ---- Receipt ------------------------------------------------------------- */
 async function receipt(v) {
-  error.value = ''
   try {
     let docId = v.document_id
     if (!docId && canGenerate.value) {
@@ -165,9 +158,9 @@ async function receipt(v) {
     if (!docId) return
     const doc = await documentsApi.get(docId)
     if (doc.download_url) window.open(doc.download_url, '_blank')
-    else error.value = 'The receipt is still being generated — try again shortly.'
+    else toastError('The receipt is still being generated — try again shortly.')
   } catch (e) {
-    error.value = e.response?.data?.message ?? 'Could not open the receipt.'
+    toastError(e.response?.data?.message ?? 'Could not open the receipt.')
   }
 }
 </script>
@@ -182,7 +175,6 @@ async function receipt(v) {
       </div>
     </div>
 
-    <p v-if="error" class="mb-2 rounded-token bg-danger/10 px-2 py-1 text-xs text-danger">{{ error }}</p>
     <p v-if="loading" class="py-2 text-xs opacity-60">Loading…</p>
 
     <template v-else>
@@ -252,20 +244,18 @@ async function receipt(v) {
         <div v-if="recordForm.open" class="mb-2 grid gap-2 rounded-token border border-border p-2 sm:grid-cols-2">
           <BaseInput v-model="recordForm.amount" type="number" label="Amount" />
           <BaseInput v-model="recordForm.paid_on" type="date" label="Paid on" />
-          <label class="block">
-            <span class="mb-1 block text-sm">Method</span>
-            <select v-model="recordForm.method_id" :class="inputClass">
-              <option value="">Select…</option>
-              <option v-for="m in methods" :key="m.id" :value="m.id">{{ m.label }}</option>
-            </select>
-          </label>
-          <label class="block">
-            <span class="mb-1 block text-sm">Instalment (optional)</span>
-            <select v-model="recordForm.schedule_item_id" :class="inputClass">
-              <option value="">Unallocated</option>
-              <option v-for="s in schedule" :key="s.id" :value="s.id">#{{ s.installment_no }} · {{ formatMoney(s.amount) }}</option>
-            </select>
-          </label>
+          <BaseSelect
+            v-model="recordForm.method_id"
+            label="Method"
+            placeholder="Select…"
+            :options="methods.map((m) => ({ value: m.id, label: m.label }))"
+          />
+          <BaseSelect
+            v-model="recordForm.schedule_item_id"
+            label="Instalment (optional)"
+            placeholder="Unallocated"
+            :options="schedule.map((s) => ({ value: s.id, label: `#${s.installment_no} · ${formatMoney(s.amount)}` }))"
+          />
           <BaseInput v-model="recordForm.reference" label="Reference" class="sm:col-span-2" />
           <div class="flex gap-2 sm:col-span-2">
             <BaseButton class="!min-h-0 !px-3 !py-1 !text-xs" @click="recordPayment">Record</BaseButton>
@@ -293,12 +283,12 @@ async function receipt(v) {
             <div v-if="correctForm.id === v.id" class="mt-2 grid gap-2 border-t border-border pt-2 sm:grid-cols-2">
               <BaseInput v-model="correctForm.amount" type="number" label="Corrected amount" />
               <BaseInput v-model="correctForm.paid_on" type="date" label="Paid on" />
-              <label class="block">
-                <span class="mb-1 block text-sm">Method</span>
-                <select v-model="correctForm.method_id" :class="inputClass">
-                  <option v-for="m in methods" :key="m.id" :value="m.id">{{ m.label }}</option>
-                </select>
-              </label>
+              <BaseSelect
+                v-model="correctForm.method_id"
+                label="Method"
+                :clearable="false"
+                :options="methods.map((m) => ({ value: m.id, label: m.label }))"
+              />
               <BaseInput v-model="correctForm.reference" label="Reference" />
               <BaseInput v-model="correctForm.reason" label="Reason" class="sm:col-span-2" />
               <div class="flex gap-2 sm:col-span-2">

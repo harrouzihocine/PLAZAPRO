@@ -19,7 +19,7 @@ class UpdateUnit
     {
         $unit->update(Arr::only($data, [
             'reference', 'type_id', 'floor_id', 'area_sqm',
-            'block', 'stack_floor', 'position',
+            'block', 'stack_floor', 'position', 'gtm_priority',
         ]));
 
         return $unit->fresh();

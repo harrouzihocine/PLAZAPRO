@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Http\Requests;
 
+use App\Modules\Inventory\Enums\GtmPriority;
 use App\Modules\Inventory\Enums\SaleStatus;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -39,6 +40,7 @@ class StoreUnitRequest extends FormRequest
             'block' => ['nullable', 'string', 'max:255'],
             'stack_floor' => ['nullable', 'integer'],
             'position' => ['nullable', 'integer'],
+            'gtm_priority' => ['sometimes', new Enum(GtmPriority::class)],
         ];
     }
 }

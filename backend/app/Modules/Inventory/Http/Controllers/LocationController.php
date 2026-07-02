@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Http\Controllers;
 
+use App\Modules\Inventory\Actions\ArchiveLocation;
 use App\Modules\Inventory\Actions\CancelLocation;
 use App\Modules\Inventory\Actions\CreateLocation;
+use App\Modules\Inventory\Actions\ReactivateLocation;
 use App\Modules\Inventory\Actions\UpdateLocation;
 use App\Modules\Inventory\Http\Requests\StoreLocationRequest;
 use App\Modules\Inventory\Http\Requests\UpdateLocationRequest;
@@ -22,14 +24,23 @@ class LocationController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
+        // Default lists live projects; ?status=archived feeds the "reactivate"
+        // view; ?status=all returns every lifecycle state (removed included).
+        $status = $request->query('status');
+
         $locations = Location::query()
-            ->with('area')
-            ->when($request->query('status') !== 'all', fn ($q) => $q->active())
-            ->when($request->filled('area_id'), fn ($q) => $q->where('area_id', $request->query('area_id')))
+            ->with(['wilaya', 'commune'])
+            ->when($status === 'archived', fn ($q) => $q->archived())
+            ->when(! in_array($status, ['archived', 'all'], true), fn ($q) => $q->active())
+            ->when($request->filled('wilaya_id'), fn ($q) => $q->where('wilaya_id', $request->query('wilaya_id')))
+            ->when($request->filled('commune_id'), fn ($q) => $q->where('commune_id', $request->query('commune_id')))
+            ->when($request->filled('priority'), fn ($q) => $q->where('gtm_priority', $request->query('priority')))
             ->when($request->filled('q'), fn ($q) => $q->where(
                 fn ($w) => $w->where('name', 'like', '%'.$request->query('q').'%')
                     ->orWhere('code', 'like', '%'.$request->query('q').'%')
             ))
+            // Highest GTM priority first so the vente team sees what to push on top.
+            ->orderByRaw("FIELD(gtm_priority, 'critical', 'high', 'medium', 'low')")
             ->orderBy('name')
             ->get();
 
@@ -38,17 +49,17 @@ class LocationController extends Controller
 
     public function show(Location $location): LocationResource
     {
-        return new LocationResource($location->load('area'));
+        return new LocationResource($location->load(['wilaya', 'commune']));
     }
 
     public function store(StoreLocationRequest $request, CreateLocation $action): LocationResource
     {
-        return new LocationResource($action->handle($request->validated())->load('area'));
+        return new LocationResource($action->handle($request->validated())->load(['wilaya', 'commune']));
     }
 
     public function update(UpdateLocationRequest $request, Location $location, UpdateLocation $action): LocationResource
     {
-        return new LocationResource($action->handle($location, $request->validated())->load('area'));
+        return new LocationResource($action->handle($location, $request->validated())->load(['wilaya', 'commune']));
     }
 
     public function destroy(Request $request, Location $location, CancelLocation $action): LocationResource
@@ -56,5 +67,17 @@ class LocationController extends Controller
         $reason = (string) $request->input('reason', 'Removed by admin');
 
         return new LocationResource($action->handle($location, $reason));
+    }
+
+    /** Archive the project + its inventory (reversible; hidden until reactivated). */
+    public function archive(Location $location, ArchiveLocation $action): LocationResource
+    {
+        return new LocationResource($action->handle($location)->load(['wilaya', 'commune']));
+    }
+
+    /** Bring an archived project (and the inventory archived with it) back to active. */
+    public function reactivate(Location $location, ReactivateLocation $action): LocationResource
+    {
+        return new LocationResource($action->handle($location)->load(['wilaya', 'commune']));
     }
 }

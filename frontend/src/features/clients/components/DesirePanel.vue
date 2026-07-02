@@ -1,16 +1,19 @@
 <script setup>
-import { onMounted, reactive } from 'vue'
+import { onMounted, reactive, watch } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
 import { useDynamicList } from '@/composables/useDynamicList'
+import { useWilayas, useCommunes } from '@/composables/useGeography'
 import { useClientsStore } from '@/features/clients/clientsStore'
 import { useAuthStore } from '@/features/settings/store'
 
 const props = defineProps({ clientId: { type: [String, Number], required: true } })
 const store = useClientsStore()
 const auth = useAuthStore()
-const { items: areas } = useDynamicList('areas')
+const { wilayas } = useWilayas()
+const { communes, load: loadCommunes } = useCommunes()
 const { items: unitTypes } = useDynamicList('unit_types')
 
 const selectClass =
@@ -21,7 +24,8 @@ const canViewMatches = () => auth.can('units.view')
 const canReserve = () => auth.can('units.reserve')
 
 const form = reactive({
-  area_id: '',
+  wilaya_id: '',
+  commune_id: '',
   type_id: '',
   budget_min: '',
   budget_max: '',
@@ -29,15 +33,26 @@ const form = reactive({
   notes: '',
 })
 
+// Cascade: reload communes when the wilaya changes; a user change clears the commune.
+watch(
+  () => form.wilaya_id,
+  (id, prev) => {
+    if (prev !== undefined && id !== prev) form.commune_id = ''
+    loadCommunes(id)
+  },
+)
+
 function fillFrom(desire) {
   Object.assign(form, {
-    area_id: desire?.area_id ?? '',
+    wilaya_id: desire?.wilaya_id ?? '',
+    commune_id: desire?.commune_id ?? '',
     type_id: desire?.type_id ?? '',
     budget_min: desire?.budget_min ?? '',
     budget_max: desire?.budget_max ?? '',
     floor_pref: desire?.floor_pref ?? '',
     notes: desire?.notes ?? '',
   })
+  loadCommunes(desire?.wilaya_id)
 }
 
 onMounted(async () => {
@@ -48,7 +63,8 @@ onMounted(async () => {
 
 async function save() {
   const payload = {
-    area_id: form.area_id || null,
+    wilaya_id: form.wilaya_id || null,
+    commune_id: form.commune_id || null,
     type_id: form.type_id || null,
     budget_min: form.budget_min === '' ? null : Number(form.budget_min),
     budget_max: form.budget_max === '' ? null : Number(form.budget_max),
@@ -74,20 +90,25 @@ function reserve(unit) {
 
     <!-- Editable form for users who can qualify leads (clients.create) -->
     <form v-if="canEdit()" class="grid gap-3 sm:grid-cols-2" @submit.prevent="save">
-      <label class="block">
-        <span class="mb-1 block text-sm">Area</span>
-        <select v-model="form.area_id" :class="selectClass">
-          <option value="">Any</option>
-          <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.label }}</option>
-        </select>
-      </label>
-      <label class="block">
-        <span class="mb-1 block text-sm">Type</span>
-        <select v-model="form.type_id" :class="selectClass">
-          <option value="">Any</option>
-          <option v-for="t in unitTypes" :key="t.id" :value="t.id">{{ t.label }}</option>
-        </select>
-      </label>
+      <BaseSelect
+        v-model="form.wilaya_id"
+        label="Wilaya"
+        placeholder="Any"
+        :options="wilayas.map((w) => ({ value: w.id, label: `${w.code} · ${w.name}` }))"
+      />
+      <BaseSelect
+        v-model="form.commune_id"
+        label="Commune"
+        placeholder="Any"
+        :disabled="!form.wilaya_id"
+        :options="communes.map((c) => ({ value: c.id, label: c.name }))"
+      />
+      <BaseSelect
+        v-model="form.type_id"
+        label="Type"
+        placeholder="Any"
+        :options="unitTypes.map((t) => ({ value: t.id, label: t.label }))"
+      />
       <BaseInput v-model="form.floor_pref" label="Floor preference" />
       <BaseInput v-model="form.budget_min" label="Budget min" type="number" />
       <BaseInput v-model="form.budget_max" label="Budget max" type="number" />
@@ -102,7 +123,8 @@ function reserve(unit) {
 
     <!-- Read-only summary otherwise -->
     <dl v-else class="grid gap-2 text-sm sm:grid-cols-2">
-      <div class="flex justify-between gap-2"><dt class="opacity-60">Area</dt><dd>{{ store.desire?.area?.label ?? 'Any' }}</dd></div>
+      <div class="flex justify-between gap-2"><dt class="opacity-60">Wilaya</dt><dd>{{ store.desire?.wilaya?.name ?? 'Any' }}</dd></div>
+      <div class="flex justify-between gap-2"><dt class="opacity-60">Commune</dt><dd>{{ store.desire?.commune?.name ?? 'Any' }}</dd></div>
       <div class="flex justify-between gap-2"><dt class="opacity-60">Type</dt><dd>{{ store.desire?.type?.label ?? 'Any' }}</dd></div>
       <div class="flex justify-between gap-2"><dt class="opacity-60">Budget</dt><dd>{{ store.desire?.budget_min ?? '—' }} – {{ store.desire?.budget_max ?? '—' }}</dd></div>
     </dl>

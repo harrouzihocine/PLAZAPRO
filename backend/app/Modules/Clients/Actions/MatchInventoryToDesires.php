@@ -11,7 +11,7 @@ use Illuminate\Support\Collection;
 
 /**
  * The inverse of MatchDesireToInventory: given a unit, return the active desires
- * whose criteria it satisfies (area / type / budget), eager-loading each
+ * whose criteria it satisfies (wilaya / commune / type / budget), eager-loading each
  * desire's client + assigned agent so the caller can notify. Only criteria the
  * client actually set are applied — the mirror image of the forward matcher.
  * An unavailable unit matches nothing.
@@ -28,7 +28,8 @@ class MatchInventoryToDesires
         }
 
         $unit->loadMissing('location');
-        $areaId = $unit->location?->area_id;
+        $wilayaId = $unit->location?->wilaya_id;
+        $communeId = $unit->location?->commune_id;
 
         // A criterion the client set only matches when the unit actually has that
         // attribute; when the unit's value is null, only desires that left the
@@ -55,10 +56,16 @@ class MatchInventoryToDesires
                     $q->orWhere('budget_max', '>=', $unit->price);
                 }
             })
-            ->where(function ($q) use ($areaId) {
-                $q->whereNull('area_id');
-                if ($areaId !== null) {
-                    $q->orWhere('area_id', $areaId);
+            ->where(function ($q) use ($wilayaId) {
+                $q->whereNull('wilaya_id');
+                if ($wilayaId !== null) {
+                    $q->orWhere('wilaya_id', $wilayaId);
+                }
+            })
+            ->where(function ($q) use ($communeId) {
+                $q->whereNull('commune_id');
+                if ($communeId !== null) {
+                    $q->orWhere('commune_id', $communeId);
                 }
             })
             ->get();

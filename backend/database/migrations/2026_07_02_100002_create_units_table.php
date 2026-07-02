@@ -36,6 +36,10 @@ return new class extends Migration
             $table->integer('stack_floor')->nullable();
             $table->integer('position')->nullable();
 
+            // Go-to-market / sales priority — which units the vente team pushes
+            // first (see App\Modules\Inventory\Enums\GtmPriority).
+            $table->string('gtm_priority')->default('medium');
+
             // Base-model columns (BaseModel: Cancellable + HasVersions).
             $table->string('status')->default('active');
             $table->string('cancellation_reason')->nullable();
@@ -46,6 +50,7 @@ return new class extends Migration
             $table->index('location_id');
             $table->index(['location_id', 'reference']);
             $table->index(['sale_status', 'status']);
+            $table->index('gtm_priority');
             $table->index(['block', 'stack_floor', 'position']);
         });
     }

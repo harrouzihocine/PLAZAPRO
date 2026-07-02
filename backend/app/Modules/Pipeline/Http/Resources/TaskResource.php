@@ -44,7 +44,7 @@ class TaskResource extends JsonResource
     private function subjectLabel(Model $subject): string
     {
         return match (true) {
-            $subject instanceof Client => trim($subject->first_name.' '.$subject->last_name),
+            $subject instanceof Client => $subject->full_name,
             $subject instanceof ClientProject => 'Deal #'.$subject->id,
             $subject instanceof Unit => 'Unit '.$subject->reference,
             default => class_basename($subject),

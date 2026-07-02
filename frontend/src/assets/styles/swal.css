@@ -1,0 +1,43 @@
+/* Theme SweetAlert2 dialogs with the app's design tokens (light/dark aware). */
+.swal2-popup {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.swal2-title,
+.swal2-html-container {
+  color: var(--color-text);
+}
+
+.plaza-swal-confirm {
+  background-color: var(--color-primary) !important;
+  color: var(--color-on-primary) !important;
+}
+
+.plaza-swal-danger {
+  background-color: var(--color-danger) !important;
+  color: #ffffff !important;
+}
+
+.plaza-swal-cancel {
+  background-color: transparent !important;
+  color: var(--color-text) !important;
+  box-shadow: inset 0 0 0 1px var(--color-border) !important;
+}
+
+/* Top-right flash toast */
+.plaza-swal-toast {
+  background: var(--color-surface) !important;
+  color: var(--color-text) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18) !important;
+}
+
+.plaza-swal-toast .swal2-title {
+  color: var(--color-text) !important;
+  font-size: 0.9rem !important;
+  font-weight: 500 !important;
+}

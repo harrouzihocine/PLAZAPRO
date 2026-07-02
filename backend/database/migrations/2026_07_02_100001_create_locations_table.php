@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * locations = real-estate projects / buildings / sites (they hold units and
- * boxes). The geographic dropdown is the `areas` dynamic list, not this table.
+ * boxes). The geographic dropdowns are the `wilayas`/`communes` tables.
  * See docs/database/02-inventory.md.
  */
 return new class extends Migration
@@ -19,10 +19,17 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('code')->unique();
-            $table->foreignId('area_id')->nullable()
-                ->constrained('dynamic_list_items')->nullOnDelete();
+            $table->foreignId('wilaya_id')->nullable()
+                ->constrained('wilayas')->nullOnDelete();
+            $table->foreignId('commune_id')->nullable()
+                ->constrained('communes')->nullOnDelete();
             $table->string('address')->nullable();
             $table->text('description')->nullable();
+            // Estimated hand-over / readiness date for the project (delivery).
+            $table->date('expected_delivery_date')->nullable();
+            // Go-to-market / sales priority — drives how the vente team ranks
+            // projects to push (see App\Modules\Inventory\Enums\GtmPriority).
+            $table->string('gtm_priority')->default('medium');
             $table->decimal('latitude', 10, 7)->nullable();
             $table->decimal('longitude', 10, 7)->nullable();
 
@@ -34,7 +41,9 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index('status');
-            $table->index('area_id');
+            $table->index('gtm_priority');
+            $table->index('wilaya_id');
+            $table->index('commune_id');
         });
     }
 

@@ -41,13 +41,78 @@ class LocationTest extends TestCase
             'name' => 'Résidence Les Oliviers',
             'code' => 'OLIV-1',
             'address' => '12 rue des Oliviers',
+            'expected_delivery_date' => '2027-09-01',
         ])
             ->assertCreated()
             ->assertJsonPath('data.name', 'Résidence Les Oliviers')
-            ->assertJsonPath('data.code', 'OLIV-1');
+            ->assertJsonPath('data.code', 'OLIV-1')
+            ->assertJsonPath('data.expected_delivery_date', '2027-09-01');
 
         $this->assertDatabaseHas('locations', [
-            'code' => 'OLIV-1', 'status' => 'active',
+            'code' => 'OLIV-1', 'status' => 'active', 'expected_delivery_date' => '2027-09-01',
+        ]);
+    }
+
+    public function test_expected_delivery_date_must_be_a_valid_date(): void
+    {
+        Sanctum::actingAs($this->manager());
+
+        $this->postJson('/api/v1/locations', [
+            'name' => 'X', 'code' => 'BAD-1', 'expected_delivery_date' => 'not-a-date',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('expected_delivery_date');
+    }
+
+    public function test_location_defaults_to_medium_gtm_priority(): void
+    {
+        Sanctum::actingAs($this->manager());
+
+        $this->postJson('/api/v1/locations', ['name' => 'X', 'code' => 'PRIO-1'])
+            ->assertCreated()
+            ->assertJsonPath('data.gtm_priority', 'medium');
+    }
+
+    public function test_manager_can_set_and_filter_by_gtm_priority(): void
+    {
+        Sanctum::actingAs($this->manager());
+
+        $this->postJson('/api/v1/locations', [
+            'name' => 'Flagship', 'code' => 'HIGH-1', 'gtm_priority' => 'critical',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.gtm_priority', 'critical');
+
+        Location::factory()->create(['name' => 'Slow', 'code' => 'LOW-1', 'gtm_priority' => 'low']);
+
+        $this->getJson('/api/v1/locations?priority=critical')
+            ->assertOk()
+            ->assertJsonFragment(['code' => 'HIGH-1'])
+            ->assertJsonMissing(['code' => 'LOW-1']);
+    }
+
+    public function test_gtm_priority_must_be_a_valid_degree(): void
+    {
+        Sanctum::actingAs($this->manager());
+
+        $this->postJson('/api/v1/locations', [
+            'name' => 'X', 'code' => 'BADP-1', 'gtm_priority' => 'sky-high',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('gtm_priority');
+    }
+
+    public function test_manager_can_update_the_expected_delivery_date(): void
+    {
+        $location = Location::factory()->create(['expected_delivery_date' => null]);
+        Sanctum::actingAs($this->manager());
+
+        $this->putJson("/api/v1/locations/{$location->id}", ['expected_delivery_date' => '2028-01-15'])
+            ->assertOk()
+            ->assertJsonPath('data.expected_delivery_date', '2028-01-15');
+
+        $this->assertDatabaseHas('locations', [
+            'id' => $location->id, 'expected_delivery_date' => '2028-01-15',
         ]);
     }
 

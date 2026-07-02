@@ -3,12 +3,12 @@ import { onMounted, reactive, ref } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
+import BasePhoneInput from '@/components/base/BasePhoneInput.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
 import { useUsersStore } from '@/features/settings/usersStore'
+import { confirmAction } from '@/composables/useConfirm'
 
 const store = useUsersStore()
-
-const selectClass =
-  'w-full rounded-token border border-border bg-bg px-3 py-2 min-h-[44px] text-ink outline-none focus:border-primary'
 
 const drawerOpen = ref(false)
 const editingId = ref(null) // null = creating
@@ -67,8 +67,15 @@ function toggleActive(user) {
   store.setActive(user.id, !user.is_active)
 }
 
-function cancelUser(user) {
-  if (window.confirm(`Cancel user "${user.name}"? The record is kept but marked cancelled.`)) {
+async function cancelUser(user) {
+  if (
+    await confirmAction({
+      title: `Cancel user "${user.name}"?`,
+      text: 'The record is kept but marked cancelled.',
+      confirmText: 'Cancel user',
+      danger: true,
+    })
+  ) {
     store.cancel(user.id)
   }
 }
@@ -84,28 +91,30 @@ function cancelUser(user) {
       <BaseButton @click="openCreate">New user</BaseButton>
     </div>
 
-    <p v-if="store.error" class="text-sm text-danger">{{ store.error }}</p>
 
     <!-- Filters -->
     <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
-      <select v-model="store.filters.role_id" :class="selectClass" aria-label="Filter by role" @change="store.fetch()">
-        <option value="">All roles</option>
-        <option v-for="r in store.roles" :key="r.id" :value="r.id">{{ r.name }}</option>
-      </select>
-      <select
-        v-model="store.filters.department_id"
-        :class="selectClass"
-        aria-label="Filter by department"
+      <BaseSelect
+        v-model="store.filters.role_id"
+        aria-label="Filter by role"
+        placeholder="All roles"
+        :options="store.roles.map((r) => ({ value: r.id, label: r.name }))"
         @change="store.fetch()"
-      >
-        <option value="">All departments</option>
-        <option v-for="d in store.departments" :key="d.id" :value="d.id">{{ d.name }}</option>
-      </select>
-      <select v-model="store.filters.is_active" :class="selectClass" aria-label="Filter by state" @change="store.fetch()">
-        <option value="">Any state</option>
-        <option value="1">Active</option>
-        <option value="0">Inactive</option>
-      </select>
+      />
+      <BaseSelect
+        v-model="store.filters.department_id"
+        aria-label="Filter by department"
+        placeholder="All departments"
+        :options="store.departments.map((d) => ({ value: d.id, label: d.name }))"
+        @change="store.fetch()"
+      />
+      <BaseSelect
+        v-model="store.filters.is_active"
+        aria-label="Filter by state"
+        placeholder="Any state"
+        :options="[{ value: '1', label: 'Active' }, { value: '0', label: 'Inactive' }]"
+        @change="store.fetch()"
+      />
     </div>
 
     <BaseCard>
@@ -154,23 +163,22 @@ function cancelUser(user) {
           <BaseInput v-model="form.password" label="Password" type="password" />
           <p v-if="editingId" class="-mt-2 text-xs opacity-60">Leave blank to keep the current password.</p>
 
-          <label class="block">
-            <span class="mb-1 block text-sm">Role</span>
-            <select v-model="form.role_id" :class="selectClass" aria-label="Role">
-              <option value="" disabled>Select a role</option>
-              <option v-for="r in store.roles" :key="r.id" :value="r.id">{{ r.name }}</option>
-            </select>
-          </label>
+          <BaseSelect
+            v-model="form.role_id"
+            label="Role"
+            placeholder="Select a role"
+            :clearable="false"
+            :options="store.roles.map((r) => ({ value: r.id, label: r.name }))"
+          />
 
-          <label class="block">
-            <span class="mb-1 block text-sm">Department</span>
-            <select v-model="form.department_id" :class="selectClass" aria-label="Department">
-              <option value="">None</option>
-              <option v-for="d in store.departments" :key="d.id" :value="d.id">{{ d.name }}</option>
-            </select>
-          </label>
+          <BaseSelect
+            v-model="form.department_id"
+            label="Department"
+            placeholder="None"
+            :options="store.departments.map((d) => ({ value: d.id, label: d.name }))"
+          />
 
-          <BaseInput v-model="form.phone" label="Phone" />
+          <BasePhoneInput v-model="form.phone" label="Phone" />
 
           <div class="flex gap-2 pt-2">
             <BaseButton type="submit" :disabled="store.saving">Save</BaseButton>

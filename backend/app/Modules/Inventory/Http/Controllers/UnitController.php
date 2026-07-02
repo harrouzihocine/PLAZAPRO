@@ -28,7 +28,7 @@ class UnitController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        // type_id / floor_id / area_id / sale_status accept either a single value
+        // type_id / floor_id / wilaya_id / sale_status accept either a single value
         // or a list (multi-select filters) — cast to an array and use whereIn.
         $asList = fn (string $key) => array_values(array_filter(
             (array) $request->query($key),
@@ -36,18 +36,22 @@ class UnitController extends Controller
         ));
 
         $units = Unit::query()
-            ->with(['type', 'floor', 'location.area'])
+            ->with(['type', 'floor', 'location.wilaya', 'location.commune'])
             ->when($request->query('status') !== 'all', fn ($q) => $q->active())
             ->when($request->filled('location_id'), fn ($q) => $q->where('location_id', $request->query('location_id')))
             ->when($asList('type_id'), fn ($q, $ids) => $q->whereIn('type_id', $ids))
             ->when($asList('floor_id'), fn ($q, $ids) => $q->whereIn('floor_id', $ids))
-            // Geographic area lives on the unit's location (project), not the unit.
-            ->when($asList('area_id'), fn ($q, $ids) => $q->whereHas('location', fn ($l) => $l->whereIn('area_id', $ids)))
+            // Geographic location lives on the unit's project (location), not the unit.
+            ->when($asList('wilaya_id'), fn ($q, $ids) => $q->whereHas('location', fn ($l) => $l->whereIn('wilaya_id', $ids)))
+            ->when($asList('commune_id'), fn ($q, $ids) => $q->whereHas('location', fn ($l) => $l->whereIn('commune_id', $ids)))
             ->when($asList('sale_status'), fn ($q, $statuses) => $q->whereIn('sale_status', $statuses))
+            ->when($asList('priority'), fn ($q, $priorities) => $q->whereIn('gtm_priority', $priorities))
             ->when($request->filled('min_price'), fn ($q) => $q->where('price', '>=', $request->query('min_price')))
             ->when($request->filled('max_price'), fn ($q) => $q->where('price', '<=', $request->query('max_price')))
             ->when($request->filled('min_area'), fn ($q) => $q->where('area_sqm', '>=', $request->query('min_area')))
             ->when($request->filled('max_area'), fn ($q) => $q->where('area_sqm', '<=', $request->query('max_area')))
+            // Highest GTM priority first so the vente team sees what to push on top.
+            ->orderByRaw("FIELD(gtm_priority, 'critical', 'high', 'medium', 'low')")
             ->orderBy('reference')
             ->get();
 
@@ -56,7 +60,7 @@ class UnitController extends Controller
 
     public function show(Unit $unit): UnitResource
     {
-        return new UnitResource($unit->load(['type', 'floor', 'location.area']));
+        return new UnitResource($unit->load(['type', 'floor', 'location.wilaya', 'location.commune']));
     }
 
     public function store(StoreUnitRequest $request, Location $location, CreateUnit $action): UnitResource

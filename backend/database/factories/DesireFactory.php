@@ -20,7 +20,8 @@ class DesireFactory extends Factory
         return [
             'client_id' => Client::factory(),
             'client_project_id' => null,
-            'area_id' => null,
+            'wilaya_id' => null,
+            'commune_id' => null,
             'type_id' => null,
             'floor_pref' => null,
             'budget_min' => null,

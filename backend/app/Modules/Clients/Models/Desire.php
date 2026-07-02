@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Clients\Models;
 
 use App\Core\Models\BaseModel;
+use App\Modules\Settings\Models\Commune;
 use App\Modules\Settings\Models\DynamicListItem;
+use App\Modules\Settings\Models\Wilaya;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -19,7 +21,7 @@ class Desire extends BaseModel
     use HasFactory;
 
     protected $fillable = [
-        'client_id', 'client_project_id', 'area_id', 'type_id',
+        'client_id', 'client_project_id', 'wilaya_id', 'commune_id', 'type_id',
         'floor_pref', 'budget_min', 'budget_max', 'notes',
     ];
 
@@ -36,9 +38,14 @@ class Desire extends BaseModel
         return $this->belongsTo(Client::class);
     }
 
-    public function area(): BelongsTo
+    public function wilaya(): BelongsTo
     {
-        return $this->belongsTo(DynamicListItem::class, 'area_id');
+        return $this->belongsTo(Wilaya::class);
+    }
+
+    public function commune(): BelongsTo
+    {
+        return $this->belongsTo(Commune::class);
     }
 
     public function type(): BelongsTo

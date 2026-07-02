@@ -1,27 +1,56 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
-import { useDynamicList } from '@/composables/useDynamicList'
+import BaseSelect from '@/components/base/BaseSelect.vue'
+import { useWilayas, useCommunes } from '@/composables/useGeography'
+import { GTM_PRIORITIES } from '@/features/inventory/api'
+import GtmPriorityBadge from '@/features/inventory/components/GtmPriorityBadge.vue'
 import LocationMap from '@/features/inventory/components/LocationMap.vue'
+import { googleMapsUrl } from '@/features/inventory/googleMaps'
 import { useLocationsStore } from '@/features/inventory/locationsStore'
 import { useAuthStore } from '@/features/settings/store'
+import { confirmAction } from '@/composables/useConfirm'
 
 const store = useLocationsStore()
 const auth = useAuthStore()
-const { items: areas } = useDynamicList('areas')
+const { wilayas } = useWilayas()
+// Independent dependent-commune lists for the filter bar and the form.
+const { communes: filterCommunes, load: loadFilterCommunes } = useCommunes()
+const { communes: formCommunes, load: loadFormCommunes } = useCommunes()
 
 const canManage = auth.can('locations.manage')
 
-const blank = { name: '', code: '', area_id: '', address: '', description: '', latitude: null, longitude: null }
+const blank = { name: '', code: '', wilaya_id: '', commune_id: '', address: '', description: '', expected_delivery_date: '', gtm_priority: 'medium', latitude: null, longitude: null }
 const form = reactive({ ...blank })
 const editingId = ref(null)
 const showForm = ref(false)
 const showMap = ref(false)
+const mapsUrl = computed(() => googleMapsUrl(form))
+// Archived projects are lazy-loaded the first time the section is opened.
+const showArchived = ref(false)
 
 onMounted(() => store.fetch())
+
+// Cascade: reload the dependent commune list when the chosen wilaya changes.
+// A user-driven change also clears the previously-picked commune.
+watch(
+  () => form.wilaya_id,
+  (id, prev) => {
+    if (prev !== undefined && id !== prev) form.commune_id = ''
+    loadFormCommunes(id)
+  },
+)
+watch(
+  () => store.filters.wilaya_id,
+  (id, prev) => {
+    if (prev !== undefined && id !== prev) store.filters.commune_id = ''
+    loadFilterCommunes(id)
+    store.fetch()
+  },
+)
 
 function openCreate() {
   Object.assign(form, blank)
@@ -34,12 +63,16 @@ function openEdit(loc) {
   Object.assign(form, {
     name: loc.name,
     code: loc.code,
-    area_id: loc.area_id ?? '',
+    wilaya_id: loc.wilaya_id ?? '',
+    commune_id: loc.commune_id ?? '',
     address: loc.address ?? '',
     description: loc.description ?? '',
+    expected_delivery_date: loc.expected_delivery_date ?? '',
+    gtm_priority: loc.gtm_priority ?? 'medium',
     latitude: loc.latitude ?? null,
     longitude: loc.longitude ?? null,
   })
+  loadFormCommunes(loc.wilaya_id)
   editingId.value = loc.id
   showMap.value = loc.latitude != null && loc.longitude != null
   showForm.value = true
@@ -49,9 +82,12 @@ async function submit() {
   const payload = {
     name: form.name.trim(),
     code: form.code.trim(),
-    area_id: form.area_id || null,
+    wilaya_id: form.wilaya_id || null,
+    commune_id: form.commune_id || null,
     address: form.address.trim() || null,
     description: form.description.trim() || null,
+    expected_delivery_date: form.expected_delivery_date || null,
+    gtm_priority: form.gtm_priority,
     latitude: form.latitude ?? null,
     longitude: form.longitude ?? null,
   }
@@ -67,10 +103,40 @@ async function submit() {
   }
 }
 
-function remove(loc) {
-  if (window.confirm(`Cancel project "${loc.name}"? The record is kept but marked cancelled.`)) {
+// Archive: reversible. Hides the project and everything inside it until reactivated.
+async function archive(loc) {
+  if (
+    await confirmAction({
+      title: `Archive project "${loc.name}"?`,
+      text: 'This archives the project and all its units and boxes. You can reactivate it later.',
+      confirmText: 'Archive',
+    })
+  ) {
+    store.archive(loc.id)
+  }
+}
+
+function reactivate(loc) {
+  store.reactivate(loc.id)
+}
+
+// Remove: terminal. Cancels the project and its inventory (kept + audited, not deleted).
+async function remove(loc) {
+  if (
+    await confirmAction({
+      title: `Remove project "${loc.name}"?`,
+      text: 'This removes the project and everything inside it. The records are kept but marked cancelled.',
+      confirmText: 'Remove',
+      danger: true,
+    })
+  ) {
     store.cancel(loc.id)
   }
+}
+
+function toggleArchived() {
+  showArchived.value = !showArchived.value
+  if (showArchived.value) store.loadArchived()
 }
 </script>
 
@@ -91,20 +157,29 @@ function remove(loc) {
         class="flex-1 min-w-[12rem]"
         @keyup.enter="store.fetch()"
       />
-      <label class="block">
-        <span class="mb-1 block text-sm">Area</span>
-        <select
-          v-model="store.filters.area_id"
-          class="w-full rounded-token border border-border bg-bg px-3 py-2 min-h-[44px] text-ink"
-          @change="store.fetch()"
-        >
-          <option value="">All areas</option>
-          <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.label }}</option>
-        </select>
-      </label>
+      <BaseSelect
+        v-model="store.filters.wilaya_id"
+        label="Wilaya"
+        placeholder="All wilayas"
+        :options="wilayas.map((w) => ({ value: w.id, label: `${w.code} · ${w.name}` }))"
+      />
+      <BaseSelect
+        v-model="store.filters.commune_id"
+        label="Commune"
+        placeholder="All communes"
+        :disabled="!store.filters.wilaya_id"
+        :options="filterCommunes.map((c) => ({ value: c.id, label: c.name }))"
+        @change="store.fetch()"
+      />
+      <BaseSelect
+        v-model="store.filters.priority"
+        label="GTM priority"
+        placeholder="All priorities"
+        :options="GTM_PRIORITIES"
+        @change="store.fetch()"
+      />
     </div>
 
-    <p v-if="store.error" class="text-sm text-danger">{{ store.error }}</p>
 
     <BaseCard v-if="showForm && canManage">
       <form class="space-y-3" @submit.prevent="submit">
@@ -112,17 +187,58 @@ function remove(loc) {
         <div class="grid gap-3 sm:grid-cols-2">
           <BaseInput v-model="form.name" label="Name" />
           <BaseInput v-model="form.code" label="Code" />
-          <label class="block">
-            <span class="mb-1 block text-sm">Area</span>
-            <select
-              v-model="form.area_id"
-              class="w-full rounded-token border border-border bg-bg px-3 py-2 min-h-[44px] text-ink"
+          <BaseSelect
+            v-model="form.wilaya_id"
+            label="Wilaya"
+            placeholder="— none —"
+            :options="wilayas.map((w) => ({ value: w.id, label: `${w.code} · ${w.name}` }))"
+          />
+          <BaseSelect
+            v-model="form.commune_id"
+            label="Commune"
+            placeholder="— none —"
+            :disabled="!form.wilaya_id"
+            :options="formCommunes.map((c) => ({ value: c.id, label: c.name }))"
+          />
+          <div>
+            <BaseInput v-model="form.address" label="Address" />
+            <a
+              v-if="mapsUrl"
+              :href="mapsUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open in Google Maps"
+              aria-label="Open in Google Maps"
+              class="mt-1 inline-flex text-primary hover:opacity-80"
             >
-              <option value="">— none —</option>
-              <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.label }}</option>
-            </select>
-          </label>
-          <BaseInput v-model="form.address" label="Address" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+            </a>
+          </div>
+          <BaseInput
+            v-model="form.expected_delivery_date"
+            label="Expected delivery date"
+            type="date"
+          />
+          <BaseSelect
+            v-model="form.gtm_priority"
+            label="GTM priority"
+            :clearable="false"
+            :options="GTM_PRIORITIES"
+          />
         </div>
         <div class="space-y-2">
           <button
@@ -163,17 +279,57 @@ function remove(loc) {
             >
               {{ loc.name }}
             </RouterLink>
+            <GtmPriorityBadge v-if="loc.gtm_priority" :priority="loc.gtm_priority" class="ml-2" />
             <span class="ml-2 text-xs opacity-60">
-              {{ loc.code }}<template v-if="loc.area"> · {{ loc.area.label }}</template>
+              {{ loc.code
+              }}<template v-if="loc.wilaya"> · {{ loc.wilaya.name }}</template
+              ><template v-if="loc.commune"> ({{ loc.commune.name }})</template>
+            </span>
+            <span v-if="loc.expected_delivery_date" class="ml-2 text-xs opacity-60">
+              🏁 Delivery {{ loc.expected_delivery_date }}
             </span>
           </div>
           <div v-if="canManage" class="flex items-center gap-1">
             <BaseButton variant="ghost" @click="openEdit(loc)">Edit</BaseButton>
+            <BaseButton variant="ghost" @click="archive(loc)">Archive</BaseButton>
             <BaseButton variant="ghost" @click="remove(loc)">Remove</BaseButton>
           </div>
         </div>
         <p v-if="!store.items.length" class="py-4 text-center text-sm opacity-60">
           No projects yet.
+        </p>
+      </div>
+    </BaseCard>
+
+    <!-- Archived projects: hidden by default, reactivatable one by one. -->
+    <BaseCard v-if="canManage">
+      <button
+        type="button"
+        class="text-sm font-semibold uppercase opacity-60 hover:opacity-100"
+        @click="toggleArchived"
+      >
+        {{ showArchived ? 'Hide' : 'Show' }} archived projects
+      </button>
+
+      <div v-if="showArchived" class="mt-3 space-y-2">
+        <div
+          v-for="loc in store.archivedItems"
+          :key="loc.id"
+          class="flex flex-col gap-2 rounded-token border border-dashed border-border p-3 opacity-80 sm:flex-row sm:items-center"
+        >
+          <div class="flex-1">
+            <span class="font-medium">{{ loc.name }}</span>
+            <span class="ml-2 text-xs opacity-60">
+              {{ loc.code
+              }}<template v-if="loc.wilaya"> · {{ loc.wilaya.name }}</template
+              ><template v-if="loc.commune"> ({{ loc.commune.name }})</template>
+            </span>
+            <span class="ml-2 text-xs uppercase opacity-50">archived</span>
+          </div>
+          <BaseButton variant="ghost" @click="reactivate(loc)">Reactivate</BaseButton>
+        </div>
+        <p v-if="!store.archivedItems.length" class="py-2 text-center text-sm opacity-60">
+          No archived projects.
         </p>
       </div>
     </BaseCard>

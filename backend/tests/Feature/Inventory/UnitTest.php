@@ -6,10 +6,10 @@ namespace Tests\Feature\Inventory;
 
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
-use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
+use App\Modules\Settings\Models\Wilaya;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -51,6 +51,61 @@ class UnitTest extends TestCase
         $this->assertDatabaseHas('units', [
             'location_id' => $location->id, 'reference' => 'A-101', 'status' => 'active',
         ]);
+    }
+
+    public function test_unit_defaults_to_medium_gtm_priority(): void
+    {
+        $location = Location::factory()->create();
+        Sanctum::actingAs($this->manager());
+
+        $this->postJson("/api/v1/locations/{$location->id}/units", [
+            'reference' => 'A-101', 'price' => 250000,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.gtm_priority', 'medium');
+    }
+
+    public function test_manager_can_set_gtm_priority_on_create_and_edit(): void
+    {
+        $location = Location::factory()->create();
+        Sanctum::actingAs($this->manager());
+
+        $response = $this->postJson("/api/v1/locations/{$location->id}/units", [
+            'reference' => 'A-101', 'price' => 250000, 'gtm_priority' => 'high',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.gtm_priority', 'high');
+
+        $unitId = $response->json('data.id');
+
+        $this->putJson("/api/v1/units/{$unitId}", ['gtm_priority' => 'critical'])
+            ->assertOk()
+            ->assertJsonPath('data.gtm_priority', 'critical');
+    }
+
+    public function test_index_filters_by_gtm_priority(): void
+    {
+        $location = Location::factory()->create();
+        Unit::factory()->for($location)->create(['reference' => 'HOT', 'gtm_priority' => 'critical']);
+        Unit::factory()->for($location)->create(['reference' => 'COLD', 'gtm_priority' => 'low']);
+        Sanctum::actingAs($this->manager());
+
+        $this->getJson('/api/v1/units?priority[]=critical')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.reference', 'HOT');
+    }
+
+    public function test_gtm_priority_must_be_a_valid_degree(): void
+    {
+        $location = Location::factory()->create();
+        Sanctum::actingAs($this->manager());
+
+        $this->postJson("/api/v1/locations/{$location->id}/units", [
+            'reference' => 'A-101', 'price' => 1, 'gtm_priority' => 'sky-high',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('gtm_priority');
     }
 
     public function test_reference_must_be_unique_among_active_units_in_the_location(): void
@@ -132,22 +187,22 @@ class UnitTest extends TestCase
             ->assertJsonPath('data.0.reference', 'A-2');
     }
 
-    public function test_index_filters_by_geographic_area_of_the_project(): void
+    public function test_index_filters_by_wilaya_of_the_project(): void
     {
-        $alger = DynamicListItem::factory()->create();
-        $oran = DynamicListItem::factory()->create();
-        $algerLocation = Location::factory()->create(['area_id' => $alger->id]);
-        $oranLocation = Location::factory()->create(['area_id' => $oran->id]);
+        $alger = Wilaya::factory()->create();
+        $oran = Wilaya::factory()->create();
+        $algerLocation = Location::factory()->create(['wilaya_id' => $alger->id]);
+        $oranLocation = Location::factory()->create(['wilaya_id' => $oran->id]);
         Unit::factory()->for($algerLocation)->create(['reference' => 'A-1']);
         Unit::factory()->for($oranLocation)->create(['reference' => 'O-1']);
         Sanctum::actingAs($this->manager());
 
-        // A unit's geographic area is its project's area_id.
-        $this->getJson("/api/v1/units?area_id[]={$alger->id}")
+        // A unit's wilaya is its project's wilaya_id.
+        $this->getJson("/api/v1/units?wilaya_id[]={$alger->id}")
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.reference', 'A-1')
-            ->assertJsonPath('data.0.location.area_id', $alger->id);
+            ->assertJsonPath('data.0.location.wilaya_id', $alger->id);
     }
 
     public function test_a_reserved_unit_cannot_be_cancelled(): void
@@ -168,10 +223,12 @@ class UnitTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_cannot_cancel_a_location_with_active_units(): void
+    public function test_cannot_remove_a_location_with_reserved_or_sold_units(): void
     {
+        // Removing a project now cascades over AVAILABLE inventory, but is still
+        // refused while a unit is reserved or sold, so a live sale is never lost.
         $location = Location::factory()->create();
-        Unit::factory()->for($location)->create();
+        Unit::factory()->for($location)->reserved()->create();
         Sanctum::actingAs($this->userWithPermissions(['units.view', 'locations.manage']));
 
         $this->deleteJson("/api/v1/locations/{$location->id}")->assertStatus(422);

@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
 import { useDynamicList } from '@/composables/useDynamicList'
 import { useClientsStore } from '@/features/clients/clientsStore'
 import { pipelineApi } from '@/features/pipeline/api'
@@ -115,20 +116,18 @@ async function submitComplete() {
     <!-- Log call form -->
     <form v-if="showCall" class="mb-3 space-y-2 rounded-token bg-surface p-3" @submit.prevent="submitCall">
       <div class="grid gap-2 sm:grid-cols-2">
-        <label class="block">
-          <span class="mb-1 block text-xs">Direction</span>
-          <select v-model="callForm.direction" :class="selectClass">
-            <option value="outbound">outbound</option>
-            <option value="inbound">inbound</option>
-          </select>
-        </label>
-        <label class="block">
-          <span class="mb-1 block text-xs">Outcome</span>
-          <select v-model="callForm.outcome_id" :class="selectClass">
-            <option value="">None</option>
-            <option v-for="o in callOutcomes" :key="o.id" :value="o.id">{{ o.label }}</option>
-          </select>
-        </label>
+        <BaseSelect
+          v-model="callForm.direction"
+          label="Direction"
+          :clearable="false"
+          :options="[{ value: 'outbound', label: 'outbound' }, { value: 'inbound', label: 'inbound' }]"
+        />
+        <BaseSelect
+          v-model="callForm.outcome_id"
+          label="Outcome"
+          placeholder="None"
+          :options="callOutcomes.map((o) => ({ value: o.id, label: o.label }))"
+        />
         <BaseInput v-model="callForm.notes" label="Notes" class="sm:col-span-2" />
       </div>
       <NextActionFields v-model="callForm.next_action" :agents="store.agents" />
@@ -141,27 +140,25 @@ async function submitComplete() {
     <!-- Schedule visit form -->
     <form v-if="showVisit" class="mb-3 space-y-2 rounded-token bg-surface p-3" @submit.prevent="submitVisit">
       <div class="grid gap-2 sm:grid-cols-2">
-        <label class="block">
-          <span class="mb-1 block text-xs">Type</span>
-          <select v-model="visitForm.type" :class="selectClass">
-            <option value="office">office</option>
-            <option value="apartment">apartment</option>
-          </select>
-        </label>
-        <label v-if="visitForm.type === 'apartment'" class="block">
-          <span class="mb-1 block text-xs">Unit</span>
-          <select v-model="visitForm.unit_id" :class="selectClass">
-            <option value="">Select unit</option>
-            <option v-for="u in units" :key="u.id" :value="u.id">{{ u.reference }}</option>
-          </select>
-        </label>
-        <label class="block">
-          <span class="mb-1 block text-xs">Agent</span>
-          <select v-model="visitForm.agent_id" :class="selectClass">
-            <option value="">Select agent</option>
-            <option v-for="a in store.agents" :key="a.id" :value="a.id">{{ a.name }}</option>
-          </select>
-        </label>
+        <BaseSelect
+          v-model="visitForm.type"
+          label="Type"
+          :clearable="false"
+          :options="[{ value: 'office', label: 'office' }, { value: 'apartment', label: 'apartment' }]"
+        />
+        <BaseSelect
+          v-if="visitForm.type === 'apartment'"
+          v-model="visitForm.unit_id"
+          label="Unit"
+          placeholder="Select unit"
+          :options="units.map((u) => ({ value: u.id, label: u.reference }))"
+        />
+        <BaseSelect
+          v-model="visitForm.agent_id"
+          label="Agent"
+          placeholder="Select agent"
+          :options="store.agents.map((a) => ({ value: a.id, label: a.name }))"
+        />
         <label class="block">
           <span class="mb-1 block text-xs">When</span>
           <input v-model="visitForm.scheduled_at" type="datetime-local" :class="selectClass" />
@@ -212,13 +209,12 @@ async function submitComplete() {
             class="mt-2 space-y-2 rounded-token bg-surface p-3"
             @submit.prevent="submitComplete"
           >
-            <label class="block">
-              <span class="mb-1 block text-xs">Outcome</span>
-              <select v-model="completeForm.outcome_id" :class="selectClass">
-                <option value="">None</option>
-                <option v-for="o in outcomes" :key="o.id" :value="o.id">{{ o.label }}</option>
-              </select>
-            </label>
+            <BaseSelect
+              v-model="completeForm.outcome_id"
+              label="Outcome"
+              placeholder="None"
+              :options="outcomes.map((o) => ({ value: o.id, label: o.label }))"
+            />
             <NextActionFields v-model="completeForm.next_action" :agents="store.agents" />
             <div class="flex gap-2">
               <BaseButton type="submit" :disabled="store.saving">Complete visit</BaseButton>

@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { toastError } from '@/composables/useConfirm'
 import { tasksApi } from '@/features/pipeline/api'
 import { agentsApi } from '@/features/clients/api'
 
@@ -39,6 +40,7 @@ export const useTasksStore = defineStore('tasks', {
         await this.fetch()
       } catch (e) {
         this.error = e.response?.data?.message ?? 'Could not create the task.'
+        toastError(this.error)
         throw e
       } finally {
         this.saving = false

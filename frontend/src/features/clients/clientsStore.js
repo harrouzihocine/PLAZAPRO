@@ -1,16 +1,27 @@
 import { defineStore } from 'pinia'
-import { agentsApi, clientsApi, desireApi, projectsApi, reserveUnit } from '@/features/clients/api'
+import { toastError } from '@/composables/useConfirm'
+import {
+  agentsApi,
+  clientsApi,
+  desireApi,
+  followUpAgentsApi,
+  projectsApi,
+  reserveUnit,
+} from '@/features/clients/api'
 import { pipelineApi } from '@/features/pipeline/api'
 
-// State for the Clients screens. Loads clients plus the agent catalogue (for the
-// assign-agent picker). Filters are sent to the server; every write refetches so
-// server rules (e.g. agent-only assignment) are reflected.
+// State for the Clients screens. Loads clients plus two agent catalogues: `agents`
+// (field agents, for visit/next-action pickers) and `followUpAgents` (sales agents
+// who can log calls, for the client "assigned agent" picker). Filters are sent to
+// the server; every write refetches so server rules are reflected.
 export const useClientsStore = defineStore('clients', {
   state: () => ({
     items: [],
     current: null,
     agents: [],
+    followUpAgents: [],
     projects: [],
+    archivedProjects: [],
     desire: null,
     matches: [],
     timeline: { calls: [], visits: [], next_actions: [] },
@@ -28,9 +39,14 @@ export const useClientsStore = defineStore('clients', {
         for (const [k, v] of Object.entries(this.filters)) {
           if (v !== '' && v !== null) params[k] = v
         }
-        const [clients, agents] = await Promise.all([clientsApi.list(params), agentsApi.list()])
+        const [clients, agents, followUpAgents] = await Promise.all([
+          clientsApi.list(params),
+          agentsApi.list(),
+          followUpAgentsApi.list(),
+        ])
         this.items = clients
         this.agents = agents
+        this.followUpAgents = followUpAgents
       } finally {
         this.loading = false
       }
@@ -41,6 +57,7 @@ export const useClientsStore = defineStore('clients', {
       try {
         this.current = await clientsApi.get(id)
         if (!this.agents.length) this.agents = await agentsApi.list()
+        if (!this.followUpAgents.length) this.followUpAgents = await followUpAgentsApi.list()
         return this.current
       } finally {
         this.loading = false
@@ -55,6 +72,7 @@ export const useClientsStore = defineStore('clients', {
         return result
       } catch (e) {
         this.error = e.response?.data?.message ?? 'Action failed.'
+        toastError(this.error)
         throw e
       } finally {
         this.saving = false
@@ -87,6 +105,11 @@ export const useClientsStore = defineStore('clients', {
       return this.projects
     },
 
+    async loadArchivedProjects(clientId) {
+      this.archivedProjects = await projectsApi.list(clientId, 'archived')
+      return this.archivedProjects
+    },
+
     async createProject(clientId, payload = {}) {
       await this.mutate(() => projectsApi.create(clientId, payload))
       return this.loadProjects(clientId)
@@ -97,7 +120,21 @@ export const useClientsStore = defineStore('clients', {
       return this.loadProjects(clientId)
     },
 
-    async cancelProject(clientId, projectId, reason = 'Deal cancelled') {
+    // Archive = reversible: hides the deal + its contents until reactivated.
+    async archiveProject(clientId, projectId) {
+      await this.mutate(() => projectsApi.archive(projectId))
+      await this.loadArchivedProjects(clientId)
+      return this.loadProjects(clientId)
+    },
+
+    async reactivateProject(clientId, projectId) {
+      await this.mutate(() => projectsApi.reactivate(projectId))
+      await this.loadArchivedProjects(clientId)
+      return this.loadProjects(clientId)
+    },
+
+    // Remove = terminal: cancels the deal and everything inside it (kept + audited).
+    async cancelProject(clientId, projectId, reason = 'Deal removed') {
       await this.mutate(() => projectsApi.cancel(projectId, reason))
       return this.loadProjects(clientId)
     },

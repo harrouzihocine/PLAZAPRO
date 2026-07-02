@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import BaseCard from '@/components/base/BaseCard.vue'
+import GtmPriorityBadge from '@/features/inventory/components/GtmPriorityBadge.vue'
 import MediaGallery from '@/features/inventory/components/MediaGallery.vue'
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
 import { useUnitsStore } from '@/features/inventory/unitsStore'
@@ -28,6 +29,10 @@ onMounted(() => units.fetchOne(props.id))
       <div class="flex flex-wrap items-center gap-2">
         <h1 class="text-xl font-semibold">{{ units.current.reference }}</h1>
         <SaleStatusBadge :status="units.current.sale_status" />
+        <GtmPriorityBadge
+          v-if="units.current.gtm_priority"
+          :priority="units.current.gtm_priority"
+        />
       </div>
 
       <BaseCard>
@@ -63,6 +68,14 @@ onMounted(() => units.fetchOne(props.id))
           <div v-if="units.current.position != null">
             <dt class="text-xs opacity-60">Position</dt>
             <dd>{{ units.current.position }}</dd>
+          </div>
+          <div v-if="units.current.location?.expected_delivery_date">
+            <dt class="text-xs opacity-60">Project delivery</dt>
+            <dd>{{ units.current.location.expected_delivery_date }}</dd>
+          </div>
+          <div v-if="units.current.location?.gtm_priority">
+            <dt class="text-xs opacity-60">Project priority</dt>
+            <dd><GtmPriorityBadge :priority="units.current.location.gtm_priority" /></dd>
           </div>
         </dl>
       </BaseCard>

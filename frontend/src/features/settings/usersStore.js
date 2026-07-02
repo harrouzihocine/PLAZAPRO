@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { toastError } from '@/composables/useConfirm'
 import { departmentsApi, rolesApi, usersApi } from '@/features/settings/api'
 
 // State for the Users admin screen. Loads users plus the role and department
@@ -45,6 +46,7 @@ export const useUsersStore = defineStore('users', {
         return result
       } catch (e) {
         this.error = e.response?.data?.message ?? 'Action failed.'
+        toastError(this.error)
         throw e
       } finally {
         this.saving = false

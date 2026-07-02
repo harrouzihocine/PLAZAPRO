@@ -12,6 +12,7 @@ use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
+use App\Modules\Settings\Models\Wilaya;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -66,12 +67,12 @@ class DesireTest extends TestCase
 
     public function test_matching_returns_only_available_units_that_fit(): void
     {
-        $area = DynamicListItem::factory()->create();
+        $wilaya = Wilaya::factory()->create();
         $type = DynamicListItem::factory()->create();
         $otherType = DynamicListItem::factory()->create();
 
-        $location = Location::factory()->create(['area_id' => $area->id]);
-        $otherLocation = Location::factory()->create(['area_id' => null]);
+        $location = Location::factory()->create(['wilaya_id' => $wilaya->id]);
+        $otherLocation = Location::factory()->create(['wilaya_id' => null]);
 
         // The one true match.
         $match = Unit::factory()->for($location)->create([
@@ -82,12 +83,12 @@ class DesireTest extends TestCase
         Unit::factory()->for($location)->create(['reference' => 'X-sold', 'sale_status' => 'sold', 'type_id' => $type->id, 'price' => 5000000]);
         Unit::factory()->for($location)->create(['reference' => 'X-pricey', 'sale_status' => 'available', 'type_id' => $type->id, 'price' => 99000000]);
         Unit::factory()->for($location)->create(['reference' => 'X-type', 'sale_status' => 'available', 'type_id' => $otherType->id, 'price' => 5000000]);
-        Unit::factory()->for($otherLocation)->create(['reference' => 'X-area', 'sale_status' => 'available', 'type_id' => $type->id, 'price' => 5000000]);
+        Unit::factory()->for($otherLocation)->create(['reference' => 'X-wilaya', 'sale_status' => 'available', 'type_id' => $type->id, 'price' => 5000000]);
 
         $client = Client::factory()->create();
         Desire::factory()->create([
             'client_id' => $client->id,
-            'area_id' => $area->id, 'type_id' => $type->id,
+            'wilaya_id' => $wilaya->id, 'type_id' => $type->id,
             'budget_min' => 1000000, 'budget_max' => 10000000,
         ]);
 

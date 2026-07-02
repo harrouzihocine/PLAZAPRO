@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { toastError } from '@/composables/useConfirm'
 import { auditApi } from '@/features/analytics/api'
 
 // State for the admin audit feed. Filters are sent to the server (user, action,
@@ -37,6 +38,7 @@ export const useAuditStore = defineStore('audit', {
         this.meta = meta
       } catch (e) {
         this.error = e.response?.data?.message ?? 'Could not load the audit feed.'
+        toastError(this.error)
       } finally {
         this.loading = false
       }
@@ -70,6 +72,7 @@ export const useAuditStore = defineStore('audit', {
         URL.revokeObjectURL(url)
       } catch (e) {
         this.error = e.response?.data?.message ?? 'Could not export the audit feed.'
+        toastError(this.error)
       } finally {
         this.exporting = false
       }

@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/features/settings/store'
 import { useChatStore } from '@/features/collaboration/chatStore'
 import MessageComposer from '@/features/collaboration/components/MessageComposer.vue'
+import { confirmAction } from '@/composables/useConfirm'
 
 const route = useRoute()
 const router = useRouter()
@@ -48,8 +49,15 @@ async function sendFile({ file, durationMs }) {
   scrollToBottom()
 }
 
-function remove(message) {
-  if (window.confirm('Delete this message? It will show as deleted for everyone.')) {
+async function remove(message) {
+  if (
+    await confirmAction({
+      title: 'Delete this message?',
+      text: 'It will show as deleted for everyone.',
+      confirmText: 'Delete',
+      danger: true,
+    })
+  ) {
     store.deleteMessage(message.id)
   }
 }
@@ -63,7 +71,7 @@ async function kick(userId) {
 }
 
 async function leave() {
-  if (!window.confirm('Leave this group?')) return
+  if (!(await confirmAction({ title: 'Leave this group?', confirmText: 'Leave', danger: true }))) return
   await store.removeParticipant(store.activeId, auth.user.id)
   router.push('/chat')
 }
@@ -179,7 +187,6 @@ onBeforeUnmount(() => store.unsubscribe())
       </p>
     </div>
 
-    <p v-if="store.error" class="px-2 pb-1 text-sm text-danger">{{ store.error }}</p>
 
     <MessageComposer :disabled="store.sending" @send-text="sendText" @send-file="sendFile" />
   </div>

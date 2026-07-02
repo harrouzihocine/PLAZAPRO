@@ -4,6 +4,7 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import { useRolesStore } from '@/features/settings/rolesStore'
+import { confirmAction } from '@/composables/useConfirm'
 
 const store = useRolesStore()
 
@@ -65,7 +66,14 @@ async function save() {
 
 async function cancelRole(role) {
   if (!role) return
-  if (window.confirm(`Cancel role "${role.name}"? The record is kept but marked cancelled.`)) {
+  if (
+    await confirmAction({
+      title: `Cancel role "${role.name}"?`,
+      text: 'The record is kept but marked cancelled.',
+      confirmText: 'Cancel role',
+      danger: true,
+    })
+  ) {
     await store.cancel(role.id)
     if (selectedId.value === role.id) startNew()
   }
@@ -81,7 +89,6 @@ async function cancelRole(role) {
       </p>
     </div>
 
-    <p v-if="store.error" class="text-sm text-danger">{{ store.error }}</p>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-[16rem_1fr]">
       <!-- Role list -->

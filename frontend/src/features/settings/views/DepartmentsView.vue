@@ -4,6 +4,7 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import { useDepartmentsStore } from '@/features/settings/departmentsStore'
+import { confirmAction } from '@/composables/useConfirm'
 
 const store = useDepartmentsStore()
 
@@ -35,9 +36,14 @@ async function saveEdit(dept) {
   editingId.value = null
 }
 
-function remove(dept) {
+async function remove(dept) {
   if (
-    window.confirm(`Cancel department "${dept.name}"? The record is kept but marked cancelled.`)
+    await confirmAction({
+      title: `Cancel department "${dept.name}"?`,
+      text: 'The record is kept but marked cancelled.',
+      confirmText: 'Cancel department',
+      danger: true,
+    })
   ) {
     store.cancel(dept.id)
   }
@@ -51,7 +57,6 @@ function remove(dept) {
       <p class="opacity-70">Organisational units you can assign users to.</p>
     </div>
 
-    <p v-if="store.error" class="text-sm text-danger">{{ store.error }}</p>
 
     <BaseCard>
       <div class="space-y-2">

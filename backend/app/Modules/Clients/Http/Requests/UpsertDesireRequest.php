@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Clients\Http\Requests;
 
+use App\Modules\Settings\Http\Requests\Concerns\ValidatesCommuneBelongsToWilaya;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -13,6 +14,8 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class UpsertDesireRequest extends FormRequest
 {
+    use ValidatesCommuneBelongsToWilaya;
+
     public function authorize(): bool
     {
         return (bool) $this->user()?->can('clients.create');
@@ -24,7 +27,8 @@ class UpsertDesireRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'area_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
+            'wilaya_id' => ['nullable', 'integer', 'exists:wilayas,id'],
+            'commune_id' => ['nullable', 'integer', 'exists:communes,id'],
             'type_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
             'floor_pref' => ['nullable', 'string', 'max:255'],
             'budget_min' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
@@ -35,6 +39,8 @@ class UpsertDesireRequest extends FormRequest
 
     public function withValidator(Validator $validator): void
     {
+        $this->validateCommuneMatchesWilaya($validator);
+
         // Enforce ordering only when both bounds are actually provided.
         $validator->after(function (Validator $v) {
             $min = $this->input('budget_min');

@@ -3,6 +3,16 @@ import { useApi } from '@/composables/useApi'
 // Network calls for the Inventory feature. State lives in the feature stores;
 // these functions are the only place Inventory talks to the API (via useApi).
 
+// GTM (sales) priority degrees, mirroring App\Modules\Inventory\Enums\GtmPriority
+// (the single source of truth). Ordered high→low for the pickers; `value` is the
+// stored API value, `label` the caption.
+export const GTM_PRIORITIES = [
+  { value: 'critical', label: 'Critical' },
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
+]
+
 // Locations (projects). `list` also feeds location pickers elsewhere.
 export const locationsApi = {
   async list(params = {}) {
@@ -23,6 +33,14 @@ export const locationsApi = {
   async update(id, payload) {
     const { data } = await useApi().put(`/locations/${id}`, payload)
     return data.data
+  },
+
+  archive(id) {
+    return useApi().post(`/locations/${id}/archive`)
+  },
+
+  reactivate(id) {
+    return useApi().post(`/locations/${id}/reactivate`)
   },
 
   cancel(id) {
@@ -116,6 +134,9 @@ export const boxesApi = {
 // uses cookie auth, these relative URLs authenticate in <img>/<video>/<iframe>.
 export const mediaFileUrl = (id) => `/api/v1/media/${id}/file`
 export const mediaPreviewUrl = (id) => `/api/v1/media/${id}/preview`
+// Forces an attachment download (original file + name). Same-origin cookie auth,
+// so a plain <a href download> authenticates.
+export const mediaDownloadUrl = (id) => `/api/v1/media/${id}/download`
 
 // The media tabs, mirroring the backend MediaCollection enum (the single source
 // of truth). `key` is the stored `collection` value; `label` is the tab caption.

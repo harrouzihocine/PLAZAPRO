@@ -1,19 +1,35 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { titleCaseName } from '@/utils/names'
 
 const props = defineProps({
   label: { type: String, default: '' },
   type: { type: String, default: 'text' },
   modelValue: { type: [String, Number], default: '' },
   error: { type: String, default: '' },
+  // Standardize input to Title Case as the user types (used for name fields).
+  capitalize: { type: Boolean, default: false },
 })
-defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue'])
 
 const isPassword = computed(() => props.type === 'password')
 const revealed = ref(false)
 const inputType = computed(() =>
   isPassword.value ? (revealed.value ? 'text' : 'password') : props.type,
 )
+
+function onInput(event) {
+  let value = event.target.value
+  if (props.capitalize) {
+    const normalized = titleCaseName(value)
+    if (normalized !== value) {
+      // Rewrite the field and keep the caret at the end (typical while typing).
+      event.target.value = normalized
+      value = normalized
+    }
+  }
+  emit('update:modelValue', value)
+}
 </script>
 
 <template>
@@ -25,7 +41,7 @@ const inputType = computed(() =>
         :value="modelValue"
         class="w-full rounded-token border border-border bg-bg px-3 py-2 min-h-[44px] text-ink outline-none focus:border-primary"
         :class="{ 'pr-11': isPassword }"
-        @input="$emit('update:modelValue', $event.target.value)"
+        @input="onInput"
       />
       <button
         v-if="isPassword"

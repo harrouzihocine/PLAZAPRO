@@ -45,10 +45,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/clients/{client}', [ClientController::class, 'update']);
         Route::delete('/clients/{client}', [ClientController::class, 'destroy']);
 
-        // Deal lifecycle: open, edit particulars, advance stage, cancel.
+        // Deal lifecycle: open, edit particulars, advance stage, archive/reactivate, remove.
         Route::post('/clients/{client}/projects', [ClientProjectController::class, 'store']);
         Route::put('/projects/{project}', [ClientProjectController::class, 'update']);
         Route::post('/projects/{project}/advance', [ClientProjectController::class, 'advance']);
+        Route::post('/projects/{project}/archive', [ClientProjectController::class, 'archive']);
+        Route::post('/projects/{project}/reactivate', [ClientProjectController::class, 'reactivate']);
         Route::delete('/projects/{project}', [ClientProjectController::class, 'destroy']);
     });
 });

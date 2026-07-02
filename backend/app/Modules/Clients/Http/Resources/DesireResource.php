@@ -22,16 +22,21 @@ class DesireResource extends JsonResource
             'budget_min' => $this->budget_min,
             'budget_max' => $this->budget_max,
             'notes' => $this->notes,
-            'area' => $this->whenLoaded('area', fn () => $this->area ? [
-                'id' => $this->area->id,
-                'label' => $this->area->label,
+            'wilaya' => $this->whenLoaded('wilaya', fn () => $this->wilaya ? [
+                'id' => $this->wilaya->id,
+                'name' => $this->wilaya->name,
+            ] : null),
+            'commune' => $this->whenLoaded('commune', fn () => $this->commune ? [
+                'id' => $this->commune->id,
+                'name' => $this->commune->name,
             ] : null),
             'type' => $this->whenLoaded('type', fn () => $this->type ? [
                 'id' => $this->type->id,
                 'label' => $this->type->label,
             ] : null),
             // Raw ids too, so the edit form can pre-select without extra lookups.
-            'area_id' => $this->area_id,
+            'wilaya_id' => $this->wilaya_id,
+            'commune_id' => $this->commune_id,
             'type_id' => $this->type_id,
             'updated_at' => $this->updated_at,
         ];

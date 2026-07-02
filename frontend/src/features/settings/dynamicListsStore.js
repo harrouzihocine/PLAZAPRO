@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { toastError } from '@/composables/useConfirm'
 import { dynamicListsApi } from '@/features/settings/api'
 import { invalidateDynamicList } from '@/composables/useDynamicList'
 
@@ -50,6 +51,7 @@ export const useDynamicListsStore = defineStore('dynamicLists', {
         await this.refresh()
       } catch (e) {
         this.error = e.response?.data?.message ?? 'Action failed.'
+        toastError(this.error)
         throw e
       } finally {
         this.saving = false

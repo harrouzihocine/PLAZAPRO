@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { toastError } from '@/composables/useConfirm'
 import { departmentsApi } from '@/features/settings/api'
 
 // State for the Departments admin screen. Network lives in api.js; every write
@@ -30,6 +31,7 @@ export const useDepartmentsStore = defineStore('departments', {
         await this.fetch()
       } catch (e) {
         this.error = e.response?.data?.message ?? 'Action failed.'
+        toastError(this.error)
         throw e
       } finally {
         this.saving = false

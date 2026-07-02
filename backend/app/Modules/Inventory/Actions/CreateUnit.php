@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Actions;
 
+use App\Modules\Inventory\Enums\GtmPriority;
 use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Events\UnitPublished;
 use App\Modules\Inventory\Models\Location;
@@ -16,12 +17,14 @@ class CreateUnit
     {
         $attributes = Arr::only($data, [
             'reference', 'type_id', 'floor_id', 'area_sqm',
-            'price', 'sale_status', 'block', 'stack_floor', 'position',
+            'price', 'sale_status', 'block', 'stack_floor', 'position', 'gtm_priority',
         ]);
 
-        // A new unit starts available unless explicitly stated (also populates the
-        // in-memory attribute so the response reflects the DB default).
+        // A new unit starts available at medium GTM priority unless explicitly
+        // stated (also populates the in-memory attributes so the response reflects
+        // the DB defaults).
         $attributes['sale_status'] ??= SaleStatus::Available->value;
+        $attributes['gtm_priority'] ??= GtmPriority::Medium->value;
 
         $unit = $location->units()->create($attributes);
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Payments;
 
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Payments\Models\PaymentSchedule;
 use App\Modules\Payments\Models\Versement;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
@@ -14,8 +15,11 @@ use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
- * Archive-only-without-payments (a guide test rule): a deal that has active
- * versements cannot be archived; with none it succeeds.
+ * The deal lifecycle beyond active. Two off-active moves, both cascading to the
+ * deal's payment plan + recorded versements:
+ *   - Archive (POST /archive)   → reversible; hidden until reactivated.
+ *   - Remove  (DELETE)          → terminal; the deal and its money are cancelled.
+ * Neither hard-deletes; children cancelled beforehand are never disturbed.
  */
 class ArchiveProjectTest extends TestCase
 {
@@ -38,40 +42,122 @@ class ArchiveProjectTest extends TestCase
         return $this->userWithPermissions(['clients.view', 'clients.manage']);
     }
 
-    public function test_a_deal_with_active_versements_cannot_be_archived(): void
+    // --- Remove (DELETE): terminal, cascades, no longer blocked by payments ---
+
+    public function test_removing_a_deal_cancels_it_and_cascades_to_its_contents(): void
     {
         $project = ClientProject::factory()->create(['total_price' => '1000.00']);
-        Versement::factory()->create(['client_project_id' => $project->id, 'amount' => '500.00']);
-        Sanctum::actingAs($this->manager());
-
-        $this->deleteJson("/api/v1/projects/{$project->id}", ['reason' => 'Closing out'])
-            ->assertStatus(422);
-
-        $this->assertDatabaseHas('client_projects', ['id' => $project->id, 'status' => 'active']);
-    }
-
-    public function test_a_deal_with_no_active_versements_can_be_archived(): void
-    {
-        $project = ClientProject::factory()->create(['total_price' => '1000.00']);
+        $schedule = PaymentSchedule::factory()->create(['client_project_id' => $project->id]);
+        $versement = Versement::factory()->create(['client_project_id' => $project->id, 'amount' => '500.00']);
         Sanctum::actingAs($this->manager());
 
         $this->deleteJson("/api/v1/projects/{$project->id}", ['reason' => 'Closing out'])
             ->assertOk();
 
         $this->assertDatabaseHas('client_projects', ['id' => $project->id, 'status' => 'cancelled']);
+        $this->assertDatabaseHas('payment_schedules', ['id' => $schedule->id, 'status' => 'cancelled']);
+        $this->assertDatabaseHas('versements', ['id' => $versement->id, 'status' => 'cancelled']);
     }
 
-    public function test_a_deal_whose_only_versement_was_cancelled_can_be_archived(): void
+    public function test_removing_a_deal_leaves_a_pre_cancelled_versement_untouched(): void
     {
         $project = ClientProject::factory()->create(['total_price' => '1000.00']);
-        Versement::factory()->create([
-            'client_project_id' => $project->id, 'amount' => '500.00', 'status' => 'cancelled',
+        $versement = Versement::factory()->create([
+            'client_project_id' => $project->id,
+            'amount' => '500.00',
+            'status' => 'cancelled',
+            'cancellation_reason' => 'Duplicate entry',
         ]);
         Sanctum::actingAs($this->manager());
 
-        $this->deleteJson("/api/v1/projects/{$project->id}", ['reason' => 'Closing out'])
-            ->assertOk();
+        $this->deleteJson("/api/v1/projects/{$project->id}", ['reason' => 'Closing out'])->assertOk();
 
-        $this->assertDatabaseHas('client_projects', ['id' => $project->id, 'status' => 'cancelled']);
+        // Reason is not overwritten — the row was already cancelled, so it is skipped.
+        $this->assertDatabaseHas('versements', [
+            'id' => $versement->id, 'status' => 'cancelled', 'cancellation_reason' => 'Duplicate entry',
+        ]);
+    }
+
+    // --- Archive (POST /archive): reversible, hidden, cascades ---
+
+    public function test_archiving_a_deal_hides_it_and_its_contents(): void
+    {
+        $project = ClientProject::factory()->create(['total_price' => '1000.00']);
+        $schedule = PaymentSchedule::factory()->create(['client_project_id' => $project->id]);
+        $versement = Versement::factory()->create(['client_project_id' => $project->id]);
+        Sanctum::actingAs($this->manager());
+
+        $this->postJson("/api/v1/projects/{$project->id}/archive")->assertOk();
+
+        $this->assertDatabaseHas('client_projects', ['id' => $project->id, 'status' => 'archived']);
+        $this->assertDatabaseHas('payment_schedules', ['id' => $schedule->id, 'status' => 'archived']);
+        $this->assertDatabaseHas('versements', ['id' => $versement->id, 'status' => 'archived']);
+
+        // Gone from the default list, present under ?status=archived.
+        $this->getJson("/api/v1/clients/{$project->client_id}/projects")
+            ->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson("/api/v1/clients/{$project->client_id}/projects?status=archived")
+            ->assertOk()->assertJsonCount(1, 'data');
+    }
+
+    public function test_reactivating_an_archived_deal_restores_it_and_its_contents(): void
+    {
+        $project = ClientProject::factory()->create(['total_price' => '1000.00']);
+        $schedule = PaymentSchedule::factory()->create(['client_project_id' => $project->id]);
+        $versement = Versement::factory()->create(['client_project_id' => $project->id]);
+        Sanctum::actingAs($this->manager());
+
+        $this->postJson("/api/v1/projects/{$project->id}/archive")->assertOk();
+        $this->postJson("/api/v1/projects/{$project->id}/reactivate")->assertOk();
+
+        $this->assertDatabaseHas('client_projects', ['id' => $project->id, 'status' => 'active']);
+        $this->assertDatabaseHas('payment_schedules', ['id' => $schedule->id, 'status' => 'active']);
+        $this->assertDatabaseHas('versements', ['id' => $versement->id, 'status' => 'active']);
+    }
+
+    public function test_reactivate_does_not_revive_children_cancelled_before_the_archive(): void
+    {
+        $project = ClientProject::factory()->create(['total_price' => '1000.00']);
+        $cancelled = Versement::factory()->create([
+            'client_project_id' => $project->id, 'status' => 'cancelled', 'cancellation_reason' => 'Correction',
+        ]);
+        $live = Versement::factory()->create(['client_project_id' => $project->id]);
+        Sanctum::actingAs($this->manager());
+
+        $this->postJson("/api/v1/projects/{$project->id}/archive")->assertOk();
+        $this->postJson("/api/v1/projects/{$project->id}/reactivate")->assertOk();
+
+        // The live one round-trips back to active; the pre-cancelled one stays cancelled.
+        $this->assertDatabaseHas('versements', ['id' => $live->id, 'status' => 'active']);
+        $this->assertDatabaseHas('versements', ['id' => $cancelled->id, 'status' => 'cancelled']);
+    }
+
+    // --- Guards ---
+
+    public function test_a_removed_deal_cannot_be_archived(): void
+    {
+        $project = ClientProject::factory()->create();
+        Sanctum::actingAs($this->manager());
+
+        $this->deleteJson("/api/v1/projects/{$project->id}", ['reason' => 'Gone'])->assertOk();
+
+        $this->postJson("/api/v1/projects/{$project->id}/archive")->assertStatus(422);
+    }
+
+    public function test_a_deal_that_is_not_archived_cannot_be_reactivated(): void
+    {
+        $project = ClientProject::factory()->create();
+        Sanctum::actingAs($this->manager());
+
+        $this->postJson("/api/v1/projects/{$project->id}/reactivate")->assertStatus(422);
+    }
+
+    public function test_archive_and_reactivate_require_the_manage_permission(): void
+    {
+        $project = ClientProject::factory()->create();
+        Sanctum::actingAs($this->userWithPermissions(['clients.view']));
+
+        $this->postJson("/api/v1/projects/{$project->id}/archive")->assertForbidden();
+        $this->postJson("/api/v1/projects/{$project->id}/reactivate")->assertForbidden();
     }
 }

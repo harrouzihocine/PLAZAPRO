@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { toastError } from '@/composables/useConfirm'
 import { locationsApi } from '@/features/inventory/api'
 
 // State for the Locations (projects) screen. Network lives in api.js; every write
@@ -6,11 +7,12 @@ import { locationsApi } from '@/features/inventory/api'
 export const useLocationsStore = defineStore('locations', {
   state: () => ({
     items: [],
+    archivedItems: [],
     current: null,
     loading: false,
     saving: false,
     error: '',
-    filters: { q: '', area_id: '' },
+    filters: { q: '', wilaya_id: '', commune_id: '', priority: '' },
   }),
 
   actions: {
@@ -19,7 +21,9 @@ export const useLocationsStore = defineStore('locations', {
       try {
         const params = {}
         if (this.filters.q) params.q = this.filters.q
-        if (this.filters.area_id) params.area_id = this.filters.area_id
+        if (this.filters.wilaya_id) params.wilaya_id = this.filters.wilaya_id
+        if (this.filters.commune_id) params.commune_id = this.filters.commune_id
+        if (this.filters.priority) params.priority = this.filters.priority
         this.items = await locationsApi.list(params)
       } finally {
         this.loading = false
@@ -45,6 +49,7 @@ export const useLocationsStore = defineStore('locations', {
         return result
       } catch (e) {
         this.error = e.response?.data?.message ?? 'Action failed.'
+        toastError(this.error)
         throw e
       } finally {
         this.saving = false
@@ -59,6 +64,23 @@ export const useLocationsStore = defineStore('locations', {
       return this.mutate(() => locationsApi.update(id, payload))
     },
 
+    async loadArchived() {
+      this.archivedItems = await locationsApi.list({ status: 'archived' })
+      return this.archivedItems
+    },
+
+    // Archive = reversible: hides the project + its units/boxes until reactivated.
+    async archive(id) {
+      await this.mutate(() => locationsApi.archive(id))
+      return this.loadArchived()
+    },
+
+    async reactivate(id) {
+      await this.mutate(() => locationsApi.reactivate(id))
+      return this.loadArchived()
+    },
+
+    // Remove = terminal: cancels the project and everything inside it (kept + audited).
     cancel(id) {
       return this.mutate(() => locationsApi.cancel(id))
     },

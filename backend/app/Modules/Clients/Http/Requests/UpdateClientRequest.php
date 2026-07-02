@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Clients\Http\Requests;
 
-use App\Modules\Settings\Rules\IsAgentUser;
+use App\Modules\Settings\Rules\CanFollowUpClient;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -30,7 +30,7 @@ class UpdateClientRequest extends FormRequest
             'email' => ['sometimes', 'nullable', 'email', 'max:255'],
             'source_id' => ['sometimes', 'nullable', 'integer', 'exists:dynamic_list_items,id'],
             'rating_id' => ['sometimes', 'nullable', 'integer', 'exists:dynamic_list_items,id'],
-            'assigned_agent_id' => ['sometimes', 'nullable', 'integer', new IsAgentUser],
+            'assigned_agent_id' => ['sometimes', 'nullable', 'integer', new CanFollowUpClient],
             'notes' => ['sometimes', 'nullable', 'string', 'max:5000'],
         ];
     }

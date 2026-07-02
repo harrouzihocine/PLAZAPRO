@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { toastError } from '@/composables/useConfirm'
 import { unitsApi } from '@/features/inventory/api'
 
 // State for the Units screens (the global filterable table and the per-location
@@ -14,10 +15,12 @@ export const useUnitsStore = defineStore('units', {
     scope: null, // location_id when scoped to a project, else null (global)
     filters: {
       location_id: '',
-      area_id: [], // multi-select — geographic area (from the unit's project)
+      wilaya_id: [], // multi-select — geographic wilaya (from the unit's project)
+      commune_id: [], // multi-select — commune, cascades from the selected wilaya(s)
       type_id: [], // multi-select
       floor_id: [], // multi-select
       sale_status: [], // multi-select
+      priority: [], // multi-select — GTM (sales) priority
       min_area: '',
       max_area: '',
       min_price: '',
@@ -77,6 +80,7 @@ export const useUnitsStore = defineStore('units', {
         return result
       } catch (e) {
         this.error = e.response?.data?.message ?? 'Action failed.'
+        toastError(this.error)
         throw e
       } finally {
         this.saving = false

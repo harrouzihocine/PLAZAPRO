@@ -74,7 +74,7 @@ class BuildDashboard
                 ->get()
                 ->map(fn (Visit $v) => [
                     'id' => $v->id,
-                    'client' => $v->client ? trim("{$v->client->first_name} {$v->client->last_name}") : null,
+                    'client' => $v->client?->full_name,
                     'unit' => $v->unit?->reference,
                     'type' => $v->type->value,
                     'scheduled_at' => $v->scheduled_at,

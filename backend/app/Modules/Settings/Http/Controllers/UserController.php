@@ -54,6 +54,24 @@ class UserController extends Controller
         return UserResource::collection($agents);
     }
 
+    /**
+     * Active follow-up agents — users whose role can log calls (calls.log): the
+     * sales agents (and managers) who follow a client up, as opposed to the field
+     * agents who conduct visits. Feeds the client "assigned agent" picker.
+     */
+    public function followUpAgents(): AnonymousResourceCollection
+    {
+        $agents = User::query()
+            ->with('role')
+            ->active()
+            ->where('is_active', true)
+            ->whereHas('role.permissions', fn ($q) => $q->where('slug', 'calls.log'))
+            ->orderBy('name')
+            ->get();
+
+        return UserResource::collection($agents);
+    }
+
     public function store(StoreUserRequest $request, CreateUser $action): UserResource
     {
         return new UserResource($action->handle($request->validated()));
@@ -61,7 +79,7 @@ class UserController extends Controller
 
     public function update(UpdateUserRequest $request, User $user, UpdateUser $action): UserResource
     {
-        return new UserResource($action->handle($user, $request->validated()));
+        return new UserResource($action->handle($user, $request->validated(), $request->user()));
     }
 
     public function setActive(SetUserActiveRequest $request, User $user, SetUserActive $action): UserResource

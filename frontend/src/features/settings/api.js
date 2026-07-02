@@ -51,6 +51,49 @@ export const dynamicListsApi = {
   },
 }
 
+// Wilayas & communes admin (the geographic hierarchy, requires settings.manage).
+// Reads (list/communes) are open to any authed user and also feed the dropdowns
+// via the useGeography composable; these cover the management screen.
+export const geographyApi = {
+  async wilayas(params = {}) {
+    const { data } = await useApi().get('/wilayas', { params })
+    return data.data
+  },
+
+  async communes(wilayaId, params = {}) {
+    const { data } = await useApi().get(`/wilayas/${wilayaId}/communes`, { params })
+    return data.data
+  },
+
+  async createWilaya(payload) {
+    const { data } = await useApi().post('/wilayas', payload)
+    return data.data
+  },
+
+  async updateWilaya(id, payload) {
+    const { data } = await useApi().put(`/wilayas/${id}`, payload)
+    return data.data
+  },
+
+  cancelWilaya(id) {
+    return useApi().delete(`/wilayas/${id}`)
+  },
+
+  async createCommune(wilayaId, payload) {
+    const { data } = await useApi().post(`/wilayas/${wilayaId}/communes`, payload)
+    return data.data
+  },
+
+  async updateCommune(id, payload) {
+    const { data } = await useApi().put(`/communes/${id}`, payload)
+    return data.data
+  },
+
+  cancelCommune(id) {
+    return useApi().delete(`/communes/${id}`)
+  },
+}
+
 // Departments admin. `list` is also usable anywhere a department picker is needed.
 export const departmentsApi = {
   async list() {

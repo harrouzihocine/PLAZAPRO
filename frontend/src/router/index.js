@@ -113,6 +113,12 @@ const routes = [
             meta: { permission: 'settings.manage' },
           },
           {
+            path: 'wilayas',
+            name: 'settings.wilayas',
+            component: () => import('@/features/settings/views/WilayasView.vue'),
+            meta: { permission: 'settings.manage' },
+          },
+          {
             path: 'departments',
             name: 'settings.departments',
             component: () => import('@/features/settings/views/DepartmentsView.vue'),

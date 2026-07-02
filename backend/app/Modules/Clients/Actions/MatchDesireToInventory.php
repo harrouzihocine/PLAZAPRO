@@ -11,7 +11,7 @@ use Illuminate\Support\Collection;
 
 /**
  * Match a client's desire to inventory: return the **available** units that fit
- * the desire's area / type / budget, ranked by closeness (best first).
+ * the desire's wilaya / commune / type / budget, ranked by closeness (best first).
  * Only criteria the client actually set are applied. This is a key rule to test.
  */
 class MatchDesireToInventory
@@ -28,7 +28,8 @@ class MatchDesireToInventory
             ->when($desire->type_id, fn ($q) => $q->where('type_id', $desire->type_id))
             ->when($desire->budget_min !== null, fn ($q) => $q->where('price', '>=', $desire->budget_min))
             ->when($desire->budget_max !== null, fn ($q) => $q->where('price', '<=', $desire->budget_max))
-            ->when($desire->area_id, fn ($q) => $q->whereHas('location', fn ($l) => $l->where('area_id', $desire->area_id)))
+            ->when($desire->wilaya_id, fn ($q) => $q->whereHas('location', fn ($l) => $l->where('wilaya_id', $desire->wilaya_id)))
+            ->when($desire->commune_id, fn ($q) => $q->whereHas('location', fn ($l) => $l->where('commune_id', $desire->commune_id)))
             ->get();
 
         // Rank by closeness (lower score = better): distance from the budget the

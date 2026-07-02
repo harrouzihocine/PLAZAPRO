@@ -8,8 +8,8 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * desires = what a client is looking for, matched against available inventory by
- * the MatchDesireToInventory action (area / type / budget). Area and type
- * come from the dynamic lists (`areas`, `unit_types`).
+ * the MatchDesireToInventory action (wilaya / type / budget). Wilaya comes from
+ * the `wilayas`/`communes` tables; type from the `unit_types` dynamic list.
  * See docs/database/03-clients-pipeline.md.
  */
 return new class extends Migration
@@ -21,8 +21,10 @@ return new class extends Migration
             $table->foreignId('client_id')->constrained('clients');
             $table->foreignId('client_project_id')->nullable()
                 ->constrained('client_projects')->nullOnDelete();
-            $table->foreignId('area_id')->nullable()
-                ->constrained('dynamic_list_items')->nullOnDelete();
+            $table->foreignId('wilaya_id')->nullable()
+                ->constrained('wilayas')->nullOnDelete();
+            $table->foreignId('commune_id')->nullable()
+                ->constrained('communes')->nullOnDelete();
             $table->foreignId('type_id')->nullable()
                 ->constrained('dynamic_list_items')->nullOnDelete();
             $table->string('floor_pref')->nullable();

@@ -15,11 +15,16 @@ class ClientResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        // Client ownership (who it's assigned to, and who created it, when) is
+        // back-office-only — gated by clients.manage, held by super-admin / admin
+        // / manager. Agents (view/create only) never see it.
+        $canSeeOwnership = (bool) $request->user()?->can('clients.manage');
+
         return [
             'id' => $this->id,
             'first_name' => $this->first_name,
             'last_name' => $this->last_name,
-            'full_name' => trim("{$this->first_name} {$this->last_name}"),
+            'full_name' => $this->full_name,
             'phone' => $this->phone,
             'email' => $this->email,
             'notes' => $this->notes,
@@ -35,9 +40,13 @@ class ClientResource extends JsonResource
                 'value' => $this->rating->value,
                 'meta' => $this->rating->meta,
             ] : null),
-            'assigned_agent' => $this->whenLoaded('assignedAgent', fn () => $this->assignedAgent ? [
+            'assigned_agent' => $this->when($canSeeOwnership, fn () => $this->assignedAgent ? [
                 'id' => $this->assignedAgent->id,
                 'name' => $this->assignedAgent->name,
+            ] : null),
+            'created_by' => $this->when($canSeeOwnership, fn () => $this->creator ? [
+                'id' => $this->creator->id,
+                'name' => $this->creator->name,
             ] : null),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

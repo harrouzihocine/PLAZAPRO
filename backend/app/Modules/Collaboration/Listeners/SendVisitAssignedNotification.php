@@ -24,7 +24,7 @@ class SendVisitAssignedNotification implements ShouldQueue
 
         $when = $visit->scheduled_at?->format('D d M, H:i');
         $client = $visit->client;
-        $clientName = $client ? trim($client->first_name.' '.$client->last_name) : 'a client';
+        $clientName = $client?->full_name ?: 'a client';
 
         $agent->notify(new DomainNotification(
             kind: 'visit_assigned',

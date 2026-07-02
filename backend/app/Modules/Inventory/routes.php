@@ -37,12 +37,15 @@ Route::middleware('auth:sanctum')->group(function () {
             ->whereIn('mediableType', ['locations', 'units'])->whereNumber('mediableId');
         Route::get('/media/{media}/file', [MediaController::class, 'file'])->name('media.file');
         Route::get('/media/{media}/preview', [MediaController::class, 'preview'])->name('media.preview');
+        Route::get('/media/{media}/download', [MediaController::class, 'download'])->name('media.download');
     });
 
     // Location writes require the dedicated locations.manage permission.
     Route::middleware('can:locations.manage')->group(function () {
         Route::post('/locations', [LocationController::class, 'store']);
         Route::put('/locations/{location}', [LocationController::class, 'update']);
+        Route::post('/locations/{location}/archive', [LocationController::class, 'archive']);
+        Route::post('/locations/{location}/reactivate', [LocationController::class, 'reactivate']);
         Route::delete('/locations/{location}', [LocationController::class, 'destroy']);
     });
 

@@ -24,7 +24,7 @@ class SendPaymentNotification implements ShouldQueue
             return;
         }
 
-        $clientName = trim($client->first_name.' '.$client->last_name);
+        $clientName = $client->full_name;
 
         $agent->notify(new DomainNotification(
             kind: 'payment',

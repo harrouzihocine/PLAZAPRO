@@ -9,7 +9,8 @@ use App\Modules\Settings\Models\User;
 /**
  * Activate or deactivate a user (`is_active`). Deactivating keeps the row and
  * the login credentials intact — it only blocks access. An admin cannot
- * deactivate their own account (no self-lockout).
+ * deactivate their own account (no self-lockout), and only a super admin may
+ * deactivate another super admin.
  */
 class SetUserActive
 {
@@ -19,6 +20,12 @@ class SetUserActive
             ! $active && $user->is($actor),
             422,
             'You cannot deactivate your own account.',
+        );
+
+        abort_if(
+            ! $active && $user->isSuperAdmin() && ! $actor->isSuperAdmin(),
+            403,
+            'Only a super admin can deactivate a super admin.',
         );
 
         $user->update(['is_active' => $active]);

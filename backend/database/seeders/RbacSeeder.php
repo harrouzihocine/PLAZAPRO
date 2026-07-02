@@ -8,9 +8,27 @@ use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
+/**
+ * Baseline roles, permissions and staff accounts.
+ *
+ * Roles (see docs) map to what each person may do in the app:
+ *   - super-admin : everything. One person only.
+ *   - admin       : everything, but cannot remove/modify a super admin
+ *                   (enforced in the user actions, not by a permission).
+ *   - manager     : every rapport (calls, office & outside visits) + all
+ *                   analytics reports. Flagged is_agent so a manager can also
+ *                   be assigned visits.
+ *   - sales-agent : calls rapports + office-visit rapports.
+ *   - site-agent  : outside (apartment) visit rapports only. The field agent —
+ *                   flagged is_agent so they can be assigned visits.
+ *
+ * Idempotent: roles/permissions/users are firstOrCreate'd and permissions are
+ * synced, so re-running only reconciles the grants.
+ */
 class RbacSeeder extends Seeder
 {
     /**
@@ -30,38 +48,112 @@ class RbacSeeder extends Seeder
         'chat.use', 'notifications.view', 'dashboard.view', 'reports.view',
     ];
 
+    /**
+     * Grants that are common to every operational role, so the app is usable
+     * (see own dashboard, chat, notifications).
+     *
+     * @var list<string>
+     */
+    private array $baseline = ['dashboard.view', 'notifications.view', 'chat.use'];
+
+    /**
+     * Password for every seeded account. Development default — change it
+     * immediately in any real environment.
+     */
+    private const DEFAULT_PASSWORD = 'password';
+
     public function run(): void
     {
-        $permissions = collect($this->permissions)->map(fn (string $slug) => Permission::firstOrCreate(
-            ['slug' => $slug],
-            ['name' => Str::headline(str_replace('.', ' ', $slug)), 'group' => Str::headline(Str::before($slug, '.'))],
-        ));
+        $permissions = collect($this->permissions)->mapWithKeys(fn (string $slug) => [
+            $slug => Permission::firstOrCreate(
+                ['slug' => $slug],
+                ['name' => Str::headline(str_replace('.', ' ', $slug)), 'group' => Str::headline(Str::before($slug, '.'))],
+            ),
+        ]);
 
-        $admin = Role::firstOrCreate(
-            ['slug' => 'super-admin'],
-            ['name' => 'Super Admin', 'is_agent' => false],
-        );
-        $admin->permissions()->sync($permissions->pluck('id'));
+        $roles = $this->seedRoles($permissions);
 
-        $agent = Role::firstOrCreate(
-            ['slug' => 'agent'],
-            ['name' => 'Agent', 'is_agent' => true],
-        );
-        $agent->permissions()->sync(
-            Permission::whereIn('slug', [
-                'units.view', 'clients.view', 'clients.create', 'calls.log',
-                'visits.conduct', 'tasks.manage', 'chat.use', 'notifications.view', 'dashboard.view',
-            ])->pluck('id')
-        );
+        $this->seedUsers($roles);
+    }
 
-        User::firstOrCreate(
-            ['email' => 'admin@plaza.local'],
-            [
-                'name' => 'Administrator',
-                'password' => Hash::make('change-me-now'),
-                'role_id' => $admin->id,
-                'is_active' => true,
-            ],
-        );
+    /**
+     * @param  Collection<string, Permission>  $permissions
+     * @return array<string, Role>
+     */
+    private function seedRoles(Collection $permissions): array
+    {
+        $all = $permissions->keys()->all();
+
+        // Outside/apartment visit rapports (the field agent).
+        $siteAgent = [...$this->baseline, 'clients.view', 'units.view', 'visits.conduct'];
+
+        // Calls + office-visit rapports.
+        $salesAgent = [...$this->baseline, 'clients.view', 'clients.create', 'calls.log', 'visits.conduct'];
+
+        // Every rapport type + all analytics reports + operational oversight.
+        $manager = [
+            ...$this->baseline, 'reports.view',
+            'clients.view', 'clients.create', 'clients.manage',
+            'calls.log', 'visits.assign', 'visits.conduct', 'tasks.manage',
+            'units.view', 'units.reserve', 'units.manage', 'media.manage',
+            'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
+        ];
+
+        $definitions = [
+            'super-admin' => ['name' => 'Super Admin', 'is_agent' => false, 'grants' => $all],
+            'admin' => ['name' => 'Admin', 'is_agent' => false, 'grants' => $all],
+            'manager' => ['name' => 'Manager', 'is_agent' => true, 'grants' => $manager],
+            'sales-agent' => ['name' => 'Sales Agent', 'is_agent' => false, 'grants' => $salesAgent],
+            'site-agent' => ['name' => 'Site Agent', 'is_agent' => true, 'grants' => $siteAgent],
+        ];
+
+        $roles = [];
+        foreach ($definitions as $slug => $def) {
+            $role = Role::firstOrCreate(
+                ['slug' => $slug],
+                ['name' => $def['name'], 'is_agent' => $def['is_agent']],
+            );
+            $role->permissions()->sync($permissions->only($def['grants'])->pluck('id'));
+            $roles[$slug] = $role;
+        }
+
+        return $roles;
+    }
+
+    /**
+     * One super admin, two of every other role. The super admin keeps the
+     * canonical admin@plaza.local address (the demo seeder looks it up).
+     *
+     * @param  array<string, Role>  $roles
+     */
+    private function seedUsers(array $roles): void
+    {
+        $users = [
+            ['name' => 'Super Admin', 'email' => 'admin@plaza.local', 'role' => 'super-admin'],
+
+            ['name' => 'Yasmine Admin', 'email' => 'admin1@plaza.local', 'role' => 'admin'],
+            ['name' => 'Omar Admin', 'email' => 'admin2@plaza.local', 'role' => 'admin'],
+
+            ['name' => 'Nassim Manager', 'email' => 'manager1@plaza.local', 'role' => 'manager'],
+            ['name' => 'Leila Manager', 'email' => 'manager2@plaza.local', 'role' => 'manager'],
+
+            ['name' => 'Sami Sales', 'email' => 'sales1@plaza.local', 'role' => 'sales-agent'],
+            ['name' => 'Rania Sales', 'email' => 'sales2@plaza.local', 'role' => 'sales-agent'],
+
+            ['name' => 'Bilal Field', 'email' => 'site1@plaza.local', 'role' => 'site-agent'],
+            ['name' => 'Imene Field', 'email' => 'site2@plaza.local', 'role' => 'site-agent'],
+        ];
+
+        foreach ($users as $data) {
+            User::firstOrCreate(
+                ['email' => $data['email']],
+                [
+                    'name' => $data['name'],
+                    'password' => Hash::make(self::DEFAULT_PASSWORD),
+                    'role_id' => $roles[$data['role']]->id,
+                    'is_active' => true,
+                ],
+            );
+        }
     }
 }

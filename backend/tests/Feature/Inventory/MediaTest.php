@@ -252,4 +252,35 @@ class MediaTest extends TestCase
         $response->assertOk();
         $this->assertStringContainsString('inline', (string) $response->headers->get('Content-Disposition'));
     }
+
+    public function test_download_serves_the_original_as_an_attachment(): void
+    {
+        Queue::fake();
+        $location = Location::factory()->create();
+        Sanctum::actingAs($this->editor());
+        $id = $this->postJson("/api/v1/locations/{$location->id}/media", [
+            'file' => UploadedFile::fake()->image('villa.jpg'),
+        ])->json('data.id');
+
+        $response = $this->get("/api/v1/media/{$id}/download");
+
+        $response->assertOk();
+        $disposition = (string) $response->headers->get('Content-Disposition');
+        $this->assertStringContainsString('attachment', $disposition);
+        $this->assertStringContainsString('villa.jpg', $disposition);
+    }
+
+    public function test_download_requires_units_view(): void
+    {
+        Queue::fake();
+        $location = Location::factory()->create();
+        Sanctum::actingAs($this->editor());
+        $id = $this->postJson("/api/v1/locations/{$location->id}/media", [
+            'file' => UploadedFile::fake()->image('villa.jpg'),
+        ])->json('data.id');
+
+        // A user without units.view cannot pull the bytes down.
+        Sanctum::actingAs($this->userWithPermissions(['media.manage']));
+        $this->get("/api/v1/media/{$id}/download")->assertForbidden();
+    }
 }

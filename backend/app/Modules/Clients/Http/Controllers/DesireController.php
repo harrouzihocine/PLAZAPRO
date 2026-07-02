@@ -23,7 +23,7 @@ class DesireController extends Controller
 {
     public function show(Client $client): JsonResponse
     {
-        $desire = $client->desire()->with(['area', 'type'])->first();
+        $desire = $client->desire()->with(['wilaya', 'commune', 'type'])->first();
 
         return response()->json([
             'data' => $desire ? (new DesireResource($desire))->resolve() : null,
@@ -32,7 +32,7 @@ class DesireController extends Controller
 
     public function upsert(UpsertDesireRequest $request, Client $client, UpsertDesire $action): JsonResponse
     {
-        $desire = $action->handle($client, $request->validated())->load(['area', 'type']);
+        $desire = $action->handle($client, $request->validated())->load(['wilaya', 'commune', 'type']);
 
         // Idempotent PUT: a first call creates the row (JsonResource would auto-send
         // 201), later calls update it. Return a consistent 200 either way.

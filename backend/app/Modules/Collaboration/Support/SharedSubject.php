@@ -60,7 +60,7 @@ final class SharedSubject
             $subject instanceof Client => [
                 'type' => 'client',
                 'id' => $subject->id,
-                'label' => trim($subject->first_name.' '.$subject->last_name),
+                'label' => $subject->full_name,
                 'link' => '/clients/'.$subject->id,
                 'permission' => 'clients.view',
             ],

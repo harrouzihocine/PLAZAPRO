@@ -99,6 +99,12 @@ class MediaController extends Controller
         return $this->file($media);
     }
 
+    /** Download the original file as an attachment (keeps the original name). */
+    public function download(Media $media): Response
+    {
+        return $this->stream($media->disk, $media->path, $media->mime_type, $media->original_name, 'attachment');
+    }
+
     private function resolveMediable(string $type, int $id): Model
     {
         abort_unless(isset(self::MEDIABLES[$type]), 404);
@@ -111,20 +117,25 @@ class MediaController extends Controller
      * support (needed for video seeking); remote disks redirect to a short-lived
      * signed URL.
      */
-    private function stream(string $disk, string $path, string $mime, string $name): Response
+    private function stream(string $disk, string $path, string $mime, string $name, string $disposition = 'inline'): Response
     {
         $storage = Storage::disk($disk);
         abort_unless($storage->exists($path), 404);
+
+        $contentDisposition = $disposition.'; filename="'.addslashes($name).'"';
 
         // Local disks stream from the filesystem (byte-range support for video
         // seeking). Remote disks (S3) hand back a short-lived signed URL.
         if (config("filesystems.disks.{$disk}.driver") === 'local') {
             return response()->file($storage->path($path), [
                 'Content-Type' => $mime,
-                'Content-Disposition' => 'inline; filename="'.addslashes($name).'"',
+                'Content-Disposition' => $contentDisposition,
             ]);
         }
 
-        return redirect($storage->temporaryUrl($path, now()->addMinutes(5)));
+        // Ask the signed URL to force the download disposition where supported (S3).
+        $options = $disposition === 'attachment' ? ['ResponseContentDisposition' => $contentDisposition] : [];
+
+        return redirect($storage->temporaryUrl($path, now()->addMinutes(5), $options));
     }
 }

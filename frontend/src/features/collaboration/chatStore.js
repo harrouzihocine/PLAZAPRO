@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { toastError } from '@/composables/useConfirm'
 import { chatApi } from '@/features/collaboration/api'
 import { getEcho } from '@/composables/useEcho'
 
@@ -101,6 +102,7 @@ export const useChatStore = defineStore('chat', {
         this.appendMessage(message)
       } catch (e) {
         this.error = e.response?.data?.message ?? 'Could not send the message.'
+        toastError(this.error)
         throw e
       } finally {
         this.sending = false

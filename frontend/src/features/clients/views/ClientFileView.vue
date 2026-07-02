@@ -6,12 +6,19 @@ import DealsPanel from '@/features/clients/components/DealsPanel.vue'
 import DesirePanel from '@/features/clients/components/DesirePanel.vue'
 import { useClientsStore } from '@/features/clients/clientsStore'
 import { useAuthStore } from '@/features/settings/store'
+import { formatPhone } from '@/data/countryCodes'
 import ShareToChat from '@/features/collaboration/components/ShareToChat.vue'
 import TimelinePanel from '@/features/pipeline/components/TimelinePanel.vue'
 
 const props = defineProps({ id: { type: [String, Number], required: true } })
 const store = useClientsStore()
 const auth = useAuthStore()
+
+// Client ownership (assigned agent + who created it/when) is back-office-only,
+// gated by clients.manage (super-admin / admin / manager).
+const canSeeOwnership = () => auth.can('clients.manage')
+const fmtDateTime = (v) =>
+  v ? new Date(v).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
 
 onMounted(() => store.load(props.id))
 </script>
@@ -34,7 +41,7 @@ onMounted(() => store.load(props.id))
             cancelled
           </span>
         </div>
-        <p class="opacity-70">{{ store.current.phone }}<template v-if="store.current.email"> · {{ store.current.email }}</template></p>
+        <p class="opacity-70">{{ formatPhone(store.current.phone) }}<template v-if="store.current.email"> · {{ store.current.email }}</template></p>
         <div v-if="auth.can('chat.use')" class="pt-1">
           <ShareToChat subject-type="client" :subject-id="store.current.id" label="Share client to chat" />
         </div>
@@ -52,9 +59,17 @@ onMounted(() => store.load(props.id))
               <dt class="opacity-60">Rating</dt>
               <dd>{{ store.current.rating?.label ?? '—' }}</dd>
             </div>
-            <div class="flex justify-between gap-2">
+            <div v-if="canSeeOwnership()" class="flex justify-between gap-2">
               <dt class="opacity-60">Assigned agent</dt>
               <dd>{{ store.current.assigned_agent?.name ?? 'Unassigned' }}</dd>
+            </div>
+            <div v-if="canSeeOwnership()" class="flex justify-between gap-2">
+              <dt class="opacity-60">Created by</dt>
+              <dd>{{ store.current.created_by?.name ?? '—' }}</dd>
+            </div>
+            <div v-if="canSeeOwnership()" class="flex justify-between gap-2">
+              <dt class="opacity-60">Created</dt>
+              <dd>{{ fmtDateTime(store.current.created_at) }}</dd>
             </div>
           </dl>
           <p v-if="store.current.notes" class="mt-3 border-t border-border pt-3 text-sm opacity-80">

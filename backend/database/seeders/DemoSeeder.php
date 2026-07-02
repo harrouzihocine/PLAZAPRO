@@ -33,6 +33,7 @@ use App\Modules\Settings\Models\DynamicList;
 use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
+use App\Modules\Settings\Models\Wilaya;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Auth;
 
@@ -72,7 +73,7 @@ class DemoSeeder extends Seeder
 
         $this->command->info('Seeding demo data…');
 
-        $agentRole = Role::where('slug', 'agent')->firstOrFail();
+        $agentRole = Role::where('slug', 'site-agent')->firstOrFail();
         $sales = Department::firstOrCreate(['slug' => 'ventes'], ['name' => 'Ventes']);
 
         // --- Agents (also the chat participants) ------------------------------
@@ -92,11 +93,11 @@ class DemoSeeder extends Seeder
         // --- Inventory --------------------------------------------------------
         $createLocation = app(CreateLocation::class);
         $elFeth = $createLocation->handle([
-            'name' => 'Résidence El Feth', 'code' => 'REF', 'area_id' => $this->item('areas', 'alger'),
+            'name' => 'Résidence El Feth', 'code' => 'REF', 'wilaya_id' => $this->wilaya('Alger'),
             'address' => '12 Rue des Frères Boughedou, Alger', 'description' => 'Standing residence, 5 floors.',
         ]);
         $oran = $createLocation->handle([
-            'name' => "Les Jardins d'Oran", 'code' => 'LJO', 'area_id' => $this->item('areas', 'oran'),
+            'name' => "Les Jardins d'Oran", 'code' => 'LJO', 'wilaya_id' => $this->wilaya('Oran'),
             'address' => 'Route de Sénia, Oran', 'description' => 'Family project near the coast.',
         ]);
 
@@ -133,9 +134,9 @@ class DemoSeeder extends Seeder
 
         // --- Desires (what a few clients are looking for) ---------------------
         $desire = app(UpsertDesire::class);
-        $desire->handle($c1, ['area_id' => $this->item('areas', 'alger'), 'type_id' => $this->item('unit_types', 'f4'), 'floor_pref' => 'floor_3', 'budget_min' => '7000000.00', 'budget_max' => '9000000.00', 'notes' => 'Étage élevé de préférence.']);
-        $desire->handle($c2, ['area_id' => $this->item('areas', 'alger'), 'type_id' => $this->item('unit_types', 'f3'), 'budget_min' => '6000000.00', 'budget_max' => '7500000.00']);
-        $desire->handle($c4, ['area_id' => $this->item('areas', 'oran'), 'type_id' => $this->item('unit_types', 'f2'), 'budget_min' => '3800000.00', 'budget_max' => '5000000.00']);
+        $desire->handle($c1, ['wilaya_id' => $this->wilaya('Alger'), 'type_id' => $this->item('unit_types', 'f4'), 'floor_pref' => 'floor_3', 'budget_min' => '7000000.00', 'budget_max' => '9000000.00', 'notes' => 'Étage élevé de préférence.']);
+        $desire->handle($c2, ['wilaya_id' => $this->wilaya('Alger'), 'type_id' => $this->item('unit_types', 'f3'), 'budget_min' => '6000000.00', 'budget_max' => '7500000.00']);
+        $desire->handle($c4, ['wilaya_id' => $this->wilaya('Oran'), 'type_id' => $this->item('unit_types', 'f2'), 'budget_min' => '3800000.00', 'budget_max' => '5000000.00']);
 
         // --- Deals (one per stage) -------------------------------------------
         $mkDeal = app(CreateClientProject::class);
@@ -217,6 +218,15 @@ class DemoSeeder extends Seeder
 
         $id = $this->listCache[$listKey][$value] ?? null;
         abort_if($id === null, 500, "Missing dynamic-list item {$listKey}:{$value} — run DynamicListSeeder first.");
+
+        return (int) $id;
+    }
+
+    /** Resolve a wilaya id by its name. */
+    private function wilaya(string $name): int
+    {
+        $id = Wilaya::where('name', $name)->value('id');
+        abort_if($id === null, 500, "Missing wilaya {$name} — run WilayaCommuneSeeder first.");
 
         return (int) $id;
     }

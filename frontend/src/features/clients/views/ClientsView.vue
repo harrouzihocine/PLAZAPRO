@@ -1,15 +1,20 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
+import BasePhoneInput from '@/components/base/BasePhoneInput.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
+import { formatPhone } from '@/data/countryCodes'
 import { useDynamicList } from '@/composables/useDynamicList'
 import { useClientsStore } from '@/features/clients/clientsStore'
 import { useAuthStore } from '@/features/settings/store'
+import { confirmAction } from '@/composables/useConfirm'
 
 const store = useClientsStore()
 const auth = useAuthStore()
+const router = useRouter()
 const { items: sources } = useDynamicList('sources')
 const { items: ratings } = useDynamicList('client_ratings')
 
@@ -18,6 +23,11 @@ const selectClass =
 
 const canCreate = () => auth.can('clients.create')
 const canManage = () => auth.can('clients.manage')
+// Client ownership (assigned agent + who created it/when) is back-office-only,
+// gated by clients.manage (super-admin / admin / manager).
+const canSeeOwnership = () => auth.can('clients.manage')
+const fmtDateTime = (v) =>
+  v ? new Date(v).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
 
 const drawerOpen = ref(false)
 const editingId = ref(null) // null = creating
@@ -69,16 +79,28 @@ async function save() {
     notes: form.notes.trim() || null,
   }
   try {
-    if (editingId.value) await store.update(editingId.value, payload)
-    else await store.create(payload)
-    drawerOpen.value = false
+    if (editingId.value) {
+      await store.update(editingId.value, payload)
+      drawerOpen.value = false
+    } else {
+      const created = await store.create(payload)
+      drawerOpen.value = false
+      router.push({ name: 'clients.file', params: { id: created.id } })
+    }
   } catch {
     /* error surfaced via store.error */
   }
 }
 
-function removeClient(client) {
-  if (window.confirm(`Cancel client "${client.full_name}"? The record and its history are kept.`)) {
+async function removeClient(client) {
+  if (
+    await confirmAction({
+      title: `Cancel client "${client.full_name}"?`,
+      text: 'The record and its history are kept.',
+      confirmText: 'Cancel client',
+      danger: true,
+    })
+  ) {
     store.cancel(client.id)
   }
 }
@@ -99,7 +121,6 @@ function resetFilters() {
       <BaseButton v-if="canCreate()" @click="openCreate">New client</BaseButton>
     </div>
 
-    <p v-if="store.error" class="text-sm text-danger">{{ store.error }}</p>
 
     <!-- Filters -->
     <BaseCard>
@@ -108,27 +129,28 @@ function resetFilters() {
           <span class="mb-1 block text-sm">Search (name or phone)</span>
           <BaseInput v-model="store.filters.search" @keyup.enter="store.fetch()" />
         </label>
-        <label class="block">
-          <span class="mb-1 block text-sm">Agent</span>
-          <select v-model="store.filters.assigned_agent_id" :class="selectClass" @change="store.fetch()">
-            <option value="">All</option>
-            <option v-for="a in store.agents" :key="a.id" :value="a.id">{{ a.name }}</option>
-          </select>
-        </label>
-        <label class="block">
-          <span class="mb-1 block text-sm">Source</span>
-          <select v-model="store.filters.source_id" :class="selectClass" @change="store.fetch()">
-            <option value="">All</option>
-            <option v-for="s in sources" :key="s.id" :value="s.id">{{ s.label }}</option>
-          </select>
-        </label>
-        <label class="block">
-          <span class="mb-1 block text-sm">Rating</span>
-          <select v-model="store.filters.rating_id" :class="selectClass" @change="store.fetch()">
-            <option value="">All</option>
-            <option v-for="r in ratings" :key="r.id" :value="r.id">{{ r.label }}</option>
-          </select>
-        </label>
+        <BaseSelect
+          v-if="canSeeOwnership()"
+          v-model="store.filters.assigned_agent_id"
+          label="Agent"
+          placeholder="All"
+          :options="store.followUpAgents.map((a) => ({ value: a.id, label: a.name }))"
+          @change="store.fetch()"
+        />
+        <BaseSelect
+          v-model="store.filters.source_id"
+          label="Source"
+          placeholder="All"
+          :options="sources.map((s) => ({ value: s.id, label: s.label }))"
+          @change="store.fetch()"
+        />
+        <BaseSelect
+          v-model="store.filters.rating_id"
+          label="Rating"
+          placeholder="All"
+          :options="ratings.map((r) => ({ value: r.id, label: r.label }))"
+          @change="store.fetch()"
+        />
       </div>
       <div class="mt-3 flex gap-2">
         <BaseButton @click="store.fetch()">Filter</BaseButton>
@@ -146,7 +168,8 @@ function resetFilters() {
               <th class="py-2 pr-3">Phone</th>
               <th class="py-2 pr-3">Source</th>
               <th class="py-2 pr-3">Rating</th>
-              <th class="py-2 pr-3">Agent</th>
+              <th v-if="canSeeOwnership()" class="py-2 pr-3">Agent</th>
+              <th v-if="canSeeOwnership()" class="py-2 pr-3">Created by</th>
               <th class="py-2 pr-3"></th>
             </tr>
           </thead>
@@ -157,10 +180,14 @@ function resetFilters() {
                   {{ c.full_name }}
                 </RouterLink>
               </td>
-              <td class="py-2 pr-3">{{ c.phone }}</td>
+              <td class="py-2 pr-3">{{ formatPhone(c.phone) }}</td>
               <td class="py-2 pr-3">{{ c.source?.label ?? '—' }}</td>
               <td class="py-2 pr-3">{{ c.rating?.label ?? '—' }}</td>
-              <td class="py-2 pr-3">{{ c.assigned_agent?.name ?? '—' }}</td>
+              <td v-if="canSeeOwnership()" class="py-2 pr-3">{{ c.assigned_agent?.name ?? '—' }}</td>
+              <td v-if="canSeeOwnership()" class="py-2 pr-3">
+                <div>{{ c.created_by?.name ?? '—' }}</div>
+                <div class="text-xs opacity-60">{{ fmtDateTime(c.created_at) }}</div>
+              </td>
               <td class="py-2 pr-3">
                 <div v-if="canManage()" class="flex justify-end gap-1">
                   <BaseButton variant="ghost" @click="openEdit(c)">Edit</BaseButton>
@@ -169,7 +196,7 @@ function resetFilters() {
               </td>
             </tr>
             <tr v-if="!store.items.length">
-              <td colspan="6" class="py-4 text-center text-sm opacity-60">No clients match.</td>
+              <td :colspan="canSeeOwnership() ? 7 : 5" class="py-4 text-center text-sm opacity-60">No clients match.</td>
             </tr>
           </tbody>
         </table>
@@ -182,35 +209,33 @@ function resetFilters() {
         <h2 class="mb-4 text-lg font-semibold">{{ editingId ? 'Edit client' : 'New client' }}</h2>
         <form class="space-y-3" @submit.prevent="save">
           <div class="grid grid-cols-2 gap-3">
-            <BaseInput v-model="form.first_name" label="First name" />
-            <BaseInput v-model="form.last_name" label="Last name" />
+            <BaseInput v-model="form.last_name" label="Last name" capitalize />
+            <BaseInput v-model="form.first_name" label="First name" capitalize />
           </div>
-          <BaseInput v-model="form.phone" label="Phone" />
+          <BasePhoneInput v-model="form.phone" label="Phone" />
           <BaseInput v-model="form.email" label="Email" type="email" />
 
-          <label class="block">
-            <span class="mb-1 block text-sm">Source</span>
-            <select v-model="form.source_id" :class="selectClass" aria-label="Source">
-              <option value="">None</option>
-              <option v-for="s in sources" :key="s.id" :value="s.id">{{ s.label }}</option>
-            </select>
-          </label>
+          <BaseSelect
+            v-model="form.source_id"
+            label="Source"
+            placeholder="None"
+            :options="sources.map((s) => ({ value: s.id, label: s.label }))"
+          />
 
-          <label class="block">
-            <span class="mb-1 block text-sm">Rating</span>
-            <select v-model="form.rating_id" :class="selectClass" aria-label="Rating">
-              <option value="">None</option>
-              <option v-for="r in ratings" :key="r.id" :value="r.id">{{ r.label }}</option>
-            </select>
-          </label>
+          <BaseSelect
+            v-model="form.rating_id"
+            label="Rating"
+            placeholder="None"
+            :options="ratings.map((r) => ({ value: r.id, label: r.label }))"
+          />
 
-          <label class="block">
-            <span class="mb-1 block text-sm">Assigned agent</span>
-            <select v-model="form.assigned_agent_id" :class="selectClass" aria-label="Assigned agent">
-              <option value="">Unassigned</option>
-              <option v-for="a in store.agents" :key="a.id" :value="a.id">{{ a.name }}</option>
-            </select>
-          </label>
+          <BaseSelect
+            v-if="canSeeOwnership()"
+            v-model="form.assigned_agent_id"
+            label="Assigned agent"
+            placeholder="Unassigned"
+            :options="store.followUpAgents.map((a) => ({ value: a.id, label: a.name }))"
+          />
 
           <label class="block">
             <span class="mb-1 block text-sm">Notes</span>

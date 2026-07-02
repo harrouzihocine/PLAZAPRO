@@ -88,7 +88,7 @@ class GenerateVersementDocument
                 'generated_at' => now()->toDayDateTimeString(),
             ],
             'client' => [
-                'name' => trim(($project?->client?->first_name ?? '').' '.($project?->client?->last_name ?? '')) ?: null,
+                'name' => ($project?->client?->full_name ?: null),
                 'phone' => $project?->client?->phone,
             ],
             'project' => [

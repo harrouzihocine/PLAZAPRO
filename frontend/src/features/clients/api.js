@@ -28,11 +28,21 @@ export const clientsApi = {
   },
 }
 
-// Active agents (role.is_agent) — feeds the "assign agent" picker. Open to any
-// authenticated user, like the other reference-data pickers.
+// Active agents (role.is_agent) — feeds the visit/next-action assign pickers
+// (field agents). Open to any authenticated user, like the other pickers.
 export const agentsApi = {
   async list() {
     const { data } = await useApi().get('/agents')
+    return data.data
+  },
+}
+
+// Follow-up agents (role can log calls) — the sales agents/managers who follow a
+// client up. Feeds the client "assigned agent" picker, distinct from the visit
+// (field-agent) picker above.
+export const followUpAgentsApi = {
+  async list() {
+    const { data } = await useApi().get('/follow-up-agents')
     return data.data
   },
 }
@@ -60,8 +70,9 @@ export const reserveUnit = (unitId, payload = {}) => useApi().post(`/units/${uni
 
 // Deals (client_projects) hanging off a client. Stage moves through /advance.
 export const projectsApi = {
-  async list(clientId) {
-    const { data } = await useApi().get(`/clients/${clientId}/projects`)
+  async list(clientId, status) {
+    const params = status ? { status } : {}
+    const { data } = await useApi().get(`/clients/${clientId}/projects`, { params })
     return data.data
   },
 
@@ -78,6 +89,14 @@ export const projectsApi = {
   async advance(projectId, stage) {
     const { data } = await useApi().post(`/projects/${projectId}/advance`, { stage })
     return data.data
+  },
+
+  archive(projectId) {
+    return useApi().post(`/projects/${projectId}/archive`)
+  },
+
+  reactivate(projectId) {
+    return useApi().post(`/projects/${projectId}/reactivate`)
   },
 
   cancel(projectId, reason) {

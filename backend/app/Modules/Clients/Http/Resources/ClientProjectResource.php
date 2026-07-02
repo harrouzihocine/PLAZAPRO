@@ -26,6 +26,8 @@ class ClientProjectResource extends JsonResource
             'location' => $this->whenLoaded('location', fn () => $this->location ? [
                 'id' => $this->location->id,
                 'name' => $this->location->name,
+                'expected_delivery_date' => $this->location->expected_delivery_date?->toDateString(),
+                'gtm_priority' => $this->location->gtm_priority?->value,
             ] : null),
             'unit' => $this->whenLoaded('unit', fn () => $this->unit ? [
                 'id' => $this->unit->id,

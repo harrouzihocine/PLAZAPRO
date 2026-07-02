@@ -2,9 +2,10 @@
 import { computed, onMounted, ref } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
-import { MEDIA_COLLECTIONS, mediaFileUrl } from '@/features/inventory/api'
+import { MEDIA_COLLECTIONS, mediaDownloadUrl, mediaFileUrl } from '@/features/inventory/api'
 import MediaViewer from '@/features/inventory/components/MediaViewer.vue'
 import { useMediaStore } from '@/features/inventory/mediaStore'
+import { confirmAction } from '@/composables/useConfirm'
 
 const props = defineProps({
   mediableType: { type: String, required: true }, // 'locations' | 'units'
@@ -57,8 +58,15 @@ function onReplacePick(e) {
   replacingId.value = null
 }
 
-function remove(item) {
-  if (window.confirm(`Remove "${item.original_name}"? The file is kept but hidden.`)) {
+async function remove(item) {
+  if (
+    await confirmAction({
+      title: `Remove "${item.original_name}"?`,
+      text: 'The file is kept but hidden.',
+      confirmText: 'Remove',
+      danger: true,
+    })
+  ) {
     media.remove(item.id)
   }
 }
@@ -96,7 +104,6 @@ function remove(item) {
       </button>
     </nav>
 
-    <p v-if="media.error" class="mt-2 text-sm text-danger">{{ media.error }}</p>
 
     <!-- Drag-drop upload zone — targets the active tab -->
     <div
@@ -137,11 +144,21 @@ function remove(item) {
             {{ item.original_name }}
             <span v-if="item.version > 1" class="opacity-60">v{{ item.version }}</span>
           </span>
-          <div v-if="canManage" class="flex shrink-0">
-            <button class="min-h-[36px] px-1 text-xs disabled:opacity-30" :disabled="i === 0 || media.busy" aria-label="Move up" @click="media.move(item.id, -1)">↑</button>
-            <button class="min-h-[36px] px-1 text-xs disabled:opacity-30" :disabled="i === tabItems.length - 1 || media.busy" aria-label="Move down" @click="media.move(item.id, 1)">↓</button>
-            <button class="min-h-[36px] px-1 text-xs" aria-label="Replace" @click="startReplace(item.id)">⟳</button>
-            <button class="min-h-[36px] px-1 text-xs" aria-label="Remove" @click="remove(item)">✕</button>
+          <div class="flex shrink-0">
+            <a
+              :href="mediaDownloadUrl(item.id)"
+              :download="item.original_name"
+              class="min-h-[36px] px-1 text-xs hover:text-primary"
+              aria-label="Download"
+            >
+              ⬇
+            </a>
+            <template v-if="canManage">
+              <button class="min-h-[36px] px-1 text-xs disabled:opacity-30" :disabled="i === 0 || media.busy" aria-label="Move up" @click="media.move(item.id, -1)">↑</button>
+              <button class="min-h-[36px] px-1 text-xs disabled:opacity-30" :disabled="i === tabItems.length - 1 || media.busy" aria-label="Move down" @click="media.move(item.id, 1)">↓</button>
+              <button class="min-h-[36px] px-1 text-xs" aria-label="Replace" @click="startReplace(item.id)">⟳</button>
+              <button class="min-h-[36px] px-1 text-xs" aria-label="Remove" @click="remove(item)">✕</button>
+            </template>
           </div>
         </div>
       </div>

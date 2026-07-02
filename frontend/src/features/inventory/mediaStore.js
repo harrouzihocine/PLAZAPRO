@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { toastError } from '@/composables/useConfirm'
 import { mediaApi } from '@/features/inventory/api'
 
 // State for a mediable's gallery (upload / reorder / replace / remove). Keyed to
@@ -44,6 +45,7 @@ export const useMediaStore = defineStore('media', {
         return await fn()
       } catch (e) {
         this.error = e.response?.data?.message ?? 'Action failed.'
+        toastError(this.error)
         throw e
       } finally {
         this.busy = false

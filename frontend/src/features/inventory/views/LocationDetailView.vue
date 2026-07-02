@@ -1,19 +1,23 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
 import { useDynamicList } from '@/composables/useDynamicList'
-import { reservationsApi } from '@/features/inventory/api'
+import { GTM_PRIORITIES, reservationsApi } from '@/features/inventory/api'
 import BoxesPanel from '@/features/inventory/components/BoxesPanel.vue'
+import GtmPriorityBadge from '@/features/inventory/components/GtmPriorityBadge.vue'
 import LocationMap from '@/features/inventory/components/LocationMap.vue'
 import MediaGallery from '@/features/inventory/components/MediaGallery.vue'
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
 import StackingPlan from '@/features/inventory/components/StackingPlan.vue'
+import { googleMapsUrl } from '@/features/inventory/googleMaps'
 import { useLocationsStore } from '@/features/inventory/locationsStore'
 import { useUnitsStore } from '@/features/inventory/unitsStore'
 import { useAuthStore } from '@/features/settings/store'
+import { confirmAction } from '@/composables/useConfirm'
 
 const props = defineProps({ id: { type: [String, Number], required: true } })
 const locations = useLocationsStore()
@@ -24,6 +28,8 @@ const { items: floors } = useDynamicList('floors')
 
 const canManage = auth.can('units.manage')
 const canReserve = auth.can('units.reserve')
+
+const mapsUrl = computed(() => googleMapsUrl(locations.current ?? {}))
 
 const stackingRef = ref(null)
 const reserving = ref(false)
@@ -55,6 +61,7 @@ const blank = {
   block: '',
   stack_floor: '',
   position: '',
+  gtm_priority: 'medium',
 }
 const form = reactive({ ...blank })
 const mode = ref(null) // 'create' | 'edit' | 'correct' | null
@@ -82,6 +89,7 @@ function openEdit(u) {
     block: u.block ?? '',
     stack_floor: u.stack_floor ?? '',
     position: u.position ?? '',
+    gtm_priority: u.gtm_priority ?? 'medium',
   })
   editingId.value = u.id
   mode.value = 'edit'
@@ -108,6 +116,7 @@ async function submit() {
     block: form.block.trim() || null,
     stack_floor: num(form.stack_floor),
     position: num(form.position),
+    gtm_priority: form.gtm_priority,
   }
   try {
     if (mode.value === 'edit') {
@@ -134,8 +143,15 @@ async function submitCorrection() {
   }
 }
 
-function remove(u) {
-  if (window.confirm(`Cancel unit "${u.reference}"? The record is kept but marked cancelled.`)) {
+async function remove(u) {
+  if (
+    await confirmAction({
+      title: `Cancel unit "${u.reference}"?`,
+      text: 'The record is kept but marked cancelled.',
+      confirmText: 'Cancel unit',
+      danger: true,
+    })
+  ) {
     units.cancel(u.id)
   }
 }
@@ -153,7 +169,8 @@ function remove(u) {
           <h1 class="text-xl font-semibold">{{ locations.current.name }}</h1>
           <p class="opacity-70">
             {{ locations.current.code
-            }}<template v-if="locations.current.area"> · {{ locations.current.area.label }}</template>
+            }}<template v-if="locations.current.wilaya"> · {{ locations.current.wilaya.name }}</template
+            ><template v-if="locations.current.commune"> ({{ locations.current.commune.name }})</template>
           </p>
         </div>
         <BaseButton v-if="canManage" @click="openCreate">Add unit</BaseButton>
@@ -163,7 +180,48 @@ function remove(u) {
         <dl class="grid gap-2 sm:grid-cols-3">
           <div>
             <dt class="text-xs opacity-60">Address</dt>
-            <dd>{{ locations.current.address || '—' }}</dd>
+            <dd>
+              {{ locations.current.address || '—' }}
+              <a
+                v-if="mapsUrl"
+                :href="mapsUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open in Google Maps"
+                aria-label="Open in Google Maps"
+                class="ml-1 inline-flex align-middle text-primary hover:opacity-80"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+              </a>
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs opacity-60">Expected delivery</dt>
+            <dd>{{ locations.current.expected_delivery_date || '—' }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs opacity-60">GTM priority</dt>
+            <dd>
+              <GtmPriorityBadge
+                v-if="locations.current.gtm_priority"
+                :priority="locations.current.gtm_priority"
+              />
+              <template v-else>—</template>
+            </dd>
           </div>
           <div>
             <dt class="text-xs opacity-60">Status</dt>
@@ -204,7 +262,6 @@ function remove(u) {
         </template>
       </StackingPlan>
 
-      <p v-if="units.error" class="text-sm text-danger">{{ units.error }}</p>
 
       <!-- Create / edit specs form -->
       <BaseCard v-if="(mode === 'create' || mode === 'edit') && canManage">
@@ -212,25 +269,29 @@ function remove(u) {
           <h2 class="font-semibold">{{ mode === 'edit' ? 'Edit unit' : 'New unit' }}</h2>
           <div class="grid gap-3 sm:grid-cols-3">
             <BaseInput v-model="form.reference" label="Reference" />
-            <label class="block">
-              <span class="mb-1 block text-sm">Type</span>
-              <select v-model="form.type_id" class="w-full rounded-token border border-border bg-bg px-3 py-2 min-h-[44px] text-ink">
-                <option value="">— none —</option>
-                <option v-for="t in unitTypes" :key="t.id" :value="t.id">{{ t.label }}</option>
-              </select>
-            </label>
-            <label class="block">
-              <span class="mb-1 block text-sm">Floor</span>
-              <select v-model="form.floor_id" class="w-full rounded-token border border-border bg-bg px-3 py-2 min-h-[44px] text-ink">
-                <option value="">— none —</option>
-                <option v-for="f in floors" :key="f.id" :value="f.id">{{ f.label }}</option>
-              </select>
-            </label>
+            <BaseSelect
+              v-model="form.type_id"
+              label="Type"
+              placeholder="— none —"
+              :options="unitTypes.map((t) => ({ value: t.id, label: t.label }))"
+            />
+            <BaseSelect
+              v-model="form.floor_id"
+              label="Floor"
+              placeholder="— none —"
+              :options="floors.map((f) => ({ value: f.id, label: f.label }))"
+            />
             <BaseInput v-model="form.area_sqm" label="Area (m²)" type="number" />
             <BaseInput v-if="mode === 'create'" v-model="form.price" label="Price" type="number" />
             <BaseInput v-model="form.block" label="Block" />
             <BaseInput v-model="form.stack_floor" label="Stack floor" type="number" />
             <BaseInput v-model="form.position" label="Position" type="number" />
+            <BaseSelect
+              v-model="form.gtm_priority"
+              label="GTM priority"
+              :clearable="false"
+              :options="GTM_PRIORITIES"
+            />
           </div>
           <p v-if="mode === 'edit'" class="text-xs opacity-60">
             To change price or sale status, use “Correct” (keeps the old version).
@@ -248,14 +309,12 @@ function remove(u) {
           <h2 class="font-semibold">Correct price / status</h2>
           <div class="grid gap-3 sm:grid-cols-3">
             <BaseInput v-model="correction.price" label="Price" type="number" />
-            <label class="block">
-              <span class="mb-1 block text-sm">Sale status</span>
-              <select v-model="correction.sale_status" class="w-full rounded-token border border-border bg-bg px-3 py-2 min-h-[44px] text-ink">
-                <option value="available">available</option>
-                <option value="reserved">reserved</option>
-                <option value="sold">sold</option>
-              </select>
-            </label>
+            <BaseSelect
+              v-model="correction.sale_status"
+              label="Sale status"
+              :clearable="false"
+              :options="[{ value: 'available', label: 'available' }, { value: 'reserved', label: 'reserved' }, { value: 'sold', label: 'sold' }]"
+            />
             <BaseInput v-model="correction.reason" label="Reason" />
           </div>
           <p class="text-xs opacity-60">
@@ -280,6 +339,7 @@ function remove(u) {
                 <th class="py-2 pr-3">Floor</th>
                 <th class="py-2 pr-3">Price</th>
                 <th class="py-2 pr-3">Status</th>
+                <th class="py-2 pr-3">Priority</th>
                 <th v-if="canManage" class="py-2"></th>
               </tr>
             </thead>
@@ -294,6 +354,10 @@ function remove(u) {
                 <td class="py-2 pr-3">{{ u.floor || '—' }}</td>
                 <td class="py-2 pr-3">{{ u.price }}</td>
                 <td class="py-2 pr-3"><SaleStatusBadge :status="u.sale_status" /></td>
+                <td class="py-2 pr-3">
+                  <GtmPriorityBadge v-if="u.gtm_priority" :priority="u.gtm_priority" />
+                  <span v-else>—</span>
+                </td>
                 <td v-if="canManage" class="py-2">
                   <div class="flex justify-end gap-1">
                     <BaseButton variant="ghost" @click="openEdit(u)">Edit</BaseButton>
@@ -303,7 +367,7 @@ function remove(u) {
                 </td>
               </tr>
               <tr v-if="!units.items.length">
-                <td colspan="6" class="py-4 text-center text-sm opacity-60">No units yet.</td>
+                <td colspan="7" class="py-4 text-center text-sm opacity-60">No units yet.</td>
               </tr>
             </tbody>
           </table>

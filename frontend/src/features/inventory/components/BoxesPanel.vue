@@ -3,9 +3,11 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
 import { useDynamicList } from '@/composables/useDynamicList'
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
 import { useBoxesStore } from '@/features/inventory/boxesStore'
+import { confirmAction } from '@/composables/useConfirm'
 
 const props = defineProps({
   locationId: { type: [String, Number], required: true },
@@ -64,8 +66,10 @@ async function submit() {
   }
 }
 
-function remove(b) {
-  if (window.confirm(`Cancel box "${b.reference}"?`)) boxes.cancel(b.id)
+async function remove(b) {
+  if (await confirmAction({ title: `Cancel box "${b.reference}"?`, confirmText: 'Cancel box', danger: true })) {
+    boxes.cancel(b.id)
+  }
 }
 </script>
 
@@ -76,7 +80,6 @@ function remove(b) {
       <BaseButton v-if="canManage" variant="ghost" @click="openCreate">Add box</BaseButton>
     </div>
 
-    <p v-if="boxes.error" class="mt-2 text-sm text-danger">{{ boxes.error }}</p>
 
     <form
       v-if="mode && canManage"
@@ -84,29 +87,25 @@ function remove(b) {
       @submit.prevent="submit"
     >
       <BaseInput v-model="form.reference" label="Reference" />
-      <label class="block">
-        <span class="mb-1 block text-sm">Type</span>
-        <select v-model="form.type_id" class="w-full rounded-token border border-border bg-bg px-3 py-2 min-h-[44px] text-ink">
-          <option value="">— none —</option>
-          <option v-for="t in boxTypes" :key="t.id" :value="t.id">{{ t.label }}</option>
-        </select>
-      </label>
+      <BaseSelect
+        v-model="form.type_id"
+        label="Type"
+        placeholder="— none —"
+        :options="boxTypes.map((t) => ({ value: t.id, label: t.label }))"
+      />
       <BaseInput v-model="form.price" label="Price" type="number" />
-      <label class="block">
-        <span class="mb-1 block text-sm">Linked unit</span>
-        <select v-model="form.unit_id" class="w-full rounded-token border border-border bg-bg px-3 py-2 min-h-[44px] text-ink">
-          <option value="">— none —</option>
-          <option v-for="u in units" :key="u.id" :value="u.id">{{ u.reference }}</option>
-        </select>
-      </label>
-      <label class="block">
-        <span class="mb-1 block text-sm">Sale status</span>
-        <select v-model="form.sale_status" class="w-full rounded-token border border-border bg-bg px-3 py-2 min-h-[44px] text-ink">
-          <option value="available">available</option>
-          <option value="reserved">reserved</option>
-          <option value="sold">sold</option>
-        </select>
-      </label>
+      <BaseSelect
+        v-model="form.unit_id"
+        label="Linked unit"
+        placeholder="— none —"
+        :options="units.map((u) => ({ value: u.id, label: u.reference }))"
+      />
+      <BaseSelect
+        v-model="form.sale_status"
+        label="Sale status"
+        :clearable="false"
+        :options="[{ value: 'available', label: 'available' }, { value: 'reserved', label: 'reserved' }, { value: 'sold', label: 'sold' }]"
+      />
       <div class="flex items-end gap-2">
         <BaseButton type="submit" :disabled="boxes.saving">Save</BaseButton>
         <BaseButton type="button" variant="ghost" @click="mode = null">Cancel</BaseButton>

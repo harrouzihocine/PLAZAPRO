@@ -3,7 +3,9 @@ import { computed, onMounted, reactive } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
 import { useTasksStore } from '@/features/pipeline/tasksStore'
+import { confirmAction } from '@/composables/useConfirm'
 
 const store = useTasksStore()
 
@@ -39,8 +41,15 @@ async function quickAdd() {
   }
 }
 
-function cancelTask(task) {
-  if (window.confirm(`Cancel task "${task.title}"? The record is kept.`)) {
+async function cancelTask(task) {
+  if (
+    await confirmAction({
+      title: `Cancel task "${task.title}"?`,
+      text: 'The record is kept.',
+      confirmText: 'Cancel task',
+      danger: true,
+    })
+  ) {
     store.cancel(task.id)
   }
 }
@@ -70,7 +79,6 @@ function formatDue(value) {
       <p class="opacity-70">Your to-dos and the team's. Overdue items are flagged.</p>
     </div>
 
-    <p v-if="store.error" class="text-sm text-danger">{{ store.error }}</p>
 
     <!-- Quick add -->
     <BaseCard>
@@ -79,21 +87,18 @@ function formatDue(value) {
           <span class="mb-1 block text-sm">New task</span>
           <BaseInput v-model="form.title" placeholder="What needs doing?" />
         </label>
-        <label class="block">
-          <span class="mb-1 block text-sm">Assign to</span>
-          <select v-model="form.assigned_to" :class="selectClass" aria-label="Assign to">
-            <option value="">Me</option>
-            <option v-for="a in store.agents" :key="a.id" :value="a.id">{{ a.name }}</option>
-          </select>
-        </label>
-        <label class="block">
-          <span class="mb-1 block text-sm">Priority</span>
-          <select v-model="form.priority" :class="selectClass" aria-label="Priority">
-            <option value="low">Low</option>
-            <option value="normal">Normal</option>
-            <option value="high">High</option>
-          </select>
-        </label>
+        <BaseSelect
+          v-model="form.assigned_to"
+          label="Assign to"
+          placeholder="Me"
+          :options="store.agents.map((a) => ({ value: a.id, label: a.name }))"
+        />
+        <BaseSelect
+          v-model="form.priority"
+          label="Priority"
+          :clearable="false"
+          :options="[{ value: 'low', label: 'Low' }, { value: 'normal', label: 'Normal' }, { value: 'high', label: 'High' }]"
+        />
         <label class="block">
           <span class="mb-1 block text-sm">Due</span>
           <input v-model="form.due_at" type="datetime-local" :class="selectClass" aria-label="Due" />
@@ -107,30 +112,27 @@ function formatDue(value) {
     <!-- Filters -->
     <BaseCard>
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label class="block">
-          <span class="mb-1 block text-sm">Scope</span>
-          <select v-model="store.filters.scope" :class="selectClass" @change="store.fetch()">
-            <option value="mine">Mine</option>
-            <option value="team">Team</option>
-          </select>
-        </label>
-        <label class="block">
-          <span class="mb-1 block text-sm">State</span>
-          <select v-model="store.filters.state" :class="selectClass" @change="store.fetch()">
-            <option value="">All</option>
-            <option value="open">Open</option>
-            <option value="done">Done</option>
-          </select>
-        </label>
-        <label class="block">
-          <span class="mb-1 block text-sm">Priority</span>
-          <select v-model="store.filters.priority" :class="selectClass" @change="store.fetch()">
-            <option value="">All</option>
-            <option value="high">High</option>
-            <option value="normal">Normal</option>
-            <option value="low">Low</option>
-          </select>
-        </label>
+        <BaseSelect
+          v-model="store.filters.scope"
+          label="Scope"
+          :clearable="false"
+          :options="[{ value: 'mine', label: 'Mine' }, { value: 'team', label: 'Team' }]"
+          @change="store.fetch()"
+        />
+        <BaseSelect
+          v-model="store.filters.state"
+          label="State"
+          placeholder="All"
+          :options="[{ value: 'open', label: 'Open' }, { value: 'done', label: 'Done' }]"
+          @change="store.fetch()"
+        />
+        <BaseSelect
+          v-model="store.filters.priority"
+          label="Priority"
+          placeholder="All"
+          :options="[{ value: 'high', label: 'High' }, { value: 'normal', label: 'Normal' }, { value: 'low', label: 'Low' }]"
+          @change="store.fetch()"
+        />
         <label class="flex items-center gap-2 pt-6">
           <input v-model="store.filters.overdue" type="checkbox" @change="store.fetch()" />
           <span class="text-sm">Overdue only</span>

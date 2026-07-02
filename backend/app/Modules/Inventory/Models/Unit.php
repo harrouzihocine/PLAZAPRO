@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Models;
 
 use App\Core\Models\BaseModel;
+use App\Modules\Inventory\Enums\GtmPriority;
 use App\Modules\Inventory\Enums\HoldStatus;
 use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Settings\Models\DynamicListItem;
@@ -26,7 +27,7 @@ class Unit extends BaseModel
 
     protected $fillable = [
         'location_id', 'reference', 'type_id', 'floor_id', 'area_sqm',
-        'price', 'sale_status', 'block', 'stack_floor', 'position',
+        'price', 'sale_status', 'block', 'stack_floor', 'position', 'gtm_priority',
     ];
 
     protected function casts(): array
@@ -35,6 +36,7 @@ class Unit extends BaseModel
             'price' => 'decimal:2',
             'area_sqm' => 'decimal:2',
             'sale_status' => SaleStatus::class,
+            'gtm_priority' => GtmPriority::class,
         ]);
     }
 

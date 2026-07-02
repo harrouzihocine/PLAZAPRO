@@ -74,6 +74,12 @@ class User extends Authenticatable implements MustVerifyEmail
         return (bool) $this->role?->is_agent;
     }
 
+    /** The all-powerful role. Only a super admin may modify/remove another super admin. */
+    public function isSuperAdmin(): bool
+    {
+        return $this->role?->slug === 'super-admin';
+    }
+
     /**
      * Broadcast this user's notifications on a stable, opaque channel name
      * (users.{id}) instead of the default namespaced class path. The matching

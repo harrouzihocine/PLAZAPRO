@@ -10,6 +10,7 @@ const auth = useAuthStore()
 const tabs = computed(() =>
   [
     { to: { name: 'settings.lists' }, label: 'Lists', permission: 'settings.manage' },
+    { to: { name: 'settings.wilayas' }, label: 'Wilayas & Communes', permission: 'settings.manage' },
     { to: { name: 'settings.departments' }, label: 'Departments', permission: 'settings.manage' },
     { to: { name: 'settings.roles' }, label: 'Roles', permission: 'roles.manage' },
     { to: { name: 'settings.users' }, label: 'Users', permission: 'users.manage' },

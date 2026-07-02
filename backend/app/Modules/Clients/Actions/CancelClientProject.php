@@ -4,26 +4,31 @@ declare(strict_types=1);
 
 namespace App\Modules\Clients\Actions;
 
+use App\Core\Enums\RecordStatus;
 use App\Modules\Clients\Models\ClientProject;
+use Illuminate\Support\Facades\DB;
 
 /**
- * Cancel/archive (no-delete) a deal. The row and its history are kept and marked
- * cancelled (audited via LogsActivity).
+ * Remove (no-delete) a deal and everything inside it. The deal, its payment plan
+ * and its recorded versements are all marked cancelled — rows and history kept
+ * and audited (LogsActivity), never hard-deleted.
  *
- * Archive-only-without-payments (Phase 4, a guide test rule): a deal that has
- * active versements cannot be archived — the money must be resolved (corrected)
- * first, so recorded payments are never orphaned by a cancelled parent.
+ * Terminal, unlike ArchiveClientProject: recorded payments are cancelled along
+ * with the parent (not orphaned, not blocked), so there is nothing to reactivate.
+ * Every non-cancelled child is swept, whether the deal was active or archived.
  */
 class CancelClientProject
 {
     public function handle(ClientProject $project, string $reason): ClientProject
     {
-        abort_if(
-            $project->versements()->active()->exists(),
-            422,
-            'This deal has recorded payments and cannot be archived. Resolve the versements first.'
-        );
+        return DB::transaction(function () use ($project, $reason) {
+            $childReason = 'Parent deal removed';
+            $cancelled = RecordStatus::Cancelled->value;
 
-        return $project->cancel($reason);
+            $project->paymentSchedules()->where('status', '!=', $cancelled)->get()->each->cancel($childReason);
+            $project->versements()->where('status', '!=', $cancelled)->get()->each->cancel($childReason);
+
+            return $project->cancel($reason);
+        });
     }
 }

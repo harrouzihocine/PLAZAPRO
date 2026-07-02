@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
@@ -29,7 +29,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:latitude', 'update:longitude', 'update:address'])
 
-// The business operates in Algeria (see the `areas` dynamic list / DemoSeeder),
+// The business operates in Algeria (see the wilayas/communes tables / DemoSeeder),
 // so fall back to a country-level view of Algiers when nothing is picked yet.
 const DEFAULT_CENTER = [36.7538, 3.0588]
 const DEFAULT_ZOOM = 6
@@ -46,6 +46,7 @@ let marker = null
 const searching = ref(false)
 const geoError = ref('')
 const results = ref([])
+const expanded = ref(false)
 
 function toNum(v) {
   return v === '' || v === null || v === undefined ? null : Number(v)
@@ -141,6 +142,28 @@ function clear() {
   emit('update:longitude', null)
 }
 
+// Leaflet caches its container size, so it must re-measure after any layout
+// change. Wait for the browser to actually apply the new box (double rAF = after
+// the next paint) or it reads a stale/zero size and renders blank.
+function refreshSize() {
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => map && map.invalidateSize({ animate: false })),
+  )
+}
+
+// Blow the map up to a full-screen overlay (and back), locking body scroll while
+// it is open.
+async function toggleExpanded(value) {
+  expanded.value = typeof value === 'boolean' ? value : !expanded.value
+  document.body.style.overflow = expanded.value ? 'hidden' : ''
+  await nextTick()
+  refreshSize()
+}
+
+function onKeydown(e) {
+  if (e.key === 'Escape' && expanded.value) toggleExpanded(false)
+}
+
 onMounted(() => {
   const start = hasCoords() ? [toNum(props.latitude), toNum(props.longitude)] : DEFAULT_CENTER
   map = L.map(mapEl.value, { scrollWheelZoom: props.editable }).setView(
@@ -155,10 +178,11 @@ onMounted(() => {
 
   if (hasCoords()) placeMarker(toNum(props.latitude), toNum(props.longitude))
   if (props.editable) map.on('click', (e) => commit(e.latlng.lat, e.latlng.lng))
+  window.addEventListener('keydown', onKeydown)
 
   // The container is frequently measured before layout settles (or while hidden
   // inside a toggled panel); recompute once the DOM has painted.
-  setTimeout(() => map && map.invalidateSize(), 0)
+  refreshSize()
 })
 
 // Reflect coordinates changed by the parent (e.g. opening the edit form) onto the
@@ -185,6 +209,8 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  document.body.style.overflow = ''
   if (map) {
     map.remove()
     map = null
@@ -193,7 +219,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="space-y-2">
+  <div :class="expanded ? 'fixed inset-0 z-[1000] flex flex-col gap-2 bg-bg p-4' : 'space-y-2'">
     <div v-if="editable" class="space-y-2">
       <div class="flex flex-wrap items-center gap-2">
         <BaseButton type="button" variant="ghost" :disabled="searching" @click="search">
@@ -218,7 +244,51 @@ onBeforeUnmount(() => {
       <p v-if="geoError" class="text-sm text-danger">{{ geoError }}</p>
     </div>
 
-    <div ref="mapEl" class="h-72 w-full rounded-token border border-border" />
+    <div class="relative" :class="expanded ? 'min-h-0 flex-1' : 'h-72'">
+      <div ref="mapEl" class="absolute inset-0 rounded-token border border-border" />
+      <button
+        type="button"
+        class="absolute right-2 top-2 z-[1000] flex items-center justify-center rounded-token border border-border bg-surface p-2 text-ink shadow-sm hover:opacity-90"
+        :aria-label="expanded ? 'Close full-screen map' : 'Expand map'"
+        :title="expanded ? 'Close' : 'Expand map'"
+        @click="toggleExpanded()"
+      >
+        <svg
+          v-if="expanded"
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="18" x2="6" y1="6" y2="18" />
+          <line x1="6" x2="18" y1="6" y2="18" />
+        </svg>
+        <svg
+          v-else
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <polyline points="15 3 21 3 21 9" />
+          <polyline points="9 21 3 21 3 15" />
+          <line x1="21" x2="14" y1="3" y2="10" />
+          <line x1="3" x2="10" y1="21" y2="14" />
+        </svg>
+      </button>
+    </div>
 
     <div v-if="editable" class="flex flex-wrap items-center justify-between gap-2 text-xs">
       <span class="opacity-70">

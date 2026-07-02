@@ -39,7 +39,7 @@ class NotifyAgentsOfMatchingUnit implements ShouldQueue
             }
 
             $clients = $desires
-                ->map(fn ($desire) => trim($desire->client->first_name.' '.$desire->client->last_name))
+                ->map(fn ($desire) => $desire->client->full_name)
                 ->unique()
                 ->implode(', ');
 

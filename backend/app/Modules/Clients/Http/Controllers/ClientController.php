@@ -25,17 +25,26 @@ class ClientController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $clients = Client::query()
-            ->with(['source', 'rating', 'assignedAgent'])
+            ->with(['source', 'rating', 'assignedAgent', 'creator'])
             ->when($request->query('status') !== 'all', fn ($q) => $q->active())
             ->when($request->filled('assigned_agent_id'), fn ($q) => $q->where('assigned_agent_id', $request->integer('assigned_agent_id')))
             ->when($request->filled('source_id'), fn ($q) => $q->where('source_id', $request->integer('source_id')))
             ->when($request->filled('rating_id'), fn ($q) => $q->where('rating_id', $request->integer('rating_id')))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = trim((string) $request->query('search'));
-                $q->where(fn ($sub) => $sub
-                    ->where('first_name', 'like', "%{$term}%")
-                    ->orWhere('last_name', 'like', "%{$term}%")
-                    ->orWhere('phone', 'like', "%{$term}%"));
+                // Phone match is format-agnostic: compare digits only and ignore the
+                // leading trunk "0" so any fragment matches regardless of how the
+                // number (or the search term) is written — "+213555…", "0555…", "555…".
+                $digits = ltrim(preg_replace('/\D/', '', $term), '0');
+                $q->where(function ($sub) use ($term, $digits) {
+                    $sub->where('first_name', 'like', "%{$term}%")
+                        ->orWhere('last_name', 'like', "%{$term}%");
+                    if ($digits !== '') {
+                        $sub->orWhereRaw("REGEXP_REPLACE(phone, '[^0-9]', '') LIKE ?", ["%{$digits}%"]);
+                    } else {
+                        $sub->orWhere('phone', 'like', "%{$term}%");
+                    }
+                });
             })
             ->orderBy('last_name')
             ->orderBy('first_name')
@@ -46,20 +55,20 @@ class ClientController extends Controller
 
     public function show(Client $client): ClientResource
     {
-        return new ClientResource($client->load(['source', 'rating', 'assignedAgent']));
+        return new ClientResource($client->load(['source', 'rating', 'assignedAgent', 'creator']));
     }
 
     public function store(StoreClientRequest $request, CreateClient $action): ClientResource
     {
         return new ClientResource(
-            $action->handle($request->validated())->load(['source', 'rating', 'assignedAgent']),
+            $action->handle($request->validated())->load(['source', 'rating', 'assignedAgent', 'creator']),
         );
     }
 
     public function update(UpdateClientRequest $request, Client $client, UpdateClient $action): ClientResource
     {
         return new ClientResource(
-            $action->handle($client, $request->validated())->load(['source', 'rating', 'assignedAgent']),
+            $action->handle($client, $request->validated())->load(['source', 'rating', 'assignedAgent', 'creator']),
         );
     }
 

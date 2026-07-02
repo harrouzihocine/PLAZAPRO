@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { toastError } from '@/composables/useConfirm'
 import { boxesApi } from '@/features/inventory/api'
 
 // State for the boxes list shown under a project (parking / storage). Network
@@ -32,6 +33,7 @@ export const useBoxesStore = defineStore('boxes', {
         return result
       } catch (e) {
         this.error = e.response?.data?.message ?? 'Action failed.'
+        toastError(this.error)
         throw e
       } finally {
         this.saving = false

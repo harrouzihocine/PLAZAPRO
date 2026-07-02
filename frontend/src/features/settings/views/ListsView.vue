@@ -87,7 +87,6 @@ function move(index, dir) {
           </p>
         </header>
 
-        <p v-if="store.error" class="mb-3 text-sm text-danger">{{ store.error }}</p>
 
         <div class="space-y-2">
           <DynamicListItemRow

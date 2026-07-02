@@ -161,4 +161,52 @@ class UserTest extends TestCase
         $this->getJson('/api/v1/users')->assertForbidden();
         $this->postJson('/api/v1/users', [])->assertForbidden();
     }
+
+    private function superAdmin(): User
+    {
+        $role = Role::firstOrCreate(['slug' => 'super-admin'], ['name' => 'Super Admin', 'is_agent' => false]);
+        $role->permissions()->sync([
+            Permission::firstOrCreate(['slug' => 'users.manage'], ['name' => 'users.manage'])->id,
+        ]);
+
+        return User::factory()->create(['role_id' => $role->id]);
+    }
+
+    public function test_admin_cannot_remove_a_super_admin(): void
+    {
+        $superAdmin = $this->superAdmin();
+        Sanctum::actingAs($this->admin());
+
+        $this->deleteJson("/api/v1/users/{$superAdmin->id}")->assertForbidden();
+        $this->assertDatabaseHas('users', ['id' => $superAdmin->id, 'status' => 'active']);
+    }
+
+    public function test_admin_cannot_deactivate_a_super_admin(): void
+    {
+        $superAdmin = $this->superAdmin();
+        Sanctum::actingAs($this->admin());
+
+        $this->putJson("/api/v1/users/{$superAdmin->id}/active", ['is_active' => false])
+            ->assertForbidden();
+        $this->assertTrue($superAdmin->fresh()->is_active);
+    }
+
+    public function test_admin_cannot_modify_a_super_admin(): void
+    {
+        $superAdmin = $this->superAdmin();
+        Sanctum::actingAs($this->admin());
+
+        $this->putJson("/api/v1/users/{$superAdmin->id}", ['name' => 'Hijacked'])
+            ->assertForbidden();
+        $this->assertNotSame('Hijacked', $superAdmin->fresh()->name);
+    }
+
+    public function test_super_admin_can_remove_another_super_admin(): void
+    {
+        $target = $this->superAdmin();
+        Sanctum::actingAs($this->superAdmin());
+
+        $this->deleteJson("/api/v1/users/{$target->id}")->assertOk();
+        $this->assertDatabaseHas('users', ['id' => $target->id, 'status' => 'cancelled']);
+    }
 }

@@ -10,12 +10,14 @@ declare(strict_types=1);
 */
 
 use App\Modules\Settings\Http\Controllers\AuthController;
+use App\Modules\Settings\Http\Controllers\CommuneController;
 use App\Modules\Settings\Http\Controllers\DepartmentController;
 use App\Modules\Settings\Http\Controllers\DynamicListController;
 use App\Modules\Settings\Http\Controllers\DynamicListItemController;
 use App\Modules\Settings\Http\Controllers\PermissionController;
 use App\Modules\Settings\Http\Controllers\RoleController;
 use App\Modules\Settings\Http\Controllers\UserController;
+use App\Modules\Settings\Http\Controllers\WilayaController;
 use Illuminate\Support\Facades\Route;
 
 // Authentication (Sanctum SPA cookie mode). Login is throttled.
@@ -46,6 +48,25 @@ Route::middleware('auth:sanctum')->group(function () {
     // Agents — active users whose role is_agent; feeds the assign-agent pickers
     // (clients, visits). Reference data, readable by any authenticated user.
     Route::get('/agents', [UserController::class, 'agents']);
+
+    // Follow-up agents — active users who can log calls (sales agents / managers);
+    // feeds the client "assigned agent" picker. Reference data, any authed user.
+    Route::get('/follow-up-agents', [UserController::class, 'followUpAgents']);
+
+    // Wilayas & communes — the geographic hierarchy. Reads feed the location /
+    // desire dropdowns, so they are open to any authenticated user; writes below.
+    Route::get('/wilayas', [WilayaController::class, 'index']);
+    Route::get('/wilayas/{wilaya}/communes', [CommuneController::class, 'index']);
+
+    Route::middleware('can:settings.manage')->group(function () {
+        Route::post('/wilayas', [WilayaController::class, 'store']);
+        Route::put('/wilayas/{wilaya}', [WilayaController::class, 'update']);
+        Route::delete('/wilayas/{wilaya}', [WilayaController::class, 'destroy']);
+
+        Route::post('/wilayas/{wilaya}/communes', [CommuneController::class, 'store']);
+        Route::put('/communes/{commune}', [CommuneController::class, 'update']);
+        Route::delete('/communes/{commune}', [CommuneController::class, 'destroy']);
+    });
 
     Route::middleware('can:settings.manage')->group(function () {
         Route::get('/dynamic-lists', [DynamicListController::class, 'index']);

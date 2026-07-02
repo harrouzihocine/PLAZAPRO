@@ -118,15 +118,8 @@ class DynamicListSeeder extends Seeder
                     ['label' => '5th Floor', 'value' => 'floor_5'],
                 ],
             ],
-            'areas' => [
-                'name' => 'Areas',
-                'description' => 'Geographic areas / zones (example values — edit for your region).',
-                'items' => [
-                    ['label' => 'Alger', 'value' => 'alger'],
-                    ['label' => 'Oran', 'value' => 'oran'],
-                    ['label' => 'Constantine', 'value' => 'constantine'],
-                ],
-            ],
+            // Geography (wilayas / communes) lives in its own tables now — see
+            // WilayaCommuneSeeder — not in this flat dynamic list.
             'visit_outcomes' => [
                 'name' => 'Visit Outcomes',
                 'description' => 'Result recorded after an apartment visit.',

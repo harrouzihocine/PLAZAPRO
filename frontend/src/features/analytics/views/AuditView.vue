@@ -67,7 +67,6 @@ onMounted(store.fetch)
       </div>
     </BaseCard>
 
-    <p v-if="store.error" class="text-sm text-danger">{{ store.error }}</p>
 
     <BaseCard>
       <p v-if="store.loading" class="py-4 text-center text-sm opacity-60">Loading…</p>

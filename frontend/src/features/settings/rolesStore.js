@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { toastError } from '@/composables/useConfirm'
 import { permissionsApi, rolesApi } from '@/features/settings/api'
 
 // State for the Roles & permissions admin. Loads the role list plus the full
@@ -34,6 +35,7 @@ export const useRolesStore = defineStore('roles', {
         return result
       } catch (e) {
         this.error = e.response?.data?.message ?? 'Action failed.'
+        toastError(this.error)
         throw e
       } finally {
         this.saving = false

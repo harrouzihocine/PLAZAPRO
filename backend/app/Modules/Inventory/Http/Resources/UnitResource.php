@@ -20,12 +20,16 @@ class UnitResource extends JsonResource
             'location_id' => $this->location_id,
             // Surfaced on the unit detail page (its project name + back-link);
             // only present when the relation is loaded (UnitController::show/index).
-            // area_id/area is the project's geographic area (the `areas` list).
+            // wilaya/commune is the project's geographic location.
             'location' => $this->whenLoaded('location', fn () => [
                 'id' => $this->location?->id,
                 'name' => $this->location?->name,
-                'area_id' => $this->location?->area_id,
-                'area' => $this->location?->area?->label,
+                'wilaya_id' => $this->location?->wilaya_id,
+                'wilaya' => $this->location?->wilaya?->name,
+                'commune_id' => $this->location?->commune_id,
+                'commune' => $this->location?->commune?->name,
+                'expected_delivery_date' => $this->location?->expected_delivery_date?->toDateString(),
+                'gtm_priority' => $this->location?->gtm_priority?->value,
             ]),
             'reference' => $this->reference,
             'type_id' => $this->type_id,
@@ -35,6 +39,7 @@ class UnitResource extends JsonResource
             'area_sqm' => $this->area_sqm,
             'price' => $this->price,
             'sale_status' => $this->sale_status?->value,
+            'gtm_priority' => $this->gtm_priority?->value,
             'block' => $this->block,
             'stack_floor' => $this->stack_floor,
             'position' => $this->position,

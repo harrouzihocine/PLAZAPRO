@@ -38,17 +38,25 @@ class ClientTest extends TestCase
         return User::factory()->agent()->create();
     }
 
+    /** A sales agent: can log calls, so eligible to follow a client up. */
+    private function followUpAgent(): User
+    {
+        return $this->userWithPermissions(['clients.view', 'calls.log']);
+    }
+
     public function test_manager_can_create_a_client(): void
     {
         Sanctum::actingAs($this->manager());
 
         $this->postJson('/api/v1/clients', [
-            'first_name' => 'Amine',
-            'last_name' => 'Khaled',
+            'first_name' => 'amine',
+            'last_name' => 'khaled',
             'phone' => '0555123456',
         ])
             ->assertCreated()
-            ->assertJsonPath('data.full_name', 'Amine Khaled')
+            ->assertJsonPath('data.first_name', 'Amine')
+            ->assertJsonPath('data.last_name', 'Khaled')
+            ->assertJsonPath('data.full_name', 'Khaled Amine')
             ->assertJsonPath('data.status', 'active');
 
         $this->assertDatabaseHas('clients', [
@@ -56,9 +64,9 @@ class ClientTest extends TestCase
         ]);
     }
 
-    public function test_a_client_can_be_assigned_to_an_agent(): void
+    public function test_a_client_can_be_assigned_to_a_sales_agent(): void
     {
-        $agent = $this->agentUser();
+        $agent = $this->followUpAgent();
         Sanctum::actingAs($this->manager());
 
         $this->postJson('/api/v1/clients', [
@@ -69,14 +77,29 @@ class ClientTest extends TestCase
             ->assertJsonPath('data.assigned_agent.id', $agent->id);
     }
 
-    public function test_a_client_cannot_be_assigned_to_a_non_agent(): void
+    public function test_a_client_cannot_be_assigned_to_a_non_follow_up_user(): void
     {
-        $nonAgent = $this->userWithPermissions(['clients.view']); // role is not is_agent
+        $nonAgent = $this->userWithPermissions(['clients.view']); // cannot log calls
         Sanctum::actingAs($this->manager());
 
         $this->postJson('/api/v1/clients', [
             'first_name' => 'Sara', 'last_name' => 'B', 'phone' => '0661000000',
             'assigned_agent_id' => $nonAgent->id,
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('assigned_agent_id');
+    }
+
+    public function test_a_client_cannot_be_assigned_to_a_field_only_agent(): void
+    {
+        // A field/site agent (is_agent, conducts visits) but with no calls.log —
+        // they do not follow clients up, so they are not assignable.
+        $fieldAgent = $this->userWithPermissions(['clients.view', 'visits.conduct']);
+        Sanctum::actingAs($this->manager());
+
+        $this->postJson('/api/v1/clients', [
+            'first_name' => 'Sara', 'last_name' => 'B', 'phone' => '0661000000',
+            'assigned_agent_id' => $fieldAgent->id,
         ])
             ->assertStatus(422)
             ->assertJsonValidationErrorFor('assigned_agent_id');
@@ -98,6 +121,26 @@ class ClientTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.first_name', 'Nadia');
+    }
+
+    public function test_phone_search_is_format_agnostic(): void
+    {
+        // Stored in compact international form (as the phone input now saves it).
+        Client::factory()->create(['first_name' => 'Karim', 'phone' => '+213555042142']);
+        Sanctum::actingAs($this->manager());
+
+        // Any way of writing the same number — or a fragment — finds the client.
+        foreach (['0555042142', '555042142', '+213 555 042 142', '5042142', '213555'] as $term) {
+            $this->getJson('/api/v1/clients?search='.urlencode($term))
+                ->assertOk()
+                ->assertJsonCount(1, 'data')
+                ->assertJsonPath('data.0.first_name', 'Karim');
+        }
+
+        // A non-matching fragment returns nothing.
+        $this->getJson('/api/v1/clients?search=999888')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
     }
 
     public function test_cancelling_a_client_keeps_the_record(): void
@@ -131,6 +174,46 @@ class ClientTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_created_by_is_stamped_and_visible_to_manager(): void
+    {
+        $manager = $this->manager();
+        Sanctum::actingAs($manager);
+
+        $this->postJson('/api/v1/clients', [
+            'first_name' => 'Amine', 'last_name' => 'Khaled', 'phone' => '0555123456',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.created_by.id', $manager->id)
+            ->assertJsonPath('data.created_by.name', $manager->name);
+
+        $this->assertDatabaseHas('clients', ['first_name' => 'Amine', 'created_by' => $manager->id]);
+    }
+
+    public function test_ownership_is_hidden_from_non_managers_and_cannot_be_assigned(): void
+    {
+        $agent = $this->agentUser();
+        // A lead-capturing user: can view/create clients but not manage them.
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.create']));
+
+        // The assigned_agent_id is dropped (managers-only), so the client is created unassigned.
+        $created = $this->postJson('/api/v1/clients', [
+            'first_name' => 'Sara', 'last_name' => 'B', 'phone' => '0661000000',
+            'assigned_agent_id' => $agent->id,
+        ])
+            ->assertCreated()
+            ->assertJsonMissingPath('data.assigned_agent')
+            ->assertJsonMissingPath('data.created_by')
+            ->json('data.id');
+
+        $this->assertDatabaseHas('clients', ['id' => $created, 'assigned_agent_id' => null]);
+
+        // Ownership stays hidden when reading back, too.
+        $this->getJson("/api/v1/clients/{$created}")
+            ->assertOk()
+            ->assertJsonMissingPath('data.assigned_agent')
+            ->assertJsonMissingPath('data.created_by');
+    }
+
     public function test_agents_picker_returns_only_active_agents(): void
     {
         $agent = $this->agentUser();
@@ -141,5 +224,18 @@ class ClientTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $agent->id);
+    }
+
+    public function test_follow_up_agents_picker_returns_only_calls_log_users(): void
+    {
+        $salesAgent = $this->followUpAgent();          // has calls.log → included
+        $fieldAgent = $this->userWithPermissions(['clients.view', 'visits.conduct']); // no calls.log → excluded
+        Sanctum::actingAs($this->manager());
+
+        $ids = collect($this->getJson('/api/v1/follow-up-agents')->assertOk()->json('data'))
+            ->pluck('id');
+
+        $this->assertTrue($ids->contains($salesAgent->id));
+        $this->assertFalse($ids->contains($fieldAgent->id));
     }
 }

@@ -5,26 +5,41 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Actions;
 
 use App\Core\Enums\RecordStatus;
+use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Models\Location;
+use Illuminate\Support\Facades\DB;
 
 /**
- * Cancel (no-delete) a location. Guarded: a location that still holds active
- * units or boxes can't be cancelled — cancel or move them first, so no inventory
- * is left pointing at a cancelled project.
+ * Remove (no-delete) a project (location) and everything inside it. The project,
+ * its units and its boxes are all marked cancelled — rows and history kept and
+ * audited, never hard-deleted.
+ *
+ * Terminal, unlike ArchiveLocation. Guarded so a live sale is never silently
+ * discarded: removal is refused while any unit or box is reserved or sold —
+ * release or convert those first. Once every non-cancelled unit/box is available,
+ * they are cancelled along with the project in one transaction.
  */
 class CancelLocation
 {
     public function handle(Location $location, string $reason): Location
     {
-        $active = RecordStatus::Active->value;
+        $cancelled = RecordStatus::Cancelled->value;
+        $available = SaleStatus::Available->value;
 
         abort_if(
-            $location->units()->where('status', $active)->exists()
-                || $location->boxes()->where('status', $active)->exists(),
+            $location->units()->where('status', '!=', $cancelled)->where('sale_status', '!=', $available)->exists()
+                || $location->boxes()->where('status', '!=', $cancelled)->where('sale_status', '!=', $available)->exists(),
             422,
-            'Cancel this project\'s active units and boxes before cancelling the project.',
+            "Release or convert this project's reserved or sold units and boxes before removing it.",
         );
 
-        return $location->cancel($reason);
+        return DB::transaction(function () use ($location, $reason, $cancelled) {
+            $childReason = 'Parent project removed';
+
+            $location->units()->where('status', '!=', $cancelled)->get()->each->cancel($childReason);
+            $location->boxes()->where('status', '!=', $cancelled)->get()->each->cancel($childReason);
+
+            return $location->cancel($reason);
+        });
     }
 }

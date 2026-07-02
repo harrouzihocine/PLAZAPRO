@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Modules\Inventory\Enums\GtmPriority;
 use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
@@ -27,6 +28,7 @@ class UnitFactory extends Factory
             'block' => fake()->randomElement(['A', 'B', 'C']),
             'stack_floor' => fake()->numberBetween(0, 10),
             'position' => fake()->numberBetween(1, 6),
+            'gtm_priority' => fake()->randomElement(GtmPriority::cases())->value,
         ];
     }
 
