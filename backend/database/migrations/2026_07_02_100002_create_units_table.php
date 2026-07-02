@@ -28,7 +28,6 @@ return new class extends Migration
             $table->foreignId('floor_id')->nullable()
                 ->constrained('dynamic_list_items')->nullOnDelete();
             $table->decimal('area_sqm', 8, 2)->nullable();
-            $table->unsignedTinyInteger('rooms')->nullable();
             $table->decimal('price', 12, 2);
             $table->string('sale_status')->default('available'); // available | reserved | sold
 

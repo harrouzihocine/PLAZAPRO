@@ -41,17 +41,19 @@ defineEmits(['close'])
           title="Document preview"
         ></iframe>
 
-        <template v-else-if="media.type === 'pptx'">
+        <!-- Office docs (presentations, Word, spreadsheets) are shown via their
+             LibreOffice-rendered PDF preview — nothing is downloaded. -->
+        <template v-else-if="['pptx', 'docx', 'xlsx'].includes(media.type)">
           <iframe
             v-if="media.preview_status === 'ready'"
             :src="mediaPreviewUrl(media.id)"
             class="h-[80vh] w-full"
-            title="Presentation preview"
+            title="Document preview"
           ></iframe>
           <p v-else-if="media.preview_status === 'pending'" class="p-8 text-center opacity-70">
-            Converting presentation for preview… check back shortly.
+            Converting document for preview… check back shortly.
           </p>
-          <p v-else class="p-8 text-center opacity-70">Preview unavailable for this presentation.</p>
+          <p v-else class="p-8 text-center opacity-70">Preview unavailable for this file.</p>
         </template>
       </div>
     </div>

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Http\Resources;
 
-use App\Modules\Inventory\Enums\MediaType;
 use App\Modules\Inventory\Models\Media;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -16,11 +15,11 @@ class MediaResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $hasPreview = $this->type === MediaType::Pptx;
+        $hasPreview = $this->type?->needsPreview() ?? false;
 
         return [
             'id' => $this->id,
-            'collection' => $this->collection,
+            'collection' => $this->collection?->value,
             'type' => $this->type?->value,
             'original_name' => $this->original_name,
             'mime_type' => $this->mime_type,

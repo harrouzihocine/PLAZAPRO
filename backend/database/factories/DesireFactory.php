@@ -23,7 +23,6 @@ class DesireFactory extends Factory
             'area_id' => null,
             'type_id' => null,
             'floor_pref' => null,
-            'rooms_min' => null,
             'budget_min' => null,
             'budget_max' => null,
             'notes' => null,

@@ -36,7 +36,6 @@ class UpdateUnitRequest extends FormRequest
             'type_id' => ['sometimes', 'nullable', 'integer', 'exists:dynamic_list_items,id'],
             'floor_id' => ['sometimes', 'nullable', 'integer', 'exists:dynamic_list_items,id'],
             'area_sqm' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:999999.99'],
-            'rooms' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:255'],
             'block' => ['sometimes', 'nullable', 'string', 'max:255'],
             'stack_floor' => ['sometimes', 'nullable', 'integer'],
             'position' => ['sometimes', 'nullable', 'integer'],

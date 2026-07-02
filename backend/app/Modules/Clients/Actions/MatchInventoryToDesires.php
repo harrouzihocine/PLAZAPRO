@@ -11,7 +11,7 @@ use Illuminate\Support\Collection;
 
 /**
  * The inverse of MatchDesireToInventory: given a unit, return the active desires
- * whose criteria it satisfies (area / type / budget / rooms), eager-loading each
+ * whose criteria it satisfies (area / type / budget), eager-loading each
  * desire's client + assigned agent so the caller can notify. Only criteria the
  * client actually set are applied — the mirror image of the forward matcher.
  * An unavailable unit matches nothing.
@@ -41,12 +41,6 @@ class MatchInventoryToDesires
                 $q->whereNull('type_id');
                 if ($unit->type_id !== null) {
                     $q->orWhere('type_id', $unit->type_id);
-                }
-            })
-            ->where(function ($q) use ($unit) {
-                $q->whereNull('rooms_min');
-                if ($unit->rooms !== null) {
-                    $q->orWhere('rooms_min', '<=', $unit->rooms);
                 }
             })
             ->where(function ($q) use ($unit) {

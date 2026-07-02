@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * desires = what a client is looking for, matched against available inventory by
- * the MatchDesireToInventory action (area / type / budget / rooms). Area and type
+ * the MatchDesireToInventory action (area / type / budget). Area and type
  * come from the dynamic lists (`areas`, `unit_types`).
  * See docs/database/03-clients-pipeline.md.
  */
@@ -26,7 +26,6 @@ return new class extends Migration
             $table->foreignId('type_id')->nullable()
                 ->constrained('dynamic_list_items')->nullOnDelete();
             $table->string('floor_pref')->nullable();
-            $table->unsignedTinyInteger('rooms_min')->nullable();
             $table->decimal('budget_min', 12, 2)->nullable();
             $table->decimal('budget_max', 12, 2)->nullable();
             $table->text('notes')->nullable();

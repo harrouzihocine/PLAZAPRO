@@ -42,14 +42,14 @@ class DesireTest extends TestCase
         $client = Client::factory()->create();
         Sanctum::actingAs($this->agent());
 
-        $this->putJson("/api/v1/clients/{$client->id}/desire", ['rooms_min' => 2, 'budget_max' => 5000000])
+        $this->putJson("/api/v1/clients/{$client->id}/desire", ['floor_pref' => 'floor_2', 'budget_max' => 5000000])
             ->assertOk()
-            ->assertJsonPath('data.rooms_min', 2);
+            ->assertJsonPath('data.floor_pref', 'floor_2');
 
         // A second upsert updates the same row rather than creating a new one.
-        $this->putJson("/api/v1/clients/{$client->id}/desire", ['rooms_min' => 3])
+        $this->putJson("/api/v1/clients/{$client->id}/desire", ['floor_pref' => 'floor_3'])
             ->assertOk()
-            ->assertJsonPath('data.rooms_min', 3);
+            ->assertJsonPath('data.floor_pref', 'floor_3');
 
         $this->assertSame(1, Desire::where('client_id', $client->id)->count());
     }
@@ -76,20 +76,19 @@ class DesireTest extends TestCase
         // The one true match.
         $match = Unit::factory()->for($location)->create([
             'reference' => 'M-1', 'sale_status' => 'available',
-            'type_id' => $type->id, 'rooms' => 3, 'price' => 5000000,
+            'type_id' => $type->id, 'price' => 5000000,
         ]);
         // Excluded for various reasons.
-        Unit::factory()->for($location)->create(['reference' => 'X-sold', 'sale_status' => 'sold', 'type_id' => $type->id, 'rooms' => 3, 'price' => 5000000]);
-        Unit::factory()->for($location)->create(['reference' => 'X-pricey', 'sale_status' => 'available', 'type_id' => $type->id, 'rooms' => 3, 'price' => 99000000]);
-        Unit::factory()->for($location)->create(['reference' => 'X-rooms', 'sale_status' => 'available', 'type_id' => $type->id, 'rooms' => 1, 'price' => 5000000]);
-        Unit::factory()->for($location)->create(['reference' => 'X-type', 'sale_status' => 'available', 'type_id' => $otherType->id, 'rooms' => 3, 'price' => 5000000]);
-        Unit::factory()->for($otherLocation)->create(['reference' => 'X-area', 'sale_status' => 'available', 'type_id' => $type->id, 'rooms' => 3, 'price' => 5000000]);
+        Unit::factory()->for($location)->create(['reference' => 'X-sold', 'sale_status' => 'sold', 'type_id' => $type->id, 'price' => 5000000]);
+        Unit::factory()->for($location)->create(['reference' => 'X-pricey', 'sale_status' => 'available', 'type_id' => $type->id, 'price' => 99000000]);
+        Unit::factory()->for($location)->create(['reference' => 'X-type', 'sale_status' => 'available', 'type_id' => $otherType->id, 'price' => 5000000]);
+        Unit::factory()->for($otherLocation)->create(['reference' => 'X-area', 'sale_status' => 'available', 'type_id' => $type->id, 'price' => 5000000]);
 
         $client = Client::factory()->create();
         Desire::factory()->create([
             'client_id' => $client->id,
             'area_id' => $area->id, 'type_id' => $type->id,
-            'rooms_min' => 3, 'budget_min' => 1000000, 'budget_max' => 10000000,
+            'budget_min' => 1000000, 'budget_max' => 10000000,
         ]);
 
         Sanctum::actingAs($this->agent());
@@ -136,6 +135,6 @@ class DesireTest extends TestCase
         $client = Client::factory()->create();
         Sanctum::actingAs($this->userWithPermissions(['clients.view']));
 
-        $this->putJson("/api/v1/clients/{$client->id}/desire", ['rooms_min' => 2])->assertForbidden();
+        $this->putJson("/api/v1/clients/{$client->id}/desire", ['floor_pref' => 'floor_2'])->assertForbidden();
     }
 }

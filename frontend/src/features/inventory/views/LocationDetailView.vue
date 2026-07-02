@@ -7,6 +7,7 @@ import BaseInput from '@/components/base/BaseInput.vue'
 import { useDynamicList } from '@/composables/useDynamicList'
 import { reservationsApi } from '@/features/inventory/api'
 import BoxesPanel from '@/features/inventory/components/BoxesPanel.vue'
+import LocationMap from '@/features/inventory/components/LocationMap.vue'
 import MediaGallery from '@/features/inventory/components/MediaGallery.vue'
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
 import StackingPlan from '@/features/inventory/components/StackingPlan.vue'
@@ -50,7 +51,6 @@ const blank = {
   type_id: '',
   floor_id: '',
   area_sqm: '',
-  rooms: '',
   price: '',
   block: '',
   stack_floor: '',
@@ -78,7 +78,6 @@ function openEdit(u) {
     type_id: u.type_id ?? '',
     floor_id: u.floor_id ?? '',
     area_sqm: u.area_sqm ?? '',
-    rooms: u.rooms ?? '',
     price: u.price ?? '',
     block: u.block ?? '',
     stack_floor: u.stack_floor ?? '',
@@ -106,7 +105,6 @@ async function submit() {
     type_id: form.type_id || null,
     floor_id: form.floor_id || null,
     area_sqm: num(form.area_sqm),
-    rooms: num(form.rooms),
     block: form.block.trim() || null,
     stack_floor: num(form.stack_floor),
     position: num(form.position),
@@ -176,6 +174,15 @@ function remove(u) {
             <dd>{{ units.items.length }}</dd>
           </div>
         </dl>
+        <div
+          v-if="locations.current.latitude != null && locations.current.longitude != null"
+          class="mt-3"
+        >
+          <LocationMap
+            :latitude="locations.current.latitude"
+            :longitude="locations.current.longitude"
+          />
+        </div>
       </BaseCard>
 
       <!-- Visual stacking plan (colour-coded by sale status) -->
@@ -220,7 +227,6 @@ function remove(u) {
               </select>
             </label>
             <BaseInput v-model="form.area_sqm" label="Area (m²)" type="number" />
-            <BaseInput v-model="form.rooms" label="Rooms" type="number" />
             <BaseInput v-if="mode === 'create'" v-model="form.price" label="Price" type="number" />
             <BaseInput v-model="form.block" label="Block" />
             <BaseInput v-model="form.stack_floor" label="Stack floor" type="number" />
@@ -279,7 +285,11 @@ function remove(u) {
             </thead>
             <tbody>
               <tr v-for="u in units.items" :key="u.id" class="border-t border-border">
-                <td class="py-2 pr-3 font-medium">{{ u.reference }}</td>
+                <td class="py-2 pr-3 font-medium">
+                  <RouterLink :to="{ name: 'inventory.unit', params: { id: u.id } }" class="hover:text-primary">
+                    {{ u.reference }}
+                  </RouterLink>
+                </td>
                 <td class="py-2 pr-3">{{ u.type || '—' }}</td>
                 <td class="py-2 pr-3">{{ u.floor || '—' }}</td>
                 <td class="py-2 pr-3">{{ u.price }}</td>

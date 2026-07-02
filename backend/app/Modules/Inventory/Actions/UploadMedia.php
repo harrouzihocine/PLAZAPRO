@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Actions;
 
+use App\Modules\Inventory\Enums\MediaCollection;
 use App\Modules\Inventory\Enums\MediaType;
 use App\Modules\Inventory\Jobs\MakeMediaPreview;
 use App\Modules\Inventory\Models\Media;
@@ -25,6 +26,12 @@ class UploadMedia
     {
         $type = MediaType::fromMime($file->getMimeType());
         abort_if($type === null, 422, 'Unsupported media type.');
+
+        // Land in the catch-all bucket when no tab was specified. Resolved before
+        // use so both the per-collection sort_order and the stored row agree.
+        $collection = ($collection === null || $collection === '')
+            ? MediaCollection::default()->value
+            : $collection;
 
         return DB::transaction(function () use ($mediable, $file, $collection, $user, $type) {
             // Derive the extension from the detected mime, never the client name.

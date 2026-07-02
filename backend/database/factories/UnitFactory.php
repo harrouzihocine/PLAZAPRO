@@ -22,7 +22,6 @@ class UnitFactory extends Factory
             'location_id' => Location::factory(),
             'reference' => 'U-'.fake()->unique()->numberBetween(1, 999999),
             'area_sqm' => fake()->numberBetween(30, 200),
-            'rooms' => fake()->numberBetween(1, 5),
             'price' => fake()->numberBetween(50000, 900000),
             'sale_status' => SaleStatus::Available->value,
             'block' => fake()->randomElement(['A', 'B', 'C']),

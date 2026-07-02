@@ -19,7 +19,6 @@ class DesireResource extends JsonResource
             'id' => $this->id,
             'client_id' => $this->client_id,
             'floor_pref' => $this->floor_pref,
-            'rooms_min' => $this->rooms_min,
             'budget_min' => $this->budget_min,
             'budget_max' => $this->budget_max,
             'notes' => $this->notes,

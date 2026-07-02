@@ -28,15 +28,26 @@ class UnitController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
+        // type_id / floor_id / area_id / sale_status accept either a single value
+        // or a list (multi-select filters) — cast to an array and use whereIn.
+        $asList = fn (string $key) => array_values(array_filter(
+            (array) $request->query($key),
+            fn ($v) => $v !== '' && $v !== null,
+        ));
+
         $units = Unit::query()
-            ->with(['type', 'floor'])
+            ->with(['type', 'floor', 'location.area'])
             ->when($request->query('status') !== 'all', fn ($q) => $q->active())
             ->when($request->filled('location_id'), fn ($q) => $q->where('location_id', $request->query('location_id')))
-            ->when($request->filled('type_id'), fn ($q) => $q->where('type_id', $request->query('type_id')))
-            ->when($request->filled('floor_id'), fn ($q) => $q->where('floor_id', $request->query('floor_id')))
-            ->when($request->filled('sale_status'), fn ($q) => $q->where('sale_status', $request->query('sale_status')))
+            ->when($asList('type_id'), fn ($q, $ids) => $q->whereIn('type_id', $ids))
+            ->when($asList('floor_id'), fn ($q, $ids) => $q->whereIn('floor_id', $ids))
+            // Geographic area lives on the unit's location (project), not the unit.
+            ->when($asList('area_id'), fn ($q, $ids) => $q->whereHas('location', fn ($l) => $l->whereIn('area_id', $ids)))
+            ->when($asList('sale_status'), fn ($q, $statuses) => $q->whereIn('sale_status', $statuses))
             ->when($request->filled('min_price'), fn ($q) => $q->where('price', '>=', $request->query('min_price')))
             ->when($request->filled('max_price'), fn ($q) => $q->where('price', '<=', $request->query('max_price')))
+            ->when($request->filled('min_area'), fn ($q) => $q->where('area_sqm', '>=', $request->query('min_area')))
+            ->when($request->filled('max_area'), fn ($q) => $q->where('area_sqm', '<=', $request->query('max_area')))
             ->orderBy('reference')
             ->get();
 
@@ -45,7 +56,7 @@ class UnitController extends Controller
 
     public function show(Unit $unit): UnitResource
     {
-        return new UnitResource($unit->load(['type', 'floor', 'location']));
+        return new UnitResource($unit->load(['type', 'floor', 'location.area']));
     }
 
     public function store(StoreUnitRequest $request, Location $location, CreateUnit $action): UnitResource

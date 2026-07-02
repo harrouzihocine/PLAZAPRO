@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Http\Requests;
 
+use App\Modules\Inventory\Enums\MediaCollection;
 use App\Modules\Inventory\Enums\MediaType;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UploadMediaRequest extends FormRequest
 {
@@ -27,7 +29,9 @@ class UploadMediaRequest extends FormRequest
                 // never the extension — per the security baseline.
                 'mimetypes:'.implode(',', MediaType::allowedMimes()),
             ],
-            'collection' => ['nullable', 'string', 'max:255'],
+            // The semantic bucket (tab). Unknown values are rejected — the enum
+            // is the single source of truth. Omitted => UploadMedia's default.
+            'collection' => ['nullable', Rule::enum(MediaCollection::class)],
         ];
     }
 }

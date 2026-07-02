@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Modules\Inventory\Enums\MediaCollection;
 use App\Modules\Inventory\Enums\MediaType;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Media;
@@ -23,7 +24,7 @@ class MediaFactory extends Factory
         return [
             'mediable_type' => 'location',
             'mediable_id' => Location::factory(),
-            'collection' => 'gallery',
+            'collection' => MediaCollection::Photos->value,
             'type' => MediaType::Photo->value,
             'disk' => 'media',
             'path' => 'uploads/'.Str::uuid()->toString().'.jpg',

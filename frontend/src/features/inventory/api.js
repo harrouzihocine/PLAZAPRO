@@ -117,13 +117,24 @@ export const boxesApi = {
 export const mediaFileUrl = (id) => `/api/v1/media/${id}/file`
 export const mediaPreviewUrl = (id) => `/api/v1/media/${id}/preview`
 
+// The media tabs, mirroring the backend MediaCollection enum (the single source
+// of truth). `key` is the stored `collection` value; `label` is the tab caption.
+export const MEDIA_COLLECTIONS = [
+  { key: 'photos', label: 'Photos' },
+  { key: 'videos', label: 'Videos' },
+  { key: 'plans', label: 'Plans' },
+  { key: 'presentations', label: 'Presentations' },
+  { key: 'documents', label: 'Documents' },
+  { key: 'others', label: 'Others' },
+]
+
 export const mediaApi = {
   async list(mediableType, mediableId, params = {}) {
     const { data } = await useApi().get(`/${mediableType}/${mediableId}/media`, { params })
     return data.data
   },
 
-  async upload(mediableType, mediableId, file, collection = 'gallery') {
+  async upload(mediableType, mediableId, file, collection = 'others') {
     const form = new FormData()
     form.append('file', file)
     if (collection) form.append('collection', collection)

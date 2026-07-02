@@ -25,7 +25,7 @@ class Unit extends BaseModel
     use HasFactory;
 
     protected $fillable = [
-        'location_id', 'reference', 'type_id', 'floor_id', 'area_sqm', 'rooms',
+        'location_id', 'reference', 'type_id', 'floor_id', 'area_sqm',
         'price', 'sale_status', 'block', 'stack_floor', 'position',
     ];
 

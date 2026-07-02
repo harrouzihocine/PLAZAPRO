@@ -17,7 +17,7 @@ class UpsertDesire
     public function handle(Client $client, array $data): Desire
     {
         $attributes = Arr::only($data, [
-            'area_id', 'type_id', 'floor_pref', 'rooms_min', 'budget_min', 'budget_max', 'notes',
+            'area_id', 'type_id', 'floor_pref', 'budget_min', 'budget_max', 'notes',
         ]);
 
         return Desire::updateOrCreate(

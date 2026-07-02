@@ -14,9 +14,13 @@ enum MediaType: string
     case Video = 'video';
     case Pdf = 'pdf';
     case Pptx = 'pptx';
+    case Docx = 'docx';
+    case Xlsx = 'xlsx';
 
     /**
-     * Map a validated mime type to a MediaType, or null if unsupported.
+     * Map a validated mime type to a MediaType, or null if unsupported. Office
+     * formats collapse to one type per family (MS + OpenDocument alike) since
+     * they share the same PDF-preview path.
      */
     public static function fromMime(string $mime): ?self
     {
@@ -25,15 +29,25 @@ enum MediaType: string
             'video/mp4', 'video/webm', 'video/quicktime' => self::Video,
             'application/pdf' => self::Pdf,
             'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            'application/vnd.ms-powerpoint' => self::Pptx,
+            'application/vnd.ms-powerpoint',
+            'application/vnd.oasis.opendocument.presentation' => self::Pptx,
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.oasis.opendocument.text' => self::Docx,
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.oasis.opendocument.spreadsheet' => self::Xlsx,
             default => null,
         };
     }
 
-    /** Presentations are converted to PDF so they can be viewed inline. */
+    /**
+     * Office documents (presentations, word docs, spreadsheets) are converted to
+     * PDF by MakeMediaPreview so they can be viewed inline — nothing is downloaded.
+     */
     public function needsPreview(): bool
     {
-        return $this === self::Pptx;
+        return in_array($this, [self::Pptx, self::Docx, self::Xlsx], true);
     }
 
     /**
@@ -48,8 +62,18 @@ enum MediaType: string
             'image/jpeg', 'image/png', 'image/webp', 'image/gif',
             'video/mp4', 'video/webm', 'video/quicktime',
             'application/pdf',
+            // Presentations (PowerPoint + OpenDocument)
             'application/vnd.openxmlformats-officedocument.presentationml.presentation',
             'application/vnd.ms-powerpoint',
+            'application/vnd.oasis.opendocument.presentation',
+            // Word-processor documents (Word + OpenDocument)
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.oasis.opendocument.text',
+            // Spreadsheets (Excel + OpenDocument)
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.oasis.opendocument.spreadsheet',
         ];
     }
 }

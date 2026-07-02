@@ -34,7 +34,6 @@ class StoreUnitRequest extends FormRequest
             'type_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
             'floor_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
             'area_sqm' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
-            'rooms' => ['nullable', 'integer', 'min:0', 'max:255'],
             'price' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
             'sale_status' => ['sometimes', new Enum(SaleStatus::class)],
             'block' => ['nullable', 'string', 'max:255'],

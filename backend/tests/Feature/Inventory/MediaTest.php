@@ -23,6 +23,10 @@ class MediaTest extends TestCase
 
     private const PPTX_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 
+    private const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    private const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -54,8 +58,10 @@ class MediaTest extends TestCase
 
         $response = $this->postJson("/api/v1/locations/{$location->id}/media", [
             'file' => UploadedFile::fake()->image('villa.jpg'),
-            'collection' => 'gallery',
-        ])->assertCreated()->assertJsonPath('data.type', 'photo');
+            'collection' => 'photos',
+        ])->assertCreated()
+            ->assertJsonPath('data.type', 'photo')
+            ->assertJsonPath('data.collection', 'photos');
 
         $path = Media::first()->path;
         Storage::disk('media')->assertExists($path);
@@ -64,7 +70,7 @@ class MediaTest extends TestCase
         $this->assertStringNotContainsString('villa', $path);
         $this->assertDatabaseHas('media', [
             'mediable_type' => 'location', 'mediable_id' => $location->id,
-            'type' => 'photo', 'original_name' => 'villa.jpg', 'version' => 1,
+            'type' => 'photo', 'collection' => 'photos', 'original_name' => 'villa.jpg', 'version' => 1,
         ]);
         Queue::assertNotPushed(MakeMediaPreview::class); // photos need no conversion
         $response->assertJsonPath('data.preview_url', $response->json('data.file_url'));
@@ -80,6 +86,48 @@ class MediaTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrorFor('file');
     }
 
+    public function test_an_unknown_collection_is_rejected(): void
+    {
+        Queue::fake();
+        $location = Location::factory()->create();
+        Sanctum::actingAs($this->editor());
+
+        $this->postJson("/api/v1/locations/{$location->id}/media", [
+            'file' => UploadedFile::fake()->image('x.jpg'),
+            'collection' => 'not-a-tab',
+        ])->assertStatus(422)->assertJsonValidationErrorFor('collection');
+    }
+
+    public function test_an_omitted_collection_defaults_to_others(): void
+    {
+        Queue::fake();
+        $location = Location::factory()->create();
+        Sanctum::actingAs($this->editor());
+
+        $this->postJson("/api/v1/locations/{$location->id}/media", [
+            'file' => UploadedFile::fake()->image('x.jpg'),
+        ])->assertCreated()->assertJsonPath('data.collection', 'others');
+    }
+
+    public function test_index_can_filter_by_collection(): void
+    {
+        Queue::fake();
+        $location = Location::factory()->create();
+        Sanctum::actingAs($this->editor());
+
+        $this->postJson("/api/v1/locations/{$location->id}/media", [
+            'file' => UploadedFile::fake()->image('photo.jpg'), 'collection' => 'photos',
+        ])->assertCreated();
+        $this->postJson("/api/v1/locations/{$location->id}/media", [
+            'file' => UploadedFile::fake()->create('plan.pdf', 10, 'application/pdf'), 'collection' => 'plans',
+        ])->assertCreated();
+
+        $this->getJson("/api/v1/locations/{$location->id}/media?collection=plans")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.collection', 'plans');
+    }
+
     public function test_uploading_a_pptx_queues_a_pdf_preview_job(): void
     {
         Queue::fake();
@@ -90,6 +138,39 @@ class MediaTest extends TestCase
             'file' => UploadedFile::fake()->create('deck.pptx', 500, self::PPTX_MIME),
         ])->assertCreated()
             ->assertJsonPath('data.type', 'pptx')
+            ->assertJsonPath('data.preview_status', 'pending');
+
+        Queue::assertPushed(MakeMediaPreview::class);
+    }
+
+    public function test_uploading_a_word_doc_is_accepted_and_queues_a_pdf_preview(): void
+    {
+        Queue::fake();
+        $location = Location::factory()->create();
+        Sanctum::actingAs($this->editor());
+
+        $this->postJson("/api/v1/locations/{$location->id}/media", [
+            'file' => UploadedFile::fake()->create('spec.docx', 120, self::DOCX_MIME),
+            'collection' => 'documents',
+        ])->assertCreated()
+            ->assertJsonPath('data.type', 'docx')
+            ->assertJsonPath('data.collection', 'documents')
+            ->assertJsonPath('data.preview_status', 'pending');
+
+        Queue::assertPushed(MakeMediaPreview::class);
+    }
+
+    public function test_uploading_a_spreadsheet_is_accepted_and_queues_a_pdf_preview(): void
+    {
+        Queue::fake();
+        $location = Location::factory()->create();
+        Sanctum::actingAs($this->editor());
+
+        $this->postJson("/api/v1/locations/{$location->id}/media", [
+            'file' => UploadedFile::fake()->create('prices.xlsx', 90, self::XLSX_MIME),
+            'collection' => 'others',
+        ])->assertCreated()
+            ->assertJsonPath('data.type', 'xlsx')
             ->assertJsonPath('data.preview_status', 'pending');
 
         Queue::assertPushed(MakeMediaPreview::class);

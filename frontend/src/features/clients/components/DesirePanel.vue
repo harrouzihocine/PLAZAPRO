@@ -23,7 +23,6 @@ const canReserve = () => auth.can('units.reserve')
 const form = reactive({
   area_id: '',
   type_id: '',
-  rooms_min: '',
   budget_min: '',
   budget_max: '',
   floor_pref: '',
@@ -34,7 +33,6 @@ function fillFrom(desire) {
   Object.assign(form, {
     area_id: desire?.area_id ?? '',
     type_id: desire?.type_id ?? '',
-    rooms_min: desire?.rooms_min ?? '',
     budget_min: desire?.budget_min ?? '',
     budget_max: desire?.budget_max ?? '',
     floor_pref: desire?.floor_pref ?? '',
@@ -52,7 +50,6 @@ async function save() {
   const payload = {
     area_id: form.area_id || null,
     type_id: form.type_id || null,
-    rooms_min: form.rooms_min === '' ? null : Number(form.rooms_min),
     budget_min: form.budget_min === '' ? null : Number(form.budget_min),
     budget_max: form.budget_max === '' ? null : Number(form.budget_max),
     floor_pref: form.floor_pref.trim() || null,
@@ -91,7 +88,6 @@ function reserve(unit) {
           <option v-for="t in unitTypes" :key="t.id" :value="t.id">{{ t.label }}</option>
         </select>
       </label>
-      <BaseInput v-model="form.rooms_min" label="Min rooms" type="number" />
       <BaseInput v-model="form.floor_pref" label="Floor preference" />
       <BaseInput v-model="form.budget_min" label="Budget min" type="number" />
       <BaseInput v-model="form.budget_max" label="Budget max" type="number" />
@@ -108,7 +104,6 @@ function reserve(unit) {
     <dl v-else class="grid gap-2 text-sm sm:grid-cols-2">
       <div class="flex justify-between gap-2"><dt class="opacity-60">Area</dt><dd>{{ store.desire?.area?.label ?? 'Any' }}</dd></div>
       <div class="flex justify-between gap-2"><dt class="opacity-60">Type</dt><dd>{{ store.desire?.type?.label ?? 'Any' }}</dd></div>
-      <div class="flex justify-between gap-2"><dt class="opacity-60">Min rooms</dt><dd>{{ store.desire?.rooms_min ?? '—' }}</dd></div>
       <div class="flex justify-between gap-2"><dt class="opacity-60">Budget</dt><dd>{{ store.desire?.budget_min ?? '—' }} – {{ store.desire?.budget_max ?? '—' }}</dd></div>
     </dl>
 
@@ -123,7 +118,7 @@ function reserve(unit) {
         >
           <div class="flex-1 text-sm">
             <span class="font-medium">{{ u.reference }}</span>
-            <span class="opacity-70"> · {{ u.type || '—' }} · {{ u.rooms ?? '—' }} rooms · {{ u.price }}</span>
+            <span class="opacity-70"> · {{ u.type || '—' }} · {{ u.price }}</span>
           </div>
           <BaseButton v-if="canReserve()" variant="ghost" @click="reserve(u)">Reserve</BaseButton>
         </div>

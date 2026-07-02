@@ -49,7 +49,6 @@ class DomainEventNotificationTest extends TestCase
         Desire::factory()->create([
             'client_id' => $clientA->id,
             'type_id' => $type->id,
-            'rooms_min' => 2,
             'budget_max' => '500000',
         ]);
 
@@ -63,7 +62,6 @@ class DomainEventNotificationTest extends TestCase
         app(CreateUnit::class)->handle($location, [
             'reference' => 'A-101',
             'type_id' => $type->id,
-            'rooms' => 3,
             'price' => '300000',
         ]);
 
@@ -86,7 +84,6 @@ class DomainEventNotificationTest extends TestCase
         app(CreateUnit::class)->handle($location, [
             'reference' => 'B-1',
             'type_id' => $type->id,
-            'rooms' => 2,
             'price' => '100000',
         ]);
 
@@ -110,7 +107,6 @@ class DomainEventNotificationTest extends TestCase
         $unit = app(CreateUnit::class)->handle($location, [
             'reference' => 'C-9',
             'type_id' => $type->id,
-            'rooms' => 2,
             'price' => '300000',
         ]);
         $this->assertSame(0, $agent->notifications()->count());

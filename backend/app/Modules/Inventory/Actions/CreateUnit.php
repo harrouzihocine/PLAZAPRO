@@ -15,7 +15,7 @@ class CreateUnit
     public function handle(Location $location, array $data): Unit
     {
         $attributes = Arr::only($data, [
-            'reference', 'type_id', 'floor_id', 'area_sqm', 'rooms',
+            'reference', 'type_id', 'floor_id', 'area_sqm',
             'price', 'sale_status', 'block', 'stack_floor', 'position',
         ]);
 

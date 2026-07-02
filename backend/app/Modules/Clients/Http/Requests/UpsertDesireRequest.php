@@ -27,7 +27,6 @@ class UpsertDesireRequest extends FormRequest
             'area_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
             'type_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
             'floor_pref' => ['nullable', 'string', 'max:255'],
-            'rooms_min' => ['nullable', 'integer', 'min:0', 'max:255'],
             'budget_min' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'budget_max' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'notes' => ['nullable', 'string', 'max:5000'],

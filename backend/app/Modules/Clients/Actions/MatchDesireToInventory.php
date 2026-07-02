@@ -11,7 +11,7 @@ use Illuminate\Support\Collection;
 
 /**
  * Match a client's desire to inventory: return the **available** units that fit
- * the desire's area / type / budget / rooms, ranked by closeness (best first).
+ * the desire's area / type / budget, ranked by closeness (best first).
  * Only criteria the client actually set are applied. This is a key rule to test.
  */
 class MatchDesireToInventory
@@ -26,14 +26,13 @@ class MatchDesireToInventory
             ->with(['location', 'type', 'floor'])
             ->where('sale_status', SaleStatus::Available->value)
             ->when($desire->type_id, fn ($q) => $q->where('type_id', $desire->type_id))
-            ->when($desire->rooms_min, fn ($q) => $q->where('rooms', '>=', $desire->rooms_min))
             ->when($desire->budget_min !== null, fn ($q) => $q->where('price', '>=', $desire->budget_min))
             ->when($desire->budget_max !== null, fn ($q) => $q->where('price', '<=', $desire->budget_max))
             ->when($desire->area_id, fn ($q) => $q->whereHas('location', fn ($l) => $l->where('area_id', $desire->area_id)))
             ->get();
 
         // Rank by closeness (lower score = better): distance from the budget the
-        // client indicated, then how tightly the room count matches.
+        // client indicated.
         return $units
             ->sortBy(fn (Unit $unit) => $this->score($unit, $desire))
             ->values();
@@ -52,11 +51,6 @@ class MatchDesireToInventory
             $score += abs($max - $price);
         } elseif ($min !== null) {
             $score += abs($price - $min);
-        }
-
-        if ($desire->rooms_min !== null && $unit->rooms !== null) {
-            // Prefer the fewest extra rooms over the minimum (weighted to dominate ties).
-            $score += ($unit->rooms - $desire->rooms_min) * 1_000_000;
         }
 
         return $score;

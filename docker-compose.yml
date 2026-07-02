@@ -29,6 +29,7 @@ services:
         UID: ${UID:-1000}
         GID: ${GID:-1000}
     command: php artisan queue:work --tries=3 --timeout=120
+    user: "${UID:-1000}:${GID:-1000}" # write storage/ as the host UID, not root
     volumes: ["./backend:/var/www/html"]
     depends_on:
       app: { condition: service_started }
@@ -44,6 +45,7 @@ services:
         UID: ${UID:-1000}
         GID: ${GID:-1000}
     command: php artisan reverb:start --host=0.0.0.0 --port=8081
+    user: "${UID:-1000}:${GID:-1000}" # write storage/ as the host UID, not root
     ports: ["${REVERB_PORT:-8081}:8081"]
     volumes: ["./backend:/var/www/html"]
     depends_on:

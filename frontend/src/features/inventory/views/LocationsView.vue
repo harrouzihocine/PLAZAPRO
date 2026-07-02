@@ -5,6 +5,7 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import { useDynamicList } from '@/composables/useDynamicList'
+import LocationMap from '@/features/inventory/components/LocationMap.vue'
 import { useLocationsStore } from '@/features/inventory/locationsStore'
 import { useAuthStore } from '@/features/settings/store'
 
@@ -14,16 +15,18 @@ const { items: areas } = useDynamicList('areas')
 
 const canManage = auth.can('locations.manage')
 
-const blank = { name: '', code: '', area_id: '', address: '', description: '' }
+const blank = { name: '', code: '', area_id: '', address: '', description: '', latitude: null, longitude: null }
 const form = reactive({ ...blank })
 const editingId = ref(null)
 const showForm = ref(false)
+const showMap = ref(false)
 
 onMounted(() => store.fetch())
 
 function openCreate() {
   Object.assign(form, blank)
   editingId.value = null
+  showMap.value = false
   showForm.value = true
 }
 
@@ -34,8 +37,11 @@ function openEdit(loc) {
     area_id: loc.area_id ?? '',
     address: loc.address ?? '',
     description: loc.description ?? '',
+    latitude: loc.latitude ?? null,
+    longitude: loc.longitude ?? null,
   })
   editingId.value = loc.id
+  showMap.value = loc.latitude != null && loc.longitude != null
   showForm.value = true
 }
 
@@ -46,6 +52,8 @@ async function submit() {
     area_id: form.area_id || null,
     address: form.address.trim() || null,
     description: form.description.trim() || null,
+    latitude: form.latitude ?? null,
+    longitude: form.longitude ?? null,
   }
   try {
     if (editingId.value) {
@@ -115,6 +123,22 @@ function remove(loc) {
             </select>
           </label>
           <BaseInput v-model="form.address" label="Address" />
+        </div>
+        <div class="space-y-2">
+          <button
+            type="button"
+            class="text-sm text-primary hover:underline"
+            @click="showMap = !showMap"
+          >
+            {{ showMap ? 'Hide map' : '🗺 Pick location on map' }}
+          </button>
+          <LocationMap
+            v-if="showMap"
+            v-model:latitude="form.latitude"
+            v-model:longitude="form.longitude"
+            v-model:address="form.address"
+            editable
+          />
         </div>
         <BaseInput v-model="form.description" label="Description" />
         <div class="flex gap-2">

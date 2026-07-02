@@ -20,13 +20,12 @@ class Desire extends BaseModel
 
     protected $fillable = [
         'client_id', 'client_project_id', 'area_id', 'type_id',
-        'floor_pref', 'rooms_min', 'budget_min', 'budget_max', 'notes',
+        'floor_pref', 'budget_min', 'budget_max', 'notes',
     ];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'rooms_min' => 'integer',
             'budget_min' => 'decimal:2',
             'budget_max' => 'decimal:2',
         ]);

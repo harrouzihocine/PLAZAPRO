@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Models;
 
 use App\Core\Models\BaseModel;
+use App\Modules\Inventory\Enums\MediaCollection;
 use App\Modules\Inventory\Enums\MediaType;
 use App\Modules\Settings\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -29,6 +30,7 @@ class Media extends BaseModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
+            'collection' => MediaCollection::class,
             'type' => MediaType::class,
             'size_bytes' => 'integer',
             'version' => 'integer',

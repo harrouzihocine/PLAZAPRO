@@ -6,6 +6,7 @@ namespace Tests\Feature\Inventory;
 
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
+use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
@@ -42,7 +43,6 @@ class UnitTest extends TestCase
         $this->postJson("/api/v1/locations/{$location->id}/units", [
             'reference' => 'A-101',
             'price' => 250000,
-            'rooms' => 3,
         ])
             ->assertCreated()
             ->assertJsonPath('data.reference', 'A-101')
@@ -110,6 +110,44 @@ class UnitTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.reference', 'A-2');
+    }
+
+    public function test_index_filters_by_multiple_values_and_area_range(): void
+    {
+        $location = Location::factory()->create();
+        Unit::factory()->for($location)->create(['sale_status' => 'available', 'area_sqm' => 60, 'reference' => 'A-1']);
+        Unit::factory()->for($location)->reserved()->create(['area_sqm' => 90, 'reference' => 'A-2']);
+        Unit::factory()->for($location)->sold()->create(['area_sqm' => 150, 'reference' => 'A-3']);
+        Sanctum::actingAs($this->manager());
+
+        // Multi-select statuses (available OR reserved).
+        $this->getJson('/api/v1/units?sale_status[]=available&sale_status[]=reserved')
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
+
+        // Area range keeps only the mid unit.
+        $this->getJson('/api/v1/units?min_area=70&max_area=100')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.reference', 'A-2');
+    }
+
+    public function test_index_filters_by_geographic_area_of_the_project(): void
+    {
+        $alger = DynamicListItem::factory()->create();
+        $oran = DynamicListItem::factory()->create();
+        $algerLocation = Location::factory()->create(['area_id' => $alger->id]);
+        $oranLocation = Location::factory()->create(['area_id' => $oran->id]);
+        Unit::factory()->for($algerLocation)->create(['reference' => 'A-1']);
+        Unit::factory()->for($oranLocation)->create(['reference' => 'O-1']);
+        Sanctum::actingAs($this->manager());
+
+        // A unit's geographic area is its project's area_id.
+        $this->getJson("/api/v1/units?area_id[]={$alger->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.reference', 'A-1')
+            ->assertJsonPath('data.0.location.area_id', $alger->id);
     }
 
     public function test_a_reserved_unit_cannot_be_cancelled(): void

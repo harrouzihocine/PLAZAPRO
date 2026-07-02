@@ -20,7 +20,7 @@ return new class extends Migration
         Schema::create('media', function (Blueprint $table) {
             $table->id();
             $table->morphs('mediable'); // mediable_type + mediable_id (+ index)
-            $table->string('collection')->nullable(); // gallery | brochure | floorplan
+            $table->string('collection')->nullable(); // MediaCollection enum (locked in by 100005)
             $table->string('type'); // photo | video | pdf | pptx
             $table->string('disk')->default('media');
             $table->string('path');

@@ -7,15 +7,19 @@ import { unitsApi } from '@/features/inventory/api'
 export const useUnitsStore = defineStore('units', {
   state: () => ({
     items: [],
+    current: null, // the unit open on its detail page
     loading: false,
     saving: false,
     error: '',
     scope: null, // location_id when scoped to a project, else null (global)
     filters: {
       location_id: '',
-      type_id: '',
-      floor_id: '',
-      sale_status: '',
+      area_id: [], // multi-select — geographic area (from the unit's project)
+      type_id: [], // multi-select
+      floor_id: [], // multi-select
+      sale_status: [], // multi-select
+      min_area: '',
+      max_area: '',
       min_price: '',
       max_price: '',
     },
@@ -27,7 +31,11 @@ export const useUnitsStore = defineStore('units', {
       try {
         const params = {}
         for (const [k, v] of Object.entries(this.filters)) {
-          if (v !== '' && v != null) params[k] = v
+          if (Array.isArray(v)) {
+            if (v.length) params[k] = v // axios serialises arrays as k[]=…
+          } else if (v !== '' && v != null) {
+            params[k] = v
+          }
         }
         this.scope = null
         this.items = await unitsApi.list(params)
@@ -41,6 +49,16 @@ export const useUnitsStore = defineStore('units', {
       try {
         this.scope = locationId
         this.items = await unitsApi.list({ location_id: locationId })
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async fetchOne(id) {
+      this.loading = true
+      try {
+        this.current = await unitsApi.get(id)
+        return this.current
       } finally {
         this.loading = false
       }

@@ -42,6 +42,13 @@ const routes = [
             component: () => import('@/features/inventory/views/UnitsView.vue'),
             meta: { permission: 'units.view' },
           },
+          {
+            path: 'units/:id',
+            name: 'inventory.unit',
+            props: true,
+            component: () => import('@/features/inventory/views/UnitDetailView.vue'),
+            meta: { permission: 'units.view' },
+          },
         ],
       },
       {
