@@ -104,8 +104,18 @@ onBeforeUnmount(() => store.unsubscribe())
         class="!bg-highlight !text-primary-700 dark:!text-primary-300"
       />
       <h1 class="min-w-0 flex-1 truncate text-base font-semibold text-ink">
+        <i
+          v-if="store.active?.type === 'project'"
+          class="pi pi-folder mr-1 text-sm text-mute"
+          title="Project chat — participants follow the project's contributors"
+          aria-hidden="true"
+        />
         {{ store.active?.title ?? 'Conversation' }}
       </h1>
+      <!-- A project thread deep-links back to its project workspace. -->
+      <RouterLink v-if="store.active?.project_link" :to="store.active.project_link">
+        <Button label="Open project" icon="pi pi-folder-open" text size="small" />
+      </RouterLink>
       <Button
         v-if="isGroup"
         :label="showInfo ? 'Hide info' : 'Group info'"

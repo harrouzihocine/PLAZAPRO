@@ -22,7 +22,9 @@ class CreateConversationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'type' => ['required', new Enum(ConversationType::class)],
+            // Project threads are never created by hand — they belong to their
+            // project (EnsureProjectConversation) and sync with its contributors.
+            'type' => ['required', new Enum(ConversationType::class), Rule::notIn([ConversationType::Project->value])],
             'title' => ['nullable', 'string', 'max:255', Rule::requiredIf($this->input('type') === 'group')],
             'participant_ids' => ['required', 'array', 'min:1'],
             'participant_ids.*' => ['integer', 'distinct', 'exists:users,id'],

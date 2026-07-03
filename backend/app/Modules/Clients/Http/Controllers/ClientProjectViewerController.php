@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Clients\Http\Controllers;
 
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Collaboration\Actions\EnsureProjectConversation;
 use App\Modules\Settings\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -57,7 +58,7 @@ class ClientProjectViewerController extends Controller
     }
 
     /** Add a user to the list (or un-hide a previously hidden one). */
-    public function store(Request $request, ClientProject $project): JsonResponse
+    public function store(Request $request, ClientProject $project, EnsureProjectConversation $syncChat): JsonResponse
     {
         $validated = $request->validate([
             'user_id' => ['required', 'integer', 'exists:users,id'],
@@ -73,11 +74,14 @@ class ClientProjectViewerController extends Controller
         // syncWithoutDetaching leaves an existing (hidden) row untouched — un-hide it.
         $project->viewers()->updateExistingPivot($user->id, ['hidden_at' => null]);
 
+        // A contributor joins the project's chat (and can read its history).
+        $syncChat->handle($project);
+
         return $this->list($project);
     }
 
     /** Hide a viewer (no remove — the grant history is kept). */
-    public function hide(ClientProject $project, User $user): JsonResponse
+    public function hide(ClientProject $project, User $user, EnsureProjectConversation $syncChat): JsonResponse
     {
         abort_if($user->id === $project->created_by, 422, 'The creator cannot be hidden from their own project.');
 
@@ -88,6 +92,9 @@ class ClientProjectViewerController extends Controller
         );
 
         $project->viewers()->updateExistingPivot($user->id, ['hidden_at' => now()]);
+
+        // Leaving the visibility list also leaves the project's chat.
+        $syncChat->handle($project);
 
         return $this->list($project);
     }

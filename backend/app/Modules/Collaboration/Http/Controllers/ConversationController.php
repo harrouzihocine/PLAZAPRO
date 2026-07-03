@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Collaboration\Http\Controllers;
 
+use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Collaboration\Actions\AddParticipants;
 use App\Modules\Collaboration\Actions\CreateConversation;
+use App\Modules\Collaboration\Actions\EnsureProjectConversation;
 use App\Modules\Collaboration\Actions\MarkConversationRead;
 use App\Modules\Collaboration\Actions\RemoveParticipant;
 use App\Modules\Collaboration\Actions\ShareRecord;
@@ -36,7 +38,7 @@ class ConversationController extends Controller
 
         $conversations = Conversation::query()
             ->visibleTo($user)
-            ->with(['participants', 'latestMessage.author'])
+            ->with(['participants', 'latestMessage.author', 'subject'])
             ->withCount(['messages as unread_count' => function ($q) use ($user) {
                 $q->where('messages.user_id', '!=', $user->id)
                     ->where('messages.status', 'active')
@@ -55,7 +57,21 @@ class ConversationController extends Controller
     {
         $conversation = $action->handle($request->user(), $request->validated());
 
-        return new ConversationResource($conversation->load(['participants', 'latestMessage.author']));
+        return new ConversationResource($conversation->load(['participants', 'latestMessage.author', 'subject']));
+    }
+
+    /**
+     * The project's dedicated chat — the thread every contributor shares. Access
+     * follows the project's visibility, and the participant list is reconciled on
+     * the way in (self-healing after any missed sync).
+     */
+    public function forProject(Request $request, ClientProject $project, EnsureProjectConversation $ensure): ConversationResource
+    {
+        abort_unless($project->isVisibleTo($request->user()), 404);
+
+        $conversation = $ensure->handle($project);
+
+        return new ConversationResource($conversation->load(['participants', 'latestMessage.author', 'subject']));
     }
 
     public function read(Request $request, Conversation $conversation, MarkConversationRead $action): JsonResponse
@@ -72,7 +88,7 @@ class ConversationController extends Controller
     {
         $action->handle($conversation, $request->validated('user_ids'));
 
-        return new ConversationResource($conversation->fresh()->load(['participants', 'latestMessage.author']));
+        return new ConversationResource($conversation->fresh()->load(['participants', 'latestMessage.author', 'subject']));
     }
 
     /** Remove a member (an admin removing someone, or a member leaving). Groups only. */

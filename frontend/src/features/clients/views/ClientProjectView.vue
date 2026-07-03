@@ -1,6 +1,7 @@
 <script setup>
 import Swal from 'sweetalert2'
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
 import BaseModal from '@/components/base/BaseModal.vue'
@@ -19,6 +20,7 @@ import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPick
 import PaymentsPanel from '@/features/payments/components/PaymentsPanel.vue'
 import TimelinePanel from '@/features/pipeline/components/TimelinePanel.vue'
 import ShareToChat from '@/features/collaboration/components/ShareToChat.vue'
+import { chatApi } from '@/features/collaboration/api'
 import { useClientsStore } from '@/features/clients/clientsStore'
 import { useAuthStore } from '@/features/settings/store'
 import { useDynamicList } from '@/composables/useDynamicList'
@@ -37,7 +39,21 @@ const props = defineProps({
 
 const store = useClientsStore()
 const auth = useAuthStore()
+const router = useRouter()
 const { items: archiveReasons } = useDynamicList('archive_reasons')
+
+// Every project owns a dedicated chat (its communication history between the
+// contributors) — this opens it, creating it on first use for older projects.
+const openingChat = ref(false)
+async function openProjectChat() {
+  openingChat.value = true
+  try {
+    const conversation = await chatApi.projectConversation(props.projectId)
+    router.push({ name: 'chat.thread', params: { id: conversation.id } })
+  } finally {
+    openingChat.value = false
+  }
+}
 
 const canManage = () => auth.can('clients.manage')
 const canDirectDeal = () => auth.can('deals.direct')
@@ -247,6 +263,16 @@ async function submitDirectDeal() {
             icon="pi pi-undo"
             size="small"
             @click="reactivateProject"
+          />
+          <Button
+            v-if="auth.can('chat.use')"
+            label="Project chat"
+            icon="pi pi-comments"
+            size="small"
+            severity="secondary"
+            outlined
+            :loading="openingChat"
+            @click="openProjectChat"
           />
           <ShareToChat
             v-if="auth.can('chat.use')"

@@ -38,6 +38,12 @@ export const chatApi = {
     return data.data
   },
 
+  // A project's dedicated chat (find-or-create, contributor-scoped).
+  async projectConversation(projectId) {
+    const { data } = await useApi().get(`/projects/${projectId}/conversation`)
+    return data.data
+  },
+
   async messages(conversationId, params = {}) {
     const { data } = await useApi().get(`/conversations/${conversationId}/messages`, { params })
     return data.data

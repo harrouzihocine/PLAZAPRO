@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\SecurityHeaders;
+use App\Modules\Collaboration\Console\BackfillProjectChats;
 use App\Modules\Inventory\Console\ExpireHolds;
 use App\Modules\Payments\Console\MarkSchedulesOverdueCommand;
 use App\Modules\Pipeline\Console\DispatchReminders;
@@ -28,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
         MarkActionsOverdue::class,
         DispatchReminders::class,
         MarkSchedulesOverdueCommand::class,
+        BackfillProjectChats::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         // Sanctum SPA (cookie) auth for the first-party frontend.

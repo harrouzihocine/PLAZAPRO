@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Collaboration\Http\Resources;
 
+use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Collaboration\Enums\ConversationType;
 use App\Modules\Collaboration\Models\Conversation;
 use App\Modules\Collaboration\Models\Message;
@@ -33,6 +34,11 @@ class ConversationResource extends JsonResource
             'title' => $this->displayTitle($me),
             'subject_type' => $this->subject_type,
             'subject_id' => $this->subject_id,
+            // Project threads deep-link back to their project workspace.
+            'project_link' => $this->when(
+                $this->type === ConversationType::Project && $this->relationLoaded('subject') && $this->subject instanceof ClientProject,
+                fn () => '/clients/'.$this->subject->client_id.'/projects/'.$this->subject->id,
+            ),
             'last_message_at' => $this->last_message_at,
             'unread_count' => (int) ($this->getAttribute('unread_count') ?? 0),
             'participants' => $this->whenLoaded('participants', fn () => $this->participants->map(fn (User $u) => [
@@ -54,11 +60,12 @@ class ConversationResource extends JsonResource
 
     private function displayTitle(?User $me): ?string
     {
-        if ($this->type === ConversationType::Group) {
+        // Groups and project threads are named; only a direct thread derives its
+        // title from the other participant.
+        if ($this->type !== ConversationType::Direct) {
             return $this->title;
         }
 
-        // Direct: show the other participant's name (fall back to any single one).
         if ($this->relationLoaded('participants')) {
             $other = $this->participants->firstWhere('id', '!=', $me?->id) ?? $this->participants->first();
 

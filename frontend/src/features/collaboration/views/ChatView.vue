@@ -89,6 +89,12 @@ function resetModal() {
                   class="truncate text-sm text-ink"
                   :class="c.unread_count > 0 ? 'font-semibold' : 'font-medium'"
                 >
+                  <i
+                    v-if="c.type === 'project'"
+                    class="pi pi-folder mr-1 text-xs text-mute"
+                    title="Project chat"
+                    aria-hidden="true"
+                  />
                   {{ c.title ?? 'Conversation' }}
                 </span>
                 <span class="shrink-0 text-xs text-mute">{{ timeAgo(c.last_message_at) }}</span>
