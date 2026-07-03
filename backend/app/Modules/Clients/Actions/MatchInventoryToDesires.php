@@ -11,10 +11,10 @@ use Illuminate\Support\Collection;
 
 /**
  * The inverse of MatchDesireToInventory: given a unit, return the active desires
- * whose criteria it satisfies (wilaya / commune / type / budget), eager-loading each
- * desire's client + assigned agent so the caller can notify. Only criteria the
- * client actually set are applied — the mirror image of the forward matcher.
- * An unavailable unit matches nothing.
+ * whose criteria it satisfies (wilaya / commune / type / floor / area / budget /
+ * preferred sites), eager-loading each desire's client + assigned agent so the
+ * caller can notify. Only criteria the client actually set are applied — the
+ * mirror image of the forward matcher. An unavailable unit matches nothing.
  */
 class MatchInventoryToDesires
 {
@@ -43,6 +43,30 @@ class MatchInventoryToDesires
                 if ($unit->type_id !== null) {
                     $q->orWhere('type_id', $unit->type_id);
                 }
+            })
+            ->where(function ($q) use ($unit) {
+                $q->whereNull('floor_id');
+                if ($unit->floor_id !== null) {
+                    $q->orWhere('floor_id', $unit->floor_id);
+                }
+            })
+            ->where(function ($q) use ($unit) {
+                $q->whereNull('area_min');
+                if ($unit->area_sqm !== null) {
+                    $q->orWhere('area_min', '<=', $unit->area_sqm);
+                }
+            })
+            ->where(function ($q) use ($unit) {
+                $q->whereNull('area_max');
+                if ($unit->area_sqm !== null) {
+                    $q->orWhere('area_max', '>=', $unit->area_sqm);
+                }
+            })
+            // Preferred sites: no rows = open to any site; otherwise the unit's
+            // location must be one of them.
+            ->where(function ($q) use ($unit) {
+                $q->whereDoesntHave('locations')
+                    ->orWhereHas('locations', fn ($l) => $l->where('locations.id', $unit->location_id));
             })
             ->where(function ($q) use ($unit) {
                 $q->whereNull('budget_min');

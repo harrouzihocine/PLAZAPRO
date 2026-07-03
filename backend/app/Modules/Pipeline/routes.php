@@ -26,11 +26,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/visits', [VisitController::class, 'index']);
     });
 
-    // Logging a call always leaves a next action (LogCallRequest enforces it).
-    // Corrections (call + next action) also run under calls.log — every edit is a
-    // cancel + new version, captured in history with a reason.
+    // Logging a call may leave a next action; one can also be planned later on
+    // its own (store). Corrections (call + next action) also run under calls.log
+    // — every edit is a cancel + new version, captured in history with a reason.
     Route::middleware('can:calls.log')->group(function () {
         Route::post('/clients/{client}/calls', [CallController::class, 'store']);
+        Route::post('/clients/{client}/next-actions', [NextActionController::class, 'store']);
         Route::post('/calls/{call}/correct', [CallController::class, 'correct']);
         Route::post('/next-actions/{nextAction}/correct', [NextActionController::class, 'correct']);
     });

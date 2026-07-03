@@ -45,12 +45,12 @@ class DesireTest extends TestCase
         Call::factory()->create(['client_id' => $client->id]); // call-first rule
         Sanctum::actingAs($this->agent());
 
-        $this->putJson("/api/v1/clients/{$client->id}/desire", ['floor_pref' => 'floor_2', 'budget_max' => 5000000])
+        $this->putJson("/api/v1/clients/{$client->id}/desire", ['floor_pref' => 'floor_2', 'budget_max' => 5000000, 'notes' => 'Ground-floor ok, max 5M'])
             ->assertOk()
             ->assertJsonPath('data.floor_pref', 'floor_2');
 
         // A second upsert updates the same row rather than creating a new one.
-        $this->putJson("/api/v1/clients/{$client->id}/desire", ['floor_pref' => 'floor_3'])
+        $this->putJson("/api/v1/clients/{$client->id}/desire", ['floor_pref' => 'floor_3', 'notes' => 'Changed mind: third floor'])
             ->assertOk()
             ->assertJsonPath('data.floor_pref', 'floor_3');
 
@@ -63,9 +63,73 @@ class DesireTest extends TestCase
         Call::factory()->create(['client_id' => $client->id]); // call-first rule
         Sanctum::actingAs($this->agent());
 
-        $this->putJson("/api/v1/clients/{$client->id}/desire", ['budget_min' => 5000000, 'budget_max' => 1000000])
+        $this->putJson("/api/v1/clients/{$client->id}/desire", ['budget_min' => 5000000, 'budget_max' => 1000000, 'notes' => 'Inverted range on purpose'])
             ->assertStatus(422)
             ->assertJsonValidationErrorFor('budget_max');
+    }
+
+    public function test_desire_notes_are_required(): void
+    {
+        $client = Client::factory()->create();
+        Call::factory()->create(['client_id' => $client->id]); // call-first rule
+        Sanctum::actingAs($this->agent());
+
+        $this->putJson("/api/v1/clients/{$client->id}/desire", ['budget_max' => 5000000])
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('notes');
+    }
+
+    public function test_desire_captures_the_structured_profile_and_preferred_sites(): void
+    {
+        $client = Client::factory()->create();
+        Call::factory()->create(['client_id' => $client->id]); // call-first rule
+        $floor = DynamicListItem::factory()->create();
+        $site = Location::factory()->create();
+        Sanctum::actingAs($this->agent());
+
+        $this->putJson("/api/v1/clients/{$client->id}/desire", [
+            'floor_id' => $floor->id,
+            'area_min' => 80, 'area_max' => 120, 'rooms_min' => 3,
+            'location_ids' => [$site->id],
+            'notes' => 'F3+, 80-120sqm, prefers this site',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.floor_id', $floor->id)
+            ->assertJsonPath('data.rooms_min', 3)
+            ->assertJsonPath('data.location_ids.0', $site->id);
+
+        $this->assertDatabaseHas('desire_locations', ['location_id' => $site->id]);
+    }
+
+    public function test_matching_respects_area_floor_and_preferred_sites(): void
+    {
+        $type = DynamicListItem::factory()->create();
+        $floor = DynamicListItem::factory()->create();
+        $site = Location::factory()->create();
+        $otherSite = Location::factory()->create();
+
+        $match = Unit::factory()->for($site)->create([
+            'reference' => 'OK', 'sale_status' => 'available',
+            'type_id' => $type->id, 'floor_id' => $floor->id, 'area_sqm' => 100, 'price' => 5000000,
+        ]);
+        // Wrong floor / too small / wrong site — all excluded.
+        Unit::factory()->for($site)->create(['reference' => 'X-floor', 'sale_status' => 'available', 'type_id' => $type->id, 'area_sqm' => 100, 'price' => 5000000]);
+        Unit::factory()->for($site)->create(['reference' => 'X-small', 'sale_status' => 'available', 'type_id' => $type->id, 'floor_id' => $floor->id, 'area_sqm' => 50, 'price' => 5000000]);
+        Unit::factory()->for($otherSite)->create(['reference' => 'X-site', 'sale_status' => 'available', 'type_id' => $type->id, 'floor_id' => $floor->id, 'area_sqm' => 100, 'price' => 5000000]);
+
+        $client = Client::factory()->create();
+        $desire = Desire::factory()->create([
+            'client_id' => $client->id, 'type_id' => $type->id,
+            'floor_id' => $floor->id, 'area_min' => 80, 'area_max' => 120,
+        ]);
+        $desire->locations()->sync([$site->id]);
+
+        Sanctum::actingAs($this->agent());
+
+        $this->getJson("/api/v1/clients/{$client->id}/matches")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $match->id);
     }
 
     public function test_matching_returns_only_available_units_that_fit(): void

@@ -112,7 +112,7 @@ class CallPropertiesTest extends TestCase
 
         $this->postJson("/api/v1/clients/{$client->id}/calls", [
             'direction' => 'inbound',
-            'desire' => ['floor_pref' => 'floor_2', 'budget_min' => 4000000, 'budget_max' => 6000000],
+            'desire' => ['floor_pref' => 'floor_2', 'budget_min' => 4000000, 'budget_max' => 6000000, 'notes' => 'Budget 4-6M, second floor'],
             'next_action' => $this->nextAction(),
         ])->assertCreated();
 

@@ -227,6 +227,12 @@ export const useClientsStore = defineStore('clients', {
       return this.loadTimeline(clientId)
     },
 
+    // Plan a next action after the fact (a log that didn't need one at the time).
+    async createNextAction(clientId, payload) {
+      await this.mutate(() => pipelineApi.createNextAction(clientId, payload))
+      return this.loadTimeline(clientId)
+    },
+
     // Corrections — cancel + new version, reason required. Refetch to show history.
     async correctCall(clientId, callId, payload) {
       await this.mutate(() => pipelineApi.correctCall(callId, payload))

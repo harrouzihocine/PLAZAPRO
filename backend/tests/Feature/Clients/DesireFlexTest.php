@@ -36,7 +36,7 @@ class DesireFlexTest extends TestCase
         $project = ClientProject::factory()->create(['client_id' => $client->id]);
         Sanctum::actingAs($this->userWith(['clients.view', 'clients.manage', 'clients.create']));
 
-        $this->postJson("/api/v1/projects/{$project->id}/shift-to-desire", ['budget_max' => '3000000'])
+        $this->postJson("/api/v1/projects/{$project->id}/shift-to-desire", ['budget_max' => '3000000', 'notes' => 'Wants something cheaper'])
             ->assertSuccessful();
 
         $this->assertDatabaseHas('client_projects', [
@@ -73,7 +73,7 @@ class DesireFlexTest extends TestCase
         $project = ClientProject::factory()->create();
         Sanctum::actingAs($this->userWith(['clients.view', 'clients.manage', 'clients.create', 'projects.view_all']));
 
-        $this->postJson("/api/v1/projects/{$project->id}/shift-to-desire", ['budget_max' => '100'])
+        $this->postJson("/api/v1/projects/{$project->id}/shift-to-desire", ['budget_max' => '100', 'notes' => 'Tiny budget for now'])
             ->assertSuccessful();
 
         $project->refresh();
@@ -93,7 +93,7 @@ class DesireFlexTest extends TestCase
         $project = ClientProject::factory()->create(['client_id' => $client->id]);
         Sanctum::actingAs($this->userWith(['clients.view', 'clients.manage', 'clients.create', 'calls.log']));
 
-        $this->postJson("/api/v1/projects/{$project->id}/shift-to-desire", ['budget_max' => '100'])
+        $this->postJson("/api/v1/projects/{$project->id}/shift-to-desire", ['budget_max' => '100', 'notes' => 'Tiny budget for now'])
             ->assertSuccessful();
 
         // The reconnect call (after a desire match) reactivates the project and

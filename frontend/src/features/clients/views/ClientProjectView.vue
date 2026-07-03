@@ -12,6 +12,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import ActivityTimeline from '@/components/ui/ActivityTimeline.vue'
 import DealPanel from '@/features/clients/components/DealPanel.vue'
 import DesireFields from '@/features/clients/components/DesireFields.vue'
+import { desireForm as makeDesireForm, desirePayload } from '@/features/clients/desire'
 import ProjectViewersPanel from '@/features/clients/components/ProjectViewersPanel.vue'
 import ShortlistPanel from '@/features/clients/components/ShortlistPanel.vue'
 import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPicker.vue'
@@ -73,41 +74,20 @@ onMounted(async () => {
 
 // --- Shift to desire (modal): archive the project + re-capture the wants ---
 const shiftOpen = ref(false)
-const shiftForm = ref({
-  wilaya_id: '',
-  commune_id: '',
-  type_id: '',
-  budget_min: '',
-  budget_max: '',
-  floor_pref: '',
-  notes: '',
-})
+const shiftForm = ref(makeDesireForm())
 
 function openShift() {
-  const d = store.desire
-  shiftForm.value = {
-    wilaya_id: d?.wilaya_id ?? '',
-    commune_id: d?.commune_id ?? '',
-    type_id: d?.type_id ?? '',
-    budget_min: d?.budget_min ?? '',
-    budget_max: d?.budget_max ?? '',
-    floor_pref: d?.floor_pref ?? '',
-    notes: d?.notes ?? '',
-  }
+  shiftForm.value = makeDesireForm(store.desire)
   shiftOpen.value = true
 }
 
+// Notes are required — the story behind the numbers (matches the server rule).
+const shiftReady = computed(() => !!(shiftForm.value.notes ?? '').trim())
+
 async function submitShift() {
+  if (!shiftReady.value) return
   try {
-    await store.shiftProjectToDesire(props.id, props.projectId, {
-      wilaya_id: shiftForm.value.wilaya_id || null,
-      commune_id: shiftForm.value.commune_id || null,
-      type_id: shiftForm.value.type_id || null,
-      budget_min: shiftForm.value.budget_min === '' ? null : Number(shiftForm.value.budget_min),
-      budget_max: shiftForm.value.budget_max === '' ? null : Number(shiftForm.value.budget_max),
-      floor_pref: (shiftForm.value.floor_pref ?? '').trim() || null,
-      notes: (shiftForm.value.notes ?? '').trim() || null,
-    })
+    await store.shiftProjectToDesire(props.id, props.projectId, desirePayload(shiftForm.value))
     shiftOpen.value = false
   } catch {
     /* toast raised by the store */
@@ -352,6 +332,7 @@ async function submitDirectDeal() {
             label="Shift to desire"
             icon="pi pi-heart"
             :loading="store.saving"
+            :disabled="!shiftReady"
           />
           <Button
             type="button"

@@ -15,9 +15,9 @@ use App\Modules\Settings\Models\User;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Log a phone call and its **required** next action in one transaction. The next
- * action is validated in the FormRequest and re-checked here (defense in depth):
- * a call can never be logged without leaving a next step.
+ * Log a phone call — and, when one is planned, its next action — in one
+ * transaction. The next action is optional: some calls genuinely end a thread
+ * (a plan can still be added later via POST /clients/{client}/next-actions).
  *
  * Qualification happens on the call, so the payload may also carry:
  *  - `properties` (Branch B — matching inventory): added to the deal's shortlist;
@@ -41,8 +41,6 @@ class LogCall
 
     public function handle(Client $client, array $data, User $actor): Call
     {
-        abort_if(empty($data['next_action']), 422, 'A next action is required when logging a call.');
-
         return DB::transaction(function () use ($client, $data, $actor) {
             // The call belongs to the deal if one is linked; shortlisting properties
             // needs a deal to live on, so the open one is found-or-created.
@@ -74,12 +72,14 @@ class LogCall
             // The action belongs to the deal if one is linked, otherwise the client.
             // A call next action defaults to the client's sales agent (the request
             // only forces an assignee for in-site visits).
-            $nextAction = $this->createNextAction->handle(
-                $project ?? $client, $call, $data['next_action'], $client->assigned_agent_id ?? $actor->id,
-            );
+            if (! empty($data['next_action'])) {
+                $nextAction = $this->createNextAction->handle(
+                    $project ?? $client, $call, $data['next_action'], $client->assigned_agent_id ?? $actor->id,
+                );
 
-            // A visit-type next step IS the scheduling — materialize the visit(s).
-            $this->syncVisitFromNextAction->handle($nextAction);
+                // A visit-type next step IS the scheduling — materialize the visit(s).
+                $this->syncVisitFromNextAction->handle($nextAction);
+            }
 
             // Return the created instance (not a refetch) so the API responds 201.
             return $call;

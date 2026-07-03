@@ -11,8 +11,9 @@ use Illuminate\Support\Collection;
 
 /**
  * Match a client's desire to inventory: return the **available** units that fit
- * the desire's wilaya / commune / type / budget, ranked by closeness (best first).
- * Only criteria the client actually set are applied. This is a key rule to test.
+ * the desire's wilaya / commune / type / floor / area / budget / preferred sites,
+ * ranked by closeness (best first). Only criteria the client actually set are
+ * applied. This is a key rule to test.
  */
 class MatchDesireToInventory
 {
@@ -21,13 +22,19 @@ class MatchDesireToInventory
      */
     public function handle(Desire $desire): Collection
     {
+        $preferredLocationIds = $desire->locations()->pluck('locations.id');
+
         $units = Unit::query()
             ->active()
             ->with(['location', 'type', 'floor'])
             ->where('sale_status', SaleStatus::Available->value)
             ->when($desire->type_id, fn ($q) => $q->where('type_id', $desire->type_id))
+            ->when($desire->floor_id, fn ($q) => $q->where('floor_id', $desire->floor_id))
+            ->when($desire->area_min !== null, fn ($q) => $q->where('area_sqm', '>=', $desire->area_min))
+            ->when($desire->area_max !== null, fn ($q) => $q->where('area_sqm', '<=', $desire->area_max))
             ->when($desire->budget_min !== null, fn ($q) => $q->where('price', '>=', $desire->budget_min))
             ->when($desire->budget_max !== null, fn ($q) => $q->where('price', '<=', $desire->budget_max))
+            ->when($preferredLocationIds->isNotEmpty(), fn ($q) => $q->whereIn('location_id', $preferredLocationIds))
             ->when($desire->wilaya_id, fn ($q) => $q->whereHas('location', fn ($l) => $l->where('wilaya_id', $desire->wilaya_id)))
             ->when($desire->commune_id, fn ($q) => $q->whereHas('location', fn ($l) => $l->where('commune_id', $desire->commune_id)))
             ->get();

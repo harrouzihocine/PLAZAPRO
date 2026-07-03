@@ -62,16 +62,37 @@ class InteractionTest extends TestCase
             ->where('subject_type', 'client')->where('subject_id', $client->id)->count());
     }
 
-    public function test_logging_a_call_without_a_next_action_is_rejected(): void
+    public function test_logging_a_call_without_a_next_action_is_allowed(): void
     {
+        // Optional plan: some calls genuinely end a thread — the call is logged
+        // and simply leaves no pending action (one can be planned later).
         $client = Client::factory()->create();
         Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
 
         $this->postJson("/api/v1/clients/{$client->id}/calls", ['direction' => 'outbound'])
-            ->assertStatus(422)
-            ->assertJsonValidationErrorFor('next_action');
+            ->assertCreated();
 
+        $this->assertDatabaseHas('calls', ['client_id' => $client->id, 'direction' => 'outbound']);
         $this->assertSame(0, NextAction::count());
+    }
+
+    public function test_a_next_action_can_be_planned_after_the_fact(): void
+    {
+        $client = Client::factory()->create();
+        $agent = $this->agent();
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+
+        // A call closed its thread; the plan arrives later, standalone.
+        $this->postJson("/api/v1/clients/{$client->id}/calls", ['direction' => 'outbound'])->assertCreated();
+
+        $this->postJson("/api/v1/clients/{$client->id}/next-actions", [
+            'type' => 'call',
+            'due_date' => now()->addDays(2)->toDateString(),
+            'assigned_to' => $agent->id,
+        ])->assertCreated();
+
+        $this->assertSame(1, NextAction::query()->pending()
+            ->where('subject_type', 'client')->where('subject_id', $client->id)->count());
     }
 
     public function test_retired_next_action_types_are_rejected(): void
@@ -377,16 +398,19 @@ class InteractionTest extends TestCase
             ->assertStatus(422);
     }
 
-    public function test_completing_a_visit_requires_a_next_action(): void
+    public function test_completing_a_visit_without_a_next_action_is_allowed(): void
     {
+        // Optional plan: a visit can close its thread — completed, no pending
+        // action left (one can be planned later, standalone).
         $visit = Visit::factory()->create();
         Sanctum::actingAs($this->userWithPermissions(['clients.view', 'visits.conduct']));
 
         $this->postJson("/api/v1/visits/{$visit->id}/complete", [])
-            ->assertStatus(422)
-            ->assertJsonValidationErrorFor('next_action');
+            ->assertOk()
+            ->assertJsonPath('data.is_completed', true);
 
-        $this->assertNull($visit->fresh()->completed_at);
+        $this->assertNotNull($visit->fresh()->completed_at);
+        $this->assertSame(0, NextAction::count());
     }
 
     public function test_completing_a_visit_records_completion_and_a_next_action(): void

@@ -34,7 +34,7 @@ function update(field, value) {
 <template>
   <fieldset class="grid gap-3 rounded-xl border border-line p-3 sm:grid-cols-3">
     <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">
-      Next action (required)
+      Next action
     </legend>
     <BaseSelect
       label="Type"

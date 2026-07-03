@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
+import FlagIcon from '@/components/ui/FlagIcon.vue'
 import {
   COUNTRY_CODES,
   DEFAULT_DIAL_CODE,
@@ -95,14 +96,16 @@ function normalizeField() {
         @update:model-value="emitValue"
       >
         <template #value="{ value }">
-          <span v-if="value" class="whitespace-nowrap">
-            {{ byDial[value]?.flag }} {{ value }}
+          <span v-if="value" class="flex items-center gap-1.5 whitespace-nowrap">
+            <FlagIcon :iso="byDial[value]?.iso" />
+            {{ value }}
           </span>
         </template>
         <template #option="{ option }">
-          <span class="truncate text-sm"
-            >{{ option.flag }} {{ option.name }} ({{ option.dial }})</span
-          >
+          <span class="flex items-center gap-2 truncate text-sm">
+            <FlagIcon :iso="option.iso" />
+            {{ option.name }} ({{ option.dial }})
+          </span>
         </template>
       </Select>
       <InputText

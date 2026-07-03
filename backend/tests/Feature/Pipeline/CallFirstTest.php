@@ -71,13 +71,13 @@ class CallFirstTest extends TestCase
         $client = Client::factory()->create();
         Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.create']));
 
-        $this->putJson("/api/v1/clients/{$client->id}/desire", ['floor_pref' => 'floor_2'])
+        $this->putJson("/api/v1/clients/{$client->id}/desire", ['floor_pref' => 'floor_2', 'notes' => 'Second floor preferred'])
             ->assertStatus(422)
             ->assertJsonValidationErrorFor('client_id');
 
         Call::factory()->create(['client_id' => $client->id]);
 
-        $this->putJson("/api/v1/clients/{$client->id}/desire", ['floor_pref' => 'floor_2'])->assertOk();
+        $this->putJson("/api/v1/clients/{$client->id}/desire", ['floor_pref' => 'floor_2', 'notes' => 'Second floor preferred'])->assertOk();
     }
 
     public function test_a_cancelled_call_does_not_satisfy_the_rule(): void

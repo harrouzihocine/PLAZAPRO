@@ -19,9 +19,20 @@ class DesireResource extends JsonResource
             'id' => $this->id,
             'client_id' => $this->client_id,
             'floor_pref' => $this->floor_pref,
+            'area_min' => $this->area_min,
+            'area_max' => $this->area_max,
+            'rooms_min' => $this->rooms_min,
             'budget_min' => $this->budget_min,
             'budget_max' => $this->budget_max,
             'notes' => $this->notes,
+            'floor' => $this->whenLoaded('floor', fn () => $this->floor ? [
+                'id' => $this->floor->id,
+                'label' => $this->floor->label,
+            ] : null),
+            // The preferred sites (projects) the client would buy into.
+            'locations' => $this->whenLoaded('locations', fn () => $this->locations
+                ->map(fn ($l) => ['id' => $l->id, 'name' => $l->name])->all()),
+            'location_ids' => $this->whenLoaded('locations', fn () => $this->locations->pluck('id')->all()),
             'wilaya' => $this->whenLoaded('wilaya', fn () => $this->wilaya ? [
                 'id' => $this->wilaya->id,
                 'name' => $this->wilaya->name,
@@ -38,6 +49,7 @@ class DesireResource extends JsonResource
             'wilaya_id' => $this->wilaya_id,
             'commune_id' => $this->commune_id,
             'type_id' => $this->type_id,
+            'floor_id' => $this->floor_id,
             'updated_at' => $this->updated_at,
         ];
     }

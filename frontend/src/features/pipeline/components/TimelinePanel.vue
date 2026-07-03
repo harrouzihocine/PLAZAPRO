@@ -50,6 +50,20 @@ const emptyNextAction = () => ({ type: 'call', due_date: '', due_time: '', assig
 // Edit-with-reason state (corrections = cancel + new version).
 const editNa = reactive({ open: false, id: null, reason: '', form: emptyNextAction() })
 
+// Plan-after-the-fact state: a log that didn't need a next action at the time
+// can be re-armed later (next actions are optional on the log forms).
+const planNa = reactive({ open: false, form: emptyNextAction() })
+
+async function submitPlanNa() {
+  if (!nextActionReady(planNa.form)) return
+  const payload = { ...planNa.form }
+  if (props.projectId) payload.client_project_id = props.projectId
+  await store.createNextAction(props.clientId, payload)
+  planNa.open = false
+  planNa.form = emptyNextAction()
+  emit('changed')
+}
+
 const nextActionReady = (na) => !!na.due_date && (na.type !== 'in_site_visit' || !!na.assigned_to)
 
 // The single open next action drives what may be logged next.
@@ -183,14 +197,50 @@ async function submitEditNa() {
       </h3>
       <!-- One pending log at a time: the call CTA shows only when the open next
            action IS a call (or nothing is planned yet). -->
-      <Button
-        v-if="canLogCall() && pendingIsCall"
-        label="Log call"
-        icon="pi pi-phone"
-        size="small"
-        @click="showCall = true"
-      />
+      <span class="flex items-center gap-2">
+        <Button
+          v-if="canLogCall() && !pending"
+          label="Plan next action"
+          icon="pi pi-flag"
+          size="small"
+          severity="secondary"
+          outlined
+          @click="planNa.open = !planNa.open"
+        />
+        <Button
+          v-if="canLogCall() && pendingIsCall"
+          label="Log call"
+          icon="pi pi-phone"
+          size="small"
+          @click="showCall = true"
+        />
+      </span>
     </div>
+
+    <!-- Plan a next action after the fact (nothing is pending right now). -->
+    <form
+      v-if="planNa.open && !pending"
+      class="mb-4 space-y-3 rounded-xl border border-line bg-card p-3"
+      @submit.prevent="submitPlanNa"
+    >
+      <NextActionFields v-model="planNa.form" :field-agents="store.agents" />
+      <div class="flex gap-2">
+        <Button
+          type="submit"
+          label="Plan it"
+          size="small"
+          :disabled="store.saving || !nextActionReady(planNa.form)"
+        />
+        <Button
+          type="button"
+          label="Cancel"
+          size="small"
+          severity="secondary"
+          outlined
+          @click="planNa.open = false"
+        />
+      </div>
+    </form>
 
     <!-- The open next action (the one pending log to fill), editable with a reason. -->
     <div v-if="store.timeline.next_actions.length" class="mb-4 space-y-2">

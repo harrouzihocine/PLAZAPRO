@@ -15,6 +15,12 @@ export const pipelineApi = {
     return data.data
   },
 
+  // Plan a next action after the fact (for a log that didn't need one then).
+  async createNextAction(clientId, payload) {
+    const { data } = await useApi().post(`/clients/${clientId}/next-actions`, payload)
+    return data.data
+  },
+
   async assignVisit(visitId, agentId) {
     const { data } = await useApi().post(`/visits/${visitId}/assign`, { agent_id: agentId })
     return data.data

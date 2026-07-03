@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Pipeline\Http\Requests;
 
+use App\Modules\Clients\Http\Requests\Concerns\ValidatesDesireFields;
 use App\Modules\Pipeline\Enums\CallDirection;
 use App\Modules\Pipeline\Http\Requests\Concerns\ValidatesNextAction;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 
 class LogCallRequest extends FormRequest
 {
+    use ValidatesDesireFields;
     use ValidatesNextAction;
 
     public function authorize(): bool
@@ -45,15 +48,13 @@ class LogCallRequest extends FormRequest
             'properties.*.shortlistable_id' => ['required', 'integer'],
             'properties.*.note' => ['nullable', 'string', 'max:1000'],
             // Branch A — no matching inventory: capture the desire profile in the
-            // same call (mirrors UpsertDesireRequest).
+            // same call (shared field set — notes required when the branch is used).
             'desire' => ['nullable', 'array'],
-            'desire.wilaya_id' => ['nullable', 'integer', 'exists:wilayas,id'],
-            'desire.commune_id' => ['nullable', 'integer', 'exists:communes,id'],
-            'desire.type_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
-            'desire.floor_pref' => ['nullable', 'string', 'max:255'],
-            'desire.budget_min' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
-            'desire.budget_max' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
-            'desire.notes' => ['nullable', 'string', 'max:5000'],
-        ], $this->nextActionRules());
+        ], $this->desireFieldRules('desire'), $this->nextActionRules());
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $this->validateDesireRanges($validator, 'desire');
     }
 }

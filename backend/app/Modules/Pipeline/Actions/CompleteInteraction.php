@@ -12,9 +12,9 @@ use App\Modules\Pipeline\Models\Visit;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Complete a visit and record its **required** next action in one transaction.
- * Completing an interaction can never leave the pipeline without a next step — the
- * rule is validated in the FormRequest and re-checked here.
+ * Complete a visit — and, when one is planned, record its next action — in one
+ * transaction. The next action is optional: some visits genuinely end a thread
+ * (a plan can still be added later via POST /clients/{client}/next-actions).
  *
  * Two automations hang off completion:
  *  - the next step is materialized into its pending visit(s) when it's a visit type
@@ -34,7 +34,6 @@ class CompleteInteraction
     public function handle(Visit $visit, array $data): Visit
     {
         abort_if($visit->isCompleted(), 422, 'This visit is already completed.');
-        abort_if(empty($data['next_action']), 422, 'A next action is required to complete a visit.');
 
         return DB::transaction(function () use ($visit, $data) {
             $visit->update([
@@ -70,7 +69,7 @@ class CompleteInteraction
 
             // Default assignee = the client's sales agent, else whoever conducted
             // the visit (only in-site visits force an explicit field-agent assignee).
-            $nextAction = $this->createNextAction->handle(
+            $nextAction = empty($data['next_action']) ? null : $this->createNextAction->handle(
                 $subject, $visit, $data['next_action'], $client->assigned_agent_id ?? $visit->agent_id,
             );
 
@@ -82,7 +81,9 @@ class CompleteInteraction
             }
 
             // A visit-type next step IS the scheduling — materialize the visit(s).
-            $this->syncVisitFromNextAction->handle($nextAction);
+            if ($nextAction !== null) {
+                $this->syncVisitFromNextAction->handle($nextAction);
+            }
 
             return $visit->fresh();
         });

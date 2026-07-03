@@ -1,11 +1,13 @@
 <script setup>
 import { computed, ref } from 'vue'
+import Checkbox from 'primevue/checkbox'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import { useDynamicList } from '@/composables/useDynamicList'
 import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPicker.vue'
 import DesireFields from '@/features/clients/components/DesireFields.vue'
+import { desireForm as makeDesireForm, desirePayload } from '@/features/clients/desire'
 import NextActionFields from '@/features/pipeline/components/NextActionFields.vue'
 
 // The fast-entry call log (qualification happens on the phone): direction
@@ -29,20 +31,15 @@ const { items: propertyInterests } = useDynamicList('property_interests')
 const direction = ref('outbound')
 const notes = ref('')
 const topics = ref([])
+// Optional plan: most calls leave a next step (default ON), but some genuinely
+// end a thread — untick and the call is logged without one (addable later).
+const planNext = ref(true)
 const nextAction = ref({ type: 'call', due_date: '', due_time: '', assigned_to: '' })
 
 // Qualification branch: null (quick call) | 'properties' | 'desire'.
 const branch = ref(null)
 const properties = ref([])
-const desireForm = ref({
-  wilaya_id: props.desire?.wilaya_id ?? '',
-  commune_id: props.desire?.commune_id ?? '',
-  type_id: props.desire?.type_id ?? '',
-  budget_min: props.desire?.budget_min ?? '',
-  budget_max: props.desire?.budget_max ?? '',
-  floor_pref: props.desire?.floor_pref ?? '',
-  notes: props.desire?.notes ?? '',
-})
+const desireForm = ref(makeDesireForm(props.desire))
 
 // The client's interest categories (captured at lead creation) as passive context.
 const interestLabels = computed(() => {
@@ -58,18 +55,24 @@ function toggleTopic(id) {
 
 const nextActionReady = computed(
   () =>
-    !!nextAction.value.due_date &&
-    (nextAction.value.type !== 'in_site_visit' || !!nextAction.value.assigned_to),
+    !planNext.value ||
+    (!!nextAction.value.due_date &&
+      (nextAction.value.type !== 'in_site_visit' || !!nextAction.value.assigned_to)),
+)
+
+// Branch A saves a desire — its notes are required (the story behind the numbers).
+const desireReady = computed(
+  () => branch.value !== 'desire' || !!(desireForm.value.notes ?? '').trim(),
 )
 
 function submit() {
-  if (!nextActionReady.value) return
+  if (!nextActionReady.value || !desireReady.value) return
   const payload = {
     direction: direction.value,
     notes: notes.value.trim() || null,
     topics: topics.value,
-    next_action: { ...nextAction.value },
   }
+  if (planNext.value) payload.next_action = { ...nextAction.value }
   if (branch.value === 'properties' && properties.value.length) {
     payload.properties = properties.value.map(({ shortlistable_type, shortlistable_id }) => ({
       shortlistable_type,
@@ -77,15 +80,7 @@ function submit() {
     }))
   }
   if (branch.value === 'desire') {
-    payload.desire = {
-      wilaya_id: desireForm.value.wilaya_id || null,
-      commune_id: desireForm.value.commune_id || null,
-      type_id: desireForm.value.type_id || null,
-      budget_min: desireForm.value.budget_min === '' ? null : Number(desireForm.value.budget_min),
-      budget_max: desireForm.value.budget_max === '' ? null : Number(desireForm.value.budget_max),
-      floor_pref: (desireForm.value.floor_pref ?? '').trim() || null,
-      notes: (desireForm.value.notes ?? '').trim() || null,
-    }
+    payload.desire = desirePayload(desireForm.value)
   }
   emit('submit', payload)
 }
@@ -166,10 +161,18 @@ function submit() {
       <DesireFields v-if="branch === 'desire'" v-model="desireForm" />
     </fieldset>
 
-    <NextActionFields v-model="nextAction" :field-agents="fieldAgents" />
+    <!-- Optional next step: unticked, the call closes its thread (a plan can
+         still be added later from the timeline). -->
+    <label class="flex w-fit cursor-pointer items-center gap-2 text-sm font-medium text-ink">
+      <Checkbox v-model="planNext" binary />
+      Plan a next action
+    </label>
+    <NextActionFields v-if="planNext" v-model="nextAction" :field-agents="fieldAgents" />
 
     <div class="flex gap-2 pt-1">
-      <BaseButton type="submit" :disabled="saving || !nextActionReady">Save call</BaseButton>
+      <BaseButton type="submit" :disabled="saving || !nextActionReady || !desireReady">
+        Save call
+      </BaseButton>
       <BaseButton type="button" variant="ghost" @click="emit('cancel')">Cancel</BaseButton>
     </div>
   </form>

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import Checkbox from 'primevue/checkbox'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
@@ -38,6 +39,9 @@ const hasDeal = computed(() => !!props.visit.client_project_id)
 const outcomeId = ref('')
 const notes = ref('')
 const checklist = ref([])
+// Optional plan: most completions leave a next step (default ON), but some
+// genuinely end a thread — untick to complete without one (addable later).
+const planNext = ref(true)
 const nextAction = ref({ type: 'call', due_date: '', due_time: '', assigned_to: '' })
 
 // Office shortlist manager state: the deal's current active list, editable.
@@ -125,8 +129,9 @@ const finalShortlist = computed(() => [...shortlist.value, ...additions.value])
 
 const nextActionReady = computed(
   () =>
-    !!nextAction.value.due_date &&
-    (nextAction.value.type !== 'in_site_visit' || !!nextAction.value.assigned_to),
+    !planNext.value ||
+    (!!nextAction.value.due_date &&
+      (nextAction.value.type !== 'in_site_visit' || !!nextAction.value.assigned_to)),
 )
 
 function submit() {
@@ -143,8 +148,8 @@ function submit() {
     outcome_id: outcomeId.value || null,
     notes: notes.value.trim() || null,
     checklist: checklist.value,
-    next_action: { ...nextAction.value },
   }
+  if (planNext.value) payload.next_action = { ...nextAction.value }
   if (isOffice.value && hasDeal.value) {
     payload.shortlist = finalShortlist.value.map(({ shortlistable_type, shortlistable_id }) => ({
       shortlistable_type,
@@ -304,7 +309,13 @@ function submit() {
       </div>
     </fieldset>
 
-    <NextActionFields v-model="nextAction" :field-agents="fieldAgents" />
+    <!-- Optional next step: unticked, the visit closes its thread (a plan can
+         still be added later from the timeline). -->
+    <label class="flex w-fit cursor-pointer items-center gap-2 text-sm font-medium text-ink">
+      <Checkbox v-model="planNext" binary />
+      Plan a next action
+    </label>
+    <NextActionFields v-if="planNext" v-model="nextAction" :field-agents="fieldAgents" />
 
     <div class="flex gap-2 pt-1">
       <BaseButton type="submit" :disabled="saving || !nextActionReady">Complete visit</BaseButton>
