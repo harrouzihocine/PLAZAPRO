@@ -25,11 +25,10 @@ Broadcast::channel('users.{userId}', function (User $user, int $userId) {
     return $user->id === $userId;
 });
 
-// A conversation's live message stream. Only participants may subscribe — the
-// same visibility rule the HTTP endpoints enforce.
+// A conversation's live message stream. Same read rule as the HTTP endpoints:
+// participants, plus project-chat oversight (chat.view_project_chats).
 Broadcast::channel('conversation.{conversationId}', function (User $user, int $conversationId) {
-    return Conversation::query()
-        ->whereKey($conversationId)
-        ->whereHas('participants', fn ($q) => $q->where('users.id', $user->id))
-        ->exists();
+    $conversation = Conversation::query()->find($conversationId);
+
+    return $conversation !== null && $conversation->isReadableBy($user);
 });

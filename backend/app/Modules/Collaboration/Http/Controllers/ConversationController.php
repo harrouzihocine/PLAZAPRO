@@ -74,9 +74,22 @@ class ConversationController extends Controller
         return new ConversationResource($conversation->load(['participants', 'latestMessage.author', 'subject']));
     }
 
+    /**
+     * One conversation, for deep links (e.g. an overseer opening a project chat
+     * that is not in their participant inbox). Read-scoped like the messages.
+     */
+    public function show(Request $request, Conversation $conversation): ConversationResource
+    {
+        abort_unless($conversation->isReadableBy($request->user()), 403);
+
+        return new ConversationResource($conversation->load(['participants', 'latestMessage.author', 'subject']));
+    }
+
     public function read(Request $request, Conversation $conversation, MarkConversationRead $action): JsonResponse
     {
-        abort_unless($conversation->hasParticipant($request->user()), 403);
+        // Read-scoped: for a non-participant overseer the cursor update is a
+        // harmless no-op (updateExistingPivot on a missing row does nothing).
+        abort_unless($conversation->isReadableBy($request->user()), 403);
 
         $action->handle($conversation, $request->user());
 

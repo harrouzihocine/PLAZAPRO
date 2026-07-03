@@ -38,6 +38,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // A project's dedicated chat (find-or-create; guarded by project visibility).
         Route::get('/projects/{project}/conversation', [ConversationController::class, 'forProject']);
 
+        // One conversation for deep links — read-scoped (participants + project-chat oversight).
+        Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
+
         // Visibility & sharing.
         Route::post('/conversations/{conversation}/participants', [ConversationController::class, 'addParticipants']);
         Route::delete('/conversations/{conversation}/participants/{user}', [ConversationController::class, 'removeParticipant']);

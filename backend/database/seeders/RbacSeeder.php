@@ -58,7 +58,9 @@ class RbacSeeder extends Seeder
         // Payments
         'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
         // Collaboration & analytics
-        'chat.use', 'notifications.view', 'dashboard.view', 'reports.view',
+        // chat.view_project_chats: oversight — read ANY client-project chat
+        // without being a contributor (writing still requires joining).
+        'chat.use', 'chat.view_project_chats', 'notifications.view', 'dashboard.view', 'reports.view',
     ];
 
     /**
@@ -117,9 +119,10 @@ class RbacSeeder extends Seeder
             'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
         ];
 
-        // Every rapport type + all analytics reports + operational oversight.
+        // Every rapport type + all analytics reports + operational oversight
+        // (incl. reading any project chat without being a contributor).
         $manager = [
-            ...$this->baseline, ...$fullVisibility, 'reports.view',
+            ...$this->baseline, ...$fullVisibility, 'reports.view', 'chat.view_project_chats',
             'clients.view', 'clients.create', 'clients.manage', 'projects.contributors',
             'calls.log', 'visits.assign', 'visits.dispatch', 'visits.conduct', 'tasks.manage', 'deals.direct',
             'units.view', 'units.reserve', 'units.manage', 'media.manage',

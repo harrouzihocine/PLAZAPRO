@@ -96,6 +96,68 @@ class ProjectChatTest extends TestCase
         $this->getJson("/api/v1/projects/{$projectId}/conversation")->assertNotFound();
     }
 
+    public function test_oversight_permission_reads_project_chats_but_cannot_write(): void
+    {
+        $creator = $this->userWith(['clients.view', 'clients.manage', 'chat.use']);
+        $overseer = $this->userWith(['chat.use', 'chat.view_project_chats']);
+        $client = Client::factory()->create();
+
+        Sanctum::actingAs($creator);
+        $projectId = $this->postJson("/api/v1/clients/{$client->id}/projects", [])->json('data.id');
+        $chat = $this->projectChat(ClientProject::findOrFail($projectId));
+        $this->postJson("/api/v1/conversations/{$chat->id}/messages", ['body' => 'internal note'])->assertCreated();
+
+        // The overseer is NOT a participant, yet may read: the thread, its
+        // messages, the read-cursor ping — but never write.
+        Sanctum::actingAs($overseer);
+        $this->getJson("/api/v1/conversations/{$chat->id}")
+            ->assertOk()
+            ->assertJsonPath('data.can_post', false);
+        $this->getJson("/api/v1/conversations/{$chat->id}/messages")
+            ->assertOk()
+            ->assertJsonPath('data.0.body', 'internal note');
+        $this->postJson("/api/v1/conversations/{$chat->id}/read")->assertOk();
+        $this->postJson("/api/v1/conversations/{$chat->id}/messages", ['body' => 'butting in'])
+            ->assertForbidden();
+
+        // A participant still sees can_post = true.
+        Sanctum::actingAs($creator);
+        $this->getJson("/api/v1/conversations/{$chat->id}")
+            ->assertOk()
+            ->assertJsonPath('data.can_post', true);
+    }
+
+    public function test_oversight_permission_does_not_open_direct_or_group_chats(): void
+    {
+        $overseer = $this->userWith(['chat.use', 'chat.view_project_chats']);
+        $a = $this->userWith(['chat.use']);
+        $b = $this->userWith(['chat.use']);
+
+        $direct = Conversation::factory()->create(['type' => 'direct', 'created_by' => $a->id]);
+        $direct->participants()->attach([
+            $a->id => ['role' => 'member', 'joined_at' => now()],
+            $b->id => ['role' => 'member', 'joined_at' => now()],
+        ]);
+
+        Sanctum::actingAs($overseer);
+        $this->getJson("/api/v1/conversations/{$direct->id}/messages")->assertForbidden();
+        $this->getJson("/api/v1/conversations/{$direct->id}")->assertForbidden();
+    }
+
+    public function test_without_the_permission_a_non_participant_cannot_read_a_project_chat(): void
+    {
+        $creator = $this->userWith(['clients.view', 'clients.manage', 'chat.use']);
+        $stranger = $this->userWith(['chat.use']);
+        $client = Client::factory()->create();
+
+        Sanctum::actingAs($creator);
+        $projectId = $this->postJson("/api/v1/clients/{$client->id}/projects", [])->json('data.id');
+        $chat = $this->projectChat(ClientProject::findOrFail($projectId));
+
+        Sanctum::actingAs($stranger);
+        $this->getJson("/api/v1/conversations/{$chat->id}/messages")->assertForbidden();
+    }
+
     public function test_project_threads_cannot_be_created_by_hand(): void
     {
         $me = $this->userWith(['chat.use']);

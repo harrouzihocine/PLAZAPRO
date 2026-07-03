@@ -33,6 +33,12 @@ export const chatApi = {
     return data.data
   },
 
+  // One conversation (deep links / oversight threads not in the inbox).
+  async conversation(id) {
+    const { data } = await useApi().get(`/conversations/${id}`)
+    return data.data
+  },
+
   async createConversation(payload) {
     const { data } = await useApi().post('/conversations', payload)
     return data.data

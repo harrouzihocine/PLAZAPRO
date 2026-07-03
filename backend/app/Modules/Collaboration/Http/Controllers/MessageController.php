@@ -23,7 +23,8 @@ class MessageController extends Controller
 {
     public function index(Request $request, Conversation $conversation): AnonymousResourceCollection
     {
-        abort_unless($conversation->hasParticipant($request->user()), 403);
+        // Participants — plus project-chat oversight (chat.view_project_chats).
+        abort_unless($conversation->isReadableBy($request->user()), 403);
 
         // Latest window, oldest-first for display. `before` (a message id) pages
         // backwards for "load older". Redacted messages are kept (shown deleted).

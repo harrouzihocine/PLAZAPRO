@@ -60,6 +60,12 @@ export const useChatStore = defineStore('chat', {
         // Ensure the inbox is loaded so the header/title resolves when the thread
         // is opened directly (e.g. deep-linked from a notification).
         if (!this.conversations.length) await this.fetchConversations()
+        // Oversight threads (project chats read via chat.view_project_chats)
+        // aren't in the participant inbox — fetch the one conversation so the
+        // header, type and can_post flag still resolve.
+        if (!this.conversations.some((c) => c.id === Number(conversationId))) {
+          this.conversations.unshift(await chatApi.conversation(conversationId))
+        }
         this.messages = await chatApi.messages(conversationId)
         await this.markRead(conversationId)
         this.subscribe(conversationId)

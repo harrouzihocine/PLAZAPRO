@@ -7,7 +7,7 @@ import Tag from 'primevue/tag'
 import { useAuthStore } from '@/features/settings/store'
 import { useChatStore } from '@/features/collaboration/chatStore'
 import MessageComposer from '@/features/collaboration/components/MessageComposer.vue'
-import { confirmAction } from '@/composables/useConfirm'
+import { confirmAction, toastError } from '@/composables/useConfirm'
 import { initials } from '@/utils/format'
 
 const route = useRoute()
@@ -18,6 +18,9 @@ const scroller = ref(null)
 const showInfo = ref(false)
 
 const isGroup = computed(() => store.active?.type === 'group')
+// Oversight readers (project chats via chat.view_project_chats) see the thread
+// but cannot write — the composer locks and a notice explains why.
+const canPost = computed(() => store.active?.can_post ?? true)
 const iAmAdmin = computed(
   () =>
     store.active?.participants?.some((p) => p.id === auth.user?.id && p.role === 'admin') ?? false,
@@ -29,7 +32,18 @@ const nonParticipants = computed(() => {
 
 async function load(id) {
   if (!id) return
-  await store.openThread(Number(id))
+  try {
+    await store.openThread(Number(id))
+  } catch (e) {
+    // Not readable (not a participant, no oversight grant) → back to the inbox
+    // with a clear message instead of an uncaught 403.
+    if (e.response?.status === 403) {
+      toastError('You are not part of this conversation.')
+      router.replace({ name: 'chat' })
+      return
+    }
+    throw e
+  }
   scrollToBottom()
 }
 
@@ -253,7 +267,17 @@ onBeforeUnmount(() => store.unsubscribe())
     </div>
 
     <div class="border-t border-line px-3 py-2 sm:px-4">
-      <MessageComposer :disabled="store.sending" @send-text="sendText" @send-file="sendFile" />
+      <p v-if="!canPost" class="flex items-center gap-2 py-1.5 text-sm text-mute">
+        <i class="pi pi-eye" aria-hidden="true" />
+        Oversight view — you can read this project chat but not write. Join the project as a
+        contributor to take part.
+      </p>
+      <MessageComposer
+        v-else
+        :disabled="store.sending"
+        @send-text="sendText"
+        @send-file="sendFile"
+      />
     </div>
   </div>
 </template>

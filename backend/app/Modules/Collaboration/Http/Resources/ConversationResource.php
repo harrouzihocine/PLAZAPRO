@@ -41,6 +41,11 @@ class ConversationResource extends JsonResource
             ),
             'last_message_at' => $this->last_message_at,
             'unread_count' => (int) ($this->getAttribute('unread_count') ?? 0),
+            // Writing is participant-only; an oversight reader (project chats,
+            // chat.view_project_chats) gets a disabled composer.
+            'can_post' => $me !== null && ($this->relationLoaded('participants')
+                ? $this->participants->contains('id', $me->id)
+                : $this->hasParticipant($me)),
             'participants' => $this->whenLoaded('participants', fn () => $this->participants->map(fn (User $u) => [
                 'id' => $u->id,
                 'name' => $u->name,

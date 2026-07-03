@@ -77,6 +77,18 @@ class Conversation extends BaseModel
         return $this->participants()->where('users.id', $user->id)->exists();
     }
 
+    /**
+     * Read access: participants always; holders of chat.view_project_chats may
+     * additionally READ any client-project chat (oversight) without being a
+     * contributor. Writing stays participant-only everywhere — an overseer who
+     * wants to talk joins the project as a contributor.
+     */
+    public function isReadableBy(User $user): bool
+    {
+        return $this->hasParticipant($user)
+            || ($this->type === ConversationType::Project && $user->can('chat.view_project_chats'));
+    }
+
     public function isAdmin(User $user): bool
     {
         return $this->participants()
