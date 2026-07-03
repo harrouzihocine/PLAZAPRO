@@ -46,6 +46,17 @@ export const pipelineApi = {
     const { data } = await useApi().post(`/next-actions/${nextActionId}/correct`, payload)
     return data.data
   },
+
+  // The dispatch board (visits.dispatch): pending in-site pool + agent week grid.
+  async dispatchBoard(week = null) {
+    const { data } = await useApi().get('/dispatch/board', { params: week ? { week } : {} })
+    return data.data
+  },
+
+  async dispatchAssign(changes) {
+    const { data } = await useApi().post('/dispatch/assign', { changes })
+    return data
+  },
 }
 
 // Tasks (to-dos) backing the Phase 5 tasks board. All gated tasks.manage.

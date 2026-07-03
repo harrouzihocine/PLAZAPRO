@@ -35,16 +35,18 @@ trait ValidatesNextAction
     }
 
     /**
-     * In-site (field) visits must be handed to an is_agent user; every other
-     * next-action type may leave the assignee blank (it defaults to the client's
-     * sales agent) or name any user.
+     * An in-site (field) visit may only be handed to an is_agent user — but the
+     * assignee is OPTIONAL: left blank, the plan lands in the dispatch pool and
+     * the visits.dispatch holders assign it from the weekly board. Every other
+     * type may leave the assignee blank (it defaults to the client's sales
+     * agent) or name any user.
      *
      * @return array<int, mixed>
      */
     private function assignedToRules(): array
     {
         if ($this->input('next_action.type') === NextActionType::InSiteVisit->value) {
-            return ['required', 'integer', new IsAgentUser];
+            return ['nullable', 'integer', new IsAgentUser];
         }
 
         return ['nullable', 'integer', 'exists:users,id'];

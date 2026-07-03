@@ -45,16 +45,24 @@ const emptyForm = () => ({
   referrer_phone: '',
   assigned_agent_id: '',
   notes: '',
-  id_document_type: '',
-  id_document_number: '',
+  id_documents: [],
+  id_number: '',
   birth_date: '',
   birth_place: '',
-  nationality: '',
   address: '',
-  occupation: '',
 })
 const form = reactive(emptyForm())
 const showIdentity = ref(false)
+
+const emptyDocument = () => ({ type: '', number: '', issued_at: '', issued_place: '' })
+
+function addDocument() {
+  form.id_documents.push(emptyDocument())
+}
+
+function removeDocument(index) {
+  form.id_documents.splice(index, 1)
+}
 
 watch(
   () => [props.visible, props.client],
@@ -72,24 +80,26 @@ watch(
       referrer_phone: c?.referrer_phone ?? '',
       assigned_agent_id: c?.assigned_agent?.id ?? '',
       notes: c?.notes ?? '',
-      id_document_type: c?.id_document_type ?? '',
-      id_document_number: c?.id_document_number ?? '',
+      // Clone each stored document so edits don't mutate the store's copy.
+      id_documents: (c?.id_documents ?? []).map((d) => ({
+        type: d?.type ?? '',
+        number: d?.number ?? '',
+        issued_at: d?.issued_at ?? '',
+        issued_place: d?.issued_place ?? '',
+      })),
+      id_number: c?.id_number ?? '',
       birth_date: c?.birth_date ?? '',
       birth_place: c?.birth_place ?? '',
-      nationality: c?.nationality ?? '',
       address: c?.address ?? '',
-      occupation: c?.occupation ?? '',
     })
     // Open the identity section when it already holds something.
     showIdentity.value = Boolean(
       c &&
-        (c.id_document_type ||
-          c.id_document_number ||
+        (c.id_documents?.length ||
+          c.id_number ||
           c.birth_date ||
           c.birth_place ||
-          c.nationality ||
-          c.address ||
-          c.occupation),
+          c.address),
     )
   },
   { immediate: true },
@@ -113,13 +123,19 @@ async function save() {
     referrer_phone: isReferral.value ? form.referrer_phone.trim() || null : null,
     assigned_agent_id: form.assigned_agent_id || null,
     notes: form.notes.trim() || null,
-    id_document_type: form.id_document_type || null,
-    id_document_number: form.id_document_number.trim() || null,
+    // Keep only documents that carry at least a type or a number.
+    id_documents: form.id_documents
+      .map((d) => ({
+        type: d.type || null,
+        number: d.number.trim() || null,
+        issued_at: d.issued_at || null,
+        issued_place: d.issued_place.trim() || null,
+      }))
+      .filter((d) => d.type || d.number),
+    id_number: form.id_number.trim() || null,
     birth_date: form.birth_date || null,
     birth_place: form.birth_place.trim() || null,
-    nationality: form.nationality.trim() || null,
     address: form.address.trim() || null,
-    occupation: form.occupation.trim() || null,
   }
   try {
     const saved = props.client
@@ -200,22 +216,60 @@ async function save() {
           <i :class="showIdentity ? 'pi pi-chevron-up' : 'pi pi-chevron-down'" class="text-xs text-mute" aria-hidden="true" />
         </button>
         <div v-if="showIdentity" class="space-y-3 border-t border-line p-3">
-          <div class="grid grid-cols-2 gap-3">
-            <BaseSelect
-              v-model="form.id_document_type"
-              label="ID document"
-              placeholder="None"
-              :options="ID_DOCUMENT_TYPES"
+          <!-- ID documents — a client may present several; each has its own
+               number and issue date/place. -->
+          <div class="space-y-3">
+            <div
+              v-for="(doc, i) in form.id_documents"
+              :key="i"
+              class="space-y-3 rounded-lg border border-line p-3"
+            >
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold uppercase tracking-wide text-mute">
+                  ID document {{ i + 1 }}
+                </span>
+                <Button
+                  type="button"
+                  icon="pi pi-trash"
+                  text
+                  rounded
+                  size="small"
+                  severity="danger"
+                  aria-label="Remove document"
+                  @click="removeDocument(i)"
+                />
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <BaseSelect
+                  v-model="doc.type"
+                  label="ID document"
+                  placeholder="None"
+                  :options="ID_DOCUMENT_TYPES"
+                />
+                <BaseInput v-model="doc.number" label="Document number" />
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <BaseInput v-model="doc.issued_at" label="Issue date" type="date" />
+                <BaseInput v-model="doc.issued_place" label="Issue place" capitalize />
+              </div>
+            </div>
+            <Button
+              type="button"
+              label="Add ID document"
+              icon="pi pi-plus"
+              text
+              size="small"
+              @click="addDocument"
             />
-            <BaseInput v-model="form.id_document_number" label="Document number" />
           </div>
+          <BaseInput
+            v-model="form.id_number"
+            label="ID number (NIN)"
+            placeholder="National identification number"
+          />
           <div class="grid grid-cols-2 gap-3">
             <BaseInput v-model="form.birth_date" label="Birth date" type="date" />
             <BaseInput v-model="form.birth_place" label="Birth place" capitalize />
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <BaseInput v-model="form.nationality" label="Nationality" capitalize />
-            <BaseInput v-model="form.occupation" label="Occupation" />
           </div>
           <BaseInput v-model="form.address" label="Address" />
         </div>

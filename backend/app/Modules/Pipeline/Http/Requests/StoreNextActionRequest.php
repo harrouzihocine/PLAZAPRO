@@ -36,8 +36,9 @@ class StoreNextActionRequest extends FormRequest
             'type' => ['required', new Enum(NextActionType::class)],
             'due_date' => ['required', 'date'],
             'due_time' => ['nullable', 'date_format:H:i'],
+            // In-site: an agent when named, else the plan lands in the dispatch pool.
             'assigned_to' => $this->input('type') === NextActionType::InSiteVisit->value
-                ? ['required', 'integer', new IsAgentUser]
+                ? ['nullable', 'integer', new IsAgentUser]
                 : ['nullable', 'integer', 'exists:users,id'],
         ];
     }

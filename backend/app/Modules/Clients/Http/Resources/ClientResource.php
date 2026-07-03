@@ -39,14 +39,13 @@ class ClientResource extends JsonResource
             // Who told the client about the project (source = referral).
             'referrer_name' => $this->when($canSeeDetails, $this->referrer_name),
             'referrer_phone' => $this->when($canSeeDetails, $this->referrer_phone),
-            // Identity / contract details captured for closing a deal.
-            'id_document_type' => $this->when($canSeeDetails, $this->id_document_type),
-            'id_document_number' => $this->when($canSeeDetails, $this->id_document_number),
+            // Identity / contract details captured for closing a deal. A client
+            // may hold several ID documents, each with its own issue date/place.
+            'id_documents' => $this->when($canSeeDetails, fn () => $this->id_documents ?? []),
+            'id_number' => $this->when($canSeeDetails, $this->id_number),
             'birth_date' => $this->when($canSeeDetails, $this->birth_date?->toDateString()),
             'birth_place' => $this->when($canSeeDetails, $this->birth_place),
-            'nationality' => $this->when($canSeeDetails, $this->nationality),
             'address' => $this->when($canSeeDetails, $this->address),
-            'occupation' => $this->when($canSeeDetails, $this->occupation),
             // Workflow gate: a client's first entity is a call — until one exists the
             // FE hides deals/desire/visits behind a "log the first call" CTA.
             'has_calls' => $this->when(isset($this->calls_exists), fn () => (bool) $this->calls_exists),

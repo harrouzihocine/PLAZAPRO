@@ -12,6 +12,7 @@ declare(strict_types=1);
 */
 
 use App\Modules\Pipeline\Http\Controllers\CallController;
+use App\Modules\Pipeline\Http\Controllers\DispatchController;
 use App\Modules\Pipeline\Http\Controllers\NextActionController;
 use App\Modules\Pipeline\Http\Controllers\TaskController;
 use App\Modules\Pipeline\Http\Controllers\TimelineController;
@@ -34,6 +35,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/clients/{client}/next-actions', [NextActionController::class, 'store']);
         Route::post('/calls/{call}/correct', [CallController::class, 'correct']);
         Route::post('/next-actions/{nextAction}/correct', [NextActionController::class, 'correct']);
+    });
+
+    // The dispatch board: pending in-site pool + agents × weekdays, drag & drop.
+    Route::middleware('can:visits.dispatch')->group(function () {
+        Route::get('/dispatch/board', [DispatchController::class, 'board']);
+        Route::post('/dispatch/assign', [DispatchController::class, 'assign']);
     });
 
     // Scheduling / assigning a visit picks an agent (agent-only).

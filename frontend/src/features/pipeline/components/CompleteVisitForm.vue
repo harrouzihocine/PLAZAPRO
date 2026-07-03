@@ -127,12 +127,8 @@ const excludeKeys = computed(() =>
 )
 const finalShortlist = computed(() => [...shortlist.value, ...additions.value])
 
-const nextActionReady = computed(
-  () =>
-    !planNext.value ||
-    (!!nextAction.value.due_date &&
-      (nextAction.value.type !== 'in_site_visit' || !!nextAction.value.assigned_to)),
-)
+// In-site plans may go out unassigned — the dispatch board picks the agent.
+const nextActionReady = computed(() => !planNext.value || !!nextAction.value.due_date)
 
 function submit() {
   if (!nextActionReady.value) return

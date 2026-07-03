@@ -6,6 +6,7 @@ namespace App\Modules\Pipeline\Actions;
 
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Pipeline\Enums\NextActionType;
+use App\Modules\Pipeline\Events\InSiteDispatchRequested;
 use App\Modules\Pipeline\Events\VisitAssigned;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
@@ -100,6 +101,14 @@ class SyncVisitFromNextAction
             ->whereNull('completed_at')
             ->exists();
         abort_unless($eligible || $alreadyOpen, 422, $message);
+
+        // No agent yet: the plan sits in the dispatch pool — the visits are
+        // materialized when a visits.dispatch holder assigns it (weekly board).
+        if ($action->assigned_to === null) {
+            InSiteDispatchRequested::dispatch($action);
+
+            return collect();
+        }
 
         $created = $this->generateInSiteVisits->handle(
             $subject, (int) $action->assigned_to, $action->due_at, $action->id,

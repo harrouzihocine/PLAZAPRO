@@ -86,6 +86,12 @@ const routes = [
         meta: { permission: 'tasks.manage' },
       },
       {
+        path: 'dispatch',
+        name: 'dispatch',
+        component: () => import('@/features/pipeline/views/DispatchView.vue'),
+        meta: { permission: 'visits.dispatch' },
+      },
+      {
         path: 'chat',
         name: 'chat',
         component: () => import('@/features/collaboration/views/ChatView.vue'),

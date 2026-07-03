@@ -64,7 +64,8 @@ async function submitPlanNa() {
   emit('changed')
 }
 
-const nextActionReady = (na) => !!na.due_date && (na.type !== 'in_site_visit' || !!na.assigned_to)
+// In-site plans may stay unassigned — the dispatch board picks the agent.
+const nextActionReady = (na) => !!na.due_date
 
 // The single open next action drives what may be logged next.
 const pending = computed(() => store.timeline.next_actions[0] ?? null)

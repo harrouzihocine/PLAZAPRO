@@ -53,12 +53,8 @@ function toggleTopic(id) {
   else topics.value.splice(i, 1)
 }
 
-const nextActionReady = computed(
-  () =>
-    !planNext.value ||
-    (!!nextAction.value.due_date &&
-      (nextAction.value.type !== 'in_site_visit' || !!nextAction.value.assigned_to)),
-)
+// In-site plans may go out unassigned — the dispatch board picks the agent.
+const nextActionReady = computed(() => !planNext.value || !!nextAction.value.due_date)
 
 // Branch A saves a desire — its notes are required (the story behind the numbers).
 const desireReady = computed(

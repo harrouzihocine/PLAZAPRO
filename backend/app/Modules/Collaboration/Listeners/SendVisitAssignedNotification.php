@@ -10,13 +10,15 @@ use App\Modules\Pipeline\Events\VisitAssigned;
 use Illuminate\Contracts\Queue\ShouldQueue;
 
 /**
- * Notify the agent a visit was assigned to. Runs on the queue.
+ * Notify the agent a visit was assigned to — and, for an in-site visit, the
+ * project's contributors too, so everyone following the project knows the
+ * field agent is set. Runs on the queue.
  */
 class SendVisitAssignedNotification implements ShouldQueue
 {
     public function handle(VisitAssigned $event): void
     {
-        $visit = $event->visit->loadMissing(['agent', 'client', 'clientProject', 'unit.location']);
+        $visit = $event->visit->loadMissing(['agent', 'client', 'clientProject.creator', 'unit.location']);
         $agent = $visit->agent;
 
         if ($agent === null) {
@@ -47,5 +49,28 @@ class SendVisitAssignedNotification implements ShouldQueue
             subjectType: $subjectType,
             subjectId: $subjectId,
         ));
+
+        // In-site: tell the project's contributors the field agent is set.
+        $project = $visit->clientProject;
+        if ($visit->type->value !== 'in_site' || $project === null) {
+            return;
+        }
+
+        $contributors = collect([$project->creator])
+            ->merge($project->viewers()->whereNull('client_project_viewers.hidden_at')->get())
+            ->filter()
+            ->unique('id')
+            ->reject(fn ($u) => $u->id === $agent->id);
+
+        foreach ($contributors as $contributor) {
+            $contributor->notify(new DomainNotification(
+                kind: 'visit_agent_assigned',
+                title: 'In-site agent assigned',
+                body: $agent->name.' will handle the '.implode(' · ', $details).'.',
+                link: $link,
+                subjectType: $subjectType,
+                subjectId: $subjectId,
+            ));
+        }
     }
 }

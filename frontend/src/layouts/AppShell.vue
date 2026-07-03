@@ -40,6 +40,7 @@ const SECTIONS = [
       { to: '/clients', label: 'Clients', icon: 'pi pi-users', permission: 'clients.view' },
       { to: '/desires/matches', label: 'Matches', icon: 'pi pi-heart', permission: 'clients.view' },
       { to: '/tasks', label: 'Tasks', icon: 'pi pi-check-square', permission: 'tasks.manage' },
+      { to: '/dispatch', label: 'Dispatch', icon: 'pi pi-send', permission: 'visits.dispatch' },
       { to: '/chat', label: 'Chat', icon: 'pi pi-comments', permission: 'chat.use' },
     ],
   },

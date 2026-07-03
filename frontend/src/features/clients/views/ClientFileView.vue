@@ -216,30 +216,37 @@ async function submitNewProject(callPayload) {
           <SectionCard
             v-if="
               canSeeDetails() &&
-              (store.current.id_document_type ||
-                store.current.id_document_number ||
+              (store.current.id_documents?.length ||
+                store.current.id_number ||
                 store.current.birth_date ||
                 store.current.birth_place ||
-                store.current.nationality ||
-                store.current.address ||
-                store.current.occupation)
+                store.current.address)
             "
             title="Identity & contract"
             icon="pi pi-id-card"
           >
             <dl class="space-y-2.5 text-sm">
-              <div v-if="store.current.id_document_type" class="flex justify-between gap-2">
-                <dt class="text-mute">ID document</dt>
-                <dd class="text-ink">
-                  {{
-                    ID_DOCUMENT_LABELS[store.current.id_document_type] ??
-                    humanize(store.current.id_document_type)
-                  }}
-                </dd>
+              <!-- Each presented ID document, with its issue date/place. -->
+              <div
+                v-for="(doc, i) in store.current.id_documents"
+                :key="i"
+                class="border-b border-line pb-2.5 last:border-0 last:pb-0"
+              >
+                <div class="flex justify-between gap-2">
+                  <dt class="text-mute">{{ ID_DOCUMENT_LABELS[doc.type] ?? humanize(doc.type) }}</dt>
+                  <dd class="num text-ink">{{ doc.number || '—' }}</dd>
+                </div>
+                <div
+                  v-if="doc.issued_at || doc.issued_place"
+                  class="mt-0.5 text-right text-xs text-mute"
+                >
+                  <template v-if="doc.issued_at">{{ formatDate(doc.issued_at) }}</template>
+                  <template v-if="doc.issued_place"> — {{ doc.issued_place }}</template>
+                </div>
               </div>
-              <div v-if="store.current.id_document_number" class="flex justify-between gap-2">
-                <dt class="text-mute">Number</dt>
-                <dd class="num text-ink">{{ store.current.id_document_number }}</dd>
+              <div v-if="store.current.id_number" class="flex justify-between gap-2">
+                <dt class="text-mute">ID number (NIN)</dt>
+                <dd class="num text-ink">{{ store.current.id_number }}</dd>
               </div>
               <div v-if="store.current.birth_date" class="flex justify-between gap-2">
                 <dt class="text-mute">Born</dt>
@@ -250,17 +257,9 @@ async function submitNewProject(callPayload) {
                   >
                 </dd>
               </div>
-              <div v-if="store.current.nationality" class="flex justify-between gap-2">
-                <dt class="text-mute">Nationality</dt>
-                <dd class="text-ink">{{ store.current.nationality }}</dd>
-              </div>
               <div v-if="store.current.address" class="flex justify-between gap-2">
                 <dt class="text-mute">Address</dt>
                 <dd class="text-right text-ink">{{ store.current.address }}</dd>
-              </div>
-              <div v-if="store.current.occupation" class="flex justify-between gap-2">
-                <dt class="text-mute">Occupation</dt>
-                <dd class="text-ink">{{ store.current.occupation }}</dd>
               </div>
             </dl>
           </SectionCard>

@@ -38,13 +38,15 @@ class UpdateClientRequest extends FormRequest
             'notes' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'interests' => ['sometimes', 'nullable', 'array'],
             'interests.*' => ['integer', 'distinct', 'exists:dynamic_list_items,id'],
-            'id_document_type' => ['sometimes', 'nullable', new Enum(IdDocumentType::class)],
-            'id_document_number' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'id_documents' => ['sometimes', 'nullable', 'array'],
+            'id_documents.*.type' => ['nullable', new Enum(IdDocumentType::class)],
+            'id_documents.*.number' => ['nullable', 'string', 'max:100'],
+            'id_documents.*.issued_at' => ['nullable', 'date'],
+            'id_documents.*.issued_place' => ['nullable', 'string', 'max:255'],
+            'id_number' => ['sometimes', 'nullable', 'string', 'max:100'],
             'birth_date' => ['sometimes', 'nullable', 'date', 'before:today'],
             'birth_place' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'nationality' => ['sometimes', 'nullable', 'string', 'max:100'],
             'address' => ['sometimes', 'nullable', 'string', 'max:500'],
-            'occupation' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
     }
 }

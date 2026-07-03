@@ -144,19 +144,14 @@ class InteractionTest extends TestCase
             ->where('subject_type', 'client')->where('subject_id', $client->id)->value('assigned_to'));
     }
 
-    public function test_an_in_site_visit_next_action_requires_a_field_agent_assignee(): void
+    public function test_an_in_site_visit_next_action_accepts_only_field_agents(): void
     {
+        // No assignee is fine (the plan goes to the dispatch pool) — but a NAMED
+        // assignee must be an is_agent user.
         $client = Client::factory()->create();
         $nonAgent = $this->userWithPermissions(['clients.view']); // role not is_agent
         Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
 
-        // No assignee → rejected (in-site must be handed to a field agent).
-        $this->postJson("/api/v1/clients/{$client->id}/calls", [
-            'direction' => 'outbound',
-            'next_action' => ['type' => 'in_site_visit', 'due_date' => now()->addDay()->toDateString()],
-        ])->assertStatus(422)->assertJsonValidationErrorFor('next_action.assigned_to');
-
-        // A non-agent assignee → rejected.
         $this->postJson("/api/v1/clients/{$client->id}/calls", [
             'direction' => 'outbound',
             'next_action' => ['type' => 'in_site_visit', 'due_date' => now()->addDay()->toDateString(), 'assigned_to' => $nonAgent->id],

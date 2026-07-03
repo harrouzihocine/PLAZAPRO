@@ -30,8 +30,7 @@ class Client extends BaseModel
         'first_name', 'last_name', 'phone', 'email',
         'source_id', 'rating_id', 'referrer_name', 'referrer_phone',
         'assigned_agent_id', 'notes', 'interests',
-        'id_document_type', 'id_document_number', 'birth_date', 'birth_place',
-        'nationality', 'address', 'occupation',
+        'id_documents', 'id_number', 'birth_date', 'birth_place', 'address',
     ];
 
     /** Shown wherever a client has no captured name yet. */
@@ -42,6 +41,7 @@ class Client extends BaseModel
     {
         return array_merge(parent::casts(), [
             'interests' => 'array',
+            'id_documents' => 'array',
             'birth_date' => 'date:Y-m-d',
         ]);
     }

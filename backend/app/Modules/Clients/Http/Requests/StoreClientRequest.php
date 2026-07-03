@@ -51,13 +51,18 @@ class StoreClientRequest extends FormRequest
             'interests' => ['nullable', 'array'],
             'interests.*' => ['integer', 'distinct', 'exists:dynamic_list_items,id'],
             // Identity / contract details, needed by the time a deal closes.
-            'id_document_type' => ['nullable', new Enum(IdDocumentType::class)],
-            'id_document_number' => ['nullable', 'string', 'max:100'],
+            // A client may present several ID documents; each carries its type,
+            // number and issue date/place (تاريخ الإصدار و مكان الإصدار).
+            'id_documents' => ['nullable', 'array'],
+            'id_documents.*.type' => ['nullable', new Enum(IdDocumentType::class)],
+            'id_documents.*.number' => ['nullable', 'string', 'max:100'],
+            'id_documents.*.issued_at' => ['nullable', 'date'],
+            'id_documents.*.issued_place' => ['nullable', 'string', 'max:255'],
+            // Algerian national identification number (NIN) — not the ID-card number.
+            'id_number' => ['nullable', 'string', 'max:100'],
             'birth_date' => ['nullable', 'date', 'before:today'],
             'birth_place' => ['nullable', 'string', 'max:255'],
-            'nationality' => ['nullable', 'string', 'max:100'],
             'address' => ['nullable', 'string', 'max:500'],
-            'occupation' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

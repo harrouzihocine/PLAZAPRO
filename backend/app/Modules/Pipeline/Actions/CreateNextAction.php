@@ -6,6 +6,7 @@ namespace App\Modules\Pipeline\Actions;
 
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Pipeline\Enums\NextActionState;
+use App\Modules\Pipeline\Enums\NextActionType;
 use App\Modules\Pipeline\Models\NextAction;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -28,8 +29,16 @@ class CreateNextAction
      */
     public function handle(Model $subject, ?Model $source, array $data, ?int $defaultAssigneeId = null): NextAction
     {
-        $assignedTo = $data['assigned_to'] ?? $defaultAssigneeId;
-        abort_if($assignedTo === null, 422, 'A next action must be assigned to someone.');
+        // An in-site plan may stay UNASSIGNED — it lands in the dispatch pool,
+        // where a visits.dispatch holder hands it to a field agent (weekly
+        // board). Every other type needs an owner (defaulted to the client's
+        // sales agent by the caller).
+        if (($data['type'] ?? null) === NextActionType::InSiteVisit->value) {
+            $assignedTo = $data['assigned_to'] ?? null;
+        } else {
+            $assignedTo = $data['assigned_to'] ?? $defaultAssigneeId;
+            abort_if($assignedTo === null, 422, 'A next action must be assigned to someone.');
+        }
 
         return DB::transaction(function () use ($subject, $source, $data, $assignedTo) {
             // Close any prior open action so exactly one stays pending. Only active

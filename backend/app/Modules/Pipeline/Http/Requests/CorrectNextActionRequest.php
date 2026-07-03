@@ -12,8 +12,9 @@ use Illuminate\Validation\Rules\Enum;
 /**
  * Correct the enforced next action (e.g. change a follow-up "call" into an
  * "in-site visit") with a mandatory reason. Same who/when rules as creating one:
- * an in-site visit must be handed to a field agent; every other type may leave the
- * assignee blank (defaults to the current one).
+ * an in-site visit is either handed to a field agent or left for the dispatch
+ * board; every other type may leave the assignee blank (defaults to the
+ * current one).
  */
 class CorrectNextActionRequest extends FormRequest
 {
@@ -33,7 +34,7 @@ class CorrectNextActionRequest extends FormRequest
             'due_date' => ['required', 'date'],
             'due_time' => ['nullable', 'date_format:H:i'],
             'assigned_to' => $this->input('type') === NextActionType::InSiteVisit->value
-                ? ['required', 'integer', new IsAgentUser]
+                ? ['nullable', 'integer', new IsAgentUser]
                 : ['nullable', 'integer', 'exists:users,id'],
         ];
     }

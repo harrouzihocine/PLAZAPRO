@@ -71,20 +71,25 @@ class ClientVisibilityTest extends TestCase
             'first_name' => 'Sara', 'last_name' => 'B',
             'referrer_name' => 'Karim Old-Client',
             'referrer_phone' => '+213661222333',
-            'id_document_type' => 'passport',
-            'id_document_number' => 'P1234567',
+            'id_documents' => [
+                ['type' => 'passport', 'number' => 'P1234567', 'issued_at' => '2020-01-15', 'issued_place' => 'Alger'],
+                ['type' => 'national_id', 'number' => 'NID-99', 'issued_at' => null, 'issued_place' => null],
+            ],
+            'id_number' => '109990112233445566',
             'birth_date' => '1990-05-10',
             'birth_place' => 'Alger',
-            'nationality' => 'Algérienne',
             'address' => '12 Rue Didouche Mourad, Alger',
-            'occupation' => 'Médecin',
         ])->assertCreated()->json('data.id');
 
         $this->getJson("/api/v1/clients/{$id}")
             ->assertOk()
             ->assertJsonPath('data.referrer_name', 'Karim Old-Client')
-            ->assertJsonPath('data.id_document_type', 'passport')
-            ->assertJsonPath('data.id_document_number', 'P1234567')
+            ->assertJsonPath('data.id_documents.0.type', 'passport')
+            ->assertJsonPath('data.id_documents.0.number', 'P1234567')
+            ->assertJsonPath('data.id_documents.0.issued_at', '2020-01-15')
+            ->assertJsonPath('data.id_documents.0.issued_place', 'Alger')
+            ->assertJsonPath('data.id_documents.1.type', 'national_id')
+            ->assertJsonPath('data.id_number', '109990112233445566')
             ->assertJsonPath('data.birth_date', '1990-05-10');
     }
 
@@ -92,9 +97,12 @@ class ClientVisibilityTest extends TestCase
     {
         Sanctum::actingAs($this->userWithPermissions(['clients.create']));
 
-        $this->postJson('/api/v1/clients', ['phone' => '1', 'id_document_type' => 'library_card'])
+        $this->postJson('/api/v1/clients', [
+            'phone' => '1',
+            'id_documents' => [['type' => 'library_card']],
+        ])
             ->assertStatus(422)
-            ->assertJsonValidationErrorFor('id_document_type');
+            ->assertJsonValidationErrorFor('id_documents.0.type');
     }
 
     // --- clients.view_all ----------------------------------------------------
@@ -143,7 +151,8 @@ class ClientVisibilityTest extends TestCase
             ->assertJsonMissingPath('data.0.email')
             ->assertJsonMissingPath('data.0.notes')
             ->assertJsonMissingPath('data.0.referrer_name')
-            ->assertJsonMissingPath('data.0.id_document_number');
+            ->assertJsonMissingPath('data.0.id_documents')
+            ->assertJsonMissingPath('data.0.id_number');
     }
 
     // --- projects.view_all + the viewers list ---------------------------------

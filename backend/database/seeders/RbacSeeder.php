@@ -50,7 +50,9 @@ class RbacSeeder extends Seeder
         // were added to; projects.contributors allows sharing a project (add/hide
         // people on its visibility list).
         'projects.view_all', 'projects.contributors',
-        'calls.log', 'visits.assign', 'visits.conduct', 'tasks.manage',
+        // visits.dispatch: the weekly board — sees the pending (unassigned)
+        // in-site pool and hands tasks to field agents.
+        'calls.log', 'visits.assign', 'visits.dispatch', 'visits.conduct', 'tasks.manage',
         // A deal normally comes from a visit log; this allows opening one directly.
         'deals.direct',
         // Payments
@@ -119,7 +121,7 @@ class RbacSeeder extends Seeder
         $manager = [
             ...$this->baseline, ...$fullVisibility, 'reports.view',
             'clients.view', 'clients.create', 'clients.manage', 'projects.contributors',
-            'calls.log', 'visits.assign', 'visits.conduct', 'tasks.manage', 'deals.direct',
+            'calls.log', 'visits.assign', 'visits.dispatch', 'visits.conduct', 'tasks.manage', 'deals.direct',
             'units.view', 'units.reserve', 'units.manage', 'media.manage',
             'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
         ];
