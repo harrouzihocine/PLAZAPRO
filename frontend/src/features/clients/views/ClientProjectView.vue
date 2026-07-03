@@ -1,7 +1,7 @@
 <script setup>
 import Swal from 'sweetalert2'
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
 import BaseModal from '@/components/base/BaseModal.vue'
@@ -14,6 +14,8 @@ import ActivityTimeline from '@/components/ui/ActivityTimeline.vue'
 import DealPanel from '@/features/clients/components/DealPanel.vue'
 import DesireFields from '@/features/clients/components/DesireFields.vue'
 import { desireForm as makeDesireForm, desirePayload } from '@/features/clients/desire'
+import DraftBanner from '@/features/drafts/DraftBanner.vue'
+import { useModalDraft } from '@/composables/useModalDraft'
 import ProjectViewersPanel from '@/features/clients/components/ProjectViewersPanel.vue'
 import ShortlistPanel from '@/features/clients/components/ShortlistPanel.vue'
 import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPicker.vue'
@@ -92,6 +94,16 @@ onMounted(async () => {
 const shiftOpen = ref(false)
 const shiftForm = ref(makeDesireForm())
 
+// The modal's state lives in this view (it never unmounts on close), so the
+// draft follows the open flag instead of the component lifecycle.
+const shiftDraft = useModalDraft({
+  key: () => `shift-desire:${props.projectId}`,
+  label: 'Shift to desire',
+  active: () => shiftOpen.value,
+  getForm: () => shiftForm.value,
+  setForm: (d) => (shiftForm.value = { ...makeDesireForm(), ...d }),
+})
+
 function openShift() {
   shiftForm.value = makeDesireForm(store.desire)
   shiftOpen.value = true
@@ -104,10 +116,16 @@ async function submitShift() {
   if (!shiftReady.value) return
   try {
     await store.shiftProjectToDesire(props.id, props.projectId, desirePayload(shiftForm.value))
+    shiftDraft.complete()
     shiftOpen.value = false
   } catch {
     /* toast raised by the store */
   }
+}
+
+function cancelShift() {
+  shiftDraft.discard()
+  shiftOpen.value = false
 }
 
 // --- Archive (reason required; blocked once payments exist) ---
@@ -154,6 +172,30 @@ const directDealOpen = ref(false)
 const directDealUnits = ref([])
 const directDealNotes = ref('')
 
+const directDealDraft = useModalDraft({
+  key: () => `direct-deal:${props.projectId}`,
+  label: 'Direct deal',
+  active: () => directDealOpen.value,
+  getForm: () => ({ units: directDealUnits.value, notes: directDealNotes.value }),
+  setForm: (d) => {
+    directDealUnits.value = d.units ?? []
+    directDealNotes.value = d.notes ?? ''
+  },
+})
+
+function cancelDirectDeal() {
+  directDealDraft.discard()
+  directDealOpen.value = false
+}
+
+// ?resume=<key> (drafts indicator): reopen the right modal with its draft.
+const route = useRoute()
+onMounted(() => {
+  const resume = route.query.resume
+  if (resume === `shift-desire:${props.projectId}`) shiftOpen.value = true
+  if (resume === `direct-deal:${props.projectId}`) directDealOpen.value = true
+})
+
 async function submitDirectDeal() {
   const units = directDealUnits.value
     .filter((p) => p.shortlistable_type === 'unit')
@@ -167,6 +209,7 @@ async function submitDirectDeal() {
       units,
       notes: directDealNotes.value.trim() || null,
     })
+    directDealDraft.complete()
     directDealOpen.value = false
     directDealUnits.value = []
     directDealNotes.value = ''
@@ -351,6 +394,7 @@ async function submitDirectDeal() {
         re-matches (and reopens) when new inventory arrives.
       </p>
       <form class="space-y-4" @submit.prevent="submitShift">
+        <DraftBanner :visible="shiftDraft.restored.value" @discard="shiftDraft.discard()" />
         <DesireFields v-model="shiftForm" />
         <div class="flex gap-2">
           <Button
@@ -360,13 +404,7 @@ async function submitDirectDeal() {
             :loading="store.saving"
             :disabled="!shiftReady"
           />
-          <Button
-            type="button"
-            label="Cancel"
-            severity="secondary"
-            outlined
-            @click="shiftOpen = false"
-          />
+          <Button type="button" label="Cancel" severity="secondary" outlined @click="cancelShift" />
         </div>
       </form>
     </BaseModal>
@@ -383,6 +421,10 @@ async function submitDirectDeal() {
         immediately.
       </p>
       <form class="space-y-4" @submit.prevent="submitDirectDeal">
+        <DraftBanner
+          :visible="directDealDraft.restored.value"
+          @discard="directDealDraft.discard()"
+        />
         <ProjectUnitsPicker v-model="directDealUnits" with-boxes />
         <BaseTextarea v-model="directDealNotes" label="Notes (optional)" :rows="2" />
         <div class="flex gap-2">
@@ -397,7 +439,7 @@ async function submitDirectDeal() {
             label="Cancel"
             severity="secondary"
             outlined
-            @click="directDealOpen = false"
+            @click="cancelDirectDeal"
           />
         </div>
       </form>

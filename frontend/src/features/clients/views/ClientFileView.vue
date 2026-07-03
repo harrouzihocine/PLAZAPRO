@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRouter, RouterLink } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import Avatar from 'primevue/avatar'
 import Badge from 'primevue/badge'
 import Button from 'primevue/button'
@@ -77,6 +77,10 @@ onMounted(async () => {
 
 // --- New project: the first thing captured is its call log. ---
 const newProjectOpen = ref(false)
+
+// ?resume=<key> (drafts indicator): reopen the new-project call modal.
+const route = useRoute()
+if (route.query.resume === `call-log:new-project:${props.id}`) newProjectOpen.value = true
 
 async function submitNewProject(callPayload) {
   try {
@@ -425,6 +429,7 @@ async function submitNewProject(callPayload) {
           :field-agents="store.agents"
           :saving="store.saving"
           :desire="store.desire"
+          :draft-key="`call-log:new-project:${props.id}`"
           @submit="submitNewProject"
           @cancel="newProjectOpen = false"
         />

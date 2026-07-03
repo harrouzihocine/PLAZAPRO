@@ -8,7 +8,9 @@ import { useDynamicList } from '@/composables/useDynamicList'
 import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPicker.vue'
 import DesireFields from '@/features/clients/components/DesireFields.vue'
 import { desireForm as makeDesireForm, desirePayload } from '@/features/clients/desire'
+import DraftBanner from '@/features/drafts/DraftBanner.vue'
 import NextActionFields from '@/features/pipeline/components/NextActionFields.vue'
+import { useModalDraft } from '@/composables/useModalDraft'
 
 // The fast-entry call log (qualification happens on the phone): direction
 // defaults to outbound, what-was-discussed is one tap-chip list (the former
@@ -22,6 +24,7 @@ const props = defineProps({
   fieldAgents: { type: Array, default: () => [] },
   saving: { type: Boolean, default: false },
   desire: { type: Object, default: null }, // saved desire, prefills Branch A
+  draftKey: { type: String, default: null }, // draft-protects the modal when set
 })
 const emit = defineEmits(['submit', 'cancel'])
 
@@ -40,6 +43,40 @@ const nextAction = ref({ type: 'call', due_date: '', due_time: '', assigned_to: 
 const branch = ref(null)
 const properties = ref([])
 const desireForm = ref(makeDesireForm(props.desire))
+
+// Draft protection: a misclick outside the modal keeps everything typed here;
+// reopening (or the top-bar pencil) restores it.
+const draft = props.draftKey
+  ? useModalDraft({
+      key: props.draftKey,
+      label: `Call log — ${props.client?.full_name ?? 'client'}`,
+      getForm: () => ({
+        direction: direction.value,
+        notes: notes.value,
+        topics: topics.value,
+        planNext: planNext.value,
+        nextAction: nextAction.value,
+        branch: branch.value,
+        properties: properties.value,
+        desireForm: desireForm.value,
+      }),
+      setForm: (d) => {
+        direction.value = d.direction ?? 'outbound'
+        notes.value = d.notes ?? ''
+        topics.value = d.topics ?? []
+        planNext.value = d.planNext ?? true
+        nextAction.value = d.nextAction ?? { type: 'call', due_date: '', due_time: '', assigned_to: '' }
+        branch.value = d.branch ?? null
+        properties.value = d.properties ?? []
+        desireForm.value = d.desireForm ?? makeDesireForm(props.desire)
+      },
+    })
+  : null
+
+function cancel() {
+  draft?.discard()
+  emit('cancel')
+}
 
 // The client's interest categories (captured at lead creation) as passive context.
 const interestLabels = computed(() => {
@@ -78,12 +115,14 @@ function submit() {
   if (branch.value === 'desire') {
     payload.desire = desirePayload(desireForm.value)
   }
+  draft?.complete()
   emit('submit', payload)
 }
 </script>
 
 <template>
   <form class="space-y-4" @submit.prevent="submit">
+    <DraftBanner :visible="!!draft?.restored.value" @discard="draft.discard()" />
     <BaseSelect
       v-model="direction"
       label="Direction"
@@ -169,7 +208,7 @@ function submit() {
       <BaseButton type="submit" :disabled="saving || !nextActionReady || !desireReady">
         Save call
       </BaseButton>
-      <BaseButton type="button" variant="ghost" @click="emit('cancel')">Cancel</BaseButton>
+      <BaseButton type="button" variant="ghost" @click="cancel">Cancel</BaseButton>
     </div>
   </form>
 </template>

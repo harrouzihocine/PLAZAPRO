@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import Button from 'primevue/button'
 import Badge from 'primevue/badge'
 import Tab from 'primevue/tab'
@@ -141,7 +142,24 @@ const mapsUrl = (visit) =>
     ? `https://www.google.com/maps/search/?api=1&query=${visit.unit.location.latitude},${visit.unit.location.longitude}`
     : null
 
-onMounted(() => store.loadTimeline(props.clientId, props.projectId))
+// Draft identities for the two modal forms; ?resume=<key> (from the drafts
+// indicator) reopens the right modal with its draft restored.
+const route = useRoute()
+const callDraftKey = computed(() => `call-log:${props.clientId}:${props.projectId ?? 'client'}`)
+const completeDraftKey = (visit) => `complete-visit:${visit.id}`
+
+onMounted(async () => {
+  await store.loadTimeline(props.clientId, props.projectId)
+
+  const resume = route.query.resume
+  if (!resume) return
+  if (resume === callDraftKey.value) showCall.value = true
+  if (String(resume).startsWith('complete-visit:')) {
+    const id = Number(String(resume).split(':')[1])
+    const visit = store.timeline.visits.find((v) => v.id === id && !v.is_completed)
+    if (visit) completing.value = visit
+  }
+})
 
 async function submitCall(payload) {
   if (props.projectId) payload.client_project_id = props.projectId
@@ -591,6 +609,7 @@ async function submitEditNa() {
         :field-agents="store.agents"
         :saving="store.saving"
         :desire="store.desire"
+        :draft-key="callDraftKey"
         @submit="submitCall"
         @cancel="showCall = false"
       />
@@ -607,6 +626,7 @@ async function submitEditNa() {
         :field-agents="store.agents"
         :saving="store.saving"
         :can-deal="auth.can('visits.conduct')"
+        :draft-key="completeDraftKey(completing)"
         @submit="submitComplete"
         @cancel="completing = null"
       />

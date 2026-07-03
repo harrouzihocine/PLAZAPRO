@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Pipeline\Http\Controllers;
 
+use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Pipeline\Actions\AssignDispatchItem;
 use App\Modules\Pipeline\Enums\NextActionType;
 use App\Modules\Pipeline\Http\Requests\DispatchAssignRequest;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Settings\Models\User;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -35,7 +37,8 @@ class DispatchController extends Controller
         $pending = NextAction::query()->active()->pending()
             ->where('type', NextActionType::InSiteVisit->value)
             ->whereNull('assigned_to')
-            ->with('subject.client')
+            // Morph-aware: only a project subject nests a client relation.
+            ->with(['subject' => fn (MorphTo $m) => $m->morphWith([ClientProject::class => ['client']])])
             ->orderBy('due_at')
             ->get()
             ->map(fn (NextAction $a) => [
@@ -88,7 +91,7 @@ class DispatchController extends Controller
             ->where('type', NextActionType::Call->value)
             ->whereNotNull('assigned_to')
             ->whereBetween('due_at', [$start, $end])
-            ->with('subject.client')
+            ->with(['subject' => fn (MorphTo $m) => $m->morphWith([ClientProject::class => ['client']])])
             ->get()
             ->map(fn (NextAction $a) => [
                 'kind' => 'action',

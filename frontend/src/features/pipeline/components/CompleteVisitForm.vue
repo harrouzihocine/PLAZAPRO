@@ -9,7 +9,9 @@ import { toastError } from '@/composables/useConfirm'
 import { shortlistApi } from '@/features/clients/api'
 import { boxesApi } from '@/features/inventory/api'
 import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPicker.vue'
+import DraftBanner from '@/features/drafts/DraftBanner.vue'
 import NextActionFields from '@/features/pipeline/components/NextActionFields.vue'
+import { useModalDraft } from '@/composables/useModalDraft'
 
 // The rapid visit-completion log.
 //  - OFFICE visits: outcome select + what-happened tap-chips + the deal's property
@@ -26,6 +28,7 @@ const props = defineProps({
   fieldAgents: { type: Array, default: () => [] },
   saving: { type: Boolean, default: false },
   canDeal: { type: Boolean, default: false }, // user may open a deal (visits.conduct)
+  draftKey: { type: String, default: null }, // draft-protects the modal when set
 })
 const emit = defineEmits(['submit', 'cancel'])
 
@@ -43,6 +46,34 @@ const checklist = ref([])
 // genuinely end a thread — untick to complete without one (addable later).
 const planNext = ref(true)
 const nextAction = ref({ type: 'call', due_date: '', due_time: '', assigned_to: '' })
+
+// Draft protection: closing the modal without completing keeps what was typed
+// (outcome / notes / checklist / plan); the shortlist state reloads live.
+const draft = props.draftKey
+  ? useModalDraft({
+      key: props.draftKey,
+      label: `Complete ${props.visit.type === 'in_site' ? 'in-site' : 'office'} visit`,
+      getForm: () => ({
+        outcomeId: outcomeId.value,
+        notes: notes.value,
+        checklist: checklist.value,
+        planNext: planNext.value,
+        nextAction: nextAction.value,
+      }),
+      setForm: (d) => {
+        outcomeId.value = d.outcomeId ?? ''
+        notes.value = d.notes ?? ''
+        checklist.value = d.checklist ?? []
+        planNext.value = d.planNext ?? true
+        nextAction.value = d.nextAction ?? { type: 'call', due_date: '', due_time: '', assigned_to: '' }
+      },
+    })
+  : null
+
+function cancel() {
+  draft?.discard()
+  emit('cancel')
+}
 
 // Office shortlist manager state: the deal's current active list, editable.
 const shortlist = ref([]) // [{ shortlistable_type, shortlistable_id, label, state, property }]
@@ -158,12 +189,14 @@ function submit() {
       units: includedDealUnits.value.map((u) => ({ unit_id: u.unit_id, box_count: u.box_count })),
     }
   }
+  draft?.complete()
   emit('submit', payload)
 }
 </script>
 
 <template>
   <form class="space-y-4" @submit.prevent="submit">
+    <DraftBanner :visible="!!draft?.restored.value" @discard="draft.discard()" />
     <!-- In-site: one-tap result (didn't visit / interested / not interested / …). -->
     <fieldset v-if="!isOffice" class="rounded-xl border border-line p-3">
       <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">Result</legend>
@@ -315,7 +348,7 @@ function submit() {
 
     <div class="flex gap-2 pt-1">
       <BaseButton type="submit" :disabled="saving || !nextActionReady">Complete visit</BaseButton>
-      <BaseButton type="button" variant="ghost" @click="emit('cancel')">Cancel</BaseButton>
+      <BaseButton type="button" variant="ghost" @click="cancel">Cancel</BaseButton>
     </div>
   </form>
 </template>

@@ -10,6 +10,7 @@ import { useTheme } from '@/composables/useTheme'
 import { useAuthStore } from '@/features/settings/store'
 import { initials } from '@/utils/format'
 import NotificationBell from '@/features/collaboration/components/NotificationBell.vue'
+import DraftsIndicator from '@/components/shell/DraftsIndicator.vue'
 import GlobalSearch from '@/components/shell/GlobalSearch.vue'
 
 const { isNight, toggle } = useTheme()
@@ -237,6 +238,7 @@ async function logout() {
             :aria-label="isNight ? 'Switch to day theme' : 'Switch to night theme'"
             @click="toggle"
           />
+          <DraftsIndicator />
           <NotificationBell v-if="auth.can('notifications.view')" />
 
           <!-- User menu -->
