@@ -43,6 +43,13 @@ class RbacSeeder extends Seeder
         'locations.manage', 'units.view', 'units.reserve', 'units.manage', 'media.manage',
         // Clients & pipeline
         'clients.view', 'clients.create', 'clients.manage',
+        // Without view_all a user sees only the clients they created / follow up;
+        // without view_details they see only the client's name (no phone/profile).
+        'clients.view_all', 'clients.view_details',
+        // Without projects.view_all a user sees only the projects they created or
+        // were added to; projects.contributors allows sharing a project (add/hide
+        // people on its visibility list).
+        'projects.view_all', 'projects.contributors',
         'calls.log', 'visits.assign', 'visits.conduct', 'tasks.manage',
         // A deal normally comes from a visit log; this allows opening one directly.
         'deals.direct',
@@ -88,22 +95,30 @@ class RbacSeeder extends Seeder
     {
         $all = $permissions->keys()->all();
 
+        // Historic behavior: every role that views clients sees all of them, in
+        // full detail, along with every project. Tighter roles (own-clients-only,
+        // name-only) are built by unticking these in the role matrix.
+        $fullVisibility = ['clients.view_all', 'clients.view_details', 'projects.view_all'];
+
         // Outside/apartment visit rapports (the field agent).
-        $siteAgent = [...$this->baseline, 'clients.view', 'units.view', 'visits.conduct'];
+        $siteAgent = [...$this->baseline, ...$fullVisibility, 'clients.view', 'units.view', 'visits.conduct'];
 
         // Calls + office-visit rapports.
-        $salesAgent = [...$this->baseline, 'clients.view', 'clients.create', 'calls.log', 'visits.conduct'];
+        $salesAgent = [
+            ...$this->baseline, ...$fullVisibility,
+            'clients.view', 'clients.create', 'calls.log', 'visits.conduct',
+        ];
 
         // The payment desk: record versements, manage schedules, generate documents.
         $financer = [
-            ...$this->baseline, 'clients.view',
+            ...$this->baseline, ...$fullVisibility, 'clients.view',
             'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
         ];
 
         // Every rapport type + all analytics reports + operational oversight.
         $manager = [
-            ...$this->baseline, 'reports.view',
-            'clients.view', 'clients.create', 'clients.manage',
+            ...$this->baseline, ...$fullVisibility, 'reports.view',
+            'clients.view', 'clients.create', 'clients.manage', 'projects.contributors',
             'calls.log', 'visits.assign', 'visits.conduct', 'tasks.manage', 'deals.direct',
             'units.view', 'units.reserve', 'units.manage', 'media.manage',
             'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',

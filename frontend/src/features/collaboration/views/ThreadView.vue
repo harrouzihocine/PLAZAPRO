@@ -1,10 +1,14 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
+import Avatar from 'primevue/avatar'
+import Button from 'primevue/button'
+import Tag from 'primevue/tag'
 import { useAuthStore } from '@/features/settings/store'
 import { useChatStore } from '@/features/collaboration/chatStore'
 import MessageComposer from '@/features/collaboration/components/MessageComposer.vue'
 import { confirmAction } from '@/composables/useConfirm'
+import { initials } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,7 +19,8 @@ const showInfo = ref(false)
 
 const isGroup = computed(() => store.active?.type === 'group')
 const iAmAdmin = computed(
-  () => store.active?.participants?.some((p) => p.id === auth.user?.id && p.role === 'admin') ?? false,
+  () =>
+    store.active?.participants?.some((p) => p.id === auth.user?.id && p.role === 'admin') ?? false,
 )
 const nonParticipants = computed(() => {
   const ids = new Set(store.active?.participants?.map((p) => p.id) ?? [])
@@ -71,7 +76,8 @@ async function kick(userId) {
 }
 
 async function leave() {
-  if (!(await confirmAction({ title: 'Leave this group?', confirmText: 'Leave', danger: true }))) return
+  if (!(await confirmAction({ title: 'Leave this group?', confirmText: 'Leave', danger: true })))
+    return
   await store.removeParticipant(store.activeId, auth.user.id)
   router.push('/chat')
 }
@@ -80,54 +86,89 @@ onBeforeUnmount(() => store.unsubscribe())
 </script>
 
 <template>
-  <div class="flex h-[calc(100vh-7rem)] flex-col md:h-[calc(100vh-4.5rem)]">
+  <div
+    class="flex h-[calc(100vh-10.5rem)] flex-col overflow-hidden rounded-xl border border-line bg-card shadow-card lg:h-[calc(100vh-7.5rem)]"
+  >
     <!-- Thread header -->
-    <div class="flex items-center gap-2 border-b border-border pb-2">
-      <RouterLink to="/chat" class="min-h-[44px] px-2 py-2 md:hidden" aria-label="Back to inbox">
-        ‹
+    <div class="flex items-center gap-2 border-b border-line px-3 py-2.5 sm:px-4">
+      <RouterLink
+        to="/chat"
+        class="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg text-mute hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800"
+        aria-label="Back to inbox"
+      >
+        <i class="pi pi-arrow-left" aria-hidden="true" />
       </RouterLink>
-      <h1 class="flex-1 truncate text-lg font-semibold">{{ store.active?.title ?? 'Conversation' }}</h1>
-      <button v-if="isGroup" class="min-h-[44px] px-2 text-sm text-primary" @click="showInfo = !showInfo">
-        Group info
-      </button>
+      <Avatar
+        :label="initials(store.active?.title ?? 'C')"
+        shape="circle"
+        class="!bg-highlight !text-primary-700 dark:!text-primary-300"
+      />
+      <h1 class="min-w-0 flex-1 truncate text-base font-semibold text-ink">
+        {{ store.active?.title ?? 'Conversation' }}
+      </h1>
+      <Button
+        v-if="isGroup"
+        :label="showInfo ? 'Hide info' : 'Group info'"
+        icon="pi pi-users"
+        text
+        size="small"
+        @click="showInfo = !showInfo"
+      />
     </div>
 
     <!-- Group info / participants -->
-    <div v-if="isGroup && showInfo" class="border-b border-border p-3 text-sm">
-      <p class="mb-2 font-semibold">Participants</p>
+    <div v-if="isGroup && showInfo" class="border-b border-line px-4 py-3 text-sm">
+      <p class="mb-2 font-semibold text-ink">Participants</p>
       <ul class="space-y-1">
-        <li v-for="p in store.active?.participants ?? []" :key="p.id" class="flex items-center justify-between">
-          <span>{{ p.name }} <span v-if="p.role === 'admin'" class="opacity-60">· admin</span></span>
-          <button
+        <li
+          v-for="p in store.active?.participants ?? []"
+          :key="p.id"
+          class="flex items-center justify-between gap-2"
+        >
+          <span class="flex items-center gap-2 text-ink">
+            {{ p.name }}
+            <Tag v-if="p.role === 'admin'" value="admin" severity="secondary" />
+          </span>
+          <Button
             v-if="iAmAdmin && p.id !== auth.user?.id"
-            class="text-danger"
+            label="Remove"
+            text
+            size="small"
+            severity="danger"
             @click="kick(p.id)"
-          >
-            Remove
-          </button>
+          />
         </li>
       </ul>
 
       <div v-if="iAmAdmin && nonParticipants.length" class="mt-3">
-        <p class="mb-1 font-semibold">Add member</p>
-        <div class="flex flex-wrap gap-2">
+        <p class="mb-1.5 font-semibold text-ink">Add member</p>
+        <div class="flex flex-wrap gap-1.5">
           <button
             v-for="u in nonParticipants"
             :key="u.id"
-            class="rounded-token border border-border px-2 py-1 hover:bg-bg"
+            type="button"
+            class="rounded-full border border-line px-3 py-1 text-xs text-mute transition-colors hover:border-primary hover:text-ink"
             @click="addMember(u.id)"
           >
-            + {{ u.name }}
+            <i class="pi pi-plus text-[10px]" aria-hidden="true" /> {{ u.name }}
           </button>
         </div>
       </div>
 
-      <button class="mt-3 text-danger" @click="leave">Leave group</button>
+      <Button
+        label="Leave group"
+        icon="pi pi-sign-out"
+        text
+        size="small"
+        severity="danger"
+        class="mt-3"
+        @click="leave"
+      />
     </div>
 
     <!-- Messages -->
-    <div ref="scroller" class="flex-1 space-y-2 overflow-y-auto py-3">
-      <p v-if="store.loadingThread" class="py-4 text-center text-sm opacity-60">Loading…</p>
+    <div ref="scroller" class="flex-1 space-y-2 overflow-y-auto bg-ground px-3 py-4 sm:px-4">
+      <p v-if="store.loadingThread" class="py-4 text-center text-sm text-mute">Loading…</p>
       <div
         v-for="m in store.messages"
         :key="m.id"
@@ -135,10 +176,16 @@ onBeforeUnmount(() => store.unsubscribe())
         :class="m.is_mine ? 'justify-end' : 'justify-start'"
       >
         <div
-          class="group max-w-[80%] rounded-token px-3 py-2"
-          :class="m.is_mine ? 'bg-primary text-on-primary' : 'bg-surface border border-border'"
+          class="group max-w-[80%] rounded-2xl px-3.5 py-2 shadow-card"
+          :class="
+            m.is_mine
+              ? 'rounded-br-md bg-primary text-primary-contrast'
+              : 'rounded-bl-md border border-line bg-card text-ink'
+          "
         >
-          <p v-if="!m.is_mine && m.author" class="mb-0.5 text-xs opacity-70">{{ m.author.name }}</p>
+          <p v-if="!m.is_mine && m.author" class="mb-0.5 text-xs font-medium text-mute">
+            {{ m.author.name }}
+          </p>
 
           <p v-if="m.redacted" class="text-sm italic opacity-70">Message deleted</p>
 
@@ -148,11 +195,11 @@ onBeforeUnmount(() => store.unsubscribe())
                 v-if="a.kind === 'image'"
                 :src="a.url"
                 alt="Shared image"
-                class="mb-1 max-h-64 rounded-token"
+                class="mb-1 max-h-64 rounded-xl"
               />
               <audio v-else-if="a.kind === 'voice'" :src="a.url" controls class="mb-1 w-56" />
               <a v-else :href="a.url" target="_blank" rel="noopener" class="mb-1 block underline">
-                📎 Download file
+                <i class="pi pi-paperclip text-xs" aria-hidden="true" /> Download file
               </a>
             </template>
 
@@ -160,13 +207,17 @@ onBeforeUnmount(() => store.unsubscribe())
                  carries subject_type but no per-user card, so fall back to generic. -->
             <div
               v-if="m.subject || m.subject_type"
-              class="mb-1 rounded-token border border-border bg-bg p-2 text-sm text-ink"
+              class="mb-1 rounded-lg border border-line bg-ground p-2.5 text-sm text-ink"
             >
-              <span v-if="!m.subject || m.subject.restricted" class="opacity-70">
-                🔒 A record was shared
+              <span v-if="!m.subject || m.subject.restricted" class="text-mute">
+                <i class="pi pi-lock text-xs" aria-hidden="true" /> A record was shared
               </span>
-              <RouterLink v-else :to="m.subject.link" class="flex items-center gap-2 text-primary">
-                📄 {{ m.subject.label }}
+              <RouterLink
+                v-else
+                :to="m.subject.link"
+                class="flex items-center gap-2 font-medium text-primary-600 hover:underline dark:text-primary-400"
+              >
+                <i class="pi pi-file" aria-hidden="true" /> {{ m.subject.label }}
               </RouterLink>
             </div>
 
@@ -175,19 +226,24 @@ onBeforeUnmount(() => store.unsubscribe())
 
           <button
             v-if="m.is_mine && !m.redacted"
-            class="mt-1 hidden text-[10px] opacity-70 group-hover:inline"
+            type="button"
+            class="mt-1 hidden text-[10px] opacity-70 hover:opacity-100 group-hover:inline"
             @click="remove(m)"
           >
             Delete
           </button>
         </div>
       </div>
-      <p v-if="!store.loadingThread && !store.messages.length" class="py-8 text-center text-sm opacity-60">
+      <p
+        v-if="!store.loadingThread && !store.messages.length"
+        class="py-8 text-center text-sm text-mute"
+      >
         No messages yet. Say hello.
       </p>
     </div>
 
-
-    <MessageComposer :disabled="store.sending" @send-text="sendText" @send-file="sendFile" />
+    <div class="border-t border-line px-3 py-2 sm:px-4">
+      <MessageComposer :disabled="store.sending" @send-text="sendText" @send-file="sendFile" />
+    </div>
   </div>
 </template>

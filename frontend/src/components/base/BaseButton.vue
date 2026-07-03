@@ -1,4 +1,8 @@
 <script setup>
+import Button from 'primevue/button'
+
+// Thin wrapper over PrimeVue Button that keeps the historic API
+// (variant: primary | ghost) so existing forms don't change.
 defineProps({
   variant: { type: String, default: 'primary' }, // primary | ghost
   type: { type: String, default: 'button' },
@@ -7,16 +11,12 @@ defineProps({
 </script>
 
 <template>
-  <button
+  <Button
     :type="type"
     :disabled="disabled"
-    class="inline-flex items-center justify-center rounded-token px-4 py-2 min-h-[44px] font-medium transition disabled:opacity-50"
-    :class="
-      variant === 'primary'
-        ? 'bg-primary text-on-primary hover:opacity-90'
-        : 'bg-surface text-ink border border-border hover:opacity-90'
-    "
+    :severity="variant === 'ghost' ? 'secondary' : null"
+    :outlined="variant === 'ghost'"
   >
     <slot />
-  </button>
+  </Button>
 </template>

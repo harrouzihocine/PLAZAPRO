@@ -1,13 +1,23 @@
 <script setup>
 import { onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import BaseCard from '@/components/base/BaseCard.vue'
+import Skeleton from 'primevue/skeleton'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import SectionCard from '@/components/ui/SectionCard.vue'
+import StatCard from '@/components/ui/StatCard.vue'
+import ActivityTimeline from '@/components/ui/ActivityTimeline.vue'
+import StatusTag from '@/components/ui/StatusTag.vue'
 import GtmPriorityBadge from '@/features/inventory/components/GtmPriorityBadge.vue'
 import MediaGallery from '@/features/inventory/components/MediaGallery.vue'
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
+import ShareToChat from '@/features/collaboration/components/ShareToChat.vue'
 import { useUnitsStore } from '@/features/inventory/unitsStore'
 import { useAuthStore } from '@/features/settings/store'
+import { formatDate } from '@/utils/format'
+import { formatMoney } from '@/features/payments/money'
 
+// One unit's page: commercial status up top, the full spec sheet, its own media
+// (separate from the project's) and the complete audit history of the record.
 const props = defineProps({ id: { type: [String, Number], required: true } })
 const units = useUnitsStore()
 const auth = useAuthStore()
@@ -16,82 +26,148 @@ onMounted(() => units.fetchOne(props.id))
 </script>
 
 <template>
-  <div class="space-y-4">
-    <template v-if="units.current">
-      <RouterLink
-        v-if="units.current.location_id"
-        :to="{ name: 'inventory.location', params: { id: units.current.location_id } }"
-        class="text-sm opacity-70 hover:text-primary"
-      >
-        ← {{ units.current.location?.name || 'Project' }}
-      </RouterLink>
+  <div>
+    <div v-if="!units.current" class="space-y-4">
+      <Skeleton width="14rem" height="2rem" />
+      <Skeleton height="10rem" />
+    </div>
 
-      <div class="flex flex-wrap items-center gap-2">
-        <h1 class="text-xl font-semibold">{{ units.current.reference }}</h1>
-        <SaleStatusBadge :status="units.current.sale_status" />
-        <GtmPriorityBadge
-          v-if="units.current.gtm_priority"
-          :priority="units.current.gtm_priority"
+    <template v-else>
+      <PageHeader
+        :title="`Unit ${units.current.reference}`"
+        :back="
+          units.current.location_id
+            ? { name: 'inventory.location', params: { id: units.current.location_id } }
+            : { name: 'inventory.units' }
+        "
+      >
+        <template #back-label>{{ units.current.location?.name || 'Units' }}</template>
+        <template #badges>
+          <SaleStatusBadge :status="units.current.sale_status" />
+          <GtmPriorityBadge
+            v-if="units.current.gtm_priority"
+            :priority="units.current.gtm_priority"
+          />
+          <StatusTag v-if="units.current.status !== 'active'" :value="units.current.status" />
+        </template>
+        <template #subtitle>
+          <template v-if="units.current.location">
+            {{ units.current.location.name }}
+            <template v-if="units.current.location.wilaya">
+              · {{ units.current.location.wilaya }}
+              <template v-if="units.current.location.commune">
+                ({{ units.current.location.commune }})
+              </template>
+            </template>
+          </template>
+        </template>
+        <template #actions>
+          <ShareToChat
+            v-if="auth.can('chat.use')"
+            subject-type="unit"
+            :subject-id="Number(id)"
+            label="Share"
+          />
+        </template>
+      </PageHeader>
+
+      <!-- The numbers a seller quotes first -->
+      <div class="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <StatCard label="Price" :value="formatMoney(units.current.price)" icon="pi pi-money-bill" />
+        <StatCard
+          label="Area"
+          :value="units.current.area_sqm ? `${units.current.area_sqm} m²` : '—'"
+          icon="pi pi-expand"
+          tone="info"
+        />
+        <StatCard
+          label="Type"
+          :value="units.current.type || '—'"
+          icon="pi pi-home"
+          tone="default"
+        />
+        <StatCard
+          label="Floor"
+          :value="units.current.floor || '—'"
+          icon="pi pi-building"
+          tone="default"
         />
       </div>
 
-      <BaseCard>
-        <dl class="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
-          <div>
-            <dt class="text-xs opacity-60">Type</dt>
-            <dd>{{ units.current.type || '—' }}</dd>
-          </div>
-          <div>
-            <dt class="text-xs opacity-60">Floor</dt>
-            <dd>{{ units.current.floor || '—' }}</dd>
-          </div>
-          <div>
-            <dt class="text-xs opacity-60">Area (m²)</dt>
-            <dd>{{ units.current.area_sqm ?? '—' }}</dd>
-          </div>
-          <div v-if="units.current.rooms != null">
-            <dt class="text-xs opacity-60">Rooms</dt>
-            <dd>{{ units.current.rooms }}</dd>
-          </div>
-          <div>
-            <dt class="text-xs opacity-60">Price</dt>
-            <dd>{{ units.current.price ?? '—' }}</dd>
-          </div>
-          <div v-if="units.current.block">
-            <dt class="text-xs opacity-60">Block</dt>
-            <dd>{{ units.current.block }}</dd>
-          </div>
-          <div v-if="units.current.stack_floor != null">
-            <dt class="text-xs opacity-60">Stack floor</dt>
-            <dd>{{ units.current.stack_floor }}</dd>
-          </div>
-          <div v-if="units.current.position != null">
-            <dt class="text-xs opacity-60">Position</dt>
-            <dd>{{ units.current.position }}</dd>
-          </div>
-          <div v-if="units.current.location?.contract_type">
-            <dt class="text-xs opacity-60">Project contract</dt>
-            <dd>{{ units.current.location.contract_type }}</dd>
-          </div>
-          <div v-if="units.current.location?.expected_delivery_date">
-            <dt class="text-xs opacity-60">Project delivery</dt>
-            <dd>{{ units.current.location.expected_delivery_date }}</dd>
-          </div>
-          <div v-if="units.current.location?.gtm_priority">
-            <dt class="text-xs opacity-60">Project priority</dt>
-            <dd><GtmPriorityBadge :priority="units.current.location.gtm_priority" /></dd>
-          </div>
-        </dl>
-      </BaseCard>
+      <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div class="space-y-5 xl:col-span-2">
+          <!-- This unit's own media (separate from the project's) -->
+          <MediaGallery
+            mediable-type="units"
+            :mediable-id="props.id"
+            :can-manage="auth.can('media.manage')"
+          />
 
-      <!-- This unit's own media (separate from the project's) -->
-      <MediaGallery
-        mediable-type="units"
-        :mediable-id="props.id"
-        :can-manage="auth.can('media.manage')"
-      />
+          <SectionCard title="Specifications" icon="pi pi-list">
+            <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
+              <div>
+                <dt class="text-xs text-mute">Reference</dt>
+                <dd class="mt-0.5 font-medium text-ink">{{ units.current.reference }}</dd>
+              </div>
+              <div v-if="units.current.rooms != null">
+                <dt class="text-xs text-mute">Rooms</dt>
+                <dd class="num mt-0.5 text-ink">{{ units.current.rooms }}</dd>
+              </div>
+              <div v-if="units.current.block">
+                <dt class="text-xs text-mute">Block</dt>
+                <dd class="mt-0.5 text-ink">{{ units.current.block }}</dd>
+              </div>
+              <div v-if="units.current.stack_floor != null">
+                <dt class="text-xs text-mute">Stack floor</dt>
+                <dd class="num mt-0.5 text-ink">{{ units.current.stack_floor }}</dd>
+              </div>
+              <div v-if="units.current.position != null">
+                <dt class="text-xs text-mute">Position</dt>
+                <dd class="num mt-0.5 text-ink">{{ units.current.position }}</dd>
+              </div>
+              <div>
+                <dt class="text-xs text-mute">Created</dt>
+                <dd class="mt-0.5 text-ink">{{ formatDate(units.current.created_at) }}</dd>
+              </div>
+            </dl>
+          </SectionCard>
+        </div>
+
+        <div class="space-y-5">
+          <SectionCard v-if="units.current.location" title="Project" icon="pi pi-building">
+            <RouterLink
+              :to="{ name: 'inventory.location', params: { id: units.current.location_id } }"
+              class="font-medium text-ink hover:underline"
+            >
+              {{ units.current.location.name }}
+            </RouterLink>
+            <dl class="mt-3 space-y-2.5 text-sm">
+              <div v-if="units.current.location.contract_type" class="flex justify-between gap-3">
+                <dt class="text-mute">Contract</dt>
+                <dd class="text-ink">{{ units.current.location.contract_type }}</dd>
+              </div>
+              <div
+                v-if="units.current.location.expected_delivery_date"
+                class="flex justify-between gap-3"
+              >
+                <dt class="text-mute">Delivery</dt>
+                <dd class="text-ink">
+                  {{ formatDate(units.current.location.expected_delivery_date) }}
+                </dd>
+              </div>
+              <div v-if="units.current.location.gtm_priority" class="flex justify-between gap-3">
+                <dt class="text-mute">Priority</dt>
+                <dd><GtmPriorityBadge :priority="units.current.location.gtm_priority" /></dd>
+              </div>
+            </dl>
+          </SectionCard>
+
+          <!-- The record's full audit history: price corrections, status flips, holds. -->
+          <SectionCard title="History" icon="pi pi-clock">
+            <ActivityTimeline :id="Number(props.id)" type="unit" />
+          </SectionCard>
+        </div>
+      </div>
     </template>
-
-    <p v-else class="py-4 text-center text-sm opacity-60">Loading…</p>
   </div>
 </template>

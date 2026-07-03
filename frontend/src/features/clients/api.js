@@ -47,6 +47,34 @@ export const followUpAgentsApi = {
   },
 }
 
+// Staff directory (id + name of active users) — feeds the "share this project
+// with a colleague" picker.
+export const staffApi = {
+  async list() {
+    const { data } = await useApi().get('/staff')
+    return data.data
+  },
+}
+
+// Who can see a project: the creator + the users it was shared with. Viewers
+// are hidden, never removed; re-adding un-hides.
+export const projectViewersApi = {
+  async list(projectId) {
+    const { data } = await useApi().get(`/projects/${projectId}/viewers`)
+    return data.data
+  },
+
+  async add(projectId, userId) {
+    const { data } = await useApi().post(`/projects/${projectId}/viewers`, { user_id: userId })
+    return data.data
+  },
+
+  async hide(projectId, userId) {
+    const { data } = await useApi().post(`/projects/${projectId}/viewers/${userId}/hide`)
+    return data.data
+  },
+}
+
 // A client's desire (matching criteria) and the inventory it matches.
 export const desireApi = {
   async get(clientId) {
@@ -66,7 +94,8 @@ export const desireApi = {
 }
 
 // Reserve a unit (48h hold) — reused from the matches panel's one-tap "reserve".
-export const reserveUnit = (unitId, payload = {}) => useApi().post(`/units/${unitId}/reserve`, payload)
+export const reserveUnit = (unitId, payload = {}) =>
+  useApi().post(`/units/${unitId}/reserve`, payload)
 
 // The deal's property shortlist (units/boxes the client wants), set at the office
 // visit. `sync` replaces the active set with the given list (add / keep / remove).

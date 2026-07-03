@@ -39,7 +39,9 @@ class ClientProjectController extends Controller
         $status = $request->query('status');
 
         $projects = $client->projects()
-            ->with(['location', 'unit.type', 'unit.floor', 'activeDeal'])
+            // projects.view_all: without it, only own-created + shared-with-me.
+            ->visibleTo($request->user())
+            ->with(['location', 'unit.type', 'unit.floor', 'activeDeal', 'creator'])
             // Phase-6 closure queue, derived: properties the client liked that
             // await a won/lost decision, and prospects still in play at all.
             ->withCount([
@@ -48,6 +50,8 @@ class ClientProjectController extends Controller
                 'shortlistItems as open_prospect_count' => fn ($q) => $q->active()
                     ->whereIn('state', ['shortlisted', 'not_visited', 'visited_interested']),
             ])
+            // Feeds is_empty (remove is allowed only on never-used projects).
+            ->withExists(['calls', 'visits', 'shortlistItems', 'deals', 'paymentSchedules', 'versements'])
             ->when($status === 'archived', fn ($q) => $q->archived())
             ->when(! in_array($status, ['archived', 'all'], true), fn ($q) => $q->active())
             ->latest('id')
@@ -81,6 +85,14 @@ class ClientProjectController extends Controller
 
     public function destroy(Request $request, ClientProject $project, CancelClientProject $action): ClientProjectResource
     {
+        // A project with any history (calls, visits, shortlist, deals, payments)
+        // is part of the client's story — archive it instead of removing it.
+        abort_unless(
+            $project->isEmpty(),
+            422,
+            'Only an empty project can be removed — this one has activity logged on it. Archive it instead.',
+        );
+
         $reason = (string) $request->input('reason', 'Deal cancelled');
 
         return new ClientProjectResource($action->handle($project, $reason));

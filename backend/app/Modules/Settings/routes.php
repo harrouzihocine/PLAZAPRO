@@ -53,6 +53,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // feeds the client "assigned agent" picker. Reference data, any authed user.
     Route::get('/follow-up-agents', [UserController::class, 'followUpAgents']);
 
+    // Staff directory (id + name of active users) — feeds the "share a project
+    // with a colleague" picker. Reference data, any authed user.
+    Route::get('/staff', [UserController::class, 'staff']);
+
     // Wilayas & communes — the geographic hierarchy. Reads feed the location /
     // desire dropdowns, so they are open to any authenticated user; writes below.
     Route::get('/wilayas', [WilayaController::class, 'index']);

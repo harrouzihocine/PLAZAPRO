@@ -71,6 +71,15 @@ const routes = [
         meta: { permission: 'clients.view' },
       },
       {
+        // Each client project opens as its own workspace page (deal, shortlist,
+        // payments, timeline, history) instead of an accordion on the file.
+        path: 'clients/:id/projects/:projectId',
+        name: 'clients.project',
+        props: true,
+        component: () => import('@/features/clients/views/ClientProjectView.vue'),
+        meta: { permission: 'clients.view' },
+      },
+      {
         path: 'tasks',
         name: 'tasks',
         component: () => import('@/features/pipeline/views/TasksView.vue'),

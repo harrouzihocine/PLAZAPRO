@@ -33,6 +33,18 @@ class ClientProjectResource extends JsonResource
             // awaiting won/lost, and prospects still in play (any pre-closure state).
             'pending_closure_count' => $this->when(isset($this->pending_closure_count), fn () => (int) $this->pending_closure_count),
             'open_prospect_count' => $this->when(isset($this->open_prospect_count), fn () => (int) $this->open_prospect_count),
+            // True when nothing was ever logged on the project (set on index via
+            // withExists) — only then may it be removed; otherwise archive it.
+            'is_empty' => $this->when(
+                isset($this->calls_exists),
+                fn () => ! ($this->calls_exists || $this->visits_exists || $this->shortlist_items_exists
+                    || $this->deals_exists || $this->payment_schedules_exists || $this->versements_exists),
+            ),
+            // Who opened the project — anchors the per-project visibility list.
+            'created_by' => $this->whenLoaded('creator', fn () => $this->creator ? [
+                'id' => $this->creator->id,
+                'name' => $this->creator->name,
+            ] : null),
             'location' => $this->whenLoaded('location', fn () => $this->location ? [
                 'id' => $this->location->id,
                 'name' => $this->location->name,

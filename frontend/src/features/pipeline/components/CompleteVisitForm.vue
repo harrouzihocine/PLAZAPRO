@@ -162,17 +162,21 @@ function submit() {
 </script>
 
 <template>
-  <form class="space-y-2" @submit.prevent="submit">
+  <form class="space-y-4" @submit.prevent="submit">
     <!-- In-site: one-tap result (didn't visit / interested / not interested / …). -->
-    <fieldset v-if="!isOffice" class="rounded-token border border-border p-2">
-      <legend class="px-1 text-xs uppercase opacity-60">Result</legend>
+    <fieldset v-if="!isOffice" class="rounded-xl border border-line p-3">
+      <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">Result</legend>
       <div class="flex flex-wrap gap-1.5">
         <button
           v-for="o in insiteOutcomes"
           :key="o.id"
           type="button"
-          class="rounded-token border px-3 py-1.5 text-sm transition-colors"
-          :class="outcomeId === o.id ? 'border-primary bg-primary/15 text-ink' : 'border-border bg-bg opacity-80 hover:border-primary'"
+          class="rounded-full border px-3 py-1.5 text-sm transition-colors"
+          :class="
+            outcomeId === o.id
+              ? 'border-primary bg-highlight font-medium text-ink'
+              : 'border-line text-mute hover:border-primary hover:text-ink'
+          "
           @click="outcomeId = outcomeId === o.id ? '' : o.id"
         >
           {{ o.label }}
@@ -189,15 +193,21 @@ function submit() {
       />
 
       <!-- Office-visit checklist — what happened, logged in taps. -->
-      <fieldset v-if="officeChecklist.length" class="rounded-token border border-border p-2">
-        <legend class="px-1 text-xs uppercase opacity-60">What happened</legend>
+      <fieldset v-if="officeChecklist.length" class="rounded-xl border border-line p-3">
+        <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">
+          What happened
+        </legend>
         <div class="flex flex-wrap gap-1.5">
           <button
             v-for="c in officeChecklist"
             :key="c.id"
             type="button"
-            class="rounded-token border px-2 py-1 text-xs transition-colors"
-            :class="checklist.includes(c.id) ? 'border-primary bg-primary/15 text-ink' : 'border-border bg-bg opacity-80 hover:border-primary'"
+            class="rounded-full border px-3 py-1.5 text-xs transition-colors"
+            :class="
+              checklist.includes(c.id)
+                ? 'border-primary bg-highlight font-medium text-ink'
+                : 'border-line text-mute hover:border-primary hover:text-ink'
+            "
             @click="toggleChecklist(c.id)"
           >
             {{ c.label }}
@@ -206,16 +216,25 @@ function submit() {
       </fieldset>
 
       <!-- The deal's property shortlist: keep / drop / add. ≥1 must remain. -->
-      <fieldset v-if="hasDeal" class="rounded-token border border-border p-2">
-        <legend class="px-1 text-xs uppercase opacity-60">Property shortlist (at least one)</legend>
-        <div v-if="shortlist.length" class="mb-2 flex flex-wrap gap-1.5">
+      <fieldset v-if="hasDeal" class="rounded-xl border border-line p-3">
+        <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">
+          Property shortlist (at least one)
+        </legend>
+        <div v-if="shortlist.length" class="mb-3 flex flex-wrap gap-1.5">
           <span
             v-for="(it, i) in shortlist"
             :key="it.shortlistable_type + it.shortlistable_id"
-            class="inline-flex items-center gap-1 rounded-token bg-primary/10 px-2 py-1 text-xs"
+            class="inline-flex items-center gap-1.5 rounded-full bg-highlight px-3 py-1 text-xs text-ink"
           >
             {{ it.label }}
-            <button type="button" class="opacity-60 hover:text-danger" @click="shortlist.splice(i, 1)">✕</button>
+            <button
+              type="button"
+              class="text-mute hover:text-danger"
+              aria-label="Remove from shortlist"
+              @click="shortlist.splice(i, 1)"
+            >
+              <i class="pi pi-times text-[10px]" aria-hidden="true" />
+            </button>
           </span>
         </div>
         <ProjectUnitsPicker v-model="additions" :exclude="excludeKeys" />
@@ -227,33 +246,43 @@ function submit() {
     <!-- Open the deal with the interested properties (auto-reserves them). -->
     <fieldset
       v-if="canDeal && eligibleDealUnits.length"
-      class="rounded-token border p-2"
-      :class="makeDeal ? 'border-primary bg-primary/5' : 'border-border'"
+      class="rounded-xl border p-3"
+      :class="
+        makeDeal
+          ? 'border-primary-300 bg-primary-50/50 dark:border-primary-500/30 dark:bg-primary-500/5'
+          : 'border-line'
+      "
     >
-      <legend class="px-1 text-xs uppercase opacity-60">Deal</legend>
-      <label class="inline-flex items-center gap-2 text-sm">
-        <input v-model="makeDeal" type="checkbox" />
-        <span>💼 Client decided — open a deal with the selected properties (they will be reserved)</span>
+      <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">Deal</legend>
+      <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-ink">
+        <input v-model="makeDeal" type="checkbox" class="h-4 w-4 accent-primary" />
+        <span>
+          <i class="pi pi-briefcase text-xs" aria-hidden="true" />
+          Client decided — open a deal with the selected properties (they will be reserved)
+        </span>
       </label>
 
-      <div v-if="makeDeal" class="mt-2 space-y-1.5">
+      <div v-if="makeDeal" class="mt-3 space-y-2">
         <div
           v-for="u in dealUnits"
           :key="u.unit_id"
-          class="rounded-token border border-border bg-bg px-2 py-1.5 text-xs"
+          class="rounded-lg border border-line bg-card px-3 py-2 text-xs"
         >
-          <label class="inline-flex w-full items-center gap-2">
-            <input v-model="u.include" type="checkbox" />
-            <span class="flex-1">🏠 {{ u.label }}</span>
+          <label class="inline-flex w-full cursor-pointer items-center gap-2 text-ink">
+            <input v-model="u.include" type="checkbox" class="h-4 w-4 accent-primary" />
+            <span class="flex-1">
+              <i class="pi pi-home text-[10px] text-mute" aria-hidden="true" /> {{ u.label }}
+            </span>
           </label>
           <!-- The box decision: include 1..max available (not taken) boxes. -->
           <div
             v-if="u.include && (availableBoxes[u.location_id] ?? 0) > 0"
-            class="mt-1 flex items-center gap-2 border-t border-border pt-1"
+            class="mt-2 flex items-center gap-2 border-t border-line pt-2"
           >
-            <label class="inline-flex items-center gap-1.5">
+            <label class="inline-flex cursor-pointer items-center gap-1.5 text-ink">
               <input
                 type="checkbox"
+                class="h-4 w-4 accent-primary"
                 :checked="u.box_count > 0"
                 @change="u.box_count = $event.target.checked ? 1 : 0"
               />
@@ -262,11 +291,13 @@ function submit() {
             <template v-if="u.box_count > 0">
               <select
                 v-model.number="u.box_count"
-                class="rounded-token border border-border bg-bg px-1.5 py-0.5 text-xs text-ink"
+                class="rounded-md border border-line bg-card px-2 py-1 text-xs text-ink outline-none focus:border-primary"
               >
-                <option v-for="n in availableBoxes[u.location_id]" :key="n" :value="n">{{ n }}</option>
+                <option v-for="n in availableBoxes[u.location_id]" :key="n" :value="n">
+                  {{ n }}
+                </option>
               </select>
-              <span class="opacity-60">of {{ availableBoxes[u.location_id] }} available</span>
+              <span class="text-mute">of {{ availableBoxes[u.location_id] }} available</span>
             </template>
           </div>
         </div>
@@ -275,7 +306,7 @@ function submit() {
 
     <NextActionFields v-model="nextAction" :field-agents="fieldAgents" />
 
-    <div class="flex gap-2">
+    <div class="flex gap-2 pt-1">
       <BaseButton type="submit" :disabled="saving || !nextActionReady">Complete visit</BaseButton>
       <BaseButton type="button" variant="ghost" @click="emit('cancel')">Cancel</BaseButton>
     </div>

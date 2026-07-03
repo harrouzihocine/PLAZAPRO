@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 use App\Modules\Clients\Http\Controllers\ClientController;
 use App\Modules\Clients\Http\Controllers\ClientProjectController;
+use App\Modules\Clients\Http\Controllers\ClientProjectViewerController;
 use App\Modules\Clients\Http\Controllers\DealController;
 use App\Modules\Clients\Http\Controllers\DesireController;
 use App\Modules\Clients\Http\Controllers\DesireMatchController;
@@ -29,6 +30,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // The deal's property shortlist (read).
         Route::get('/projects/{project}/shortlist', [ShortlistController::class, 'index']);
+
+        // Who can see this project (creator + shared-with users).
+        Route::get('/projects/{project}/viewers', [ClientProjectViewerController::class, 'index']);
 
         // The project's deals (read).
         Route::get('/projects/{project}/deals', [DealController::class, 'index']);
@@ -68,6 +72,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Phase-6 per-property closure (won/lost) on an interested shortlisted property.
         Route::post('/shortlist-items/{item}/outcome', [ShortlistController::class, 'outcome']);
+    });
+
+    // Sharing a project (add / hide viewers) has its own permission.
+    Route::middleware('can:projects.contributors')->group(function () {
+        Route::post('/projects/{project}/viewers', [ClientProjectViewerController::class, 'store']);
+        Route::post('/projects/{project}/viewers/{user}/hide', [ClientProjectViewerController::class, 'hide']);
     });
 
     // The visiting agent curates the deal's property shortlist at the office visit.

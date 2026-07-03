@@ -1,13 +1,17 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import BaseButton from '@/components/base/BaseButton.vue'
-import BaseCard from '@/components/base/BaseCard.vue'
+import Button from 'primevue/button'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import SectionCard from '@/components/ui/SectionCard.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { useDynamicList } from '@/composables/useDynamicList'
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
 import { useBoxesStore } from '@/features/inventory/boxesStore'
 import { confirmAction } from '@/composables/useConfirm'
+import { formatMoney } from '@/features/payments/money'
 
 const props = defineProps({
   locationId: { type: [String, Number], required: true },
@@ -67,23 +71,27 @@ async function submit() {
 }
 
 async function remove(b) {
-  if (await confirmAction({ title: `Cancel box "${b.reference}"?`, confirmText: 'Cancel box', danger: true })) {
+  if (
+    await confirmAction({
+      title: `Cancel box "${b.reference}"?`,
+      confirmText: 'Cancel box',
+      danger: true,
+    })
+  ) {
     boxes.cancel(b.id)
   }
 }
 </script>
 
 <template>
-  <BaseCard>
-    <div class="flex items-center justify-between">
-      <h2 class="font-semibold">Boxes (parking / storage)</h2>
-      <BaseButton v-if="canManage" variant="ghost" @click="openCreate">Add box</BaseButton>
-    </div>
-
+  <SectionCard title="Boxes (parking / storage)" icon="pi pi-car" flush>
+    <template #actions>
+      <Button v-if="canManage" label="Add box" icon="pi pi-plus" size="small" @click="openCreate" />
+    </template>
 
     <form
       v-if="mode && canManage"
-      class="mt-3 grid gap-3 border-t border-border pt-3 sm:grid-cols-3"
+      class="grid gap-3 border-b border-line px-4 py-4 sm:grid-cols-3 sm:px-5"
       @submit.prevent="submit"
     >
       <BaseInput v-model="form.reference" label="Reference" />
@@ -104,45 +112,71 @@ async function remove(b) {
         v-model="form.sale_status"
         label="Sale status"
         :clearable="false"
-        :options="[{ value: 'available', label: 'available' }, { value: 'reserved', label: 'reserved' }, { value: 'sold', label: 'sold' }]"
+        :options="[
+          { value: 'available', label: 'Available' },
+          { value: 'reserved', label: 'Reserved' },
+          { value: 'sold', label: 'Sold' },
+        ]"
       />
       <div class="flex items-end gap-2">
-        <BaseButton type="submit" :disabled="boxes.saving">Save</BaseButton>
-        <BaseButton type="button" variant="ghost" @click="mode = null">Cancel</BaseButton>
+        <Button type="submit" label="Save" icon="pi pi-check" :loading="boxes.saving" />
+        <Button type="button" label="Cancel" severity="secondary" outlined @click="mode = null" />
       </div>
     </form>
 
-    <div class="mt-3 overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead class="text-left opacity-60">
-          <tr>
-            <th class="py-2 pr-3">Ref</th>
-            <th class="py-2 pr-3">Type</th>
-            <th class="py-2 pr-3">Price</th>
-            <th class="py-2 pr-3">Unit</th>
-            <th class="py-2 pr-3">Status</th>
-            <th v-if="canManage" class="py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="b in boxes.items" :key="b.id" class="border-t border-border">
-            <td class="py-2 pr-3 font-medium">{{ b.reference }}</td>
-            <td class="py-2 pr-3">{{ b.type || '—' }}</td>
-            <td class="py-2 pr-3">{{ b.price }}</td>
-            <td class="py-2 pr-3">{{ b.unit_id ? (unitRef[b.unit_id] ?? b.unit_id) : '—' }}</td>
-            <td class="py-2 pr-3"><SaleStatusBadge :status="b.sale_status" /></td>
-            <td v-if="canManage" class="py-2">
-              <div class="flex justify-end gap-1">
-                <BaseButton variant="ghost" @click="openEdit(b)">Edit</BaseButton>
-                <BaseButton variant="ghost" @click="remove(b)">Remove</BaseButton>
-              </div>
-            </td>
-          </tr>
-          <tr v-if="!boxes.items.length">
-            <td colspan="6" class="py-4 text-center text-sm opacity-60">No boxes yet.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </BaseCard>
+    <DataTable :value="boxes.items" data-key="id">
+      <template #empty>
+        <EmptyState
+          icon="pi pi-car"
+          title="No boxes yet"
+          :body="canManage ? 'Add parking or storage boxes for this project.' : undefined"
+        />
+      </template>
+      <Column header="Reference">
+        <template #body="{ data }">
+          <span class="font-medium text-ink">{{ data.reference }}</span>
+        </template>
+      </Column>
+      <Column header="Type">
+        <template #body="{ data }">{{ data.type || '—' }}</template>
+      </Column>
+      <Column header="Price">
+        <template #body="{ data }">
+          <span class="num">{{ formatMoney(data.price) }}</span>
+        </template>
+      </Column>
+      <Column header="Linked unit">
+        <template #body="{ data }">
+          {{ data.unit_id ? (unitRef[data.unit_id] ?? data.unit_id) : '—' }}
+        </template>
+      </Column>
+      <Column header="Status">
+        <template #body="{ data }"><SaleStatusBadge :status="data.sale_status" /></template>
+      </Column>
+      <Column v-if="canManage" header="" class="w-24">
+        <template #body="{ data }">
+          <span class="flex justify-end gap-1">
+            <Button
+              icon="pi pi-pencil"
+              text
+              rounded
+              size="small"
+              severity="secondary"
+              aria-label="Edit box"
+              @click="openEdit(data)"
+            />
+            <Button
+              icon="pi pi-ban"
+              text
+              rounded
+              size="small"
+              severity="danger"
+              aria-label="Cancel box"
+              @click="remove(data)"
+            />
+          </span>
+        </template>
+      </Column>
+    </DataTable>
+  </SectionCard>
 </template>

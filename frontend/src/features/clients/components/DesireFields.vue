@@ -27,7 +27,11 @@ function updateWilaya(value) {
   emit('update:modelValue', { ...props.modelValue, wilaya_id: value, commune_id: '' })
 }
 
-watch(() => props.modelValue.wilaya_id, (id) => loadCommunes(id), { immediate: true })
+watch(
+  () => props.modelValue.wilaya_id,
+  (id) => loadCommunes(id),
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -54,9 +58,23 @@ watch(() => props.modelValue.wilaya_id, (id) => loadCommunes(id), { immediate: t
       :options="unitTypes.map((t) => ({ value: t.id, label: t.label }))"
       @change="(v) => update('type_id', v)"
     />
-    <BaseInput :model-value="modelValue.floor_pref" label="Floor preference" @update:model-value="(v) => update('floor_pref', v)" />
-    <BaseInput :model-value="modelValue.budget_min" label="Budget min" type="number" @update:model-value="(v) => update('budget_min', v)" />
-    <BaseInput :model-value="modelValue.budget_max" label="Budget max" type="number" @update:model-value="(v) => update('budget_max', v)" />
+    <BaseInput
+      :model-value="modelValue.floor_pref"
+      label="Floor preference"
+      @update:model-value="(v) => update('floor_pref', v)"
+    />
+    <BaseInput
+      :model-value="modelValue.budget_min"
+      label="Budget min"
+      type="number"
+      @update:model-value="(v) => update('budget_min', v)"
+    />
+    <BaseInput
+      :model-value="modelValue.budget_max"
+      label="Budget max"
+      type="number"
+      @update:model-value="(v) => update('budget_max', v)"
+    />
     <BaseTextarea
       class="sm:col-span-2"
       label="Notes"

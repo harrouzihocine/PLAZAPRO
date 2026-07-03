@@ -12,8 +12,22 @@ export const COUNTRY_CODES = [
   // grouping is used instead (see formatNational).
   { iso: 'DZ', name: 'Algeria', dial: '+213', flag: '🇩🇿', favorite: true, groups: [3, 2, 2, 2] },
   { iso: 'FR', name: 'France', dial: '+33', flag: '🇫🇷', favorite: true, groups: [1, 2, 2, 2, 2] },
-  { iso: 'US', name: 'United States / Canada', dial: '+1', flag: '🇺🇸', favorite: true, groups: [3, 3, 4] },
-  { iso: 'AE', name: 'United Arab Emirates', dial: '+971', flag: '🇦🇪', favorite: true, groups: [2, 3, 4] },
+  {
+    iso: 'US',
+    name: 'United States / Canada',
+    dial: '+1',
+    flag: '🇺🇸',
+    favorite: true,
+    groups: [3, 3, 4],
+  },
+  {
+    iso: 'AE',
+    name: 'United Arab Emirates',
+    dial: '+971',
+    flag: '🇦🇪',
+    favorite: true,
+    groups: [2, 3, 4],
+  },
 
   // ── All countries ─────────────────────────────────────────
   { iso: 'AF', name: 'Afghanistan', dial: '+93', flag: '🇦🇫' },

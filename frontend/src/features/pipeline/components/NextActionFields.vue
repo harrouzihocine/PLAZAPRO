@@ -16,13 +16,13 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const types = [
-  { value: 'call', label: 'call' },
-  { value: 'office_visit', label: 'office visit' },
-  { value: 'in_site_visit', label: 'in-site visit' },
+  { value: 'call', label: 'Call' },
+  { value: 'office_visit', label: 'Office visit' },
+  { value: 'in_site_visit', label: 'In-site visit' },
 ]
 
 const inputClass =
-  'w-full rounded-token border border-border bg-bg px-3 py-2 min-h-[44px] text-ink outline-none focus:border-primary'
+  'w-full rounded-md border border-line bg-card px-3 py-2 min-h-[42px] text-sm text-ink outline-none transition-colors focus:border-primary'
 
 const needsFieldAgent = computed(() => props.modelValue.type === 'in_site_visit')
 
@@ -32,8 +32,10 @@ function update(field, value) {
 </script>
 
 <template>
-  <fieldset class="grid gap-2 rounded-token border border-border p-2 sm:grid-cols-3">
-    <legend class="px-1 text-xs uppercase opacity-60">Next action (required)</legend>
+  <fieldset class="grid gap-3 rounded-xl border border-line p-3 sm:grid-cols-3">
+    <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">
+      Next action (required)
+    </legend>
     <BaseSelect
       label="Type"
       :model-value="modelValue.type"
@@ -42,7 +44,7 @@ function update(field, value) {
       @change="(v) => update('type', v)"
     />
     <label class="block">
-      <span class="mb-1 block text-xs">Due date</span>
+      <span class="mb-1.5 block text-sm font-medium text-ink">Due date</span>
       <input
         type="date"
         :value="modelValue.due_date"
@@ -51,7 +53,9 @@ function update(field, value) {
       />
     </label>
     <label class="block">
-      <span class="mb-1 block text-xs">Time <span class="opacity-50">(optional)</span></span>
+      <span class="mb-1.5 block text-sm font-medium text-ink">
+        Time <span class="text-mute">(optional)</span>
+      </span>
       <input
         type="time"
         :value="modelValue.due_time"

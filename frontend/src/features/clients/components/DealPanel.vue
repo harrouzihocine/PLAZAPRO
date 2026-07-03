@@ -1,12 +1,15 @@
 <script setup>
 import Swal from 'sweetalert2'
 import { computed, onMounted, ref } from 'vue'
-import BaseButton from '@/components/base/BaseButton.vue'
+import Button from 'primevue/button'
 import BaseModal from '@/components/base/BaseModal.vue'
+import SectionCard from '@/components/ui/SectionCard.vue'
+import StatusTag from '@/components/ui/StatusTag.vue'
 import { confirmAction, toastError } from '@/composables/useConfirm'
 import { useClientsStore } from '@/features/clients/clientsStore'
 import { boxesApi } from '@/features/inventory/api'
 import { useAuthStore } from '@/features/settings/store'
+import { formatMoney } from '@/features/payments/money'
 
 // THE deal on a project: its reserved properties (full card each), the boxes
 // reserved alongside (editable while open), and the close actions. Closing won
@@ -25,12 +28,6 @@ const canEditBoxes = () => auth.can('visits.conduct')
 const deals = computed(() => store.deals[props.projectId] ?? [])
 const openDeal = computed(() => deals.value.find((d) => d.state === 'reserved'))
 const closedDeals = computed(() => deals.value.filter((d) => d.state !== 'reserved'))
-
-const stateClass = {
-  reserved: 'bg-primary/15 text-primary',
-  won: 'bg-success/15 text-success',
-  lost: 'bg-danger/15 text-danger',
-}
 
 const unitLine = (u) =>
   [u.reference, u.type, u.floor, u.area_sqm ? `${u.area_sqm} m²` : null, u.location]
@@ -57,7 +54,10 @@ async function closeWon(deal) {
     customClass: { confirmButton: 'plaza-swal-confirm', cancelButton: 'plaza-swal-cancel' },
   })
   if (!isConfirmed) return
-  await store.closeDeal(props.clientId, props.projectId, deal.id, { outcome: 'won', total_price: value })
+  await store.closeDeal(props.clientId, props.projectId, deal.id, {
+    outcome: 'won',
+    total_price: value,
+  })
 }
 
 async function closeLost(deal) {
@@ -112,73 +112,132 @@ async function saveBoxes() {
 </script>
 
 <template>
-  <div v-if="deals.length" class="rounded-token border border-border p-3">
-    <h3 class="mb-2 text-sm font-semibold uppercase opacity-60">Deal</h3>
+  <SectionCard v-if="deals.length" title="Deal" icon="pi pi-briefcase">
+    <div class="space-y-3">
+      <div
+        v-for="deal in deals"
+        :key="deal.id"
+        class="rounded-lg border p-3"
+        :class="
+          deal.state === 'reserved'
+            ? 'border-primary-300 bg-primary-50/50 dark:border-primary-500/30 dark:bg-primary-500/5'
+            : 'border-line'
+        "
+      >
+        <div class="mb-2 flex items-center justify-between gap-2">
+          <StatusTag :value="deal.state" />
+          <span v-if="deal.total_price" class="num text-sm font-semibold text-ink">
+            {{ formatMoney(deal.total_price) }}
+          </span>
+          <span v-else class="num text-xs text-mute">
+            suggested {{ suggestedTotal(deal) ? formatMoney(suggestedTotal(deal)) : '—' }}
+          </span>
+        </div>
 
-    <div v-for="deal in deals" :key="deal.id" class="mb-2 rounded-token border border-border p-2 last:mb-0">
-      <div class="mb-1 flex items-center justify-between gap-2">
-        <span class="rounded-token px-2 py-0.5 text-xs font-medium" :class="stateClass[deal.state]">
-          {{ deal.state }}
-        </span>
-        <span v-if="deal.total_price" class="text-sm font-medium">{{ deal.total_price }}</span>
-        <span v-else class="text-xs opacity-60">suggested {{ suggestedTotal(deal) || '—' }}</span>
+        <!-- The reserved properties — the full card, not just the code. -->
+        <ul class="divide-y divide-line text-sm">
+          <li
+            v-for="u in deal.units"
+            :key="'u' + u.id"
+            class="flex items-center justify-between gap-2 py-1.5"
+          >
+            <span class="flex min-w-0 items-center gap-2">
+              <i class="pi pi-home shrink-0 text-mute" aria-hidden="true" />
+              <span class="truncate text-ink">{{ unitLine(u) }}</span>
+            </span>
+            <span class="num shrink-0 text-xs text-mute">{{ formatMoney(u.price) }}</span>
+          </li>
+          <li
+            v-for="b in deal.boxes"
+            :key="'b' + b.id"
+            class="flex items-center justify-between gap-2 py-1.5"
+          >
+            <span class="flex min-w-0 items-center gap-2">
+              <i class="pi pi-car shrink-0 text-mute" aria-hidden="true" />
+              <span class="truncate text-ink">
+                {{ b.reference }}<template v-if="b.type"> · {{ b.type }}</template>
+              </span>
+            </span>
+            <span class="num shrink-0 text-xs text-mute">{{ formatMoney(b.price) }}</span>
+          </li>
+        </ul>
+        <p v-if="deal.state === 'reserved' && !deal.boxes?.length" class="mt-1 text-xs text-mute">
+          No boxes reserved on this deal.
+        </p>
+        <p v-if="deal.notes" class="mt-2 border-t border-line pt-2 text-xs text-mute">
+          {{ deal.notes }}
+        </p>
+
+        <div v-if="deal.state === 'reserved'" class="mt-3 flex flex-wrap gap-2">
+          <Button
+            v-if="canClose()"
+            label="Close won"
+            icon="pi pi-trophy"
+            size="small"
+            severity="success"
+            @click="closeWon(deal)"
+          />
+          <Button
+            v-if="canClose()"
+            label="Close lost"
+            icon="pi pi-times"
+            size="small"
+            severity="danger"
+            outlined
+            @click="closeLost(deal)"
+          />
+          <Button
+            v-if="canEditBoxes()"
+            label="Boxes…"
+            icon="pi pi-car"
+            size="small"
+            severity="secondary"
+            outlined
+            @click="openBoxEditor(deal)"
+          />
+        </div>
       </div>
 
-      <!-- The reserved properties — the full card, not just the code. -->
-      <ul class="space-y-1 text-sm">
-        <li v-for="u in deal.units" :key="'u' + u.id" class="flex items-center justify-between gap-2">
-          <span>🏠 {{ unitLine(u) }}</span>
-          <span class="text-xs opacity-70">{{ u.price }}</span>
-        </li>
-        <li v-for="b in deal.boxes" :key="'b' + b.id" class="flex items-center justify-between gap-2">
-          <span>🅿 {{ b.reference }}<template v-if="b.type"> · {{ b.type }}</template></span>
-          <span class="text-xs opacity-70">{{ b.price }}</span>
-        </li>
-      </ul>
-      <p v-if="deal.state === 'reserved' && !deal.boxes?.length" class="mt-1 text-xs opacity-60">
-        No boxes reserved on this deal.
+      <p v-if="!openDeal && closedDeals.length" class="text-xs text-mute">
+        No open deal — a new one can be created from a visit log.
       </p>
-      <p v-if="deal.notes" class="mt-1 border-t border-border pt-1 text-xs opacity-70">{{ deal.notes }}</p>
-
-      <div v-if="deal.state === 'reserved'" class="mt-2 flex flex-wrap gap-1.5">
-        <BaseButton v-if="canClose()" variant="ghost" class="!px-2 !py-1 text-xs text-success" @click="closeWon(deal)">
-          ✓ Close won
-        </BaseButton>
-        <BaseButton v-if="canClose()" variant="ghost" class="!px-2 !py-1 text-xs text-danger" @click="closeLost(deal)">
-          ✕ Close lost
-        </BaseButton>
-        <BaseButton v-if="canEditBoxes()" variant="ghost" class="!px-2 !py-1 text-xs" @click="openBoxEditor(deal)">
-          🅿 Boxes…
-        </BaseButton>
-      </div>
     </div>
 
-    <p v-if="!openDeal && closedDeals.length" class="text-xs opacity-60">
-      No open deal — a new one can be created from a visit log.
-    </p>
-
     <!-- Reserved-boxes editor -->
-    <BaseModal v-if="boxEditor.open" title="Boxes on this deal" size="max-w-lg" @close="boxEditor.open = false">
-      <p class="mb-2 text-sm opacity-70">
-        Tap to reserve / release boxes alongside the apartment. Only available (not taken) boxes are offered.
+    <BaseModal
+      v-if="boxEditor.open"
+      title="Boxes on this deal"
+      size="max-w-lg"
+      @close="boxEditor.open = false"
+    >
+      <p class="mb-3 text-sm text-mute">
+        Tap to reserve / release boxes alongside the apartment. Only available (not taken) boxes are
+        offered.
       </p>
-      <div class="mb-3 flex flex-wrap gap-1.5">
+      <div class="mb-4 flex flex-wrap gap-2">
         <button
           v-for="b in boxEditor.candidates"
           :key="b.id"
           type="button"
-          class="rounded-token border px-2 py-1 text-xs transition-colors"
-          :class="boxEditor.selected.includes(b.id) ? 'border-primary bg-primary/15 text-ink' : 'border-border bg-bg opacity-80 hover:border-primary'"
+          class="rounded-lg border px-2.5 py-1.5 text-xs transition-colors"
+          :class="
+            boxEditor.selected.includes(b.id)
+              ? 'border-primary bg-highlight font-medium text-ink'
+              : 'border-line text-mute hover:border-primary hover:text-ink'
+          "
           @click="toggleBox(b.id)"
         >
-          🅿 {{ b.reference }}<template v-if="b.price"> · {{ b.price }}</template>
+          <i class="pi pi-car text-[10px]" aria-hidden="true" />
+          {{ b.reference }}<template v-if="b.price"> · {{ formatMoney(b.price) }}</template>
         </button>
-        <p v-if="!boxEditor.candidates.length" class="text-sm opacity-60">No boxes exist in this project.</p>
+        <p v-if="!boxEditor.candidates.length" class="text-sm text-mute">
+          No boxes exist in this project.
+        </p>
       </div>
       <div class="flex gap-2">
-        <BaseButton :disabled="store.saving" @click="saveBoxes">Save boxes</BaseButton>
-        <BaseButton variant="ghost" @click="boxEditor.open = false">Cancel</BaseButton>
+        <Button label="Save boxes" icon="pi pi-check" :loading="store.saving" @click="saveBoxes" />
+        <Button label="Cancel" severity="secondary" outlined @click="boxEditor.open = false" />
       </div>
     </BaseModal>
-  </div>
+  </SectionCard>
 </template>

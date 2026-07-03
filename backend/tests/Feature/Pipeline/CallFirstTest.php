@@ -14,9 +14,10 @@ use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
- * Workflow rule: a call log is the very first entity captured for a new client.
- * Until one exists, visits, deals and desires are all rejected at the request
- * boundary — the qualification happens on the phone first.
+ * Workflow rule: a call log opens the story. Visits and desires are rejected
+ * until a call exists — qualification happens on the phone first. Projects are
+ * the exception: the "new project" flow logs the first call WITH the project,
+ * so the project row itself may be created call-less.
  */
 class CallFirstTest extends TestCase
 {
@@ -54,16 +55,13 @@ class CallFirstTest extends TestCase
         $this->postJson('/api/v1/visits', $payload)->assertCreated();
     }
 
-    public function test_a_deal_cannot_be_opened_before_the_first_call(): void
+    public function test_a_project_can_be_opened_before_the_first_call(): void
     {
+        // The "new project" flow logs the call together with the project (the
+        // project row must exist first so the call can attach to it), so project
+        // creation itself is NOT gated on a prior call.
         $client = Client::factory()->create();
         Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.manage']));
-
-        $this->postJson("/api/v1/clients/{$client->id}/projects", [])
-            ->assertStatus(422)
-            ->assertJsonValidationErrorFor('client_id');
-
-        Call::factory()->create(['client_id' => $client->id]);
 
         $this->postJson("/api/v1/clients/{$client->id}/projects", [])->assertCreated();
     }
@@ -84,11 +82,16 @@ class CallFirstTest extends TestCase
 
     public function test_a_cancelled_call_does_not_satisfy_the_rule(): void
     {
+        // Visits stay call-gated: a cancelled call must not open the gate.
         $client = Client::factory()->create();
         Call::factory()->create(['client_id' => $client->id, 'status' => 'cancelled']);
-        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.manage']));
+        $agent = User::factory()->agent()->create();
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'visits.assign']));
 
-        $this->postJson("/api/v1/clients/{$client->id}/projects", [])
+        $this->postJson('/api/v1/visits', [
+            'client_id' => $client->id, 'type' => 'office',
+            'agent_id' => $agent->id, 'scheduled_at' => now()->addDay()->toDateTimeString(),
+        ])
             ->assertStatus(422)
             ->assertJsonValidationErrorFor('client_id');
     }
@@ -98,7 +101,7 @@ class CallFirstTest extends TestCase
         $without = Client::factory()->create();
         $with = Client::factory()->create();
         Call::factory()->create(['client_id' => $with->id]);
-        Sanctum::actingAs($this->userWithPermissions(['clients.view']));
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.view_all']));
 
         $this->getJson("/api/v1/clients/{$without->id}")
             ->assertOk()->assertJsonPath('data.has_calls', false);

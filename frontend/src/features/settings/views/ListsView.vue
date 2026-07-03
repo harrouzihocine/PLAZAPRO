@@ -1,8 +1,9 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
-import BaseCard from '@/components/base/BaseCard.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import SectionCard from '@/components/ui/SectionCard.vue'
 import DynamicListItemRow from '@/features/settings/components/DynamicListItemRow.vue'
 import { useDynamicListsStore } from '@/features/settings/dynamicListsStore'
 
@@ -53,40 +54,50 @@ function move(index, dir) {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div>
-      <h1 class="text-2xl font-semibold">Lists</h1>
-      <p class="opacity-70">Manage the dropdown options used across the app.</p>
-    </div>
+  <div>
+    <PageHeader title="Lists" subtitle="Manage the dropdown options used across the app." />
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-[16rem_1fr]">
+    <div class="grid grid-cols-1 gap-5 md:grid-cols-[17rem_1fr]">
       <!-- List picker -->
-      <BaseCard>
-        <h2 class="mb-2 font-medium">Lists</h2>
-        <nav class="flex flex-col gap-1">
+      <SectionCard title="Lists" icon="pi pi-list" flush class="self-start">
+        <nav class="flex flex-col gap-0.5 p-2">
           <button
             v-for="list in store.lists"
             :key="list.key"
-            class="flex items-center justify-between rounded-token px-3 py-2 text-left hover:bg-bg"
-            :class="{ 'bg-bg text-primary': list.key === store.selectedKey }"
+            type="button"
+            class="flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors"
+            :class="
+              list.key === store.selectedKey
+                ? 'bg-highlight font-semibold text-ink'
+                : 'text-mute hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800'
+            "
             @click="store.select(list.key)"
           >
-            <span>{{ list.name }}</span>
-            <span v-if="list.is_system" class="text-xs opacity-50" title="System list">🔒</span>
+            <span class="truncate">{{ list.name }}</span>
+            <i
+              v-if="list.is_system"
+              class="pi pi-lock shrink-0 text-xs text-mute"
+              title="System list"
+              aria-hidden="true"
+            />
           </button>
         </nav>
-      </BaseCard>
+      </SectionCard>
 
       <!-- Item manager -->
-      <BaseCard v-if="selected">
-        <header class="mb-3">
-          <h2 class="font-medium">{{ selected.name }}</h2>
-          <p class="text-sm opacity-60">
-            key: <code>{{ selected.key }}</code>
-            <span v-if="selected.description"> — {{ selected.description }}</span>
-          </p>
-        </header>
-
+      <SectionCard v-if="selected">
+        <template #header>
+          <div>
+            <h2 class="text-sm font-semibold text-ink">{{ selected.name }}</h2>
+            <p class="mt-0.5 text-xs text-mute">
+              key:
+              <code class="rounded bg-surface-100 px-1 dark:bg-surface-800">{{
+                selected.key
+              }}</code>
+              <span v-if="selected.description"> — {{ selected.description }}</span>
+            </p>
+          </div>
+        </template>
 
         <div class="space-y-2">
           <DynamicListItemRow
@@ -99,14 +110,12 @@ function move(index, dir) {
             @toggle="toggle(item)"
             @move="(dir) => move(index, dir)"
           />
-          <p v-if="!store.items.length" class="py-4 text-center text-sm opacity-60">
-            No items yet.
-          </p>
+          <p v-if="!store.items.length" class="py-4 text-center text-sm text-mute">No items yet.</p>
         </div>
 
         <!-- Add item -->
         <form
-          class="mt-4 flex flex-col gap-2 border-t border-border pt-4 sm:flex-row"
+          class="mt-4 flex flex-col gap-2 border-t border-line pt-4 sm:flex-row"
           @submit.prevent="addItem"
         >
           <BaseInput v-model="newLabel" label="Label" class="flex-1" @blur="suggestValue" />
@@ -115,7 +124,7 @@ function move(index, dir) {
             <BaseButton type="submit" :disabled="store.saving">Add item</BaseButton>
           </div>
         </form>
-      </BaseCard>
+      </SectionCard>
     </div>
   </div>
 </template>

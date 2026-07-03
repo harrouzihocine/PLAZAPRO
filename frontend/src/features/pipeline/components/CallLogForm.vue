@@ -92,25 +92,34 @@ function submit() {
 </script>
 
 <template>
-  <form class="space-y-2" @submit.prevent="submit">
+  <form class="space-y-4" @submit.prevent="submit">
     <BaseSelect
       v-model="direction"
       label="Direction"
       class="sm:max-w-xs"
       :clearable="false"
-      :options="[{ value: 'outbound', label: 'outbound' }, { value: 'inbound', label: 'inbound' }]"
+      :options="[
+        { value: 'outbound', label: 'Outbound' },
+        { value: 'inbound', label: 'Inbound' },
+      ]"
     />
 
     <!-- Fast talking-points — everything discussed / how the call went, in taps. -->
-    <fieldset v-if="callTopics.length" class="rounded-token border border-border p-2">
-      <legend class="px-1 text-xs uppercase opacity-60">Discussed</legend>
+    <fieldset v-if="callTopics.length" class="rounded-xl border border-line p-3">
+      <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">
+        Discussed
+      </legend>
       <div class="flex flex-wrap gap-1.5">
         <button
           v-for="t in callTopics"
           :key="t.id"
           type="button"
-          class="rounded-token border px-2 py-1 text-xs transition-colors"
-          :class="topics.includes(t.id) ? 'border-primary bg-primary/15 text-ink' : 'border-border bg-bg opacity-80 hover:border-primary'"
+          class="rounded-full border px-3 py-1.5 text-xs transition-colors"
+          :class="
+            topics.includes(t.id)
+              ? 'border-primary bg-highlight font-medium text-ink'
+              : 'border-line text-mute hover:border-primary hover:text-ink'
+          "
           @click="toggleTopic(t.id)"
         >
           {{ t.label }}
@@ -121,26 +130,36 @@ function submit() {
     <BaseTextarea v-model="notes" label="Notes (optional)" :rows="3" />
 
     <!-- Qualification: properties (Branch B) or desire profile (Branch A). -->
-    <fieldset class="rounded-token border border-border p-2">
-      <legend class="px-1 text-xs uppercase opacity-60">
-        Client interests<template v-if="interestLabels.length"> — {{ interestLabels.join(' · ') }}</template>
+    <fieldset class="rounded-xl border border-line p-3">
+      <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">
+        Client interests<template v-if="interestLabels.length">
+          — {{ interestLabels.join(' · ') }}</template
+        >
       </legend>
-      <div class="mb-2 flex flex-wrap gap-1.5">
+      <div class="mb-3 flex flex-wrap gap-1.5">
         <button
           type="button"
-          class="rounded-token border px-2 py-1 text-xs transition-colors"
-          :class="branch === 'properties' ? 'border-primary bg-primary/15 text-ink' : 'border-border bg-bg opacity-80 hover:border-primary'"
+          class="rounded-full border px-3 py-1.5 text-xs transition-colors"
+          :class="
+            branch === 'properties'
+              ? 'border-primary bg-highlight font-medium text-ink'
+              : 'border-line text-mute hover:border-primary hover:text-ink'
+          "
           @click="branch = branch === 'properties' ? null : 'properties'"
         >
-          🏢 Select matching properties
+          <i class="pi pi-building text-[10px]" aria-hidden="true" /> Select matching properties
         </button>
         <button
           type="button"
-          class="rounded-token border px-2 py-1 text-xs transition-colors"
-          :class="branch === 'desire' ? 'border-primary bg-primary/15 text-ink' : 'border-border bg-bg opacity-80 hover:border-primary'"
+          class="rounded-full border px-3 py-1.5 text-xs transition-colors"
+          :class="
+            branch === 'desire'
+              ? 'border-primary bg-highlight font-medium text-ink'
+              : 'border-line text-mute hover:border-primary hover:text-ink'
+          "
           @click="branch = branch === 'desire' ? null : 'desire'"
         >
-          📋 No match — capture requirements
+          <i class="pi pi-heart text-[10px]" aria-hidden="true" /> No match — capture requirements
         </button>
       </div>
       <ProjectUnitsPicker v-if="branch === 'properties'" v-model="properties" />
@@ -149,7 +168,7 @@ function submit() {
 
     <NextActionFields v-model="nextAction" :field-agents="fieldAgents" />
 
-    <div class="flex gap-2">
+    <div class="flex gap-2 pt-1">
       <BaseButton type="submit" :disabled="saving || !nextActionReady">Save call</BaseButton>
       <BaseButton type="button" variant="ghost" @click="emit('cancel')">Cancel</BaseButton>
     </div>

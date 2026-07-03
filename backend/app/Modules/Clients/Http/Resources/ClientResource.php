@@ -15,6 +15,10 @@ class ClientResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        // clients.view_details: without it a user sees only who the client IS
+        // (name + status) — no phone, email, notes or profile fields.
+        $canSeeDetails = (bool) $request->user()?->can('clients.view_details');
+
         // Client ownership (who it's assigned to, and who created it, when) is
         // back-office-only — gated by clients.manage, held by super-admin / admin
         // / manager. Agents (view/create only) never see it.
@@ -25,27 +29,38 @@ class ClientResource extends JsonResource
             'first_name' => $this->first_name,
             'last_name' => $this->last_name,
             'full_name' => $this->full_name,
-            'phone' => $this->phone,
-            'email' => $this->email,
-            'notes' => $this->notes,
+            'status' => $this->status?->value,
+            'phone' => $this->when($canSeeDetails, $this->phone),
+            'email' => $this->when($canSeeDetails, $this->email),
+            'notes' => $this->when($canSeeDetails, $this->notes),
             // Ids of property_interests items — the FE maps them to labels via the
             // property_interests dynamic list it already loads.
-            'interests' => $this->interests ?? [],
+            'interests' => $this->when($canSeeDetails, fn () => $this->interests ?? []),
+            // Who told the client about the project (source = referral).
+            'referrer_name' => $this->when($canSeeDetails, $this->referrer_name),
+            'referrer_phone' => $this->when($canSeeDetails, $this->referrer_phone),
+            // Identity / contract details captured for closing a deal.
+            'id_document_type' => $this->when($canSeeDetails, $this->id_document_type),
+            'id_document_number' => $this->when($canSeeDetails, $this->id_document_number),
+            'birth_date' => $this->when($canSeeDetails, $this->birth_date?->toDateString()),
+            'birth_place' => $this->when($canSeeDetails, $this->birth_place),
+            'nationality' => $this->when($canSeeDetails, $this->nationality),
+            'address' => $this->when($canSeeDetails, $this->address),
+            'occupation' => $this->when($canSeeDetails, $this->occupation),
             // Workflow gate: a client's first entity is a call — until one exists the
             // FE hides deals/desire/visits behind a "log the first call" CTA.
             'has_calls' => $this->when(isset($this->calls_exists), fn () => (bool) $this->calls_exists),
-            'status' => $this->status?->value,
-            'source' => $this->whenLoaded('source', fn () => $this->source ? [
+            'source' => $this->when($canSeeDetails, fn () => $this->whenLoaded('source', fn () => $this->source ? [
                 'id' => $this->source->id,
                 'label' => $this->source->label,
                 'value' => $this->source->value,
-            ] : null),
-            'rating' => $this->whenLoaded('rating', fn () => $this->rating ? [
+            ] : null)),
+            'rating' => $this->when($canSeeDetails, fn () => $this->whenLoaded('rating', fn () => $this->rating ? [
                 'id' => $this->rating->id,
                 'label' => $this->rating->label,
                 'value' => $this->rating->value,
                 'meta' => $this->rating->meta,
-            ] : null),
+            ] : null)),
             'assigned_agent' => $this->when($canSeeOwnership, fn () => $this->assignedAgent ? [
                 'id' => $this->assignedAgent->id,
                 'name' => $this->assignedAgent->name,

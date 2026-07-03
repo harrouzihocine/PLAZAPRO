@@ -1,16 +1,20 @@
 <script setup>
 import { computed, onMounted, reactive } from 'vue'
-import BaseButton from '@/components/base/BaseButton.vue'
-import BaseCard from '@/components/base/BaseCard.vue'
+import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
+import Tag from 'primevue/tag'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import SectionCard from '@/components/ui/SectionCard.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { useTasksStore } from '@/features/pipeline/tasksStore'
 import { confirmAction } from '@/composables/useConfirm'
 
 const store = useTasksStore()
 
-const selectClass =
-  'w-full rounded-token border border-border bg-bg px-3 py-2 min-h-[44px] text-ink outline-none focus:border-primary'
+const inputClass =
+  'w-full rounded-md border border-line bg-card px-3 py-2 min-h-[42px] text-sm text-ink outline-none transition-colors focus:border-primary'
 
 const emptyForm = () => ({ title: '', assigned_to: '', priority: 'normal', due_at: '' })
 const form = reactive(emptyForm())
@@ -54,12 +58,7 @@ async function cancelTask(task) {
   }
 }
 
-const priorityClass = (p) =>
-  ({
-    high: 'text-danger',
-    low: 'opacity-70',
-    normal: '',
-  })[p] ?? ''
+const prioritySeverity = { high: 'danger', normal: 'info', low: 'secondary' }
 
 function formatDue(value) {
   if (!value) return '—'
@@ -73,20 +72,18 @@ function formatDue(value) {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div>
-      <h1 class="text-xl font-semibold">Tasks</h1>
-      <p class="opacity-70">Your to-dos and the team's. Overdue items are flagged.</p>
-    </div>
-
+  <div>
+    <PageHeader title="Tasks" subtitle="Your to-dos and the team's. Overdue items are flagged." />
 
     <!-- Quick add -->
-    <BaseCard>
+    <SectionCard title="Quick add" icon="pi pi-plus-circle" class="mb-5">
       <form class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" @submit.prevent="quickAdd">
-        <label class="block lg:col-span-2">
-          <span class="mb-1 block text-sm">New task</span>
-          <BaseInput v-model="form.title" placeholder="What needs doing?" />
-        </label>
+        <BaseInput
+          v-model="form.title"
+          label="New task"
+          placeholder="What needs doing?"
+          class="lg:col-span-2"
+        />
         <BaseSelect
           v-model="form.assigned_to"
           label="Assign to"
@@ -97,82 +94,154 @@ function formatDue(value) {
           v-model="form.priority"
           label="Priority"
           :clearable="false"
-          :options="[{ value: 'low', label: 'Low' }, { value: 'normal', label: 'Normal' }, { value: 'high', label: 'High' }]"
+          :options="[
+            { value: 'low', label: 'Low' },
+            { value: 'normal', label: 'Normal' },
+            { value: 'high', label: 'High' },
+          ]"
         />
         <label class="block">
-          <span class="mb-1 block text-sm">Due</span>
-          <input v-model="form.due_at" type="datetime-local" :class="selectClass" aria-label="Due" />
+          <span class="mb-1.5 block text-sm font-medium text-ink">Due</span>
+          <input v-model="form.due_at" type="datetime-local" :class="inputClass" aria-label="Due" />
         </label>
         <div class="lg:col-span-5">
-          <BaseButton type="submit" :disabled="store.saving">Add task</BaseButton>
+          <Button type="submit" label="Add task" icon="pi pi-plus" :loading="store.saving" />
         </div>
       </form>
-    </BaseCard>
+    </SectionCard>
 
-    <!-- Filters -->
-    <BaseCard>
-      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <SectionCard flush>
+      <!-- Filter toolbar -->
+      <div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
         <BaseSelect
           v-model="store.filters.scope"
-          label="Scope"
+          aria-label="Scope"
+          class="w-full sm:w-36"
           :clearable="false"
-          :options="[{ value: 'mine', label: 'Mine' }, { value: 'team', label: 'Team' }]"
+          :options="[
+            { value: 'mine', label: 'Mine' },
+            { value: 'team', label: 'Team' },
+          ]"
           @change="store.fetch()"
         />
         <BaseSelect
           v-model="store.filters.state"
-          label="State"
-          placeholder="All"
-          :options="[{ value: 'open', label: 'Open' }, { value: 'done', label: 'Done' }]"
+          placeholder="All states"
+          aria-label="State"
+          class="w-full sm:w-36"
+          :options="[
+            { value: 'open', label: 'Open' },
+            { value: 'done', label: 'Done' },
+          ]"
           @change="store.fetch()"
         />
         <BaseSelect
           v-model="store.filters.priority"
-          label="Priority"
-          placeholder="All"
-          :options="[{ value: 'high', label: 'High' }, { value: 'normal', label: 'Normal' }, { value: 'low', label: 'Low' }]"
+          placeholder="All priorities"
+          aria-label="Priority"
+          class="w-full sm:w-40"
+          :options="[
+            { value: 'high', label: 'High' },
+            { value: 'normal', label: 'Normal' },
+            { value: 'low', label: 'Low' },
+          ]"
           @change="store.fetch()"
         />
-        <label class="flex items-center gap-2 pt-6">
-          <input v-model="store.filters.overdue" type="checkbox" @change="store.fetch()" />
-          <span class="text-sm">Overdue only</span>
+        <label class="flex cursor-pointer items-center gap-2 text-sm text-ink">
+          <Checkbox v-model="store.filters.overdue" binary @change="store.fetch()" />
+          Overdue only
         </label>
       </div>
-    </BaseCard>
 
-    <BaseCard>
-      <p v-if="store.loading" class="py-4 text-center text-sm opacity-60">Loading…</p>
-      <div v-else class="space-y-6">
+      <p v-if="store.loading" class="py-8 text-center text-sm text-mute">Loading…</p>
+
+      <div v-else>
         <section>
-          <h2 class="mb-2 text-sm font-semibold uppercase opacity-60">Open ({{ openTasks.length }})</h2>
-          <ul class="divide-y divide-border">
-            <li v-for="t in openTasks" :key="t.id" class="flex items-center gap-3 py-2">
+          <h2
+            class="border-b border-line px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-mute sm:px-5"
+          >
+            Open ({{ openTasks.length }})
+          </h2>
+          <EmptyState
+            v-if="!openTasks.length"
+            icon="pi pi-check-circle"
+            title="Nothing open. Nice."
+          />
+          <ul v-else class="divide-y divide-line">
+            <li
+              v-for="t in openTasks"
+              :key="t.id"
+              class="flex items-center gap-3 px-4 py-3 sm:px-5"
+            >
+              <span
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                :class="
+                  isOverdue(t)
+                    ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300'
+                    : 'bg-surface-100 text-mute dark:bg-surface-800'
+                "
+              >
+                <i
+                  :class="isOverdue(t) ? 'pi pi-exclamation-circle' : 'pi pi-circle'"
+                  aria-hidden="true"
+                />
+              </span>
               <div class="min-w-0 flex-1">
-                <p class="truncate font-medium" :class="priorityClass(t.priority)">{{ t.title }}</p>
-                <p class="text-xs opacity-70">
-                  <span :class="{ 'text-danger': isOverdue(t) }">Due {{ formatDue(t.due_at) }}</span>
+                <p class="flex flex-wrap items-center gap-2">
+                  <span class="truncate text-sm font-medium text-ink">{{ t.title }}</span>
+                  <Tag
+                    v-if="t.priority !== 'normal'"
+                    :value="t.priority"
+                    :severity="prioritySeverity[t.priority]"
+                  />
+                </p>
+                <p class="mt-0.5 text-xs text-mute">
+                  <span :class="{ 'font-medium text-danger': isOverdue(t) }">
+                    Due {{ formatDue(t.due_at) }}
+                  </span>
                   · {{ t.assigned_to?.name ?? 'Unassigned' }}
                   <span v-if="t.subject_label"> · {{ t.subject_label }}</span>
                 </p>
               </div>
-              <BaseButton variant="ghost" @click="store.complete(t.id)">Done</BaseButton>
-              <BaseButton variant="ghost" @click="cancelTask(t)">Cancel</BaseButton>
-            </li>
-            <li v-if="!openTasks.length" class="py-4 text-center text-sm opacity-60">
-              Nothing open. Nice.
+              <Button
+                label="Done"
+                icon="pi pi-check"
+                size="small"
+                outlined
+                severity="success"
+                @click="store.complete(t.id)"
+              />
+              <Button
+                icon="pi pi-ban"
+                text
+                rounded
+                size="small"
+                severity="danger"
+                aria-label="Cancel task"
+                @click="cancelTask(t)"
+              />
             </li>
           </ul>
         </section>
 
         <section v-if="doneTasks.length">
-          <h2 class="mb-2 text-sm font-semibold uppercase opacity-60">Done ({{ doneTasks.length }})</h2>
-          <ul class="divide-y divide-border">
-            <li v-for="t in doneTasks" :key="t.id" class="py-2">
-              <p class="truncate opacity-60 line-through">{{ t.title }}</p>
+          <h2
+            class="border-y border-line px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-mute sm:px-5"
+          >
+            Done ({{ doneTasks.length }})
+          </h2>
+          <ul class="divide-y divide-line">
+            <li
+              v-for="t in doneTasks"
+              :key="t.id"
+              class="flex items-center gap-3 px-4 py-2.5 sm:px-5"
+            >
+              <i class="pi pi-check-circle text-success" aria-hidden="true" />
+              <p class="truncate text-sm text-mute line-through">{{ t.title }}</p>
             </li>
           </ul>
         </section>
       </div>
-    </BaseCard>
+    </SectionCard>
   </div>
 </template>

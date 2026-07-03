@@ -229,12 +229,12 @@ onBeforeUnmount(() => {
       </div>
       <ul
         v-if="results.length"
-        class="divide-y divide-border overflow-hidden rounded-token border border-border"
+        class="divide-y divide-line overflow-hidden rounded-lg border border-line bg-card"
       >
         <li v-for="r in results" :key="r.place_id">
           <button
             type="button"
-            class="block w-full px-3 py-2 text-left text-sm hover:bg-surface"
+            class="block w-full px-3 py-2 text-left text-sm text-ink hover:bg-highlight"
             @click="pick(r)"
           >
             {{ r.display_name }}
@@ -245,10 +245,10 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="relative" :class="expanded ? 'min-h-0 flex-1' : 'h-72'">
-      <div ref="mapEl" class="absolute inset-0 rounded-token border border-border" />
+      <div ref="mapEl" class="absolute inset-0 rounded-lg border border-line" />
       <button
         type="button"
-        class="absolute right-2 top-2 z-[1000] flex items-center justify-center rounded-token border border-border bg-surface p-2 text-ink shadow-sm hover:opacity-90"
+        class="absolute right-2 top-2 z-[1000] flex items-center justify-center rounded-lg border border-line bg-card p-2 text-ink shadow-card hover:opacity-90"
         :aria-label="expanded ? 'Close full-screen map' : 'Expand map'"
         :title="expanded ? 'Close' : 'Expand map'"
         @click="toggleExpanded()"

@@ -8,6 +8,7 @@ use App\Core\Models\BaseModel;
 use App\Modules\Pipeline\Models\Call;
 use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,14 +28,21 @@ class Client extends BaseModel
 
     protected $fillable = [
         'first_name', 'last_name', 'phone', 'email',
-        'source_id', 'rating_id', 'assigned_agent_id', 'notes', 'interests',
+        'source_id', 'rating_id', 'referrer_name', 'referrer_phone',
+        'assigned_agent_id', 'notes', 'interests',
+        'id_document_type', 'id_document_number', 'birth_date', 'birth_place',
+        'nationality', 'address', 'occupation',
     ];
+
+    /** Shown wherever a client has no captured name yet. */
+    public const NO_NAME = 'No name';
 
     /** @var list<string> Ids of the `property_interests` items the client wants. */
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
             'interests' => 'array',
+            'birth_date' => 'date:Y-m-d',
         ]);
     }
 
@@ -55,11 +63,12 @@ class Client extends BaseModel
         );
     }
 
-    /** Display name, last name first: "Dupont Jean". */
+    /** Display name, last name first: "Dupont Jean". Names are optional — a
+     * client captured with only a phone shows as "No name" everywhere. */
     protected function fullName(): Attribute
     {
         return Attribute::make(
-            get: fn () => trim("{$this->last_name} {$this->first_name}"),
+            get: fn () => trim("{$this->last_name} {$this->first_name}") ?: self::NO_NAME,
         );
     }
 
@@ -84,6 +93,21 @@ class Client extends BaseModel
             fn (array $m) => Str::ucfirst(Str::lower($m[0])),
             $value,
         );
+    }
+
+    /**
+     * Visibility rule (clients.view_all): without the grant a user sees only
+     * the clients they created or are assigned to follow up.
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        if ($user->can('clients.view_all')) {
+            return $query;
+        }
+
+        return $query->where(fn (Builder $q) => $q
+            ->where('created_by', $user->id)
+            ->orWhere('assigned_agent_id', $user->id));
     }
 
     public function source(): BelongsTo

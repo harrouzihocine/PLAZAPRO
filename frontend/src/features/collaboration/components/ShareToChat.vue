@@ -1,6 +1,9 @@
 <script setup>
 import { ref } from 'vue'
+import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 import { useChatStore } from '@/features/collaboration/chatStore'
+import EmptyState from '@/components/ui/EmptyState.vue'
 
 // A small "Share to chat" affordance for any record (client/deal/unit). Opens a
 // picker of the user's conversations and shares the record into the chosen one.
@@ -35,33 +38,45 @@ async function shareTo(conversationId) {
 </script>
 
 <template>
-  <span>
-    <button class="text-sm text-primary hover:underline" @click="openPicker">💬 {{ label }}</button>
-    <span v-if="shared" class="ml-2 text-sm text-success">Shared ✓</span>
+  <span class="inline-flex items-center gap-2">
+    <Button
+      :label="label"
+      icon="pi pi-share-alt"
+      size="small"
+      severity="secondary"
+      outlined
+      @click="openPicker"
+    />
+    <span v-if="shared" class="text-sm text-success">
+      <i class="pi pi-check" aria-hidden="true" /> Shared
+    </span>
 
-    <div
-      v-if="open"
-      class="fixed inset-0 z-40 flex items-end justify-center bg-black/40 sm:items-center"
-      @click.self="open = false"
+    <Dialog
+      v-model:visible="open"
+      modal
+      dismissable-mask
+      header="Share to a conversation"
+      class="w-[95vw] max-w-md"
     >
-      <div class="w-full max-w-md rounded-token bg-bg p-4 shadow-lg sm:p-6">
-        <h2 class="mb-3 text-lg font-semibold">Share to a conversation</h2>
-        <ul class="max-h-72 divide-y divide-border overflow-y-auto">
-          <li v-for="c in store.conversations" :key="c.id">
-            <button
-              class="w-full py-2 text-left hover:bg-surface disabled:opacity-50"
-              :disabled="busy"
-              @click="shareTo(c.id)"
-            >
-              {{ c.title ?? 'Conversation' }}
-            </button>
-          </li>
-          <li v-if="!store.conversations.length" class="py-4 text-center text-sm opacity-60">
-            No conversations yet. Open Chat and start one first.
-          </li>
-        </ul>
-        <button class="mt-3 text-sm opacity-70" @click="open = false">Cancel</button>
-      </div>
-    </div>
+      <ul class="max-h-72 divide-y divide-line overflow-y-auto">
+        <li v-for="c in store.conversations" :key="c.id">
+          <button
+            type="button"
+            class="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm text-ink transition-colors hover:bg-surface-100 disabled:opacity-50 dark:hover:bg-surface-800"
+            :disabled="busy"
+            @click="shareTo(c.id)"
+          >
+            <i class="pi pi-comments text-mute" aria-hidden="true" />
+            {{ c.title ?? 'Conversation' }}
+          </button>
+        </li>
+      </ul>
+      <EmptyState
+        v-if="!store.conversations.length"
+        icon="pi pi-comments"
+        title="No conversations yet"
+        body="Open Chat and start one first."
+      />
+    </Dialog>
   </span>
 </template>

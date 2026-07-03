@@ -13,6 +13,7 @@ use App\Modules\Settings\Http\Requests\StoreUserRequest;
 use App\Modules\Settings\Http\Requests\UpdateUserRequest;
 use App\Modules\Settings\Http\Resources\UserResource;
 use App\Modules\Settings\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
@@ -70,6 +71,22 @@ class UserController extends Controller
             ->get();
 
         return UserResource::collection($agents);
+    }
+
+    /**
+     * Minimal staff directory (id + name of every active user) — feeds pickers
+     * that target any colleague, e.g. sharing a project's visibility list.
+     * Reference data, open to any authenticated user like the agent pickers.
+     */
+    public function staff(): JsonResponse
+    {
+        $users = User::query()
+            ->active()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return response()->json(['data' => $users]);
     }
 
     public function store(StoreUserRequest $request, CreateUser $action): UserResource

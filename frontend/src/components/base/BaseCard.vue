@@ -1,5 +1,5 @@
 <template>
-  <section class="rounded-token border border-border bg-surface p-4">
+  <section class="rounded-xl border border-line bg-card p-4 shadow-card sm:p-5">
     <slot />
   </section>
 </template>

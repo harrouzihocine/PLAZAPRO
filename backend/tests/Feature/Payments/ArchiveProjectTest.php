@@ -20,8 +20,10 @@ use Tests\TestCase;
  * The deal lifecycle beyond active:
  *   - Archive (POST /archive)   → reversible; hidden until reactivated. Requires an
  *     archive reason and is BLOCKED once any payment has been recorded.
- *   - Remove  (DELETE)          → terminal; the deal and its money are cancelled.
- * Neither hard-deletes; children cancelled beforehand are never disturbed.
+ *   - Remove  (DELETE)          → terminal, and allowed only while the project is
+ *     still empty (no calls/visits/shortlist/deals/payments in any state) — a
+ *     filled project is part of the client's story and must be archived instead.
+ * Neither hard-deletes.
  */
 class ArchiveProjectTest extends TestCase
 {
@@ -41,7 +43,7 @@ class ArchiveProjectTest extends TestCase
 
     private function manager(): User
     {
-        return $this->userWithPermissions(['clients.view', 'clients.manage']);
+        return $this->userWithPermissions(['clients.view', 'clients.manage', 'projects.view_all']);
     }
 
     /** An archive_reasons item id — required to archive a deal. */
@@ -55,9 +57,20 @@ class ArchiveProjectTest extends TestCase
         )->id;
     }
 
-    // --- Remove (DELETE): terminal, cascades, no longer blocked by payments ---
+    // --- Remove (DELETE): allowed only while the project is still empty ---
 
-    public function test_removing_a_deal_cancels_it_and_cascades_to_its_contents(): void
+    public function test_removing_an_empty_deal_cancels_it(): void
+    {
+        $project = ClientProject::factory()->create();
+        Sanctum::actingAs($this->manager());
+
+        $this->deleteJson("/api/v1/projects/{$project->id}", ['reason' => 'Opened by mistake'])
+            ->assertOk();
+
+        $this->assertDatabaseHas('client_projects', ['id' => $project->id, 'status' => 'cancelled']);
+    }
+
+    public function test_removing_a_filled_deal_is_blocked(): void
     {
         $project = ClientProject::factory()->create(['total_price' => '1000.00']);
         $schedule = PaymentSchedule::factory()->create(['client_project_id' => $project->id]);
@@ -65,17 +78,19 @@ class ArchiveProjectTest extends TestCase
         Sanctum::actingAs($this->manager());
 
         $this->deleteJson("/api/v1/projects/{$project->id}", ['reason' => 'Closing out'])
-            ->assertOk();
+            ->assertStatus(422);
 
-        $this->assertDatabaseHas('client_projects', ['id' => $project->id, 'status' => 'cancelled']);
-        $this->assertDatabaseHas('payment_schedules', ['id' => $schedule->id, 'status' => 'cancelled']);
-        $this->assertDatabaseHas('versements', ['id' => $versement->id, 'status' => 'cancelled']);
+        // Nothing was touched — a filled project must be archived, not removed.
+        $this->assertDatabaseHas('client_projects', ['id' => $project->id, 'status' => 'active']);
+        $this->assertDatabaseHas('payment_schedules', ['id' => $schedule->id, 'status' => 'active']);
+        $this->assertDatabaseHas('versements', ['id' => $versement->id, 'status' => 'active']);
     }
 
-    public function test_removing_a_deal_leaves_a_pre_cancelled_versement_untouched(): void
+    public function test_cancelled_history_still_blocks_removal(): void
     {
+        // Even a child that was itself cancelled is history worth keeping.
         $project = ClientProject::factory()->create(['total_price' => '1000.00']);
-        $versement = Versement::factory()->create([
+        Versement::factory()->create([
             'client_project_id' => $project->id,
             'amount' => '500.00',
             'status' => 'cancelled',
@@ -83,12 +98,10 @@ class ArchiveProjectTest extends TestCase
         ]);
         Sanctum::actingAs($this->manager());
 
-        $this->deleteJson("/api/v1/projects/{$project->id}", ['reason' => 'Closing out'])->assertOk();
+        $this->deleteJson("/api/v1/projects/{$project->id}", ['reason' => 'Closing out'])
+            ->assertStatus(422);
 
-        // Reason is not overwritten — the row was already cancelled, so it is skipped.
-        $this->assertDatabaseHas('versements', [
-            'id' => $versement->id, 'status' => 'cancelled', 'cancellation_reason' => 'Duplicate entry',
-        ]);
+        $this->assertDatabaseHas('client_projects', ['id' => $project->id, 'status' => 'active']);
     }
 
     // --- Archive (POST /archive): reversible, hidden, requires a reason ---

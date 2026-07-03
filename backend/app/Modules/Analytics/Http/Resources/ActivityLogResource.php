@@ -18,6 +18,7 @@ class ActivityLogResource extends JsonResource
         return [
             'id' => $this->id,
             'user_id' => $this->user_id,
+            'user_name' => $this->whenLoaded('user', fn () => $this->user?->name),
             'role_at_time' => $this->role_at_time,
             'action' => $this->action,
             'subject_type' => $this->subject_type,

@@ -38,6 +38,7 @@ class UnitController extends Controller
         $units = Unit::query()
             ->with(['type', 'floor', 'location.wilaya', 'location.commune', 'location.contractType'])
             ->when($request->query('status') !== 'all', fn ($q) => $q->active())
+            ->when($request->filled('search'), fn ($q) => $q->where('reference', 'like', '%'.trim((string) $request->query('search')).'%'))
             ->when($request->filled('location_id'), fn ($q) => $q->where('location_id', $request->query('location_id')))
             ->when($asList('type_id'), fn ($q, $ids) => $q->whereIn('type_id', $ids))
             ->when($asList('floor_id'), fn ($q, $ids) => $q->whereIn('floor_id', $ids))

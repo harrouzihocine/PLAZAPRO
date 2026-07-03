@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Clients\Http\Requests;
 
+use App\Modules\Clients\Enums\IdDocumentType;
 use App\Modules\Settings\Rules\CanFollowUpClient;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rules\Enum;
 
 class StoreClientRequest extends FormRequest
 {
@@ -32,17 +34,30 @@ class StoreClientRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'first_name' => ['required', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
+            // Names are optional — the phone is the one identifying field a
+            // walk-in always gives. Nameless clients display as "No name".
+            'first_name' => ['nullable', 'string', 'max:255'],
+            'last_name' => ['nullable', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
             'source_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
             'rating_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
+            // Who told the client about the project (captured when source = referral).
+            'referrer_name' => ['nullable', 'string', 'max:255'],
+            'referrer_phone' => ['nullable', 'string', 'max:50'],
             'assigned_agent_id' => ['nullable', 'integer', new CanFollowUpClient],
             'notes' => ['nullable', 'string', 'max:5000'],
             // What the client is shopping for (property_interests items). Multi-select.
             'interests' => ['nullable', 'array'],
             'interests.*' => ['integer', 'distinct', 'exists:dynamic_list_items,id'],
+            // Identity / contract details, needed by the time a deal closes.
+            'id_document_type' => ['nullable', new Enum(IdDocumentType::class)],
+            'id_document_number' => ['nullable', 'string', 'max:100'],
+            'birth_date' => ['nullable', 'date', 'before:today'],
+            'birth_place' => ['nullable', 'string', 'max:255'],
+            'nationality' => ['nullable', 'string', 'max:100'],
+            'address' => ['nullable', 'string', 'max:500'],
+            'occupation' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

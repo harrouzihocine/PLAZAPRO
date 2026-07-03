@@ -9,25 +9,53 @@ const auth = useAuthStore()
 // user only sees the screens they can use.
 const tabs = computed(() =>
   [
-    { to: { name: 'settings.lists' }, label: 'Lists', permission: 'settings.manage' },
-    { to: { name: 'settings.wilayas' }, label: 'Wilayas & Communes', permission: 'settings.manage' },
-    { to: { name: 'settings.departments' }, label: 'Departments', permission: 'settings.manage' },
-    { to: { name: 'settings.roles' }, label: 'Roles', permission: 'roles.manage' },
-    { to: { name: 'settings.users' }, label: 'Users', permission: 'users.manage' },
+    {
+      to: { name: 'settings.lists' },
+      label: 'Lists',
+      icon: 'pi pi-list',
+      permission: 'settings.manage',
+    },
+    {
+      to: { name: 'settings.wilayas' },
+      label: 'Wilayas & Communes',
+      icon: 'pi pi-map',
+      permission: 'settings.manage',
+    },
+    {
+      to: { name: 'settings.departments' },
+      label: 'Departments',
+      icon: 'pi pi-sitemap',
+      permission: 'settings.manage',
+    },
+    {
+      to: { name: 'settings.roles' },
+      label: 'Roles',
+      icon: 'pi pi-shield',
+      permission: 'roles.manage',
+    },
+    {
+      to: { name: 'settings.users' },
+      label: 'Users',
+      icon: 'pi pi-users',
+      permission: 'users.manage',
+    },
   ].filter((t) => !t.permission || auth.can(t.permission)),
 )
 </script>
 
 <template>
-  <div class="space-y-4">
-    <nav class="flex flex-wrap gap-1 border-b border-border">
+  <div>
+    <nav
+      class="mb-5 flex max-w-full flex-wrap gap-1 overflow-x-auto rounded-lg border border-line bg-card p-1 shadow-card sm:inline-flex sm:flex-nowrap"
+    >
       <RouterLink
         v-for="tab in tabs"
         :key="tab.label"
         :to="tab.to"
-        class="px-4 py-2 text-sm hover:text-primary"
-        active-class="-mb-px border-b-2 border-primary font-medium text-primary"
+        class="flex shrink-0 items-center gap-2 rounded-md px-3.5 py-2 text-sm text-mute transition-colors hover:text-ink"
+        active-class="!bg-highlight font-semibold !text-ink"
       >
+        <i :class="tab.icon" aria-hidden="true" />
         {{ tab.label }}
       </RouterLink>
     </nav>

@@ -1,39 +1,37 @@
 <script setup>
-import { onBeforeUnmount, onMounted } from 'vue'
+import { ref } from 'vue'
+import Dialog from 'primevue/dialog'
 
-// House modal: teleported overlay with a titled card. Used by the client-file
-// workflow (log call, complete visit, open deal, …) so heavy forms don't pile up
-// inline. Close = ✕, backdrop click or Escape. Parent controls visibility with
-// v-if and listens for `close`.
+// House modal on PrimeVue Dialog: titled, maximizable to full window, closes on
+// ✕ / backdrop / Escape. Parent controls visibility with v-if and listens for
+// `close` — the historic contract, unchanged.
 defineProps({
   title: { type: String, default: '' },
   // Tailwind max-width class for the card.
   size: { type: String, default: 'max-w-2xl' },
+  // Open at full window size — for heavy workflows like property pickers.
+  fullscreen: { type: Boolean, default: false },
 })
 const emit = defineEmits(['close'])
 
-function onKeydown(e) {
-  if (e.key === 'Escape') emit('close')
-}
-
-onMounted(() => window.addEventListener('keydown', onKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+const visible = ref(true)
 </script>
 
 <template>
-  <Teleport to="body">
-    <div class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center" @click.self="emit('close')">
-      <div class="my-4 w-full rounded-token border border-border bg-surface shadow-xl" :class="size">
-        <div class="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 class="text-sm font-semibold uppercase opacity-70">{{ title }}</h2>
-          <button type="button" class="rounded px-2 text-lg leading-none opacity-60 hover:opacity-100" aria-label="Close" @click="emit('close')">
-            ✕
-          </button>
-        </div>
-        <div class="max-h-[80vh] overflow-y-auto p-4">
-          <slot />
-        </div>
-      </div>
-    </div>
-  </Teleport>
+  <Dialog
+    v-model:visible="visible"
+    modal
+    maximizable
+    dismissable-mask
+    :header="title || ' '"
+    :class="
+      fullscreen
+        ? '!m-0 !h-screen !max-h-none !w-screen !max-w-none !rounded-none'
+        : ['w-[95vw]', size]
+    "
+    :pt="{ content: { class: 'pb-5' } }"
+    @hide="emit('close')"
+  >
+    <slot />
+  </Dialog>
 </template>

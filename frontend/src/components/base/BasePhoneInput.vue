@@ -1,5 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import InputText from 'primevue/inputtext'
+import Select from 'primevue/select'
 import {
   COUNTRY_CODES,
   DEFAULT_DIAL_CODE,
@@ -18,6 +20,12 @@ const emit = defineEmits(['update:modelValue'])
 
 const favorites = COUNTRY_CODES.filter((c) => c.favorite)
 const rest = COUNTRY_CODES.filter((c) => !c.favorite)
+const dialGroups = [
+  { label: 'Favorites', items: favorites },
+  { label: 'All countries', items: rest },
+]
+// First entry wins for shared dial codes (e.g. +1) — favorites come first.
+const byDial = Object.fromEntries([...COUNTRY_CODES].reverse().map((c) => [c.dial, c]))
 
 const dial = ref(DEFAULT_DIAL_CODE)
 const number = ref('')
@@ -71,30 +79,38 @@ function normalizeField() {
 
 <template>
   <label class="block">
-    <span v-if="label" class="mb-1 block text-sm">{{ label }}</span>
+    <span v-if="label" class="mb-1.5 block text-sm font-medium text-ink">{{ label }}</span>
     <div class="flex gap-2">
-      <select
+      <Select
         v-model="dial"
+        :options="dialGroups"
+        option-label="dial"
+        option-value="dial"
+        option-group-label="label"
+        option-group-children="items"
+        filter
+        :filter-fields="['name', 'dial']"
         aria-label="Country dialing code"
-        class="w-28 shrink-0 rounded-token border border-border bg-bg px-2 py-2 min-h-[44px] text-ink outline-none focus:border-primary"
-        @change="emitValue"
+        class="w-32 shrink-0"
+        @update:model-value="emitValue"
       >
-        <optgroup label="Favorites">
-          <option v-for="c in favorites" :key="`fav-${c.iso}`" :value="c.dial">
-            {{ c.flag }} {{ c.dial }}
-          </option>
-        </optgroup>
-        <optgroup label="All countries">
-          <option v-for="c in rest" :key="c.iso" :value="c.dial">
-            {{ c.flag }} {{ c.name }} ({{ c.dial }})
-          </option>
-        </optgroup>
-      </select>
-      <input
+        <template #value="{ value }">
+          <span v-if="value" class="whitespace-nowrap">
+            {{ byDial[value]?.flag }} {{ value }}
+          </span>
+        </template>
+        <template #option="{ option }">
+          <span class="truncate text-sm"
+            >{{ option.flag }} {{ option.name }} ({{ option.dial }})</span
+          >
+        </template>
+      </Select>
+      <InputText
         v-model="number"
         type="tel"
         inputmode="tel"
-        class="w-full rounded-token border border-border bg-bg px-3 py-2 min-h-[44px] text-ink outline-none focus:border-primary"
+        :invalid="Boolean(error)"
+        fluid
         @input="emitValue"
         @blur="normalizeField"
       />

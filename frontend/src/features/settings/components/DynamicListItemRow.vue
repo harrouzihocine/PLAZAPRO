@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import BaseButton from '@/components/base/BaseButton.vue'
+import Button from 'primevue/button'
+import ToggleSwitch from 'primevue/toggleswitch'
 import BaseInput from '@/components/base/BaseInput.vue'
 
 const props = defineProps({
@@ -30,34 +31,40 @@ function save() {
 
 <template>
   <div
-    class="flex flex-col gap-2 rounded-token border border-border p-2 sm:flex-row sm:items-center"
+    class="flex flex-col gap-2 rounded-xl border border-line p-2.5 sm:flex-row sm:items-center"
     :class="{ 'opacity-60': !item.is_active }"
   >
     <div class="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
       <BaseInput v-model="label" aria-label="Label" />
       <BaseInput v-model="value" aria-label="Value" />
     </div>
-    <div class="flex items-center gap-1">
-      <BaseButton v-if="dirty" @click="save">Save</BaseButton>
-      <BaseButton
-        variant="ghost"
+    <div class="flex items-center gap-1.5">
+      <Button v-if="dirty" label="Save" icon="pi pi-check" size="small" @click="save" />
+      <Button
+        icon="pi pi-arrow-up"
+        text
+        rounded
+        size="small"
+        severity="secondary"
         :disabled="isFirst"
         aria-label="Move up"
         @click="emit('move', -1)"
-      >
-        ↑
-      </BaseButton>
-      <BaseButton
-        variant="ghost"
+      />
+      <Button
+        icon="pi pi-arrow-down"
+        text
+        rounded
+        size="small"
+        severity="secondary"
         :disabled="isLast"
         aria-label="Move down"
         @click="emit('move', 1)"
-      >
-        ↓
-      </BaseButton>
-      <BaseButton variant="ghost" @click="emit('toggle')">
-        {{ item.is_active ? 'On' : 'Off' }}
-      </BaseButton>
+      />
+      <ToggleSwitch
+        :model-value="Boolean(item.is_active)"
+        :aria-label="item.is_active ? 'Deactivate item' : 'Activate item'"
+        @update:model-value="emit('toggle')"
+      />
     </div>
   </div>
 </template>

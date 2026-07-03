@@ -34,7 +34,14 @@ const loading = ref(false)
 const showFilters = ref(false)
 
 // Inventory-style refinements, applied server-side like UnitsView.
-const filters = reactive({ type_id: [], floor_id: [], min_price: '', max_price: '', min_area: '', max_area: '' })
+const filters = reactive({
+  type_id: [],
+  floor_id: [],
+  min_price: '',
+  max_price: '',
+  min_area: '',
+  max_area: '',
+})
 
 // Available (not taken) boxes per location — drives the box_count ceiling.
 const availableBoxCount = ref({})
@@ -87,8 +94,18 @@ function boxLabel(b) {
 
 const candidates = computed(() => {
   const all = [
-    ...units.value.map((u) => ({ type: 'unit', id: u.id, label: unitLabel(u), locationId: u.location_id })),
-    ...boxes.value.map((b) => ({ type: 'box', id: b.id, label: boxLabel(b), locationId: b.location_id })),
+    ...units.value.map((u) => ({
+      type: 'unit',
+      id: u.id,
+      label: unitLabel(u),
+      locationId: u.location_id,
+    })),
+    ...boxes.value.map((b) => ({
+      type: 'box',
+      id: b.id,
+      label: boxLabel(b),
+      locationId: b.location_id,
+    })),
   ]
   return all.filter((c) => !excludedKeys.value.has(keyOf(c.type, c.id)))
 })
@@ -135,29 +152,41 @@ function toggleBoxes(index, checked) {
 </script>
 
 <template>
-  <div class="space-y-2">
+  <div class="space-y-3">
     <!-- Already-selected properties — full card + the box decision per unit. -->
-    <div v-if="modelValue.length" class="space-y-1.5">
+    <div v-if="modelValue.length" class="space-y-2">
       <div
         v-for="(p, i) in modelValue"
         :key="p.shortlistable_type + p.shortlistable_id"
-        class="rounded-token bg-primary/10 px-2 py-1.5 text-xs"
+        class="rounded-lg bg-highlight px-3 py-2 text-xs"
       >
-        <span class="inline-flex w-full items-center gap-1">
-          <span class="flex-1">
-            {{ p.shortlistable_type === 'box' ? '🅿' : '🏠' }}
+        <span class="inline-flex w-full items-center gap-2">
+          <i
+            :class="p.shortlistable_type === 'box' ? 'pi pi-car' : 'pi pi-home'"
+            class="text-[10px] text-mute"
+            aria-hidden="true"
+          />
+          <span class="flex-1 text-ink">
             {{ p.label ?? `${p.shortlistable_type} #${p.shortlistable_id}` }}
           </span>
-          <button type="button" class="opacity-60 hover:text-danger" @click="remove(i)">✕</button>
+          <button
+            type="button"
+            class="text-mute hover:text-danger"
+            aria-label="Remove property"
+            @click="remove(i)"
+          >
+            <i class="pi pi-times text-[10px]" aria-hidden="true" />
+          </button>
         </span>
         <!-- Include boxes with this apartment (1 → max available, not taken). -->
         <div
           v-if="withBoxes && p.shortlistable_type === 'unit' && maxBoxesFor(p) > 0"
-          class="mt-1 flex items-center gap-2 border-t border-primary/20 pt-1"
+          class="mt-2 flex items-center gap-2 border-t border-primary-200/60 pt-2 dark:border-primary-500/20"
         >
-          <label class="inline-flex items-center gap-1.5">
+          <label class="inline-flex cursor-pointer items-center gap-1.5 text-ink">
             <input
               type="checkbox"
+              class="h-4 w-4 accent-primary"
               :checked="(p.box_count ?? 0) > 0"
               @change="toggleBoxes(i, $event.target.checked)"
             />
@@ -165,13 +194,13 @@ function toggleBoxes(index, checked) {
           </label>
           <template v-if="(p.box_count ?? 0) > 0">
             <select
-              class="rounded-token border border-border bg-bg px-1.5 py-0.5 text-xs text-ink"
+              class="rounded-md border border-line bg-card px-2 py-1 text-xs text-ink outline-none focus:border-primary"
               :value="p.box_count"
               @change="setBoxCount(i, Number($event.target.value))"
             >
               <option v-for="n in maxBoxesFor(p)" :key="n" :value="n">{{ n }}</option>
             </select>
-            <span class="opacity-60">of {{ maxBoxesFor(p) }} available</span>
+            <span class="text-mute">of {{ maxBoxesFor(p) }} available</span>
           </template>
         </div>
       </div>
@@ -188,15 +217,19 @@ function toggleBoxes(index, checked) {
       <button
         v-if="locationId"
         type="button"
-        class="rounded-token border border-border px-2 py-2 text-xs opacity-80 hover:border-primary"
+        class="rounded-md border border-line px-3 py-2.5 text-xs text-mute transition-colors hover:border-primary hover:text-ink"
         @click="showFilters = !showFilters"
       >
-        Filters {{ showFilters ? '▴' : '▾' }}
+        <i class="pi pi-sliders-h text-[10px]" aria-hidden="true" />
+        Filters
       </button>
     </div>
 
     <!-- The same refinements as Inventory → Units, compacted. -->
-    <div v-if="showFilters && locationId" class="grid gap-2 rounded-token border border-border p-2 sm:grid-cols-3">
+    <div
+      v-if="showFilters && locationId"
+      class="grid gap-3 rounded-xl border border-line p-3 sm:grid-cols-3"
+    >
       <BaseMultiSelect
         v-model="filters.type_id"
         label="Type"
@@ -210,32 +243,57 @@ function toggleBoxes(index, checked) {
         @update:model-value="loadCandidates()"
       />
       <div class="grid grid-cols-2 gap-2">
-        <BaseInput v-model="filters.min_price" label="Min price" type="number" @change="loadCandidates()" />
-        <BaseInput v-model="filters.max_price" label="Max price" type="number" @change="loadCandidates()" />
+        <BaseInput
+          v-model="filters.min_price"
+          label="Min price"
+          type="number"
+          @change="loadCandidates()"
+        />
+        <BaseInput
+          v-model="filters.max_price"
+          label="Max price"
+          type="number"
+          @change="loadCandidates()"
+        />
       </div>
       <div class="grid grid-cols-2 gap-2 sm:col-start-1">
-        <BaseInput v-model="filters.min_area" label="Min m²" type="number" @change="loadCandidates()" />
-        <BaseInput v-model="filters.max_area" label="Max m²" type="number" @change="loadCandidates()" />
+        <BaseInput
+          v-model="filters.min_area"
+          label="Min m²"
+          type="number"
+          @change="loadCandidates()"
+        />
+        <BaseInput
+          v-model="filters.max_area"
+          label="Max m²"
+          type="number"
+          @change="loadCandidates()"
+        />
       </div>
     </div>
 
-    <p v-if="loading" class="text-xs opacity-60">Loading available properties…</p>
+    <p v-if="loading" class="text-xs text-mute">Loading available properties…</p>
     <div v-else-if="locationId" class="flex flex-wrap gap-1.5">
       <button
         v-for="c in candidates"
         :key="c.type + c.id"
         type="button"
-        class="rounded-token border px-2 py-1 text-xs transition-colors"
+        class="rounded-full border px-3 py-1.5 text-xs transition-colors"
         :class="
           selectedKeys.has(`${c.type}:${c.id}`)
-            ? 'border-primary bg-primary/15 text-ink'
-            : 'border-border bg-bg opacity-80 hover:border-primary'
+            ? 'border-primary bg-highlight font-medium text-ink'
+            : 'border-line text-mute hover:border-primary hover:text-ink'
         "
         @click="toggle(c)"
       >
-        {{ c.type === 'box' ? '🅿 ' : '🏠 ' }}{{ c.label }}
+        <i
+          :class="c.type === 'box' ? 'pi pi-car' : 'pi pi-home'"
+          class="text-[10px]"
+          aria-hidden="true"
+        />
+        {{ c.label }}
       </button>
-      <p v-if="!candidates.length" class="text-xs opacity-60">
+      <p v-if="!candidates.length" class="text-xs text-mute">
         No available properties match in this project.
       </p>
     </div>

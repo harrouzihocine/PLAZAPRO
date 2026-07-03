@@ -71,7 +71,7 @@ class DesireFlexTest extends TestCase
     public function test_shifting_marks_the_project_as_waiting_on_desire(): void
     {
         $project = ClientProject::factory()->create();
-        Sanctum::actingAs($this->userWith(['clients.view', 'clients.manage', 'clients.create']));
+        Sanctum::actingAs($this->userWith(['clients.view', 'clients.manage', 'clients.create', 'projects.view_all']));
 
         $this->postJson("/api/v1/projects/{$project->id}/shift-to-desire", ['budget_max' => '100'])
             ->assertSuccessful();

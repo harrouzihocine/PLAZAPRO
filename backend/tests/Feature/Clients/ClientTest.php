@@ -30,7 +30,10 @@ class ClientTest extends TestCase
 
     private function manager(): User
     {
-        return $this->userWithPermissions(['clients.view', 'clients.create', 'clients.manage']);
+        return $this->userWithPermissions([
+            'clients.view', 'clients.view_all', 'clients.view_details',
+            'clients.create', 'clients.manage',
+        ]);
     }
 
     private function agentUser(): User

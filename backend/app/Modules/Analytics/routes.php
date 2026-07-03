@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 use App\Modules\Analytics\Http\Controllers\AuditController;
 use App\Modules\Analytics\Http\Controllers\DashboardController;
+use App\Modules\Analytics\Http\Controllers\RecordActivityController;
 use App\Modules\Analytics\Http\Controllers\ReportController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,6 +27,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/analytics/source-roi', [ReportController::class, 'sourceRoi']);
         Route::get('/analytics/units', [ReportController::class, 'units']);
     });
+
+    // One record's audit trail, gated by that record's own view permission
+    // (checked inside the controller via AuditableRecord).
+    Route::get('/activity/{type}/{id}', [RecordActivityController::class, 'index'])
+        ->whereNumber('id');
 
     // Admin audit feed over the append-only activity log.
     Route::middleware('can:audit.view')->get('/audit', [AuditController::class, 'index']);

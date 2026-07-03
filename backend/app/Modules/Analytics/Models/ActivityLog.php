@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Analytics\Models;
 
+use App\Modules\Settings\Models\User;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Auth;
 use RuntimeException;
 
@@ -27,6 +29,11 @@ class ActivityLog extends Model
     protected $casts = [
         'changes' => 'array',
     ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public static function record(string $action, ?Model $subject = null, array $changes = []): self
     {

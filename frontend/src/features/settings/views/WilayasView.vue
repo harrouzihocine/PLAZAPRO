@@ -1,8 +1,10 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import BaseButton from '@/components/base/BaseButton.vue'
-import BaseCard from '@/components/base/BaseCard.vue'
+import Button from 'primevue/button'
 import BaseInput from '@/components/base/BaseInput.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import SectionCard from '@/components/ui/SectionCard.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { geographyApi } from '@/features/settings/api'
 import { invalidateWilayas, invalidateCommunes } from '@/composables/useGeography'
 import { confirmAction, toastError } from '@/composables/useConfirm'
@@ -21,9 +23,7 @@ const selected = computed(() => wilayas.value.find((w) => w.id === selectedId.va
 const filtered = computed(() => {
   const q = search.value.trim().toLowerCase()
   if (!q) return wilayas.value
-  return wilayas.value.filter(
-    (w) => w.name.toLowerCase().includes(q) || String(w.code).includes(q),
-  )
+  return wilayas.value.filter((w) => w.name.toLowerCase().includes(q) || String(w.code).includes(q))
 })
 
 onMounted(loadWilayas)
@@ -61,7 +61,9 @@ async function mutate(fn) {
 async function addWilaya() {
   if (!newWilaya.code.trim() || !newWilaya.name.trim()) return
   try {
-    await mutate(() => geographyApi.createWilaya({ code: newWilaya.code.trim(), name: newWilaya.name.trim() }))
+    await mutate(() =>
+      geographyApi.createWilaya({ code: newWilaya.code.trim(), name: newWilaya.name.trim() }),
+    )
     newWilaya.code = ''
     newWilaya.name = ''
     await loadWilayas()
@@ -128,7 +130,10 @@ async function addCommune() {
 async function saveCommune(commune) {
   try {
     await mutate(() =>
-      geographyApi.updateCommune(commune.id, { name: commune.name, daira_name: commune.daira_name }),
+      geographyApi.updateCommune(commune.id, {
+        name: commune.name,
+        daira_name: commune.daira_name,
+      }),
     )
   } catch {
     /* surfaced via error */
@@ -156,82 +161,124 @@ async function removeCommune(commune) {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div>
-      <h1 class="text-2xl font-semibold">Wilayas &amp; Communes</h1>
-      <p class="opacity-70">Manage Algeria's wilayas and the communes that belong to each one.</p>
-    </div>
+  <div>
+    <PageHeader
+      title="Wilayas & Communes"
+      subtitle="Manage Algeria's wilayas and the communes that belong to each one."
+    />
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-[20rem_1fr]">
+    <div class="grid grid-cols-1 gap-5 md:grid-cols-[20rem_1fr]">
       <!-- Wilaya picker -->
-      <BaseCard>
-        <h2 class="mb-2 font-medium">Wilayas ({{ wilayas.length }})</h2>
-        <BaseInput v-model="search" label="Search" class="mb-2" />
-        <p v-if="loading" class="py-2 text-center text-sm opacity-60">Loading…</p>
-        <nav v-else class="flex max-h-[26rem] flex-col gap-1 overflow-y-auto">
+      <SectionCard :title="`Wilayas (${wilayas.length})`" icon="pi pi-map" class="self-start">
+        <BaseInput v-model="search" label="Search" class="mb-3" />
+        <p v-if="loading" class="py-2 text-center text-sm text-mute">Loading…</p>
+        <nav v-else class="-mx-1 flex max-h-[26rem] flex-col gap-0.5 overflow-y-auto px-1">
           <button
             v-for="w in filtered"
             :key="w.id"
-            class="flex items-center justify-between rounded-token px-3 py-2 text-left hover:bg-bg"
-            :class="{ 'bg-bg text-primary': w.id === selectedId }"
+            type="button"
+            class="flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors"
+            :class="
+              w.id === selectedId
+                ? 'bg-highlight font-semibold text-ink'
+                : 'text-mute hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800'
+            "
             @click="select(w)"
           >
-            <span><span class="opacity-50">{{ w.code }}</span> · {{ w.name }}</span>
-            <span class="text-xs opacity-50">{{ w.communes_count }}</span>
+            <span class="truncate">
+              <span class="num text-mute">{{ w.code }}</span> · {{ w.name }}
+            </span>
+            <span class="num text-xs text-mute">{{ w.communes_count }}</span>
           </button>
         </nav>
 
         <!-- Add wilaya -->
-        <form class="mt-3 flex flex-col gap-2 border-t border-border pt-3" @submit.prevent="addWilaya">
+        <form
+          class="mt-3 flex flex-col gap-2 border-t border-line pt-3"
+          @submit.prevent="addWilaya"
+        >
           <div class="flex gap-2">
             <BaseInput v-model="newWilaya.code" label="Code" class="w-20" />
             <BaseInput v-model="newWilaya.name" label="Name" class="flex-1" />
           </div>
-          <BaseButton type="submit" :disabled="saving">Add wilaya</BaseButton>
+          <Button type="submit" label="Add wilaya" icon="pi pi-plus" :loading="saving" />
         </form>
-      </BaseCard>
+      </SectionCard>
 
       <!-- Commune manager -->
-      <BaseCard v-if="selected">
-        <header class="mb-3 flex flex-wrap items-end justify-between gap-2">
+      <SectionCard v-if="selected">
+        <header class="mb-4 flex flex-wrap items-end justify-between gap-2">
           <form class="flex items-end gap-2" @submit.prevent="renameWilaya">
             <BaseInput v-model="selected.code" label="Code" class="w-20" />
             <BaseInput v-model="selected.name" label="Wilaya" class="w-56" />
-            <BaseButton type="submit" variant="ghost" :disabled="saving">Save</BaseButton>
+            <Button
+              type="submit"
+              label="Save"
+              icon="pi pi-check"
+              severity="secondary"
+              outlined
+              :disabled="saving"
+            />
           </form>
-          <BaseButton variant="ghost" @click="removeWilaya(selected)">Remove wilaya</BaseButton>
+          <Button
+            label="Remove wilaya"
+            icon="pi pi-ban"
+            severity="danger"
+            outlined
+            @click="removeWilaya(selected)"
+          />
         </header>
 
         <div class="space-y-2">
           <div
             v-for="c in communes"
             :key="c.id"
-            class="flex flex-col gap-2 rounded-token border border-border p-2 sm:flex-row sm:items-end"
+            class="flex flex-col gap-2 rounded-xl border border-line p-2.5 sm:flex-row sm:items-end"
           >
             <BaseInput v-model="c.name" label="Commune" class="flex-1" />
             <BaseInput v-model="c.daira_name" label="Daïra" class="flex-1" />
             <div class="flex gap-1">
-              <BaseButton variant="ghost" :disabled="saving" @click="saveCommune(c)">Save</BaseButton>
-              <BaseButton variant="ghost" @click="removeCommune(c)">Remove</BaseButton>
+              <Button
+                label="Save"
+                icon="pi pi-check"
+                size="small"
+                severity="secondary"
+                outlined
+                :disabled="saving"
+                @click="saveCommune(c)"
+              />
+              <Button
+                icon="pi pi-ban"
+                text
+                rounded
+                size="small"
+                severity="danger"
+                aria-label="Remove commune"
+                @click="removeCommune(c)"
+              />
             </div>
           </div>
-          <p v-if="!communes.length" class="py-4 text-center text-sm opacity-60">No communes yet.</p>
+          <p v-if="!communes.length" class="py-4 text-center text-sm text-mute">No communes yet.</p>
         </div>
 
         <!-- Add commune -->
         <form
-          class="mt-4 flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-end"
+          class="mt-4 flex flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:items-end"
           @submit.prevent="addCommune"
         >
           <BaseInput v-model="newCommune.name" label="New commune" class="flex-1" />
           <BaseInput v-model="newCommune.daira_name" label="Daïra (optional)" class="flex-1" />
-          <BaseButton type="submit" :disabled="saving">Add commune</BaseButton>
+          <Button type="submit" label="Add commune" icon="pi pi-plus" :loading="saving" />
         </form>
-      </BaseCard>
+      </SectionCard>
 
-      <BaseCard v-else>
-        <p class="py-8 text-center text-sm opacity-60">Select a wilaya to manage its communes.</p>
-      </BaseCard>
+      <SectionCard v-else>
+        <EmptyState
+          icon="pi pi-map"
+          title="Select a wilaya"
+          body="Pick one on the left to manage its communes."
+        />
+      </SectionCard>
     </div>
   </div>
 </template>

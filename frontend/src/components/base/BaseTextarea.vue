@@ -1,4 +1,6 @@
 <script setup>
+import Textarea from 'primevue/textarea'
+
 // The multi-line sibling of BaseInput — same tokens, same label wrapper. Every
 // free-text "notes"-style field in the app uses this (house rule: notes are
 // textareas, never single-line inputs).
@@ -14,13 +16,15 @@ const emit = defineEmits(['update:modelValue'])
 
 <template>
   <label class="block">
-    <span v-if="label" class="mb-1 block text-sm">{{ label }}</span>
-    <textarea
-      :value="modelValue"
+    <span v-if="label" class="mb-1.5 block text-sm font-medium text-ink">{{ label }}</span>
+    <Textarea
+      :model-value="String(modelValue ?? '')"
       :rows="rows"
-      :placeholder="placeholder"
-      class="w-full resize-y rounded-token border border-border bg-bg px-3 py-2 text-ink outline-none focus:border-primary"
-      @input="emit('update:modelValue', $event.target.value)"
+      :placeholder="placeholder || undefined"
+      :invalid="Boolean(error)"
+      auto-resize
+      fluid
+      @update:model-value="emit('update:modelValue', $event)"
     />
     <span v-if="error" class="mt-1 block text-sm text-danger">{{ error }}</span>
   </label>

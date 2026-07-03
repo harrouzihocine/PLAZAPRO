@@ -13,6 +13,7 @@ use App\Modules\Clients\Http\Requests\SyncDealBoxesRequest;
 use App\Modules\Clients\Http\Resources\DealResource;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Clients\Models\Deal;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
 
@@ -31,8 +32,11 @@ class DealController extends Controller
         ];
     }
 
-    public function index(ClientProject $project): AnonymousResourceCollection
+    public function index(Request $request, ClientProject $project): AnonymousResourceCollection
     {
+        // A project outside the user's visibility scope reads as absent.
+        abort_unless($project->isVisibleTo($request->user()), 404);
+
         return DealResource::collection(
             $project->deals()->active()->with(self::relations())->latest('id')->get(),
         );

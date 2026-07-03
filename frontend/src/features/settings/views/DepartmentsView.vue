@@ -1,8 +1,9 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import BaseButton from '@/components/base/BaseButton.vue'
-import BaseCard from '@/components/base/BaseCard.vue'
+import Button from 'primevue/button'
 import BaseInput from '@/components/base/BaseInput.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import SectionCard from '@/components/ui/SectionCard.vue'
 import { useDepartmentsStore } from '@/features/settings/departmentsStore'
 import { confirmAction } from '@/composables/useConfirm'
 
@@ -51,19 +52,15 @@ async function remove(dept) {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div>
-      <h1 class="text-xl font-semibold">Departments</h1>
-      <p class="opacity-70">Organisational units you can assign users to.</p>
-    </div>
+  <div>
+    <PageHeader title="Departments" subtitle="Organisational units you can assign users to." />
 
-
-    <BaseCard>
+    <SectionCard>
       <div class="space-y-2">
         <div
           v-for="dept in store.items"
           :key="dept.id"
-          class="flex flex-col gap-2 rounded-token border border-border p-2 sm:flex-row sm:items-center"
+          class="flex flex-col gap-2 rounded-xl border border-line p-2.5 sm:flex-row sm:items-center"
         >
           <div class="flex-1">
             <BaseInput
@@ -73,37 +70,59 @@ async function remove(dept) {
               @keyup.enter="saveEdit(dept)"
             />
             <template v-else>
-              <span class="font-medium">{{ dept.name }}</span>
-              <span class="ml-2 text-xs opacity-60">
+              <span class="font-medium text-ink">{{ dept.name }}</span>
+              <span class="ml-2 text-xs text-mute">
                 {{ dept.slug }} · {{ dept.users_count ?? 0 }} users
               </span>
             </template>
           </div>
           <div class="flex items-center gap-1">
             <template v-if="editingId === dept.id">
-              <BaseButton @click="saveEdit(dept)">Save</BaseButton>
-              <BaseButton variant="ghost" @click="editingId = null">Cancel</BaseButton>
+              <Button label="Save" icon="pi pi-check" size="small" @click="saveEdit(dept)" />
+              <Button
+                label="Cancel"
+                size="small"
+                severity="secondary"
+                outlined
+                @click="editingId = null"
+              />
             </template>
             <template v-else>
-              <BaseButton variant="ghost" @click="startEdit(dept)">Edit</BaseButton>
-              <BaseButton variant="ghost" @click="remove(dept)">Remove</BaseButton>
+              <Button
+                icon="pi pi-pencil"
+                text
+                rounded
+                size="small"
+                severity="secondary"
+                aria-label="Edit department"
+                @click="startEdit(dept)"
+              />
+              <Button
+                icon="pi pi-ban"
+                text
+                rounded
+                size="small"
+                severity="danger"
+                aria-label="Cancel department"
+                @click="remove(dept)"
+              />
             </template>
           </div>
         </div>
-        <p v-if="!store.items.length" class="py-4 text-center text-sm opacity-60">
+        <p v-if="!store.items.length" class="py-4 text-center text-sm text-mute">
           No departments yet.
         </p>
       </div>
 
       <form
-        class="mt-4 flex flex-col gap-2 border-t border-border pt-4 sm:flex-row"
+        class="mt-4 flex flex-col gap-2 border-t border-line pt-4 sm:flex-row"
         @submit.prevent="add"
       >
         <BaseInput v-model="newName" label="New department" class="flex-1" />
         <div class="flex items-end">
-          <BaseButton type="submit" :disabled="store.saving">Add</BaseButton>
+          <Button type="submit" label="Add" icon="pi pi-plus" :loading="store.saving" />
         </div>
       </form>
-    </BaseCard>
+    </SectionCard>
   </div>
 </template>

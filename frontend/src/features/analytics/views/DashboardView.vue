@@ -1,34 +1,47 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import BaseCard from '@/components/base/BaseCard.vue'
+import { RouterLink } from 'vue-router'
+import Tag from 'primevue/tag'
 import { analyticsApi } from '@/features/analytics/api'
 import { formatMoney } from '@/features/payments/money'
 import { useAuthStore } from '@/features/settings/store'
+import { formatDateTime, humanize } from '@/utils/format'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import SectionCard from '@/components/ui/SectionCard.vue'
+import StatCard from '@/components/ui/StatCard.vue'
+import StatusTag from '@/components/ui/StatusTag.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 
 const auth = useAuthStore()
-const name = computed(() => auth.user?.name ?? 'there')
 
 const data = ref(null)
 const loading = ref(true)
 const denied = ref(false)
 const error = ref('')
 
-// Full class strings (not interpolated) so Tailwind's scanner keeps them.
-const stageStyles = {
-  lead: 'bg-border text-ink',
-  negotiating: 'bg-warning/15 text-warning',
-  reserved: 'bg-primary/15 text-primary',
-  won: 'bg-success/15 text-success',
-  lost: 'bg-danger/15 text-danger',
-}
+const greeting = computed(() => {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 18) return 'Good afternoon'
+  return 'Good evening'
+})
 
-const scopeLabel = computed(() =>
-  data.value?.scope === 'agent' ? 'Your book' : 'Company-wide',
-)
+const firstName = computed(() => (auth.user?.name ?? '').split(' ')[0] || 'there')
 
-function fmtDateTime(value) {
-  return value ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : ''
-}
+const scopeLabel = computed(() => (data.value?.scope === 'agent' ? 'Your book' : 'Company-wide'))
+
+// Pipeline funnel in its natural order. Bars are one hue (magnitude of one
+// measure); stage identity lives in the labeled tag, never in bar colour.
+const STAGE_ORDER = ['lead', 'negotiating', 'reserved', 'won', 'lost']
+const stages = computed(() => {
+  const byStage = data.value?.deals_by_stage ?? {}
+  const rows = STAGE_ORDER.filter((s) => s in byStage).map((s) => ({
+    stage: s,
+    count: byStage[s] ?? 0,
+  }))
+  const max = Math.max(1, ...rows.map((r) => r.count))
+  return rows.map((r) => ({ ...r, pct: Math.round((r.count / max) * 100) }))
+})
 
 onMounted(async () => {
   try {
@@ -43,110 +56,174 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="flex flex-wrap items-end justify-between gap-2">
-      <div>
-        <h1 class="text-2xl font-semibold">Welcome, {{ name }}</h1>
-        <p class="opacity-70">
-          Role: <span class="text-primary">{{ auth.user?.role?.name ?? '—' }}</span>
-        </p>
+  <div>
+    <PageHeader :title="`${greeting}, ${firstName}`">
+      <template #subtitle>
+        Here's what's happening across
+        <span class="font-medium text-ink">{{ scopeLabel.toLowerCase() }}</span> today.
+      </template>
+      <template #badges>
+        <Tag
+          v-if="data"
+          :value="scopeLabel"
+          :icon="data.scope === 'agent' ? 'pi pi-user' : 'pi pi-globe'"
+          severity="secondary"
+        />
+      </template>
+    </PageHeader>
+
+    <SectionCard v-if="denied">
+      <EmptyState
+        icon="pi pi-lock"
+        title="No dashboard access"
+        body="Your role doesn't include dashboard metrics. Contact your administrator."
+      />
+    </SectionCard>
+
+    <SectionCard v-else-if="error">
+      <EmptyState icon="pi pi-exclamation-triangle" :title="error" />
+    </SectionCard>
+
+    <div v-else class="space-y-5">
+      <!-- KPI row -->
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Active clients"
+          :value="data?.kpis.clients ?? '—'"
+          icon="pi pi-users"
+          :loading="loading"
+        />
+        <StatCard
+          label="Upcoming visits"
+          :value="data?.kpis.upcoming_visits ?? '—'"
+          icon="pi pi-calendar"
+          tone="info"
+          :loading="loading"
+        />
+        <StatCard
+          label="Overdue actions"
+          :value="data?.kpis.overdue_actions ?? '—'"
+          icon="pi pi-exclamation-circle"
+          :tone="(data?.kpis.overdue_actions ?? 0) > 0 ? 'danger' : 'success'"
+          :hint="(data?.kpis.overdue_actions ?? 0) > 0 ? 'Needs attention now' : 'All caught up'"
+          :loading="loading"
+        />
+        <StatCard
+          label="Payments due"
+          :value="data?.kpis.payments_due.count ?? '—'"
+          icon="pi pi-wallet"
+          tone="warning"
+          :hint="data ? formatMoney(data.kpis.payments_due.amount) : null"
+          :loading="loading"
+        />
       </div>
-      <span v-if="data" class="rounded-token border border-border px-3 py-1 text-sm opacity-80">
-        {{ scopeLabel }}
-      </span>
-    </div>
 
-    <p v-if="loading" class="py-6 text-center text-sm opacity-60">Loading…</p>
+      <div class="grid grid-cols-1 gap-5 xl:grid-cols-5">
+        <!-- Pipeline funnel -->
+        <SectionCard title="Deals by stage" icon="pi pi-filter" class="xl:col-span-2">
+          <EmptyState
+            v-if="!loading && stages.every((s) => s.count === 0)"
+            icon="pi pi-filter"
+            title="No deals yet"
+            body="Deals appear here as clients move through the pipeline."
+          />
+          <ol v-else class="space-y-3.5">
+            <li v-for="row in stages" :key="row.stage" class="flex items-center gap-3">
+              <span class="w-32 shrink-0">
+                <StatusTag :value="row.stage" />
+              </span>
+              <span
+                class="relative h-6 flex-1 overflow-hidden rounded bg-surface-100 dark:bg-surface-800"
+              >
+                <span
+                  class="absolute inset-y-0 left-0 rounded bg-primary-600 transition-[width] duration-500 dark:bg-primary-400"
+                  :style="{ width: row.count > 0 ? `max(${row.pct}%, 6px)` : '0' }"
+                  aria-hidden="true"
+                />
+              </span>
+              <span class="num w-8 shrink-0 text-right text-sm font-semibold text-ink">
+                {{ row.count }}
+              </span>
+            </li>
+          </ol>
+        </SectionCard>
 
-    <BaseCard v-else-if="denied">
-      <p class="text-sm opacity-70">You don't have access to dashboard metrics.</p>
-    </BaseCard>
-
-    <BaseCard v-else-if="error">
-      <p class="text-sm text-danger">{{ error }}</p>
-    </BaseCard>
-
-    <template v-else-if="data">
-      <!-- KPI cards -->
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <BaseCard>
-          <h2 class="mb-1 text-sm font-medium opacity-70">Clients</h2>
-          <p class="text-3xl font-semibold text-primary">{{ data.kpis.clients }}</p>
-        </BaseCard>
-        <BaseCard>
-          <h2 class="mb-1 text-sm font-medium opacity-70">Upcoming visits</h2>
-          <p class="text-3xl font-semibold text-primary">{{ data.kpis.upcoming_visits }}</p>
-        </BaseCard>
-        <BaseCard>
-          <h2 class="mb-1 text-sm font-medium opacity-70">Overdue actions</h2>
-          <p
-            class="text-3xl font-semibold"
-            :class="data.kpis.overdue_actions > 0 ? 'text-danger' : 'text-primary'"
-          >
-            {{ data.kpis.overdue_actions }}
-          </p>
-        </BaseCard>
-        <BaseCard>
-          <h2 class="mb-1 text-sm font-medium opacity-70">Payments due</h2>
-          <p class="text-3xl font-semibold text-primary">{{ data.kpis.payments_due.count }}</p>
-          <p class="text-sm opacity-70">{{ formatMoney(data.kpis.payments_due.amount) }}</p>
-        </BaseCard>
-      </div>
-
-      <!-- Deals by stage -->
-      <BaseCard>
-        <h2 class="mb-3 font-medium">Deals by stage</h2>
-        <div class="flex flex-wrap gap-2">
-          <span
-            v-for="(count, stage) in data.deals_by_stage"
-            :key="stage"
-            class="rounded-token px-3 py-1 text-sm capitalize"
-            :class="stageStyles[stage]"
-          >
-            {{ stage }}: <strong>{{ count }}</strong>
-          </span>
-        </div>
-      </BaseCard>
-
-      <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <!-- Upcoming visits -->
-        <BaseCard>
-          <h2 class="mb-3 font-medium">Next visits</h2>
-          <p v-if="!data.upcoming_visits.length" class="text-sm opacity-60">Nothing scheduled.</p>
-          <ul v-else class="space-y-2 text-sm">
+        <!-- Next visits -->
+        <SectionCard title="Next visits" icon="pi pi-calendar" flush class="xl:col-span-3">
+          <EmptyState
+            v-if="!loading && !data?.upcoming_visits?.length"
+            icon="pi pi-calendar"
+            title="Nothing scheduled"
+            body="Scheduled visits will show up here."
+          />
+          <ul v-else class="divide-y divide-line">
             <li
-              v-for="v in data.upcoming_visits"
+              v-for="v in data?.upcoming_visits ?? []"
               :key="v.id"
-              class="flex items-center justify-between gap-2 border-b border-border pb-2 last:border-0"
+              class="flex items-center gap-3 px-4 py-3 sm:px-5"
             >
-              <span>
-                <span class="font-medium">{{ v.client ?? '—' }}</span>
-                <span class="opacity-60"> · {{ v.type }}{{ v.unit ? ` · ${v.unit}` : '' }}</span>
+              <span
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
+              >
+                <i
+                  :class="v.type === 'in_site' ? 'pi pi-map-marker' : 'pi pi-building'"
+                  aria-hidden="true"
+                />
               </span>
-              <span class="shrink-0 opacity-70">{{ fmtDateTime(v.scheduled_at) }}</span>
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-sm font-medium text-ink">
+                  {{ v.client ?? '—' }}
+                </span>
+                <span class="block truncate text-xs text-mute">
+                  {{ humanize(v.type) }}<template v-if="v.unit"> · {{ v.unit }}</template>
+                </span>
+              </span>
+              <span class="num shrink-0 text-xs text-mute">
+                {{ formatDateTime(v.scheduled_at) }}
+              </span>
             </li>
           </ul>
-        </BaseCard>
-
-        <!-- Overdue actions -->
-        <BaseCard>
-          <h2 class="mb-3 font-medium">Overdue actions</h2>
-          <p v-if="!data.overdue_actions.length" class="text-sm opacity-60">All caught up.</p>
-          <ul v-else class="space-y-2 text-sm">
-            <li
-              v-for="a in data.overdue_actions"
-              :key="a.id"
-              class="flex items-center justify-between gap-2 border-b border-border pb-2 last:border-0"
-            >
-              <span>
-                <span class="font-medium">{{ a.type.replace('_', ' ') }}</span>
-                <span class="opacity-60"> · {{ a.assigned_to ?? '—' }}</span>
-              </span>
-              <span class="shrink-0 text-danger">{{ fmtDateTime(a.due_at) }}</span>
-            </li>
-          </ul>
-        </BaseCard>
+        </SectionCard>
       </div>
-    </template>
+
+      <!-- Overdue actions -->
+      <SectionCard title="Overdue actions" icon="pi pi-exclamation-circle" flush>
+        <EmptyState
+          v-if="!loading && !data?.overdue_actions?.length"
+          icon="pi pi-check-circle"
+          title="All caught up"
+          body="No next action is past its due date."
+        />
+        <ul v-else class="divide-y divide-line">
+          <li
+            v-for="a in data?.overdue_actions ?? []"
+            :key="a.id"
+            class="flex items-center gap-3 px-4 py-3 sm:px-5"
+          >
+            <span
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300"
+            >
+              <i class="pi pi-bell" aria-hidden="true" />
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-sm font-medium text-ink">
+                {{ humanize(a.type) }}
+              </span>
+              <span class="block truncate text-xs text-mute">{{ a.assigned_to ?? '—' }}</span>
+            </span>
+            <span class="num shrink-0 text-xs font-medium text-danger">
+              {{ formatDateTime(a.due_at) }}
+            </span>
+          </li>
+        </ul>
+      </SectionCard>
+
+      <p v-if="data?.scope === 'agent'" class="text-center text-xs text-mute">
+        Showing your assigned clients and actions only.
+        <RouterLink to="/clients" class="text-primary-600 hover:underline dark:text-primary-400">
+          Open your client list →
+        </RouterLink>
+      </p>
+    </div>
   </div>
 </template>

@@ -34,15 +34,15 @@ function onVoice({ file, durationMs }) {
 </script>
 
 <template>
-  <div class="flex items-end gap-2 border-t border-border bg-surface p-2">
+  <div class="flex items-end gap-1.5">
     <button
       type="button"
-      class="min-h-[44px] min-w-[44px] rounded-token px-2 hover:bg-bg"
+      class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink disabled:opacity-50 dark:hover:bg-surface-800"
       aria-label="Attach a photo or file"
       :disabled="disabled"
       @click="pickFile"
     >
-      📎
+      <i class="pi pi-paperclip" aria-hidden="true" />
     </button>
     <input
       ref="fileInput"
@@ -56,7 +56,7 @@ function onVoice({ file, durationMs }) {
       v-model="text"
       rows="1"
       placeholder="Message…"
-      class="max-h-32 min-h-[44px] flex-1 resize-none rounded-token border border-border bg-bg px-3 py-2 text-ink outline-none focus:border-primary"
+      class="max-h-32 min-h-[44px] flex-1 resize-none rounded-3xl border border-line bg-ground px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-primary"
       :disabled="disabled"
       @keydown.enter.exact.prevent="submitText"
     ></textarea>
@@ -65,11 +65,12 @@ function onVoice({ file, durationMs }) {
 
     <button
       type="button"
-      class="min-h-[44px] rounded-token bg-primary px-4 text-on-primary disabled:opacity-50"
+      class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-primary text-primary-contrast transition-opacity hover:opacity-90 disabled:opacity-40"
+      aria-label="Send message"
       :disabled="disabled || !text.trim()"
       @click="submitText"
     >
-      Send
+      <i class="pi pi-send" aria-hidden="true" />
     </button>
   </div>
 </template>

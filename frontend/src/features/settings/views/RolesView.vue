@@ -1,8 +1,11 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import BaseButton from '@/components/base/BaseButton.vue'
-import BaseCard from '@/components/base/BaseCard.vue'
+import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
+import Tag from 'primevue/tag'
 import BaseInput from '@/components/base/BaseInput.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import SectionCard from '@/components/ui/SectionCard.vue'
 import { useRolesStore } from '@/features/settings/rolesStore'
 import { confirmAction } from '@/composables/useConfirm'
 
@@ -36,12 +39,6 @@ function startNew() {
   form.description = ''
   form.is_agent = false
   form.permissions = []
-}
-
-function togglePermission(id) {
-  const i = form.permissions.indexOf(id)
-  if (i === -1) form.permissions.push(id)
-  else form.permissions.splice(i, 1)
 }
 
 async function save() {
@@ -81,63 +78,66 @@ async function cancelRole(role) {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div>
-      <h1 class="text-xl font-semibold">Roles &amp; permissions</h1>
-      <p class="opacity-70">
-        One role per user; the agent flag controls visit-assignment eligibility.
-      </p>
-    </div>
+  <div>
+    <PageHeader
+      title="Roles & permissions"
+      subtitle="One role per user; the agent flag controls visit-assignment eligibility."
+    />
 
-
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-[16rem_1fr]">
+    <div class="grid grid-cols-1 gap-5 md:grid-cols-[17rem_1fr]">
       <!-- Role list -->
-      <BaseCard>
-        <div class="mb-2 flex items-center justify-between">
-          <h2 class="font-medium">Roles</h2>
-          <BaseButton variant="ghost" @click="startNew">+ New</BaseButton>
-        </div>
-        <nav class="flex flex-col gap-1">
+      <SectionCard title="Roles" icon="pi pi-shield" flush class="self-start">
+        <template #actions>
+          <Button label="New" icon="pi pi-plus" text size="small" @click="startNew" />
+        </template>
+        <nav class="flex flex-col gap-0.5 p-2">
           <button
             v-for="role in store.roles"
             :key="role.id"
-            class="flex items-center justify-between rounded-token px-3 py-2 text-left hover:bg-bg"
-            :class="{ 'bg-bg text-primary': role.id === selectedId }"
+            type="button"
+            class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors"
+            :class="
+              role.id === selectedId
+                ? 'bg-highlight font-semibold text-ink'
+                : 'text-mute hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800'
+            "
             @click="selectRole(role)"
           >
-            <span>{{ role.name }}</span>
-            <span class="flex items-center gap-1 text-xs opacity-60">
-              <span v-if="role.is_agent" title="Agent role">🧭</span>
-              {{ role.users_count ?? 0 }}
+            <span class="truncate">{{ role.name }}</span>
+            <span class="flex shrink-0 items-center gap-1.5 text-xs">
+              <Tag v-if="role.is_agent" value="agent" severity="info" />
+              <span class="num text-mute">{{ role.users_count ?? 0 }}</span>
             </span>
           </button>
         </nav>
-      </BaseCard>
+      </SectionCard>
 
       <!-- Editor -->
-      <BaseCard>
-        <h2 class="mb-3 font-medium">{{ selectedId ? 'Edit role' : 'New role' }}</h2>
-        <div class="space-y-3">
-          <BaseInput v-model="form.name" label="Name" />
-          <BaseInput v-model="form.description" label="Description" />
-          <label class="flex items-center gap-2">
-            <input v-model="form.is_agent" type="checkbox" class="h-4 w-4" />
-            <span class="text-sm">Agent role (eligible for visit assignment)</span>
+      <SectionCard :title="selectedId ? 'Edit role' : 'New role'" icon="pi pi-pencil">
+        <div class="space-y-4">
+          <div class="grid gap-3 sm:grid-cols-2">
+            <BaseInput v-model="form.name" label="Name" />
+            <BaseInput v-model="form.description" label="Description" />
+          </div>
+          <label class="flex cursor-pointer items-center gap-2 text-sm text-ink">
+            <Checkbox v-model="form.is_agent" binary />
+            Agent role (eligible for visit assignment)
           </label>
 
           <div>
-            <h3 class="mb-1 text-sm font-medium">Permissions</h3>
-            <div class="space-y-3">
+            <h3 class="mb-2 text-sm font-semibold text-ink">Permissions</h3>
+            <div class="space-y-4">
               <fieldset v-for="(perms, group) in groupedPermissions" :key="group">
-                <legend class="text-xs uppercase tracking-wide opacity-60">{{ group }}</legend>
-                <div class="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                  <label v-for="p in perms" :key="p.id" class="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      class="h-4 w-4"
-                      :checked="form.permissions.includes(p.id)"
-                      @change="togglePermission(p.id)"
-                    />
+                <legend class="mb-1 text-xs font-semibold uppercase tracking-wide text-mute">
+                  {{ group }}
+                </legend>
+                <div class="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  <label
+                    v-for="p in perms"
+                    :key="p.id"
+                    class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-sm text-ink hover:bg-surface-50 dark:hover:bg-surface-800"
+                  >
+                    <Checkbox v-model="form.permissions" :value="p.id" />
                     <span :title="p.slug">{{ p.name }}</span>
                   </label>
                 </div>
@@ -145,20 +145,24 @@ async function cancelRole(role) {
             </div>
           </div>
 
-          <div class="flex items-center gap-2 border-t border-border pt-3">
-            <BaseButton :disabled="store.saving || !form.name.trim()" @click="save">
-              {{ selectedId ? 'Save changes' : 'Create role' }}
-            </BaseButton>
-            <BaseButton
+          <div class="flex items-center gap-2 border-t border-line pt-4">
+            <Button
+              :label="selectedId ? 'Save changes' : 'Create role'"
+              icon="pi pi-check"
+              :disabled="store.saving || !form.name.trim()"
+              @click="save"
+            />
+            <Button
               v-if="selectedId"
-              variant="ghost"
+              label="Cancel role"
+              icon="pi pi-ban"
+              severity="danger"
+              outlined
               @click="cancelRole(store.roles.find((r) => r.id === selectedId))"
-            >
-              Cancel role
-            </BaseButton>
+            />
           </div>
         </div>
-      </BaseCard>
+      </SectionCard>
     </div>
   </div>
 </template>

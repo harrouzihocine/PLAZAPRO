@@ -56,7 +56,7 @@ class ClosureQueueTest extends TestCase
         $this->itemInState($project, 'visited_interested');
         $this->itemInState($project, 'visited_not_interested'); // out of play
         $this->itemInState($project, 'lost');                   // closed
-        Sanctum::actingAs($this->userWithPermissions(['clients.view']));
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'projects.view_all']));
 
         $this->getJson("/api/v1/clients/{$client->id}/projects")
             ->assertOk()
@@ -69,7 +69,7 @@ class ClosureQueueTest extends TestCase
         $client = Client::factory()->create();
         $project = ClientProject::factory()->create(['client_id' => $client->id]);
         $interested = $this->itemInState($project, 'visited_interested');
-        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.manage']));
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.manage', 'projects.view_all']));
 
         $this->postJson("/api/v1/shortlist-items/{$interested->id}/outcome", ['outcome' => 'lost'])
             ->assertSuccessful();
@@ -86,7 +86,7 @@ class ClosureQueueTest extends TestCase
         $client = Client::factory()->create();
         $project = ClientProject::factory()->create(['client_id' => $client->id]);
         $this->itemInState($project, 'visited_interested')->cancel('Removed from shortlist');
-        Sanctum::actingAs($this->userWithPermissions(['clients.view']));
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'projects.view_all']));
 
         $this->getJson("/api/v1/clients/{$client->id}/projects")
             ->assertOk()

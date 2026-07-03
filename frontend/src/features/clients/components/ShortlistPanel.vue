@@ -1,6 +1,8 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import BaseButton from '@/components/base/BaseButton.vue'
+import Button from 'primevue/button'
+import SectionCard from '@/components/ui/SectionCard.vue'
+import StatusTag from '@/components/ui/StatusTag.vue'
 import { toastError } from '@/composables/useConfirm'
 import { shortlistApi } from '@/features/clients/api'
 import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPicker.vue'
@@ -19,20 +21,18 @@ const items = ref([]) // working copy: { shortlistable_type, shortlistable_id, s
 const additions = ref([]) // ProjectUnitsPicker v-model: properties to add on save
 const saving = ref(false)
 
-const stateClass = {
-  shortlisted: 'bg-border text-ink',
-  not_visited: 'bg-warning/15 text-warning',
-  visited_interested: 'bg-success/15 text-success',
-  visited_not_interested: 'bg-danger/15 text-danger',
-  won: 'bg-success/15 text-success',
-  lost: 'bg-danger/15 text-danger',
-}
-
 // The full property card, not just the code.
 const propertyLine = (it) => {
   const p = it.property
   if (!p) return `${it.shortlistable_type} #${it.shortlistable_id}`
-  return [p.reference, p.property_type, p.floor, p.area_sqm ? `${p.area_sqm} m²` : null, p.price, p.location]
+  return [
+    p.reference,
+    p.property_type,
+    p.floor,
+    p.area_sqm ? `${p.area_sqm} m²` : null,
+    p.price,
+    p.location,
+  ]
     .filter(Boolean)
     .join(' · ')
 }
@@ -72,7 +72,10 @@ async function save() {
   try {
     await shortlistApi.sync(
       props.projectId,
-      all.map((i) => ({ shortlistable_type: i.shortlistable_type, shortlistable_id: i.shortlistable_id })),
+      all.map((i) => ({
+        shortlistable_type: i.shortlistable_type,
+        shortlistable_id: i.shortlistable_id,
+      })),
     )
     await load()
     emit('changed')
@@ -85,40 +88,47 @@ async function save() {
 </script>
 
 <template>
-  <div class="rounded-token border border-border p-3">
-    <h3 class="mb-2 text-sm font-semibold uppercase opacity-60">Property shortlist</h3>
-
-    <ul v-if="items.length" class="mb-2 space-y-1">
+  <SectionCard title="Property shortlist" icon="pi pi-list-check">
+    <ul v-if="items.length" class="mb-3 divide-y divide-line">
       <li
         v-for="it in items"
         :key="it.shortlistable_type + it.shortlistable_id"
-        class="flex items-center justify-between gap-2 text-sm"
+        class="flex items-center justify-between gap-2 py-2 text-sm"
       >
-        <span>
-          {{ it.shortlistable_type === 'box' ? '🅿' : '🏠' }}
-          {{ propertyLine(it) }}
-          <span class="ml-1 rounded-token px-1.5 py-0.5 text-xs" :class="stateClass[it.state] ?? 'bg-border text-ink'">
-            {{ it.state.replace(/_/g, ' ') }}
-          </span>
+        <span class="flex min-w-0 flex-wrap items-center gap-2">
+          <i
+            :class="it.shortlistable_type === 'box' ? 'pi pi-car' : 'pi pi-home'"
+            class="shrink-0 text-mute"
+            aria-hidden="true"
+          />
+          <span class="min-w-0 truncate text-ink">{{ propertyLine(it) }}</span>
+          <StatusTag :value="it.state" />
         </span>
-        <button
+        <Button
           v-if="canEdit() && !['won', 'lost'].includes(it.state)"
-          type="button"
-          class="opacity-60 hover:text-danger"
-          title="Remove"
+          icon="pi pi-times"
+          text
+          rounded
+          size="small"
+          severity="danger"
+          aria-label="Remove from shortlist"
           @click="remove(it)"
-        >
-          ✕
-        </button>
+        />
       </li>
     </ul>
-    <p v-else class="mb-2 text-sm opacity-60">No properties shortlisted yet.</p>
+    <p v-else class="mb-3 text-sm text-mute">No properties shortlisted yet.</p>
 
-    <div v-if="canEdit()" class="space-y-2">
+    <div v-if="canEdit()" class="space-y-3">
       <ProjectUnitsPicker v-model="additions" :exclude="excludeKeys" />
-      <BaseButton type="button" :disabled="saving || (!hasChanges && !items.length)" @click="save">
-        Save shortlist
-      </BaseButton>
+      <Button
+        type="button"
+        label="Save shortlist"
+        icon="pi pi-check"
+        size="small"
+        :disabled="saving || (!hasChanges && !items.length)"
+        :loading="saving"
+        @click="save"
+      />
     </div>
-  </div>
+  </SectionCard>
 </template>

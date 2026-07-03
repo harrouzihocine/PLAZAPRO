@@ -21,7 +21,8 @@ import { useUsersStore } from '@/features/settings/usersStore'
 describe('usersStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    for (const m of [usersList, create, update, setActive, cancel, rolesList, deptsList]) m.mockReset()
+    for (const m of [usersList, create, update, setActive, cancel, rolesList, deptsList])
+      m.mockReset()
     rolesList.mockResolvedValue([{ id: 1, name: 'Agent' }])
     deptsList.mockResolvedValue([{ id: 1, name: 'Sales' }])
   })

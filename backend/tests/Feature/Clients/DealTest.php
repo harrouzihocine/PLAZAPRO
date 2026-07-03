@@ -231,7 +231,7 @@ class DealTest extends TestCase
     public function test_a_closed_deal_shows_in_the_project_deal_list(): void
     {
         $deal = Deal::factory()->create();
-        Sanctum::actingAs($this->userWithPermissions(['clients.view']));
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'projects.view_all']));
 
         $this->getJson("/api/v1/projects/{$deal->client_project_id}/deals")
             ->assertOk()

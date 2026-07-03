@@ -23,7 +23,7 @@ class AuditController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         return ActivityLogResource::collection(
-            $this->filtered($request)->latest('id')->paginate(50)
+            $this->filtered($request)->with('user:id,name')->latest('id')->paginate(50)
         );
     }
 

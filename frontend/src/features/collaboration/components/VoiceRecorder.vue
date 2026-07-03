@@ -81,19 +81,25 @@ onBeforeUnmount(cleanup)
     <button
       v-if="!recording"
       type="button"
-      class="min-h-[44px] min-w-[44px] rounded-token px-2 hover:bg-bg"
+      class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800"
       aria-label="Record a voice note"
       @click="start"
     >
-      🎤
+      <i class="pi pi-microphone" aria-hidden="true" />
     </button>
     <template v-else>
-      <span class="flex items-center gap-1 text-sm text-danger">
+      <span class="num flex items-center gap-1.5 text-sm font-medium text-danger">
         <span class="h-2 w-2 animate-pulse rounded-full bg-danger" aria-hidden="true" />
         {{ mmss(elapsed) }}
       </span>
-      <button type="button" class="text-sm text-primary" @click="stop">Send</button>
-      <button type="button" class="text-sm opacity-70" @click="cancel">Cancel</button>
+      <button
+        type="button"
+        class="text-sm font-medium text-primary-600 hover:underline dark:text-primary-400"
+        @click="stop"
+      >
+        Send
+      </button>
+      <button type="button" class="text-sm text-mute hover:text-ink" @click="cancel">Cancel</button>
     </template>
   </div>
 </template>

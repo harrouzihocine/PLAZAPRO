@@ -8,10 +8,12 @@ use App\Modules\Clients\Enums\ClientProjectStage;
 use App\Modules\Clients\Models\Client;
 use App\Modules\Clients\Models\ClientProject;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * Open a new deal for a client. A deal starts at the `lead` stage unless a valid
- * starting stage is given.
+ * starting stage is given. created_by is stamped from the authenticated user —
+ * it drives the projects.view_all visibility rule.
  */
 class CreateClientProject
 {
@@ -20,6 +22,11 @@ class CreateClientProject
         $attributes = Arr::only($data, ['location_id', 'unit_id', 'stage', 'total_price']);
         $attributes['stage'] ??= ClientProjectStage::Lead->value;
 
-        return $client->projects()->create($attributes);
+        $project = new ClientProject($attributes);
+        $project->client()->associate($client);
+        $project->created_by = Auth::id();
+        $project->save();
+
+        return $project;
     }
 }

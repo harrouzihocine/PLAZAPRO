@@ -14,6 +14,7 @@ use App\Modules\Clients\Models\ShortlistItem;
 use App\Modules\Inventory\Models\Box;
 use App\Modules\Inventory\Models\Unit;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
 
@@ -23,8 +24,11 @@ use Illuminate\Routing\Controller;
  */
 class ShortlistController extends Controller
 {
-    public function index(ClientProject $project): AnonymousResourceCollection
+    public function index(Request $request, ClientProject $project): AnonymousResourceCollection
     {
+        // A project outside the user's visibility scope reads as absent.
+        abort_unless($project->isVisibleTo($request->user()), 404);
+
         // Eager-load the full property card per morph type (type/floor/location).
         $items = $project->shortlistItems()->active()
             ->with(['shortlistable' => fn (MorphTo $morphTo) => $morphTo->morphWith([

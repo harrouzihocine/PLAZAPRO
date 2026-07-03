@@ -43,52 +43,55 @@ watch(() => props.media?.id, resetZoom)
 
 <template>
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-6"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 backdrop-blur-sm sm:p-6"
     @click.self="$emit('close')"
   >
-    <div class="relative flex max-h-full w-full max-w-5xl flex-col rounded-token bg-surface">
-      <div class="flex items-center justify-between gap-2 border-b border-border p-3">
-        <span class="truncate text-sm font-medium">{{ media.original_name }}</span>
-        <div class="flex shrink-0 items-center gap-1">
+    <div
+      class="relative flex max-h-full w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-card shadow-pop"
+    >
+      <div class="flex items-center justify-between gap-2 border-b border-line px-4 py-2">
+        <span class="truncate text-sm font-medium text-ink">{{ media.original_name }}</span>
+        <div class="flex shrink-0 items-center gap-0.5">
           <!-- Zoom controls (photos only) -->
           <template v-if="isPhoto">
             <button
-              class="min-h-[44px] min-w-[44px] text-lg disabled:opacity-30"
+              class="flex min-h-[44px] min-w-[44px] items-center justify-center text-mute hover:text-ink disabled:opacity-30"
               :disabled="zoom <= ZOOM_MIN"
               aria-label="Zoom out"
               @click="zoomOut"
             >
-              −
+              <i class="pi pi-search-minus" aria-hidden="true" />
             </button>
             <button
-              class="min-h-[44px] px-1 text-xs tabular-nums"
+              class="num min-h-[44px] px-1 text-xs text-mute hover:text-ink"
               aria-label="Reset zoom"
               @click="resetZoom"
             >
               {{ Math.round(zoom * 100) }}%
             </button>
             <button
-              class="min-h-[44px] min-w-[44px] text-lg disabled:opacity-30"
+              class="flex min-h-[44px] min-w-[44px] items-center justify-center text-mute hover:text-ink disabled:opacity-30"
               :disabled="zoom >= ZOOM_MAX"
               aria-label="Zoom in"
               @click="zoomIn"
             >
-              ＋
+              <i class="pi pi-search-plus" aria-hidden="true" />
             </button>
           </template>
           <a
             :href="mediaDownloadUrl(media.id)"
             :download="media.original_name"
-            class="min-h-[44px] px-2 text-sm hover:text-primary"
+            class="flex min-h-[44px] items-center gap-1.5 px-2 text-sm text-mute hover:text-ink"
           >
-            ⬇ Download
+            <i class="pi pi-download" aria-hidden="true" />
+            Download
           </a>
           <button
-            class="min-h-[44px] min-w-[44px] text-lg"
+            class="flex min-h-[44px] min-w-[44px] items-center justify-center text-mute hover:text-ink"
             aria-label="Close"
             @click="$emit('close')"
           >
-            ✕
+            <i class="pi pi-times" aria-hidden="true" />
           </button>
         </div>
       </div>
