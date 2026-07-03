@@ -1,192 +1,435 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
-import BaseCard from '@/components/base/BaseCard.vue'
-import ProjectPanel from '@/features/clients/components/ProjectPanel.vue'
+import { useRouter, RouterLink } from 'vue-router'
+import Avatar from 'primevue/avatar'
+import Badge from 'primevue/badge'
+import Button from 'primevue/button'
+import Skeleton from 'primevue/skeleton'
+import BaseModal from '@/components/base/BaseModal.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import SectionCard from '@/components/ui/SectionCard.vue'
+import StatusTag from '@/components/ui/StatusTag.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import ActivityTimeline from '@/components/ui/ActivityTimeline.vue'
+import ClientFormDrawer from '@/features/clients/components/ClientFormDrawer.vue'
+import CallLogForm from '@/features/pipeline/components/CallLogForm.vue'
 import { useClientsStore } from '@/features/clients/clientsStore'
 import { useAuthStore } from '@/features/settings/store'
 import { formatPhone } from '@/data/countryCodes'
+import { formatDate, formatDateTime, humanize, initials } from '@/utils/format'
+import { formatMoney } from '@/features/payments/money'
 import ShareToChat from '@/features/collaboration/components/ShareToChat.vue'
 import TimelinePanel from '@/features/pipeline/components/TimelinePanel.vue'
 
 // The client file, project-centric: the profile on one side and the PROJECTS the
-// client is engaging with on the other — each project card expands into its own
-// story (logs, shortlist, deal, payments), so nothing is buried in one long page.
-// Heavy forms live in modals (see ProjectPanel / TimelinePanel).
+// client is engaging with on the other. Each project card is a DOOR — it opens
+// the project's own workspace page (deal, shortlist, payments, logs), so nothing
+// is buried in one long page. A NEW project starts with its first call log (the
+// call modal IS the "new project" form).
 const props = defineProps({ id: { type: [String, Number], required: true } })
 const store = useClientsStore()
 const auth = useAuthStore()
+const router = useRouter()
 
 // Client ownership (assigned agent + who created it/when) is back-office-only,
 // gated by clients.manage (super-admin / admin / manager).
 const canSeeOwnership = () => auth.can('clients.manage')
 const canManage = () => auth.can('clients.manage')
-const fmtDateTime = (v) =>
-  v ? new Date(v).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
+// Without clients.view_details only the client's name is shown (no phone/profile).
+const canSeeDetails = () => auth.can('clients.view_details')
 
-const expandedId = ref(null)
 const showClosed = ref(false)
+const showHistory = ref(false)
+const editOpen = ref(false)
 
 const activeProjects = computed(() => store.projects)
 const closedProjects = computed(() => store.archivedProjects)
 
-// A workflow move can flip has_calls / step badges — refetch everything shown.
+const unitLine = (u) =>
+  [u.reference, u.type, u.floor, u.area_sqm ? `${u.area_sqm} m²` : null].filter(Boolean).join(' · ')
+
+// Opens WhatsApp (app or web) with the client's number — digits only, E.164.
+const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, '')}`
+
+const ID_DOCUMENT_LABELS = {
+  national_id: 'National ID card',
+  driving_license: 'Driving licence',
+  passport: 'Passport',
+}
+
+// A workflow move can flip step badges — refetch everything shown.
 async function refresh() {
   await Promise.all([
     store.load(props.id),
     store.loadProjects(props.id),
     store.loadArchivedProjects(props.id),
   ])
-  // Keep a sensible default: the single project auto-expands.
-  if (activeProjects.value.length === 1) expandedId.value = activeProjects.value[0].id
 }
 
 onMounted(async () => {
   await store.load(props.id)
-  await store.loadDesire(props.id)
-  if (store.current?.has_calls) {
-    await Promise.all([store.loadProjects(props.id), store.loadArchivedProjects(props.id)])
-    if (activeProjects.value.length === 1) expandedId.value = activeProjects.value[0].id
-  }
+  await Promise.all([
+    store.loadDesire(props.id),
+    store.loadProjects(props.id),
+    store.loadArchivedProjects(props.id),
+  ])
 })
 
-function newProject() {
-  store.createProject(props.id)
+// --- New project: the first thing captured is its call log. ---
+const newProjectOpen = ref(false)
+
+async function submitNewProject(callPayload) {
+  try {
+    const project = await store.createProject(props.id)
+    await store.logCall(props.id, { ...callPayload, client_project_id: project.id })
+    newProjectOpen.value = false
+    router.push({ name: 'clients.project', params: { id: props.id, projectId: project.id } })
+  } catch {
+    /* toast raised by the store; an empty project (if created) can be removed */
+  }
 }
 </script>
 
 <template>
-  <div class="space-y-4">
-    <RouterLink :to="{ name: 'clients' }" class="text-sm opacity-70 hover:text-primary">← All clients</RouterLink>
+  <div>
+    <div v-if="store.loading && !store.current" class="space-y-4">
+      <Skeleton width="16rem" height="2rem" />
+      <Skeleton height="10rem" />
+    </div>
 
-    <p v-if="store.loading && !store.current" class="py-4 text-center text-sm opacity-60">Loading…</p>
+    <EmptyState
+      v-else-if="!store.current"
+      icon="pi pi-user"
+      title="Client not found"
+      body="The record may have been removed."
+    />
 
-    <template v-else-if="store.current">
-      <!-- Identity header -->
-      <div class="flex flex-col gap-1">
-        <div class="flex items-center gap-2">
-          <h1 class="text-xl font-semibold">{{ store.current.full_name }}</h1>
-          <span
-            v-if="store.current.status === 'cancelled'"
-            class="rounded-token bg-surface px-2 py-0.5 text-xs opacity-70"
-          >
-            cancelled
+    <template v-else>
+      <PageHeader :title="store.current.full_name" :back="{ name: 'clients' }">
+        <template #back-label>All clients</template>
+        <template #badges>
+          <StatusTag v-if="store.current.status === 'cancelled'" value="cancelled" />
+        </template>
+        <template #subtitle>
+          <span v-if="canSeeDetails()" class="inline-flex flex-wrap items-center gap-x-2">
+            <span class="num">{{ formatPhone(store.current.phone) }}</span>
+            <a
+              :href="whatsappLink(store.current.phone)"
+              target="_blank"
+              rel="noopener"
+              class="inline-flex h-6 w-6 items-center justify-center rounded-full text-emerald-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
+              aria-label="Message on WhatsApp"
+              title="Message on WhatsApp"
+            >
+              <i class="pi pi-whatsapp" aria-hidden="true" />
+            </a>
+            <template v-if="store.current.email">· {{ store.current.email }}</template>
           </span>
-        </div>
-        <p class="opacity-70">{{ formatPhone(store.current.phone) }}<template v-if="store.current.email"> · {{ store.current.email }}</template></p>
-        <div v-if="auth.can('chat.use')" class="pt-1">
-          <ShareToChat subject-type="client" :subject-id="store.current.id" label="Share client to chat" />
-        </div>
-      </div>
+        </template>
+        <template #actions>
+          <Button
+            v-if="canManage()"
+            label="Edit"
+            icon="pi pi-pencil"
+            size="small"
+            severity="secondary"
+            outlined
+            @click="editOpen = true"
+          />
+          <ShareToChat
+            v-if="auth.can('chat.use')"
+            subject-type="client"
+            :subject-id="store.current.id"
+            label="Share to chat"
+          />
+        </template>
+      </PageHeader>
 
-      <div class="grid gap-4 lg:grid-cols-3">
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <!-- Profile -->
-        <BaseCard class="lg:col-span-1 self-start">
-          <h2 class="mb-3 text-sm font-semibold uppercase opacity-60">Profile</h2>
-          <dl class="space-y-2 text-sm">
-            <div class="flex justify-between gap-2">
-              <dt class="opacity-60">Source</dt>
-              <dd>{{ store.current.source?.label ?? '—' }}</dd>
-            </div>
-            <div class="flex justify-between gap-2">
-              <dt class="opacity-60">Rating</dt>
-              <dd>{{ store.current.rating?.label ?? '—' }}</dd>
-            </div>
-            <div v-if="canSeeOwnership()" class="flex justify-between gap-2">
-              <dt class="opacity-60">Assigned agent</dt>
-              <dd>{{ store.current.assigned_agent?.name ?? 'Unassigned' }}</dd>
-            </div>
-            <div v-if="canSeeOwnership()" class="flex justify-between gap-2">
-              <dt class="opacity-60">Created by</dt>
-              <dd>{{ store.current.created_by?.name ?? '—' }}</dd>
-            </div>
-            <div v-if="canSeeOwnership()" class="flex justify-between gap-2">
-              <dt class="opacity-60">Created</dt>
-              <dd>{{ fmtDateTime(store.current.created_at) }}</dd>
-            </div>
-          </dl>
-          <p v-if="store.current.notes" class="mt-3 whitespace-pre-line border-t border-border pt-3 text-sm opacity-80">
-            {{ store.current.notes }}
-          </p>
-        </BaseCard>
-
-        <div class="space-y-4 lg:col-span-2">
-          <!-- Workflow rule: a call is the first entity on a new client. -->
-          <template v-if="!store.current.has_calls">
-            <div class="rounded-token border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
-              📞 <span class="font-medium">New client — log the first call.</span>
-              <span class="opacity-70">Projects, visits and requirements unlock after the qualifying call.</span>
-            </div>
-            <BaseCard>
-              <TimelinePanel :client-id="store.current.id" @changed="refresh" />
-            </BaseCard>
-          </template>
-
-          <template v-else>
-            <!-- The projects the client is engaging with -->
-            <BaseCard>
-              <div class="mb-2 flex items-center justify-between">
-                <h2 class="text-sm font-semibold uppercase opacity-60">
-                  Projects ({{ activeProjects.length }})
-                </h2>
-                <button
-                  v-if="canManage()"
-                  type="button"
-                  class="text-xs opacity-60 hover:opacity-100"
-                  @click="newProject"
-                >
-                  + New project
-                </button>
-              </div>
-
-              <div class="space-y-2">
-                <ProjectPanel
-                  v-for="p in activeProjects"
-                  :key="p.id"
-                  :client-id="store.current.id"
-                  :project="p"
-                  :expanded="expandedId === p.id"
-                  @toggle="expandedId = expandedId === p.id ? null : p.id"
-                  @changed="refresh"
-                />
-                <p v-if="!activeProjects.length" class="py-2 text-sm opacity-60">
-                  No open project — log a call and select properties to open one.
+        <div class="space-y-5 self-start lg:sticky lg:top-20">
+          <SectionCard title="Profile" icon="pi pi-id-card">
+            <div class="mb-4 flex items-center gap-3">
+              <Avatar
+                :label="initials(store.current.full_name)"
+                size="large"
+                shape="circle"
+                class="!bg-highlight !text-primary-700 dark:!text-primary-300"
+              />
+              <div class="min-w-0">
+                <p class="truncate font-semibold text-ink">{{ store.current.full_name }}</p>
+                <p v-if="canSeeDetails()" class="flex items-center gap-1.5 text-sm text-mute">
+                  <span class="num truncate">{{ formatPhone(store.current.phone) }}</span>
+                  <a
+                    :href="whatsappLink(store.current.phone)"
+                    target="_blank"
+                    rel="noopener"
+                    class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-emerald-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
+                    aria-label="Message on WhatsApp"
+                    title="Message on WhatsApp"
+                  >
+                    <i class="pi pi-whatsapp text-sm" aria-hidden="true" />
+                  </a>
                 </p>
               </div>
-
-              <!-- Closed projects (archived / on the desire list), reactivatable. -->
-              <div class="mt-3 border-t border-border pt-2">
-                <button
-                  type="button"
-                  class="text-xs font-semibold uppercase opacity-60 hover:opacity-100"
-                  @click="showClosed = !showClosed"
-                >
-                  {{ showClosed ? 'Hide' : 'Show' }} closed ({{ closedProjects.length }})
-                </button>
-                <div v-if="showClosed" class="mt-2 space-y-2">
-                  <ProjectPanel
-                    v-for="p in closedProjects"
-                    :key="p.id"
-                    :client-id="store.current.id"
-                    :project="p"
-                    :expanded="expandedId === p.id"
-                    @toggle="expandedId = expandedId === p.id ? null : p.id"
-                    @changed="refresh"
-                  />
-                  <p v-if="!closedProjects.length" class="py-1 text-sm opacity-60">No closed projects.</p>
-                </div>
+            </div>
+            <dl v-if="canSeeDetails()" class="space-y-2.5 text-sm">
+              <div class="flex justify-between gap-2">
+                <dt class="text-mute">Source</dt>
+                <dd class="text-ink">{{ store.current.source?.label ?? '—' }}</dd>
               </div>
-            </BaseCard>
+              <div v-if="store.current.referrer_name || store.current.referrer_phone" class="flex justify-between gap-2">
+                <dt class="text-mute">Referred by</dt>
+                <dd class="text-right text-ink">
+                  {{ store.current.referrer_name ?? '—' }}
+                  <span v-if="store.current.referrer_phone" class="num block text-xs text-mute">
+                    {{ formatPhone(store.current.referrer_phone) }}
+                  </span>
+                </dd>
+              </div>
+              <div class="flex justify-between gap-2">
+                <dt class="text-mute">Rating</dt>
+                <dd class="text-ink">{{ store.current.rating?.label ?? '—' }}</dd>
+              </div>
+              <div v-if="canSeeOwnership()" class="flex justify-between gap-2">
+                <dt class="text-mute">Assigned agent</dt>
+                <dd class="text-ink">{{ store.current.assigned_agent?.name ?? 'Unassigned' }}</dd>
+              </div>
+              <div v-if="canSeeOwnership()" class="flex justify-between gap-2">
+                <dt class="text-mute">Created by</dt>
+                <dd class="text-ink">{{ store.current.created_by?.name ?? '—' }}</dd>
+              </div>
+              <div v-if="canSeeOwnership()" class="flex justify-between gap-2">
+                <dt class="text-mute">Created</dt>
+                <dd class="text-ink">{{ formatDateTime(store.current.created_at) }}</dd>
+              </div>
+            </dl>
+            <p
+              v-if="canSeeDetails() && store.current.notes"
+              class="mt-3 whitespace-pre-line border-t border-line pt-3 text-sm text-mute"
+            >
+              {{ store.current.notes }}
+            </p>
+          </SectionCard>
 
-            <!-- The client-level story (qualifying calls before any project). -->
-            <BaseCard v-if="!activeProjects.length">
-              <TimelinePanel :client-id="store.current.id" @changed="refresh" />
-            </BaseCard>
-          </template>
+          <!-- Identity / contract details (filled as the deal firms up). -->
+          <SectionCard
+            v-if="
+              canSeeDetails() &&
+              (store.current.id_document_type ||
+                store.current.id_document_number ||
+                store.current.birth_date ||
+                store.current.birth_place ||
+                store.current.nationality ||
+                store.current.address ||
+                store.current.occupation)
+            "
+            title="Identity & contract"
+            icon="pi pi-id-card"
+          >
+            <dl class="space-y-2.5 text-sm">
+              <div v-if="store.current.id_document_type" class="flex justify-between gap-2">
+                <dt class="text-mute">ID document</dt>
+                <dd class="text-ink">
+                  {{
+                    ID_DOCUMENT_LABELS[store.current.id_document_type] ??
+                    humanize(store.current.id_document_type)
+                  }}
+                </dd>
+              </div>
+              <div v-if="store.current.id_document_number" class="flex justify-between gap-2">
+                <dt class="text-mute">Number</dt>
+                <dd class="num text-ink">{{ store.current.id_document_number }}</dd>
+              </div>
+              <div v-if="store.current.birth_date" class="flex justify-between gap-2">
+                <dt class="text-mute">Born</dt>
+                <dd class="text-ink">
+                  {{ formatDate(store.current.birth_date) }}
+                  <template v-if="store.current.birth_place">
+                    — {{ store.current.birth_place }}</template
+                  >
+                </dd>
+              </div>
+              <div v-if="store.current.nationality" class="flex justify-between gap-2">
+                <dt class="text-mute">Nationality</dt>
+                <dd class="text-ink">{{ store.current.nationality }}</dd>
+              </div>
+              <div v-if="store.current.address" class="flex justify-between gap-2">
+                <dt class="text-mute">Address</dt>
+                <dd class="text-right text-ink">{{ store.current.address }}</dd>
+              </div>
+              <div v-if="store.current.occupation" class="flex justify-between gap-2">
+                <dt class="text-mute">Occupation</dt>
+                <dd class="text-ink">{{ store.current.occupation }}</dd>
+              </div>
+            </dl>
+          </SectionCard>
+
+          <SectionCard v-if="canSeeOwnership()" title="Record history" icon="pi pi-clock" flush>
+            <div class="px-4 py-3 sm:px-5">
+              <Button
+                :label="showHistory ? 'Hide history' : 'Show history'"
+                :icon="showHistory ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
+                text
+                size="small"
+                severity="secondary"
+                @click="showHistory = !showHistory"
+              />
+              <ActivityTimeline v-if="showHistory" :id="Number(id)" type="client" class="mt-3" />
+            </div>
+          </SectionCard>
+        </div>
+
+        <div class="space-y-5 lg:col-span-2">
+          <!-- The projects the client is engaging with -->
+          <SectionCard title="Projects" icon="pi pi-folder">
+            <template #actions>
+              <Button
+                v-if="canManage()"
+                label="New project"
+                icon="pi pi-plus"
+                size="small"
+                text
+                @click="newProjectOpen = true"
+              />
+            </template>
+
+            <div class="space-y-2">
+              <RouterLink
+                v-for="p in activeProjects"
+                :key="p.id"
+                :to="{
+                  name: 'clients.project',
+                  params: { id: store.current.id, projectId: p.id },
+                }"
+                class="group flex items-center gap-3 rounded-xl border border-line p-3 transition-colors hover:border-primary-300 hover:bg-surface-50 dark:hover:bg-surface-800"
+              >
+                <span
+                  class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-highlight text-primary-700 dark:text-primary-300"
+                >
+                  <i :class="p.unit ? 'pi pi-home' : 'pi pi-folder'" aria-hidden="true" />
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="flex flex-wrap items-center gap-2">
+                    <span class="truncate text-sm font-semibold text-ink">
+                      <template v-if="p.unit">{{ unitLine(p.unit) }}</template>
+                      <template v-else-if="p.location">{{ p.location.name }}</template>
+                      <template v-else>Project #{{ p.id }}</template>
+                    </span>
+                    <StatusTag :value="p.step" />
+                  </span>
+                  <span class="mt-0.5 block truncate text-xs text-mute">
+                    <template v-if="p.location?.name && p.unit"
+                      >{{ p.location.name }} ·
+                    </template>
+                    <template v-if="p.total_price">
+                      <span class="num font-medium">{{ formatMoney(p.total_price) }}</span> ·
+                    </template>
+                    opened {{ formatDateTime(p.created_at) }}
+                    <template v-if="p.created_by?.name"> by {{ p.created_by.name }}</template>
+                  </span>
+                </span>
+                <Badge
+                  v-if="p.pending_closure_count"
+                  v-tooltip.top="'Liked properties awaiting won / lost'"
+                  :value="p.pending_closure_count"
+                  severity="warn"
+                />
+                <i
+                  class="pi pi-arrow-right text-sm text-mute transition-transform group-hover:translate-x-0.5 group-hover:text-ink"
+                  aria-hidden="true"
+                />
+              </RouterLink>
+
+              <EmptyState
+                v-if="!activeProjects.length"
+                icon="pi pi-folder-open"
+                title="No open project"
+                body="A new project starts with its first call log."
+              />
+            </div>
+
+            <!-- Closed projects (archived / on the desire list), reactivatable. -->
+            <div class="mt-4 border-t border-line pt-3">
+              <Button
+                :label="`${showClosed ? 'Hide' : 'Show'} closed (${closedProjects.length})`"
+                :icon="showClosed ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
+                text
+                size="small"
+                severity="secondary"
+                @click="showClosed = !showClosed"
+              />
+              <div v-if="showClosed" class="mt-2 space-y-2">
+                <RouterLink
+                  v-for="p in closedProjects"
+                  :key="p.id"
+                  :to="{
+                    name: 'clients.project',
+                    params: { id: store.current.id, projectId: p.id },
+                  }"
+                  class="group flex items-center gap-3 rounded-xl border border-dashed border-line p-3 opacity-90 transition-colors hover:border-primary-300 hover:opacity-100"
+                >
+                  <span
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-100 text-mute dark:bg-surface-800"
+                  >
+                    <i
+                      :class="p.closed_to_desire ? 'pi pi-heart' : 'pi pi-inbox'"
+                      aria-hidden="true"
+                    />
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="flex flex-wrap items-center gap-2">
+                      <span class="truncate text-sm font-medium text-ink">
+                        <template v-if="p.unit">{{ unitLine(p.unit) }}</template>
+                        <template v-else-if="p.location">{{ p.location.name }}</template>
+                        <template v-else>Project #{{ p.id }}</template>
+                      </span>
+                      <StatusTag :value="p.step" />
+                    </span>
+                    <span class="mt-0.5 block truncate text-xs text-mute">
+                      {{ p.closure_reason ?? 'Closed' }}
+                      <template v-if="p.closed_to_desire">
+                        — waiting for a desire match; a new call reopens it
+                      </template>
+                    </span>
+                  </span>
+                  <i class="pi pi-arrow-right text-sm text-mute" aria-hidden="true" />
+                </RouterLink>
+                <p v-if="!closedProjects.length" class="py-1 text-sm text-mute">
+                  No closed projects.
+                </p>
+              </div>
+            </div>
+          </SectionCard>
+
+          <!-- The client-level story (qualifying calls before any project). -->
+          <SectionCard v-if="!activeProjects.length">
+            <TimelinePanel :client-id="store.current.id" @changed="refresh" />
+          </SectionCard>
         </div>
       </div>
-    </template>
 
-    <p v-else class="py-4 text-center text-sm opacity-60">Client not found.</p>
+      <ClientFormDrawer v-model:visible="editOpen" :client="store.current" @saved="refresh" />
+
+      <!-- New project — step one is logging the call that opens it. -->
+      <BaseModal
+        v-if="newProjectOpen"
+        title="New project — log the opening call"
+        @close="newProjectOpen = false"
+      >
+        <p class="mb-4 text-sm text-mute">
+          A project starts with a phone call: log it here and the project opens with the call (and
+          any qualification) attached.
+        </p>
+        <CallLogForm
+          :client="store.current"
+          :field-agents="store.agents"
+          :saving="store.saving"
+          :desire="store.desire"
+          @submit="submitNewProject"
+          @cancel="newProjectOpen = false"
+        />
+      </BaseModal>
+    </template>
   </div>
 </template>

@@ -23,9 +23,9 @@ final class NotificationLink
     {
         return match (true) {
             $subject instanceof Client => ['/clients/'.$subject->id, 'client', $subject->id],
-            // A deal links to its client's file (where the deals panel lives).
-            $subject instanceof ClientProject => ['/clients/'.$subject->client_id, 'client_project', $subject->id],
-            $subject instanceof Unit => ['/inventory/units', 'unit', $subject->id],
+            // A project links to its own workspace page, not the client file.
+            $subject instanceof ClientProject => ['/clients/'.$subject->client_id.'/projects/'.$subject->id, 'client_project', $subject->id],
+            $subject instanceof Unit => ['/inventory/units/'.$subject->id, 'unit', $subject->id],
             default => [null, null, null],
         };
     }

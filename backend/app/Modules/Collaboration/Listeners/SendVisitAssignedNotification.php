@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Collaboration\Listeners;
 
 use App\Modules\Collaboration\Notifications\DomainNotification;
+use App\Modules\Collaboration\Support\NotificationLink;
 use App\Modules\Pipeline\Events\VisitAssigned;
 use Illuminate\Contracts\Queue\ShouldQueue;
 
@@ -15,7 +16,7 @@ class SendVisitAssignedNotification implements ShouldQueue
 {
     public function handle(VisitAssigned $event): void
     {
-        $visit = $event->visit->loadMissing(['agent', 'client']);
+        $visit = $event->visit->loadMissing(['agent', 'client', 'clientProject', 'unit.location']);
         $agent = $visit->agent;
 
         if ($agent === null) {
@@ -26,13 +27,25 @@ class SendVisitAssignedNotification implements ShouldQueue
         $client = $visit->client;
         $clientName = $client?->full_name ?: 'a client';
 
+        // Deep-link to the project workspace when the visit belongs to one —
+        // that page holds the log, the property and the map; the client file
+        // is only the fallback for project-less (qualifying) visits.
+        [$link, $subjectType, $subjectId] = NotificationLink::forSubject($visit->clientProject ?? $client);
+
+        $details = array_filter([
+            ucfirst(str_replace('_', '-', $visit->type->value)).' visit with '.$clientName,
+            $when ? 'on '.$when : null,
+            $visit->unit ? 'at '.$visit->unit->reference : null,
+            $visit->unit?->location?->name,
+        ]);
+
         $agent->notify(new DomainNotification(
             kind: 'visit_assigned',
             title: 'A visit was assigned to you',
-            body: 'Visit with '.$clientName.($when ? ' on '.$when : '').'.',
-            link: $client ? '/clients/'.$client->id : null,
-            subjectType: $client ? 'client' : null,
-            subjectId: $client?->id,
+            body: implode(' · ', $details).'.',
+            link: $link,
+            subjectType: $subjectType,
+            subjectId: $subjectId,
         ));
     }
 }

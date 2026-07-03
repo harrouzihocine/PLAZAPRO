@@ -26,6 +26,11 @@ class NextActionResource extends JsonResource
             'due_at' => $this->due_at,
             'completed_at' => $this->completed_at,
             'is_overdue' => $this->state?->value === 'pending' && $this->due_at?->isPast(),
+            'status' => $this->status?->value,
+            'edited' => $this->supersedes_id !== null,
+            'edit_reason' => $this->whenLoaded('supersedes', fn () => $this->supersedes?->cancellation_reason),
+            'supersedes_id' => $this->supersedes_id,
+            'cancellation_reason' => $this->when($this->isCancelled(), fn () => $this->cancellation_reason),
             'assigned_to' => $this->whenLoaded('assignedTo', fn () => $this->assignedTo ? [
                 'id' => $this->assignedTo->id,
                 'name' => $this->assignedTo->name,

@@ -26,7 +26,7 @@ export const useClientsStore = defineStore('clients', {
     deals: {}, // projectId -> its deals (newest first)
     desire: null,
     matches: [],
-    timeline: { calls: [], visits: [], next_actions: [] },
+    timeline: { calls: [], visits: [], next_actions: [], next_action_history: [] },
     timelineProjectId: null,
     filters: { assigned_agent_id: '', source_id: '', rating_id: '', search: '' },
     loading: false,
@@ -113,9 +113,12 @@ export const useClientsStore = defineStore('clients', {
       return this.archivedProjects
     },
 
+    // Returns the created project (the "new project" flow immediately logs the
+    // first call onto it, so the caller needs the id).
     async createProject(clientId, payload = {}) {
-      await this.mutate(() => projectsApi.create(clientId, payload))
-      return this.loadProjects(clientId)
+      const project = await this.mutate(() => projectsApi.create(clientId, payload))
+      await this.loadProjects(clientId)
+      return project
     },
 
     async advanceProject(clientId, projectId, stage) {

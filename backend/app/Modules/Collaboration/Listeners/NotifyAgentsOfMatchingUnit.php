@@ -47,7 +47,7 @@ class NotifyAgentsOfMatchingUnit implements ShouldQueue
                 kind: 'unit_match',
                 title: $isNew ? 'New unit matches a client' : 'A matching unit was repriced',
                 body: 'Unit '.$unit->reference.' fits: '.$clients.'.',
-                link: '/inventory/units',
+                link: '/inventory/units/'.$unit->id,
                 subjectType: 'unit',
                 subjectId: $unit->id,
             ));

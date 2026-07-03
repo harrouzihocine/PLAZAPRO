@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Collaboration\Listeners;
 
 use App\Modules\Collaboration\Notifications\DomainNotification;
+use App\Modules\Collaboration\Support\NotificationLink;
 use App\Modules\Payments\Events\VersementRecorded;
 use Illuminate\Contracts\Queue\ShouldQueue;
 
@@ -26,13 +27,16 @@ class SendPaymentNotification implements ShouldQueue
 
         $clientName = $client->full_name;
 
+        // Straight to the project workspace, where the payments panel lives.
+        [$link, $subjectType, $subjectId] = NotificationLink::forSubject($versement->clientProject ?? $client);
+
         $agent->notify(new DomainNotification(
             kind: 'payment',
             title: 'Payment recorded',
             body: 'A payment of '.$versement->amount.' was recorded on '.$clientName."'s deal.",
-            link: '/clients/'.$client->id,
-            subjectType: 'client',
-            subjectId: $client->id,
+            link: $link,
+            subjectType: $subjectType,
+            subjectId: $subjectId,
         ));
     }
 }

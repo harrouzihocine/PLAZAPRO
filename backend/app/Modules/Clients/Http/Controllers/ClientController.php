@@ -25,6 +25,8 @@ class ClientController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $clients = Client::query()
+            // clients.view_all: without it, only own (created / assigned) clients.
+            ->visibleTo($request->user())
             ->with(['source', 'rating', 'assignedAgent', 'creator'])
             ->withExists(['calls' => fn ($q) => $q->active()])
             ->when($request->query('status') !== 'all', fn ($q) => $q->active())
@@ -47,15 +49,22 @@ class ClientController extends Controller
                     }
                 });
             })
-            ->orderBy('last_name')
-            ->orderBy('first_name')
+            // Newest clients first — a name is found via search, not by scanning.
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->get();
 
         return ClientResource::collection($clients);
     }
 
-    public function show(Client $client): ClientResource
+    public function show(Request $request, Client $client): ClientResource
     {
+        // Same visibility rule as the listing — an out-of-scope id reads as absent.
+        abort_unless(
+            Client::query()->visibleTo($request->user())->whereKey($client->id)->exists(),
+            404,
+        );
+
         return new ClientResource(
             $client->load(['source', 'rating', 'assignedAgent', 'creator'])
                 ->loadExists(['calls' => fn ($q) => $q->active()]),

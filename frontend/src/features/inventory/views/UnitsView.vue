@@ -1,11 +1,16 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
-import BaseButton from '@/components/base/BaseButton.vue'
-import BaseCard from '@/components/base/BaseCard.vue'
+import { RouterLink, useRouter } from 'vue-router'
+import Button from 'primevue/button'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseMultiSelect from '@/components/base/BaseMultiSelect.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import SectionCard from '@/components/ui/SectionCard.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import { useAutoFilter } from '@/composables/useAutoFilter'
 import { useDynamicList } from '@/composables/useDynamicList'
 import { useWilayas, useCommunes } from '@/composables/useGeography'
 import { GTM_PRIORITIES } from '@/features/inventory/api'
@@ -13,18 +18,18 @@ import GtmPriorityBadge from '@/features/inventory/components/GtmPriorityBadge.v
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
 import { useLocationsStore } from '@/features/inventory/locationsStore'
 import { useUnitsStore } from '@/features/inventory/unitsStore'
+import { formatMoney } from '@/features/payments/money'
 
 const units = useUnitsStore()
 const locations = useLocationsStore()
+const router = useRouter()
 const { items: unitTypes } = useDynamicList('unit_types')
 const { items: floors } = useDynamicList('floors')
 const { wilayas } = useWilayas()
 const { load: loadCommunes } = useCommunes()
 
 // Map location id -> name so the table shows the project, not a raw FK.
-const locationName = computed(() =>
-  Object.fromEntries(locations.items.map((l) => [l.id, l.name])),
-)
+const locationName = computed(() => Object.fromEntries(locations.items.map((l) => [l.id, l.name])))
 
 // { value, label } option lists for the multi-select filters.
 const typeOptions = computed(() => unitTypes.value.map((t) => ({ value: t.id, label: t.label })))
@@ -32,9 +37,7 @@ const floorOptions = computed(() => floors.value.map((f) => ({ value: f.id, labe
 const wilayaOptions = computed(() =>
   wilayas.value.map((w) => ({ value: w.id, label: `${w.code} · ${w.name}` })),
 )
-const projectOptions = computed(() =>
-  locations.items.map((l) => ({ value: l.id, label: l.name })),
-)
+const projectOptions = computed(() => locations.items.map((l) => ({ value: l.id, label: l.name })))
 
 // Communes cascade from the selected wilaya(s): their union, deduped by id.
 const communeItems = ref([])
@@ -54,21 +57,24 @@ async function refreshCommuneOptions() {
   communeItems.value = [...merged.values()]
 }
 
-// When the wilaya selection changes, refresh commune choices, drop any selected
-// commune whose wilaya is no longer chosen, then reload the table.
+// When the wilaya selection changes, refresh commune choices and drop any
+// selected commune whose wilaya is no longer chosen — the auto-filter watcher
+// below reloads the table.
 watch(
   () => units.filters.wilaya_id,
   async () => {
     await refreshCommuneOptions()
     const valid = new Set(communeItems.value.map((c) => c.id))
     units.filters.commune_id = units.filters.commune_id.filter((id) => valid.has(id))
-    units.fetch()
   },
 )
+
+// Filters apply themselves as they change — no "Filter" button.
+useAutoFilter(() => units.filters, () => units.fetch())
 const statusOptions = [
-  { value: 'available', label: 'available' },
-  { value: 'reserved', label: 'reserved' },
-  { value: 'sold', label: 'sold' },
+  { value: 'available', label: 'Available' },
+  { value: 'reserved', label: 'Reserved' },
+  { value: 'sold', label: 'Sold' },
 ]
 // GTM priority filter options (shared source of truth).
 const priorityOptions = GTM_PRIORITIES
@@ -81,6 +87,7 @@ onMounted(async () => {
 })
 
 function reset() {
+  // The auto-filter watcher picks the change up and refetches.
   units.filters = {
     location_id: '',
     wilaya_id: [],
@@ -94,63 +101,73 @@ function reset() {
     min_price: '',
     max_price: '',
   }
-  units.fetch()
+}
+
+function openUnit(event) {
+  router.push({ name: 'inventory.unit', params: { id: event.data.id } })
 }
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div>
-      <h1 class="text-xl font-semibold">Units</h1>
-      <p class="opacity-70">All apartments and lots across projects.</p>
-    </div>
+  <div>
+    <PageHeader title="Units" subtitle="All apartments and lots across projects." />
 
-    <BaseCard>
-      <div class="flex flex-wrap items-end gap-3">
+    <SectionCard flush class="mb-5">
+      <div class="flex flex-wrap items-end gap-2 px-4 py-3 sm:px-5">
         <BaseSelect
           v-model="units.filters.location_id"
-          label="Project"
-          class="w-40 shrink-0"
-          placeholder="All"
+          placeholder="All projects"
+          aria-label="Filter by project"
+          class="w-full sm:w-44"
           :options="projectOptions"
-          @change="units.fetch()"
         />
         <BaseMultiSelect
           v-model="units.filters.type_id"
-          label="Type"
-          class="w-40 shrink-0"
+          placeholder="Type"
+          class="w-full sm:w-40"
           :options="typeOptions"
-          @update:model-value="units.fetch()"
         />
         <BaseMultiSelect
           v-model="units.filters.floor_id"
-          label="Floor"
-          class="w-40 shrink-0"
+          placeholder="Floor"
+          class="w-full sm:w-36"
           :options="floorOptions"
-          @update:model-value="units.fetch()"
         />
         <BaseMultiSelect
           v-model="units.filters.sale_status"
-          label="Status"
-          class="w-40 shrink-0"
+          placeholder="Status"
+          class="w-full sm:w-36"
           :options="statusOptions"
-          @update:model-value="units.fetch()"
         />
         <BaseMultiSelect
           v-model="units.filters.priority"
-          label="GTM priority"
-          class="w-40 shrink-0"
+          placeholder="Priority"
+          class="w-full sm:w-36"
           :options="priorityOptions"
-          @update:model-value="units.fetch()"
         />
-        <BaseButton variant="ghost" class="shrink-0" @click="showAdvanced = !showAdvanced">
-          Advanced search {{ showAdvanced ? '▴' : '▾' }}
-        </BaseButton>
-        <BaseButton class="shrink-0" @click="units.fetch()">Filter</BaseButton>
-        <BaseButton variant="ghost" class="shrink-0" @click="reset">Reset</BaseButton>
+        <Button
+          :label="showAdvanced ? 'Less filters' : 'More filters'"
+          :icon="showAdvanced ? 'pi pi-chevron-up' : 'pi pi-sliders-h'"
+          text
+          size="small"
+          severity="secondary"
+          @click="showAdvanced = !showAdvanced"
+        />
+        <span class="ml-auto flex gap-2">
+          <Button
+            icon="pi pi-filter-slash"
+            text
+            severity="secondary"
+            aria-label="Reset filters"
+            @click="reset"
+          />
+        </span>
       </div>
 
-      <div v-if="showAdvanced" class="mt-3 grid gap-3 border-t border-border pt-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div
+        v-if="showAdvanced"
+        class="grid gap-3 border-t border-line px-4 py-3 sm:grid-cols-2 sm:px-5 lg:grid-cols-4"
+      >
         <BaseMultiSelect
           v-model="units.filters.wilaya_id"
           label="Wilaya"
@@ -161,67 +178,86 @@ function reset() {
           label="Commune"
           :options="communeOptions"
           placeholder="Select a wilaya first"
-          @update:model-value="units.fetch()"
         />
-        <BaseInput v-model="units.filters.min_area" label="Min area (m²)" type="number" @keyup.enter="units.fetch()" />
-        <BaseInput v-model="units.filters.max_area" label="Max area (m²)" type="number" @keyup.enter="units.fetch()" />
-        <BaseInput v-model="units.filters.min_price" label="Min price" type="number" @keyup.enter="units.fetch()" />
-        <BaseInput v-model="units.filters.max_price" label="Max price" type="number" @keyup.enter="units.fetch()" />
+        <BaseInput v-model="units.filters.min_area" label="Min area (m²)" type="number" />
+        <BaseInput v-model="units.filters.max_area" label="Max area (m²)" type="number" />
+        <BaseInput v-model="units.filters.min_price" label="Min price" type="number" />
+        <BaseInput v-model="units.filters.max_price" label="Max price" type="number" />
       </div>
-    </BaseCard>
+    </SectionCard>
 
-    <BaseCard>
-      <p v-if="units.loading" class="py-4 text-center text-sm opacity-60">Loading…</p>
-      <div v-else class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead class="text-left opacity-60">
-            <tr>
-              <th class="py-2 pr-3">Ref</th>
-              <th class="py-2 pr-3">Wilaya</th>
-              <th class="py-2 pr-3">Project</th>
-              <th class="py-2 pr-3">Type</th>
-              <th class="py-2 pr-3">Floor</th>
-              <th class="py-2 pr-3">Area (m²)</th>
-              <th class="py-2 pr-3">Price</th>
-              <th class="py-2 pr-3">Status</th>
-              <th class="py-2 pr-3">Priority</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="u in units.items" :key="u.id" class="border-t border-border">
-              <td class="py-2 pr-3 font-medium">
-                <RouterLink :to="{ name: 'inventory.unit', params: { id: u.id } }" class="hover:text-primary">
-                  {{ u.reference }}
-                </RouterLink>
-              </td>
-              <td class="py-2 pr-3">
-                {{ u.location?.wilaya || '—'
-                }}<span v-if="u.location?.commune" class="opacity-60"> · {{ u.location.commune }}</span>
-              </td>
-              <td class="py-2 pr-3">
-                <RouterLink :to="{ name: 'inventory.location', params: { id: u.location_id } }" class="hover:text-primary">
-                  {{ locationName[u.location_id] ?? u.location_id }}
-                </RouterLink>
-                <span v-if="u.location?.contract_type" class="block text-xs opacity-60">
-                  📄 {{ u.location.contract_type }}
-                </span>
-              </td>
-              <td class="py-2 pr-3">{{ u.type || '—' }}</td>
-              <td class="py-2 pr-3">{{ u.floor || '—' }}</td>
-              <td class="py-2 pr-3">{{ u.area_sqm ?? '—' }}</td>
-              <td class="py-2 pr-3">{{ u.price }}</td>
-              <td class="py-2 pr-3"><SaleStatusBadge :status="u.sale_status" /></td>
-              <td class="py-2 pr-3">
-                <GtmPriorityBadge v-if="u.gtm_priority" :priority="u.gtm_priority" />
-                <span v-else>—</span>
-              </td>
-            </tr>
-            <tr v-if="!units.items.length">
-              <td colspan="9" class="py-4 text-center text-sm opacity-60">No units match.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </BaseCard>
+    <SectionCard flush>
+      <DataTable
+        :value="units.items"
+        :loading="units.loading"
+        paginator
+        :rows="25"
+        :rows-per-page-options="[25, 50, 100]"
+        data-key="id"
+        class="cursor-pointer"
+        @row-click="openUnit"
+      >
+        <template #empty>
+          <EmptyState
+            icon="pi pi-th-large"
+            title="No units match"
+            body="Loosen the filters to see more inventory."
+          />
+        </template>
+
+        <Column header="Reference">
+          <template #body="{ data }">
+            <span class="font-medium text-ink">{{ data.reference }}</span>
+          </template>
+        </Column>
+        <Column header="Wilaya">
+          <template #body="{ data }">
+            {{ data.location?.wilaya || '—' }}
+            <span v-if="data.location?.commune" class="text-mute">
+              · {{ data.location.commune }}</span
+            >
+          </template>
+        </Column>
+        <Column header="Project">
+          <template #body="{ data }">
+            <RouterLink
+              :to="{ name: 'inventory.location', params: { id: data.location_id } }"
+              class="text-ink hover:underline"
+              @click.stop
+            >
+              {{ locationName[data.location_id] ?? data.location_id }}
+            </RouterLink>
+            <span v-if="data.location?.contract_type" class="block text-xs text-mute">
+              {{ data.location.contract_type }}
+            </span>
+          </template>
+        </Column>
+        <Column header="Type">
+          <template #body="{ data }">{{ data.type || '—' }}</template>
+        </Column>
+        <Column header="Floor">
+          <template #body="{ data }">{{ data.floor || '—' }}</template>
+        </Column>
+        <Column header="Area">
+          <template #body="{ data }">
+            <span class="num">{{ data.area_sqm ? `${data.area_sqm} m²` : '—' }}</span>
+          </template>
+        </Column>
+        <Column header="Price">
+          <template #body="{ data }">
+            <span class="num">{{ formatMoney(data.price) }}</span>
+          </template>
+        </Column>
+        <Column header="Status">
+          <template #body="{ data }"><SaleStatusBadge :status="data.sale_status" /></template>
+        </Column>
+        <Column header="Priority">
+          <template #body="{ data }">
+            <GtmPriorityBadge v-if="data.gtm_priority" :priority="data.gtm_priority" />
+            <span v-else class="text-mute">—</span>
+          </template>
+        </Column>
+      </DataTable>
+    </SectionCard>
   </div>
 </template>

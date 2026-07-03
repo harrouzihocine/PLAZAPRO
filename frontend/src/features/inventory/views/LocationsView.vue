@@ -1,10 +1,17 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import BaseButton from '@/components/base/BaseButton.vue'
-import BaseCard from '@/components/base/BaseCard.vue'
+import Button from 'primevue/button'
+import Drawer from 'primevue/drawer'
+import InputText from 'primevue/inputtext'
+import Skeleton from 'primevue/skeleton'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import BaseTextarea from '@/components/base/BaseTextarea.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import SectionCard from '@/components/ui/SectionCard.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import { useAutoFilter } from '@/composables/useAutoFilter'
 import { useDynamicList } from '@/composables/useDynamicList'
 import { useWilayas, useCommunes } from '@/composables/useGeography'
 import { GTM_PRIORITIES } from '@/features/inventory/api'
@@ -14,6 +21,7 @@ import { googleMapsUrl } from '@/features/inventory/googleMaps'
 import { useLocationsStore } from '@/features/inventory/locationsStore'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction } from '@/composables/useConfirm'
+import { formatDate } from '@/utils/format'
 
 const store = useLocationsStore()
 const auth = useAuthStore()
@@ -25,7 +33,19 @@ const { communes: formCommunes, load: loadFormCommunes } = useCommunes()
 
 const canManage = auth.can('locations.manage')
 
-const blank = { name: '', code: '', wilaya_id: '', commune_id: '', contract_type_id: '', address: '', description: '', expected_delivery_date: '', gtm_priority: 'medium', latitude: null, longitude: null }
+const blank = {
+  name: '',
+  code: '',
+  wilaya_id: '',
+  commune_id: '',
+  contract_type_id: '',
+  address: '',
+  description: '',
+  expected_delivery_date: '',
+  gtm_priority: 'medium',
+  latitude: null,
+  longitude: null,
+}
 const form = reactive({ ...blank })
 const editingId = ref(null)
 const showForm = ref(false)
@@ -50,9 +70,11 @@ watch(
   (id, prev) => {
     if (prev !== undefined && id !== prev) store.filters.commune_id = ''
     loadFilterCommunes(id)
-    store.fetch()
   },
 )
+
+// Filters apply themselves as they change — no "Filter" button.
+useAutoFilter(() => store.filters, () => store.fetch())
 
 function openCreate() {
   Object.assign(form, blank)
@@ -145,49 +167,185 @@ function toggleArchived() {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <div>
-        <h1 class="text-xl font-semibold">Projects</h1>
-        <p class="opacity-70">Real-estate projects, buildings and sites.</p>
-      </div>
-      <BaseButton v-if="canManage" @click="openCreate">New project</BaseButton>
-    </div>
+  <div>
+    <PageHeader title="Projects" subtitle="Real-estate projects, buildings and sites.">
+      <template #actions>
+        <Button v-if="canManage" label="New project" icon="pi pi-plus" @click="openCreate" />
+      </template>
+    </PageHeader>
 
-    <div class="flex flex-wrap gap-2">
-      <BaseInput
-        v-model="store.filters.q"
-        label="Search"
-        class="flex-1 min-w-[12rem]"
-        @keyup.enter="store.fetch()"
-      />
+    <!-- Filter toolbar -->
+    <div class="mb-5 flex flex-wrap items-center gap-2">
+      <div class="relative w-full sm:w-64">
+        <i
+          class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-mute"
+          aria-hidden="true"
+        />
+        <InputText
+          v-model="store.filters.q"
+          placeholder="Search name or code…"
+          class="w-full !pl-9"
+        />
+      </div>
       <BaseSelect
         v-model="store.filters.wilaya_id"
-        label="Wilaya"
         placeholder="All wilayas"
+        aria-label="Filter by wilaya"
+        class="w-full sm:w-52"
         :options="wilayas.map((w) => ({ value: w.id, label: `${w.code} · ${w.name}` }))"
       />
       <BaseSelect
         v-model="store.filters.commune_id"
-        label="Commune"
         placeholder="All communes"
+        aria-label="Filter by commune"
+        class="w-full sm:w-48"
         :disabled="!store.filters.wilaya_id"
         :options="filterCommunes.map((c) => ({ value: c.id, label: c.name }))"
-        @change="store.fetch()"
       />
       <BaseSelect
         v-model="store.filters.priority"
-        label="GTM priority"
         placeholder="All priorities"
+        aria-label="Filter by GTM priority"
+        class="w-full sm:w-44"
         :options="GTM_PRIORITIES"
-        @change="store.fetch()"
       />
     </div>
 
+    <!-- Project cards -->
+    <div v-if="store.loading" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <Skeleton v-for="i in 6" :key="i" height="9rem" />
+    </div>
 
-    <BaseCard v-if="showForm && canManage">
-      <form class="space-y-3" @submit.prevent="submit">
-        <h2 class="font-semibold">{{ editingId ? 'Edit project' : 'New project' }}</h2>
+    <SectionCard v-else-if="!store.items.length">
+      <EmptyState
+        icon="pi pi-building"
+        title="No projects yet"
+        :body="
+          canManage
+            ? 'Create the first project to start loading inventory.'
+            : 'Projects will appear here.'
+        "
+      />
+    </SectionCard>
+
+    <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div
+        v-for="loc in store.items"
+        :key="loc.id"
+        class="group relative flex flex-col rounded-xl border border-line bg-card p-4 shadow-card transition-all hover:border-primary-300 hover:shadow-pop"
+      >
+        <div class="flex items-start justify-between gap-2">
+          <RouterLink
+            :to="{ name: 'inventory.location', params: { id: loc.id } }"
+            class="min-w-0 after:absolute after:inset-0"
+          >
+            <span class="block truncate font-semibold text-ink group-hover:underline">
+              {{ loc.name }}
+            </span>
+            <span class="num mt-0.5 block text-xs text-mute">{{ loc.code }}</span>
+          </RouterLink>
+          <GtmPriorityBadge v-if="loc.gtm_priority" :priority="loc.gtm_priority" />
+        </div>
+
+        <dl class="mt-3 space-y-1.5 text-sm">
+          <div v-if="loc.wilaya" class="flex items-center gap-2 text-mute">
+            <i class="pi pi-map-marker text-xs" aria-hidden="true" />
+            <span class="truncate">
+              {{ loc.wilaya.name }}<template v-if="loc.commune"> · {{ loc.commune.name }}</template>
+            </span>
+          </div>
+          <div v-if="loc.contract_type" class="flex items-center gap-2 text-mute">
+            <i class="pi pi-file text-xs" aria-hidden="true" />
+            <span class="truncate">{{ loc.contract_type }}</span>
+          </div>
+          <div v-if="loc.expected_delivery_date" class="flex items-center gap-2 text-mute">
+            <i class="pi pi-flag text-xs" aria-hidden="true" />
+            <span>Delivery {{ formatDate(loc.expected_delivery_date) }}</span>
+          </div>
+        </dl>
+
+        <div
+          v-if="canManage"
+          class="relative z-10 mt-auto flex justify-end gap-1 border-t border-line pt-2.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+        >
+          <Button
+            icon="pi pi-pencil"
+            text
+            rounded
+            size="small"
+            severity="secondary"
+            aria-label="Edit project"
+            @click.prevent="openEdit(loc)"
+          />
+          <Button
+            icon="pi pi-inbox"
+            text
+            rounded
+            size="small"
+            severity="secondary"
+            aria-label="Archive project"
+            @click.prevent="archive(loc)"
+          />
+          <Button
+            icon="pi pi-trash"
+            text
+            rounded
+            size="small"
+            severity="danger"
+            aria-label="Remove project"
+            @click.prevent="remove(loc)"
+          />
+        </div>
+        <div v-else class="mt-1" />
+      </div>
+    </div>
+
+    <!-- Archived projects: hidden by default, reactivatable one by one. -->
+    <div v-if="canManage" class="mt-6">
+      <Button
+        :label="`${showArchived ? 'Hide' : 'Show'} archived projects`"
+        :icon="showArchived ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
+        text
+        size="small"
+        severity="secondary"
+        @click="toggleArchived"
+      />
+      <div v-if="showArchived" class="mt-3 space-y-2">
+        <div
+          v-for="loc in store.archivedItems"
+          :key="loc.id"
+          class="flex flex-col gap-2 rounded-xl border border-dashed border-line bg-card p-3 opacity-90 sm:flex-row sm:items-center"
+        >
+          <div class="min-w-0 flex-1">
+            <span class="font-medium text-ink">{{ loc.name }}</span>
+            <span class="ml-2 text-xs text-mute">
+              {{ loc.code }}<template v-if="loc.wilaya"> · {{ loc.wilaya.name }}</template
+              ><template v-if="loc.commune"> ({{ loc.commune.name }})</template>
+            </span>
+            <span class="ml-2 text-xs uppercase text-mute">archived</span>
+          </div>
+          <Button
+            label="Reactivate"
+            icon="pi pi-undo"
+            size="small"
+            outlined
+            @click="reactivate(loc)"
+          />
+        </div>
+        <p v-if="!store.archivedItems.length" class="py-2 text-center text-sm text-mute">
+          No archived projects.
+        </p>
+      </div>
+    </div>
+
+    <!-- Create / edit drawer -->
+    <Drawer
+      v-model:visible="showForm"
+      position="right"
+      class="!w-full sm:!w-[540px]"
+      :header="editingId ? 'Edit project' : 'New project'"
+    >
+      <form v-if="canManage" class="space-y-4" @submit.prevent="submit">
         <div class="grid gap-3 sm:grid-cols-2">
           <BaseInput v-model="form.name" label="Name" />
           <BaseInput v-model="form.code" label="Code" />
@@ -217,25 +375,10 @@ function toggleArchived() {
               :href="mapsUrl"
               target="_blank"
               rel="noopener noreferrer"
-              title="Open in Google Maps"
-              aria-label="Open in Google Maps"
-              class="mt-1 inline-flex text-primary hover:opacity-80"
+              class="mt-1 inline-flex items-center gap-1 text-sm text-primary-600 hover:underline dark:text-primary-400"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
+              <i class="pi pi-map-marker text-xs" aria-hidden="true" />
+              Open in Google Maps
             </a>
           </div>
           <BaseInput
@@ -251,13 +394,14 @@ function toggleArchived() {
           />
         </div>
         <div class="space-y-2">
-          <button
+          <Button
             type="button"
-            class="text-sm text-primary hover:underline"
+            :label="showMap ? 'Hide map' : 'Pick location on map'"
+            icon="pi pi-map"
+            text
+            size="small"
             @click="showMap = !showMap"
-          >
-            {{ showMap ? 'Hide map' : '🗺 Pick location on map' }}
-          </button>
+          />
           <LocationMap
             v-if="showMap"
             v-model:latitude="form.latitude"
@@ -266,85 +410,18 @@ function toggleArchived() {
             editable
           />
         </div>
-        <BaseInput v-model="form.description" label="Description" />
-        <div class="flex gap-2">
-          <BaseButton type="submit" :disabled="store.saving">Save</BaseButton>
-          <BaseButton type="button" variant="ghost" @click="showForm = false">Cancel</BaseButton>
+        <BaseTextarea v-model="form.description" label="Description" :rows="3" />
+        <div class="flex gap-2 pt-1">
+          <Button type="submit" label="Save" icon="pi pi-check" :loading="store.saving" />
+          <Button
+            type="button"
+            label="Cancel"
+            severity="secondary"
+            outlined
+            @click="showForm = false"
+          />
         </div>
       </form>
-    </BaseCard>
-
-    <BaseCard>
-      <p v-if="store.loading" class="py-4 text-center text-sm opacity-60">Loading…</p>
-      <div v-else class="space-y-2">
-        <div
-          v-for="loc in store.items"
-          :key="loc.id"
-          class="flex flex-col gap-2 rounded-token border border-border p-3 sm:flex-row sm:items-center"
-        >
-          <div class="flex-1">
-            <RouterLink
-              :to="{ name: 'inventory.location', params: { id: loc.id } }"
-              class="font-medium hover:text-primary"
-            >
-              {{ loc.name }}
-            </RouterLink>
-            <GtmPriorityBadge v-if="loc.gtm_priority" :priority="loc.gtm_priority" class="ml-2" />
-            <span class="ml-2 text-xs opacity-60">
-              {{ loc.code
-              }}<template v-if="loc.wilaya"> · {{ loc.wilaya.name }}</template
-              ><template v-if="loc.commune"> ({{ loc.commune.name }})</template>
-            </span>
-            <span v-if="loc.contract_type" class="ml-2 text-xs opacity-60">
-              📄 {{ loc.contract_type }}
-            </span>
-            <span v-if="loc.expected_delivery_date" class="ml-2 text-xs opacity-60">
-              🏁 Delivery {{ loc.expected_delivery_date }}
-            </span>
-          </div>
-          <div v-if="canManage" class="flex items-center gap-1">
-            <BaseButton variant="ghost" @click="openEdit(loc)">Edit</BaseButton>
-            <BaseButton variant="ghost" @click="archive(loc)">Archive</BaseButton>
-            <BaseButton variant="ghost" @click="remove(loc)">Remove</BaseButton>
-          </div>
-        </div>
-        <p v-if="!store.items.length" class="py-4 text-center text-sm opacity-60">
-          No projects yet.
-        </p>
-      </div>
-    </BaseCard>
-
-    <!-- Archived projects: hidden by default, reactivatable one by one. -->
-    <BaseCard v-if="canManage">
-      <button
-        type="button"
-        class="text-sm font-semibold uppercase opacity-60 hover:opacity-100"
-        @click="toggleArchived"
-      >
-        {{ showArchived ? 'Hide' : 'Show' }} archived projects
-      </button>
-
-      <div v-if="showArchived" class="mt-3 space-y-2">
-        <div
-          v-for="loc in store.archivedItems"
-          :key="loc.id"
-          class="flex flex-col gap-2 rounded-token border border-dashed border-border p-3 opacity-80 sm:flex-row sm:items-center"
-        >
-          <div class="flex-1">
-            <span class="font-medium">{{ loc.name }}</span>
-            <span class="ml-2 text-xs opacity-60">
-              {{ loc.code
-              }}<template v-if="loc.wilaya"> · {{ loc.wilaya.name }}</template
-              ><template v-if="loc.commune"> ({{ loc.commune.name }})</template>
-            </span>
-            <span class="ml-2 text-xs uppercase opacity-50">archived</span>
-          </div>
-          <BaseButton variant="ghost" @click="reactivate(loc)">Reactivate</BaseButton>
-        </div>
-        <p v-if="!store.archivedItems.length" class="py-2 text-center text-sm opacity-60">
-          No archived projects.
-        </p>
-      </div>
-    </BaseCard>
+    </Drawer>
   </div>
 </template>

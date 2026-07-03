@@ -32,15 +32,17 @@ class TimelineController extends Controller
             ->where('client_project_id', $projectId)
             ->orWhereNull('client_project_id'));
 
+        // Cancelled/superseded versions are returned too — an edit never hides
+        // its history (the FE nests old versions under their replacement).
         $calls = Call::query()
-            ->where('client_id', $client->id)->active()
+            ->where('client_id', $client->id)
             ->when($projectId, $scoped)
             ->with(['agent', 'outcome', 'supersedes'])->latest('called_at')->get();
 
         $visits = Visit::query()
-            ->where('client_id', $client->id)->active()
+            ->where('client_id', $client->id)
             ->when($projectId, $scoped)
-            ->with(['agent', 'unit.type', 'unit.floor', 'outcome', 'supersedes'])->orderByDesc('scheduled_at')->get();
+            ->with(['agent', 'unit.type', 'unit.floor', 'unit.location', 'outcome', 'supersedes'])->orderByDesc('scheduled_at')->get();
 
         $projectIds = ClientProject::query()
             ->where('client_id', $client->id)
@@ -60,11 +62,23 @@ class TimelineController extends Controller
             ->orderBy('due_at')
             ->get();
 
+        // The full plan history (completed / cancelled / superseded next actions)
+        // for the "Next actions" timeline tab — the open one above stays the CTA.
+        $actionHistory = NextAction::query()
+            ->with(['assignedTo', 'supersedes'])
+            ->where(function ($q) use ($client, $projectIds) {
+                $q->where(fn ($s) => $s->where('subject_type', 'client')->where('subject_id', $client->id))
+                    ->orWhere(fn ($s) => $s->where('subject_type', 'client_project')->whereIn('subject_id', $projectIds));
+            })
+            ->orderByDesc('due_at')
+            ->get();
+
         return response()->json([
             'data' => [
                 'calls' => CallResource::collection($calls)->resolve(),
                 'visits' => VisitResource::collection($visits)->resolve(),
                 'next_actions' => NextActionResource::collection($nextActions)->resolve(),
+                'next_action_history' => NextActionResource::collection($actionHistory)->resolve(),
             ],
         ]);
     }

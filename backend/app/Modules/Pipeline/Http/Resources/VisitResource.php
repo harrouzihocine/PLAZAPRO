@@ -29,6 +29,8 @@ class VisitResource extends JsonResource
             'status' => $this->status?->value,
             'edited' => $this->supersedes_id !== null,
             'edit_reason' => $this->whenLoaded('supersedes', fn () => $this->supersedes?->cancellation_reason),
+            'supersedes_id' => $this->supersedes_id,
+            'cancellation_reason' => $this->when($this->isCancelled(), fn () => $this->cancellation_reason),
             'agent' => $this->whenLoaded('agent', fn () => $this->agent ? [
                 'id' => $this->agent->id,
                 'name' => $this->agent->name,
@@ -43,6 +45,14 @@ class VisitResource extends JsonResource
                 'floor' => $this->unit->floor?->label,
                 'area_sqm' => $this->unit->area_sqm,
                 'price' => $this->unit->price,
+                // Site coordinates — lets the field agent open the in-site visit
+                // in Google Maps.
+                'location' => $this->unit->relationLoaded('location') && $this->unit->location ? [
+                    'id' => $this->unit->location->id,
+                    'name' => $this->unit->location->name,
+                    'latitude' => $this->unit->location->latitude,
+                    'longitude' => $this->unit->location->longitude,
+                ] : null,
             ] : null),
             'outcome' => $this->whenLoaded('outcome', fn () => $this->outcome ? [
                 'id' => $this->outcome->id,
