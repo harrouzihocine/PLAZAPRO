@@ -32,7 +32,9 @@ class AssignDispatchItem
      */
     public function handle(array $change): void
     {
-        $dueDate = isset($change['due_date']) ? Carbon::parse($change['due_date']) : null;
+        // Compare whole days (app timezone): a date-only due_date is midnight
+        // already, but startOfDay() keeps the guard correct even if a time slips in.
+        $dueDate = isset($change['due_date']) ? Carbon::parse($change['due_date'])->startOfDay() : null;
 
         abort_if(
             $dueDate !== null && $dueDate->isBefore(now()->startOfDay()),

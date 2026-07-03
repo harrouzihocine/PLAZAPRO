@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Modules\Pipeline\Http\Controllers;
 
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Inventory\Models\Unit;
 use App\Modules\Pipeline\Actions\AssignDispatchItem;
 use App\Modules\Pipeline\Enums\NextActionType;
 use App\Modules\Pipeline\Http\Requests\DispatchAssignRequest;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Settings\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,12 +35,21 @@ class DispatchController extends Controller
             : now())->startOfWeek();
         $end = $start->copy()->endOfWeek();
 
-        // The pool: every unassigned in-site plan, oldest due first.
+        // The pool: every unassigned in-site plan, oldest due first. Each carries
+        // the shortlisted units + their sites — the exact properties the assigned
+        // agent will visit (what GenerateInSiteVisits materializes on assignment),
+        // so the dispatcher sees WHERE to send someone before assigning.
         $pending = NextAction::query()->active()->pending()
             ->where('type', NextActionType::InSiteVisit->value)
             ->whereNull('assigned_to')
-            // Morph-aware: only a project subject nests a client relation.
-            ->with(['subject' => fn (MorphTo $m) => $m->morphWith([ClientProject::class => ['client']])])
+            // Morph-aware: only a project subject nests a client + shortlist.
+            ->with(['subject' => fn (MorphTo $m) => $m->morphWith([ClientProject::class => [
+                'client',
+                'shortlistItems' => fn ($q) => $q->active()
+                    ->where('shortlistable_type', 'unit')
+                    ->whereIn('state', ['shortlisted', 'not_visited'])
+                    ->with(['shortlistable' => fn (MorphTo $sm) => $sm->morphWith([Unit::class => ['location']])]),
+            ]])])
             ->orderBy('due_at')
             ->get()
             ->map(fn (NextAction $a) => [
@@ -48,6 +59,8 @@ class DispatchController extends Controller
                 'client' => $a->subject?->client?->full_name,
                 'client_id' => $a->subject?->client_id,
                 'project_id' => $a->subject_type === 'client_project' ? $a->subject_id : null,
+                'units' => $this->shortlistUnits($a->subject),
+                'sites' => $this->shortlistSites($a->subject),
                 'link' => $a->subject_type === 'client_project' && $a->subject
                     ? '/clients/'.$a->subject->client_id.'/projects/'.$a->subject_id
                     : null,
@@ -126,5 +139,52 @@ class DispatchController extends Controller
         });
 
         return response()->json(['saved' => true]);
+    }
+
+    /**
+     * The shortlisted properties an in-site plan will send the agent to visit.
+     *
+     * @return list<array{reference: ?string, site: ?string}>
+     */
+    private function shortlistUnits(?ClientProject $project): array
+    {
+        return $this->shortlistItems($project)
+            ->map(fn ($item) => [
+                'reference' => $item->shortlistable?->reference,
+                'site' => $item->shortlistable?->location?->name,
+            ])
+            ->filter(fn ($u) => $u['reference'] !== null)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The distinct sites (locations) those properties sit on, each with a Google
+     * Maps link when the location has coordinates.
+     *
+     * @return list<array{name: string, maps_url: ?string}>
+     */
+    private function shortlistSites(?ClientProject $project): array
+    {
+        return $this->shortlistItems($project)
+            ->map(fn ($item) => $item->shortlistable?->location)
+            ->filter()
+            ->unique('id')
+            ->map(fn ($loc) => [
+                'name' => $loc->name,
+                'maps_url' => $loc->latitude !== null && $loc->longitude !== null
+                    ? sprintf('https://www.google.com/maps/search/?api=1&query=%s,%s', $loc->latitude, $loc->longitude)
+                    : null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /** The active unit shortlist items eager-loaded on the pending action's project. */
+    private function shortlistItems(?ClientProject $project): Collection
+    {
+        return $project instanceof ClientProject
+            ? $project->shortlistItems
+            : new Collection;
     }
 }

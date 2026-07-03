@@ -8,6 +8,7 @@ use App\Modules\Clients\Models\Client;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Clients\Models\ShortlistItem;
 use App\Modules\Collaboration\Notifications\DomainNotification;
+use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
@@ -105,6 +106,33 @@ class DispatchTest extends TestCase
 
         $this->assertSame($action->id, $response->json('data.pending.0.id'));
         $this->assertContains($agent->id, array_column($response->json('data.agents'), 'id'));
+    }
+
+    public function test_a_pending_task_carries_the_shortlisted_units_and_sites_to_visit(): void
+    {
+        $dispatcher = $this->userWith(['visits.dispatch']);
+
+        $site = Location::factory()->create(['name' => 'Résidence Test']);
+        $unit = Unit::factory()->for($site)->create(['reference' => 'B-07']);
+        $project = ClientProject::factory()->create(['client_id' => Client::factory()->create()->id]);
+        ShortlistItem::factory()->create([
+            'client_project_id' => $project->id,
+            'shortlistable_type' => 'unit',
+            'shortlistable_id' => $unit->id,
+            'state' => 'shortlisted',
+        ]);
+        NextAction::factory()->create([
+            'subject_type' => 'client_project', 'subject_id' => $project->id,
+            'type' => 'in_site_visit', 'state' => 'pending',
+            'assigned_to' => null, 'due_at' => now()->addDay(),
+        ]);
+
+        Sanctum::actingAs($dispatcher);
+        $response = $this->getJson('/api/v1/dispatch/board')->assertOk();
+
+        $this->assertSame('B-07', $response->json('data.pending.0.units.0.reference'));
+        $this->assertSame('Résidence Test', $response->json('data.pending.0.units.0.site'));
+        $this->assertSame('Résidence Test', $response->json('data.pending.0.sites.0.name'));
     }
 
     public function test_assigning_from_the_board_materializes_visits_and_notifies(): void

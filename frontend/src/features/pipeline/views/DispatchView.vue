@@ -26,17 +26,34 @@ const pending = ref([]) // draggable list (pending strip)
 const cells = ref({}) // `${agentId}|${day}` -> draggable list
 const moves = ref([]) // accumulated drag moves, saved in one batch
 
+// The board works entirely in UTC calendar dates. The backend (app timezone is
+// UTC) produces week_start, every item's `day`, and the "today onwards" guard in
+// UTC — so the columns, the dropped due_date and the highlights must use UTC too.
+// Using the browser's local offset (e.g. toISOString on a locally-parsed date)
+// shifted every column a day back for east-of-UTC users, so dropping on "today"
+// sent yesterday and the server rejected it as a past day.
+function addUtcDays(isoDate, n) {
+  const d = new Date(isoDate + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+const todayUtc = () => new Date().toISOString().slice(0, 10)
+
 const days = computed(() => {
   if (!weekStart.value) return []
-  const start = new Date(weekStart.value + 'T00:00:00')
+  const today = todayUtc()
   return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(start)
-    d.setDate(start.getDate() + i)
+    const date = addUtcDays(weekStart.value, i)
     return {
-      date: d.toISOString().slice(0, 10),
-      label: d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }),
-      isPast: d < new Date(new Date().toDateString()),
-      isToday: d.toDateString() === new Date().toDateString(),
+      date,
+      label: new Date(date + 'T00:00:00Z').toLocaleDateString(undefined, {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        timeZone: 'UTC',
+      }),
+      isPast: date < today, // ISO YYYY-MM-DD compares chronologically as strings
+      isToday: date === today,
     }
   })
 })
@@ -66,18 +83,11 @@ async function load(week = weekStart.value) {
 }
 
 function dayDates(start) {
-  const s = new Date(start + 'T00:00:00')
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(s)
-    d.setDate(s.getDate() + i)
-    return d.toISOString().slice(0, 10)
-  })
+  return Array.from({ length: 7 }, (_, i) => addUtcDays(start, i))
 }
 
 function shiftWeek(deltaDays) {
-  const d = new Date(weekStart.value + 'T00:00:00')
-  d.setDate(d.getDate() + deltaDays)
-  load(d.toISOString().slice(0, 10))
+  load(addUtcDays(weekStart.value, deltaDays))
 }
 
 onMounted(() => load(null))
@@ -190,19 +200,28 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
         >
           <template #item="{ element }">
             <div
-              class="flex cursor-grab items-center gap-2 rounded-xl border border-dashed border-amber-300 bg-amber-50 px-3 py-2 text-sm active:cursor-grabbing dark:border-amber-500/40 dark:bg-amber-500/10"
+              class="flex max-w-xs cursor-grab flex-col gap-0.5 rounded-xl border border-dashed border-amber-300 bg-amber-50 px-3 py-2 text-sm active:cursor-grabbing dark:border-amber-500/40 dark:bg-amber-500/10"
             >
-              <i class="pi pi-map-marker text-amber-600 dark:text-amber-400" aria-hidden="true" />
-              <span class="font-medium text-ink">{{ element.client ?? '—' }}</span>
+              <div class="flex items-center gap-2">
+                <i class="pi pi-map-marker text-amber-600 dark:text-amber-400" aria-hidden="true" />
+                <span class="min-w-0 flex-1 truncate font-medium text-ink">
+                  {{ element.client ?? '—' }}
+                </span>
+                <button
+                  type="button"
+                  class="text-mute transition-colors hover:text-ink"
+                  aria-label="Task details"
+                  @click.stop="showDetails($event, element)"
+                >
+                  <i class="pi pi-info-circle" aria-hidden="true" />
+                </button>
+              </div>
+              <!-- Which site(s) to visit — the shortlisted properties' locations. -->
+              <span v-if="element.sites?.length" class="truncate text-xs text-ink">
+                <i class="pi pi-building text-[10px]" aria-hidden="true" />
+                {{ element.sites.map((s) => s.name).join(', ') }}
+              </span>
               <span class="num text-xs text-mute">due {{ formatDateTime(element.due_at) }}</span>
-              <button
-                type="button"
-                class="text-mute transition-colors hover:text-ink"
-                aria-label="Task details"
-                @click.stop="showDetails($event, element)"
-              >
-                <i class="pi pi-info-circle" aria-hidden="true" />
-              </button>
             </div>
           </template>
         </draggable>
@@ -316,6 +335,41 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
             <dd class="text-ink">{{ detailsItem.location }}</dd>
           </div>
         </dl>
+
+        <!-- Pending in-site plans: the properties + sites to visit once assigned. -->
+        <div v-if="detailsItem.units?.length" class="border-t border-line pt-2">
+          <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-mute">To visit</p>
+          <ul class="space-y-1">
+            <li
+              v-for="(u, i) in detailsItem.units"
+              :key="i"
+              class="flex items-center justify-between gap-2"
+            >
+              <span class="num text-ink">{{ u.reference }}</span>
+              <span v-if="u.site" class="truncate text-xs text-mute">{{ u.site }}</span>
+            </li>
+          </ul>
+        </div>
+        <p
+          v-else-if="detailsItem.kind === 'action' && detailsItem.type !== 'call'"
+          class="border-t border-line pt-2 text-xs text-mute"
+        >
+          No shortlisted property yet — the site is set on the project.
+        </p>
+
+        <!-- Per-site Google Maps links for a pending plan (may span sites). -->
+        <div v-if="detailsItem.sites?.length" class="flex flex-wrap gap-x-3 gap-y-1">
+          <a
+            v-for="(s, i) in detailsItem.sites.filter((x) => x.maps_url)"
+            :key="i"
+            :href="s.maps_url"
+            target="_blank"
+            rel="noopener"
+            class="inline-flex items-center gap-1.5 text-xs text-primary-600 hover:underline dark:text-primary-400"
+          >
+            <i class="pi pi-map" aria-hidden="true" /> {{ s.name }}
+          </a>
+        </div>
         <div class="flex items-center gap-3 border-t border-line pt-2">
           <RouterLink
             v-if="detailsItem.link"
