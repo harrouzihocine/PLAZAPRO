@@ -69,6 +69,10 @@ onMounted(() => units.fetchOne(props.id))
             <dt class="text-xs opacity-60">Position</dt>
             <dd>{{ units.current.position }}</dd>
           </div>
+          <div v-if="units.current.location?.contract_type">
+            <dt class="text-xs opacity-60">Project contract</dt>
+            <dd>{{ units.current.location.contract_type }}</dd>
+          </div>
           <div v-if="units.current.location?.expected_delivery_date">
             <dt class="text-xs opacity-60">Project delivery</dt>
             <dd>{{ units.current.location.expected_delivery_date }}</dd>

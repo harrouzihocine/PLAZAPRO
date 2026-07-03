@@ -17,8 +17,8 @@ class CreateLocation
         $data['gtm_priority'] ??= GtmPriority::Medium->value;
 
         return Location::create(Arr::only($data, [
-            'name', 'code', 'wilaya_id', 'commune_id', 'address', 'description',
-            'expected_delivery_date', 'gtm_priority', 'latitude', 'longitude',
+            'name', 'code', 'wilaya_id', 'commune_id', 'contract_type_id', 'address',
+            'description', 'expected_delivery_date', 'gtm_priority', 'latitude', 'longitude',
         ]));
     }
 }

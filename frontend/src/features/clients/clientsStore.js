@@ -3,6 +3,7 @@ import { toastError } from '@/composables/useConfirm'
 import {
   agentsApi,
   clientsApi,
+  dealsApi,
   desireApi,
   followUpAgentsApi,
   projectsApi,
@@ -22,9 +23,11 @@ export const useClientsStore = defineStore('clients', {
     followUpAgents: [],
     projects: [],
     archivedProjects: [],
+    deals: {}, // projectId -> its deals (newest first)
     desire: null,
     matches: [],
     timeline: { calls: [], visits: [], next_actions: [] },
+    timelineProjectId: null,
     filters: { assigned_agent_id: '', source_id: '', rating_id: '', search: '' },
     loading: false,
     saving: false,
@@ -120,9 +123,10 @@ export const useClientsStore = defineStore('clients', {
       return this.loadProjects(clientId)
     },
 
-    // Archive = reversible: hides the deal + its contents until reactivated.
-    async archiveProject(clientId, projectId) {
-      await this.mutate(() => projectsApi.archive(projectId))
+    // Archive = reversible: hides the deal + its contents until reactivated. A
+    // reason (archive_reasons item) is required; blocked if payments were recorded.
+    async archiveProject(clientId, projectId, payload) {
+      await this.mutate(() => projectsApi.archive(projectId, payload))
       await this.loadArchivedProjects(clientId)
       return this.loadProjects(clientId)
     },
@@ -130,6 +134,14 @@ export const useClientsStore = defineStore('clients', {
     async reactivateProject(clientId, projectId) {
       await this.mutate(() => projectsApi.reactivate(projectId))
       await this.loadArchivedProjects(clientId)
+      return this.loadProjects(clientId)
+    },
+
+    // Shift a deal back to the desire list (client changed their mind).
+    async shiftProjectToDesire(clientId, projectId, payload) {
+      await this.mutate(() => projectsApi.shiftToDesire(projectId, payload))
+      await this.loadArchivedProjects(clientId)
+      await this.loadDesire(clientId)
       return this.loadProjects(clientId)
     },
 
@@ -162,25 +174,69 @@ export const useClientsStore = defineStore('clients', {
       return this.loadMatches(clientId)
     },
 
+    // --- Deals on a project (created from visit logs; one active at a time) ---
+
+    async loadDeals(projectId) {
+      this.deals = { ...this.deals, [projectId]: await dealsApi.list(projectId) }
+      return this.deals[projectId]
+    },
+
+    async createDeal(clientId, projectId, payload) {
+      await this.mutate(() => dealsApi.create(projectId, payload))
+      await this.loadDeals(projectId)
+      return this.loadProjects(clientId)
+    },
+
+    async closeDeal(clientId, projectId, dealId, payload) {
+      await this.mutate(() => dealsApi.close(dealId, payload))
+      await this.loadDeals(projectId)
+      return this.loadProjects(clientId)
+    },
+
+    async syncDealBoxes(projectId, dealId, boxIds) {
+      await this.mutate(() => dealsApi.syncBoxes(dealId, boxIds))
+      return this.loadDeals(projectId)
+    },
+
     // --- Interaction chain (calls, visits, next actions) ---
 
-    async loadTimeline(clientId) {
-      this.timeline = await pipelineApi.timeline(clientId)
+    // Scoped to one project when projectId is given (the per-project story).
+    async loadTimeline(clientId, projectId = this.timelineProjectId) {
+      this.timelineProjectId = projectId ?? null
+      this.timeline = await pipelineApi.timeline(clientId, this.timelineProjectId)
       return this.timeline
     },
 
     async logCall(clientId, payload) {
       await this.mutate(() => pipelineApi.logCall(clientId, payload))
-      return this.loadTimeline(clientId)
-    },
-
-    async scheduleVisit(clientId, payload) {
-      await this.mutate(() => pipelineApi.scheduleVisit(payload))
+      // The first call unlocks the projects (has_calls flips), a call may open /
+      // reopen a project or upsert the desire — refresh what the panels show.
+      if (this.current && String(this.current.id) === String(clientId)) {
+        this.current = await clientsApi.get(clientId)
+      }
+      await this.loadProjects(clientId)
+      if (payload.desire) await this.loadDesire(clientId)
       return this.loadTimeline(clientId)
     },
 
     async completeVisit(clientId, visitId, payload) {
       await this.mutate(() => pipelineApi.completeVisit(visitId, payload))
+      return this.loadTimeline(clientId)
+    },
+
+    // Corrections — cancel + new version, reason required. Refetch to show history.
+    async correctCall(clientId, callId, payload) {
+      await this.mutate(() => pipelineApi.correctCall(callId, payload))
+      return this.loadTimeline(clientId)
+    },
+
+    async correctVisit(clientId, visitId, payload) {
+      await this.mutate(() => pipelineApi.correctVisit(visitId, payload))
+      return this.loadTimeline(clientId)
+    },
+
+    async correctNextAction(clientId, nextActionId, payload) {
+      await this.mutate(() => pipelineApi.correctNextAction(nextActionId, payload))
       return this.loadTimeline(clientId)
     },
   },

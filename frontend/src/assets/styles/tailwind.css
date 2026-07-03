@@ -1,12 +1,61 @@
 @import './tokens.css';
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+
+/* CSS layer order: PrimeVue styles sit between Tailwind's base (preflight)
+   and utilities, so preflight never wipes component styles and utility
+   classes always win when we override a component inline. */
+@layer tailwind-base, primevue, tailwind-utilities;
+
+@layer tailwind-base {
+  @tailwind base;
+}
+
+@layer tailwind-utilities {
+  @tailwind components;
+  @tailwind utilities;
+}
 
 html,
 body,
 #app {
   min-height: 100%;
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--app-ground);
+  color: var(--p-text-color, var(--color-text));
+  font-family:
+    'Inter Variable',
+    Inter,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04';
+}
+
+/* Money and metrics line up when digits share a width. */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Thin, theme-aware scrollbars everywhere. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--p-surface-300, #d1cfc9) transparent;
+}
+[data-theme='dark'] * {
+  scrollbar-color: var(--p-surface-700, #31302a) transparent;
+}
+
+/* Page-level fade for router transitions. */
+.page-enter-active,
+.page-leave-active {
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(4px);
+}
+.page-leave-to {
+  opacity: 0;
 }

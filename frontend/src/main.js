@@ -1,9 +1,30 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+import PrimeVue from 'primevue/config'
+import Tooltip from 'primevue/tooltip'
 import router from '@/router'
 import App from '@/App.vue'
+import preset from '@/theme/preset'
+import '@fontsource-variable/inter'
 import '@/assets/styles/tailwind.css'
+import 'primeicons/primeicons.css'
 import 'sweetalert2/dist/sweetalert2.min.css'
 import '@/assets/styles/swal.css'
 
-createApp(App).use(createPinia()).use(router).mount('#app')
+const app = createApp(App)
+
+app.use(createPinia())
+app.use(router)
+app.use(PrimeVue, {
+  ripple: true,
+  theme: {
+    preset,
+    options: {
+      darkModeSelector: '[data-theme="dark"]',
+      cssLayer: { name: 'primevue', order: 'tailwind-base, primevue, tailwind-utilities' },
+    },
+  },
+})
+app.directive('tooltip', Tooltip)
+
+app.mount('#app')

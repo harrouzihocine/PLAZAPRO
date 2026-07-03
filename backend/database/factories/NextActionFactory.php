@@ -25,7 +25,7 @@ class NextActionFactory extends Factory
             'subject_id' => Client::factory(),
             'source_type' => null,
             'source_id' => null,
-            'type' => NextActionType::FollowUp->value,
+            'type' => NextActionType::Call->value,
             'due_at' => now()->addDay(),
             'assigned_to' => User::factory()->agent(),
             'state' => NextActionState::Pending->value,

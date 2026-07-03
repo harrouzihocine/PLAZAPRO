@@ -24,13 +24,14 @@ class Call extends BaseModel
 
     protected $fillable = [
         'client_id', 'client_project_id', 'agent_id', 'direction',
-        'outcome_id', 'notes', 'called_at',
+        'outcome_id', 'notes', 'topics', 'called_at',
     ];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
             'direction' => CallDirection::class,
+            'topics' => 'array',
             'called_at' => 'datetime',
         ]);
     }

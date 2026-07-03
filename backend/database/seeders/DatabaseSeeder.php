@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             RbacSeeder::class,
+            DepartmentSeeder::class,
             DynamicListSeeder::class,
             WilayaCommuneSeeder::class,
         ]);

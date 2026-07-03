@@ -32,6 +32,8 @@ class UpdateClientRequest extends FormRequest
             'rating_id' => ['sometimes', 'nullable', 'integer', 'exists:dynamic_list_items,id'],
             'assigned_agent_id' => ['sometimes', 'nullable', 'integer', new CanFollowUpClient],
             'notes' => ['sometimes', 'nullable', 'string', 'max:5000'],
+            'interests' => ['sometimes', 'nullable', 'array'],
+            'interests.*' => ['integer', 'distinct', 'exists:dynamic_list_items,id'],
         ];
     }
 }

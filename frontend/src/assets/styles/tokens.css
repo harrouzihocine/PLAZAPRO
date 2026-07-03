@@ -1,28 +1,38 @@
-/* Design tokens — gold/white (day) + gold/black (night). Colour is never
-   hard-coded in a component; it always resolves to these CSS variables. */
+/* App-level design tokens. PrimeVue's preset (src/theme/preset.js) owns the
+   component palette at runtime (--p-* vars); these tokens cover what sits
+   outside PrimeVue — the page ground, state colours, and legacy aliases still
+   referenced by swal.css. Colour is never hard-coded in a component. */
 :root {
-  /* light: gold on white */
-  --color-bg: #ffffff;
-  --color-surface: #faf6e9;
-  --color-text: #1a1a1a;
-  --color-primary: #c9a227; /* gold */
-  --color-on-primary: #1a1a1a;
-  --color-border: #e7e0c8;
-  --color-danger: #b3261e;
-  --color-success: #2e7d32;
-  --color-warning: #b5850b;
-  --radius: 12px;
+  --app-ground: #f6f5f1; /* warm paper behind white cards */
+  --app-danger: #b3261e;
+  --app-success: #2e7d32;
+  --app-warning: #9a6b00;
+  --app-info: #0b6bcb;
+
+  /* legacy aliases (swal.css + transitional) */
+  --color-bg: var(--app-ground);
+  --color-surface: #ffffff;
+  --color-text: #201f1c;
+  --color-primary: #a9851d;
+  --color-on-primary: #231a05;
+  --color-border: #e5e3dc;
+  --color-danger: var(--app-danger);
+  --color-success: var(--app-success);
+  --color-warning: var(--app-warning);
+  --radius: 10px;
 }
 
 [data-theme='dark'] {
-  /* night: gold on black */
-  --color-bg: #111111;
-  --color-surface: #1c1c1c;
-  --color-text: #f0f0f0;
-  --color-primary: #c9a227; /* same gold */
-  --color-on-primary: #1a1a1a;
-  --color-border: #2c2c2c;
-  --color-danger: #f2b8b5;
-  --color-success: #7bd88f;
-  --color-warning: #e6c260;
+  --app-ground: #0d0c0a; /* warm near-black */
+  --app-danger: #f2b8b5;
+  --app-success: #7bd88f;
+  --app-warning: #e6c260;
+  --app-info: #8ec7ff;
+
+  --color-bg: var(--app-ground);
+  --color-surface: #161511;
+  --color-text: #ece9e2;
+  --color-primary: #d8b254;
+  --color-on-primary: #37270c;
+  --color-border: #2b2a24;
 }

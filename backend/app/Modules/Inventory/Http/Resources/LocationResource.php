@@ -30,6 +30,8 @@ class LocationResource extends JsonResource
                 'id' => $this->commune->id,
                 'name' => $this->commune->name,
             ] : null),
+            'contract_type_id' => $this->contract_type_id,
+            'contract_type' => $this->whenLoaded('contractType', fn () => $this->contractType?->label),
             'address' => $this->address,
             'description' => $this->description,
             'expected_delivery_date' => $this->expected_delivery_date?->toDateString(),

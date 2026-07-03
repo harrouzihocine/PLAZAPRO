@@ -21,6 +21,7 @@ class GenerateDueReminders
         $count = 0;
 
         NextAction::query()
+            ->active()
             ->overdue()
             ->whereDoesntHave('reminders', fn ($q) => $q->whereIn('state', [
                 ReminderState::Pending->value,

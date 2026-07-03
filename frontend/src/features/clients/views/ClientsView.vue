@@ -17,6 +17,7 @@ const auth = useAuthStore()
 const router = useRouter()
 const { items: sources } = useDynamicList('sources')
 const { items: ratings } = useDynamicList('client_ratings')
+const { items: interestOptions } = useDynamicList('property_interests')
 
 const selectClass =
   'w-full rounded-token border border-border bg-bg px-3 py-2 min-h-[44px] text-ink outline-none focus:border-primary'
@@ -40,8 +41,16 @@ const emptyForm = () => ({
   rating_id: '',
   assigned_agent_id: '',
   notes: '',
+  interests: [],
 })
 const form = reactive(emptyForm())
+
+// Toggle a property-interest id (apartment / box / local) on the form.
+function toggleInterest(id) {
+  const i = form.interests.indexOf(id)
+  if (i === -1) form.interests.push(id)
+  else form.interests.splice(i, 1)
+}
 
 onMounted(() => store.fetch())
 
@@ -62,6 +71,7 @@ function openEdit(client) {
     rating_id: client.rating?.id ?? '',
     assigned_agent_id: client.assigned_agent?.id ?? '',
     notes: client.notes ?? '',
+    interests: [...(client.interests ?? [])],
   })
   drawerOpen.value = true
 }
@@ -77,6 +87,7 @@ async function save() {
     rating_id: form.rating_id || null,
     assigned_agent_id: form.assigned_agent_id || null,
     notes: form.notes.trim() || null,
+    interests: form.interests,
   }
   try {
     if (editingId.value) {
@@ -228,6 +239,25 @@ function resetFilters() {
             placeholder="None"
             :options="ratings.map((r) => ({ value: r.id, label: r.label }))"
           />
+
+          <!-- What the client is shopping for (drives qualification & shortlist). -->
+          <fieldset v-if="interestOptions.length">
+            <legend class="mb-1 block text-sm">Interested in</legend>
+            <div class="flex flex-wrap gap-3">
+              <label
+                v-for="opt in interestOptions"
+                :key="opt.id"
+                class="flex items-center gap-1.5 text-sm"
+              >
+                <input
+                  type="checkbox"
+                  :checked="form.interests.includes(opt.id)"
+                  @change="toggleInterest(opt.id)"
+                />
+                {{ opt.label }}
+              </label>
+            </div>
+          </fieldset>
 
           <BaseSelect
             v-if="canSeeOwnership()"

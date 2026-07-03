@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Pipeline\Http\Controllers;
 
 use App\Modules\Clients\Models\Client;
+use App\Modules\Pipeline\Actions\CorrectCall;
 use App\Modules\Pipeline\Actions\LogCall;
+use App\Modules\Pipeline\Http\Requests\CorrectCallRequest;
 use App\Modules\Pipeline\Http\Requests\LogCallRequest;
 use App\Modules\Pipeline\Http\Resources\CallResource;
 use App\Modules\Pipeline\Models\Call;
@@ -36,5 +38,17 @@ class CallController extends Controller
             ->load(['agent', 'outcome']);
 
         return new CallResource($call);
+    }
+
+    /**
+     * Correct a call: cancels the original and returns the new version (201),
+     * keeping both in history with the reason (CorrectCall → supersedeWith).
+     */
+    public function correct(CorrectCallRequest $request, Call $call, CorrectCall $action): CallResource
+    {
+        $new = $action->handle($call, $request->safe()->except('reason'), $request->validated('reason'))
+            ->load(['agent', 'outcome']);
+
+        return new CallResource($new);
     }
 }

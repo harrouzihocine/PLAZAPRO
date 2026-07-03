@@ -1,37 +1,48 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
-import BaseCard from '@/components/base/BaseCard.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
-import BaseSelect from '@/components/base/BaseSelect.vue'
-import { useDynamicList } from '@/composables/useDynamicList'
+import BaseModal from '@/components/base/BaseModal.vue'
 import { useClientsStore } from '@/features/clients/clientsStore'
-import { pipelineApi } from '@/features/pipeline/api'
+import CallLogForm from '@/features/pipeline/components/CallLogForm.vue'
+import CompleteVisitForm from '@/features/pipeline/components/CompleteVisitForm.vue'
 import NextActionFields from '@/features/pipeline/components/NextActionFields.vue'
 import { useAuthStore } from '@/features/settings/store'
 
-const props = defineProps({ clientId: { type: [String, Number], required: true } })
+// The interaction timeline — scoped to ONE project when projectId is set (its
+// logs + the client-level qualifying calls). The pipeline keeps exactly one
+// pending log to fill: the open next action drives the only CTA offered (a
+// pending call → "Log the call"; a pending visit → its "Complete" button), so
+// the next log created is always the pending one's nature. Forms open in modals.
+const props = defineProps({
+  clientId: { type: [String, Number], required: true },
+  projectId: { type: [String, Number], default: null },
+})
+const emit = defineEmits(['changed'])
 const store = useClientsStore()
 const auth = useAuthStore()
-const { items: outcomes } = useDynamicList('visit_outcomes')
-const { items: callOutcomes } = useDynamicList('call_outcomes')
-
-const selectClass =
-  'w-full rounded-token border border-border bg-bg px-3 py-2 min-h-[44px] text-ink outline-none focus:border-primary'
 
 const canLogCall = () => auth.can('calls.log')
-const canScheduleVisit = () => auth.can('visits.assign')
-const canConduct = () => auth.can('visits.conduct')
+// An in-site log is completed by its assigned agent (or a visit admin); office
+// visits by any conducting user — mirrors the server rule.
+const canComplete = (visit) =>
+  auth.can('visits.conduct') &&
+  (visit.type !== 'in_site' || visit.agent?.id === auth.user?.id || auth.can('visits.assign'))
 
 const showCall = ref(false)
-const showVisit = ref(false)
-const completingId = ref(null)
-const units = ref([])
+const completing = ref(null) // the visit being completed (modal)
 
-const emptyNextAction = () => ({ type: 'follow_up', due_at: '', assigned_to: '' })
-const callForm = reactive({ direction: 'outbound', outcome_id: '', notes: '', next_action: emptyNextAction() })
-const visitForm = reactive({ type: 'office', unit_id: '', agent_id: '', scheduled_at: '', notes: '' })
-const completeForm = reactive({ outcome_id: '', notes: '', next_action: emptyNextAction() })
+const emptyNextAction = () => ({ type: 'call', due_date: '', due_time: '', assigned_to: '' })
+
+// Edit-with-reason state (corrections = cancel + new version).
+const editNa = reactive({ open: false, id: null, reason: '', form: emptyNextAction() })
+
+const nextActionReady = (na) => !!na.due_date && (na.type !== 'in_site_visit' || !!na.assigned_to)
+
+// The single open next action drives what may be logged next.
+const pending = computed(() => store.timeline.next_actions[0] ?? null)
+const pendingIsCall = computed(() => !pending.value || pending.value.type === 'call')
+const openVisits = computed(() => store.timeline.visits.filter((v) => !v.is_completed))
 
 // Merge calls + visits into one list, newest first, for the timeline display.
 const entries = computed(() => {
@@ -40,135 +51,111 @@ const entries = computed(() => {
   return [...calls, ...visits].sort((a, b) => new Date(b.at) - new Date(a.at))
 })
 
-onMounted(() => store.loadTimeline(props.clientId))
+onMounted(async () => {
+  await store.loadTimeline(props.clientId, props.projectId)
+  // A call is the first thing logged on a new client — open the form when the
+  // timeline has no calls yet and the user can log one.
+  if (canLogCall() && !store.timeline.calls.length) showCall.value = true
+})
 
-async function openVisitForm() {
-  showVisit.value = true
-  if (!units.value.length) units.value = await pipelineApi.availableUnits()
-}
-
-async function submitCall() {
-  if (!callForm.next_action.assigned_to || !callForm.next_action.due_at) return
-  await store.logCall(props.clientId, {
-    direction: callForm.direction,
-    outcome_id: callForm.outcome_id || null,
-    notes: callForm.notes.trim() || null,
-    next_action: callForm.next_action,
-  })
-  Object.assign(callForm, { direction: 'outbound', outcome_id: '', notes: '', next_action: emptyNextAction() })
+async function submitCall(payload) {
+  if (props.projectId) payload.client_project_id = props.projectId
+  await store.logCall(props.clientId, payload)
   showCall.value = false
+  emit('changed')
 }
 
-async function submitVisit() {
-  if (!visitForm.agent_id || !visitForm.scheduled_at) return
-  if (visitForm.type === 'apartment' && !visitForm.unit_id) return
-  await store.scheduleVisit(props.clientId, {
-    client_id: props.clientId,
-    type: visitForm.type,
-    unit_id: visitForm.type === 'apartment' ? visitForm.unit_id : null,
-    agent_id: visitForm.agent_id,
-    scheduled_at: visitForm.scheduled_at,
-    notes: visitForm.notes.trim() || null,
+// Completing may also carry the deal step ("client decided") — the visit is
+// completed first, then THE deal opens on the visit's project with provenance.
+async function submitComplete(payload) {
+  const { deal, ...completion } = payload
+  const visit = completing.value
+  await store.completeVisit(props.clientId, visit.id, completion)
+  completing.value = null
+  if (deal && visit.client_project_id) {
+    await store.createDeal(props.clientId, visit.client_project_id, deal)
+    await store.loadDeals(visit.client_project_id)
+  }
+  emit('changed')
+}
+
+// --- Edit the open next action (change type/when/assignee) with a reason ---
+function openEditNa(na) {
+  const d = na.due_at ? new Date(na.due_at) : null
+  editNa.open = true
+  editNa.id = na.id
+  editNa.reason = ''
+  Object.assign(editNa.form, {
+    type: na.type,
+    due_date: d ? d.toISOString().slice(0, 10) : '',
+    due_time: '',
+    assigned_to: na.assigned_to?.id ?? '',
   })
-  Object.assign(visitForm, { type: 'office', unit_id: '', agent_id: '', scheduled_at: '', notes: '' })
-  showVisit.value = false
 }
 
-function openComplete(visit) {
-  completingId.value = visit.id
-  Object.assign(completeForm, { outcome_id: '', notes: '', next_action: emptyNextAction() })
-}
-
-async function submitComplete() {
-  if (!completeForm.next_action.assigned_to || !completeForm.next_action.due_at) return
-  await store.completeVisit(props.clientId, completingId.value, {
-    outcome_id: completeForm.outcome_id || null,
-    notes: completeForm.notes.trim() || null,
-    next_action: completeForm.next_action,
-  })
-  completingId.value = null
+async function submitEditNa() {
+  if (!editNa.reason.trim() || !nextActionReady(editNa.form)) return
+  await store.correctNextAction(props.clientId, editNa.id, { reason: editNa.reason.trim(), ...editNa.form })
+  editNa.open = false
+  emit('changed')
 }
 </script>
 
 <template>
-  <BaseCard>
+  <div>
     <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-      <h2 class="text-sm font-semibold uppercase opacity-60">Timeline</h2>
-      <div class="flex gap-1">
-        <BaseButton v-if="canLogCall()" variant="ghost" @click="showCall = !showCall">Log call</BaseButton>
-        <BaseButton v-if="canScheduleVisit()" variant="ghost" @click="openVisitForm">Schedule visit</BaseButton>
-      </div>
+      <h3 class="text-sm font-semibold uppercase opacity-60">Timeline</h3>
+      <!-- One pending log at a time: the call CTA shows only when the open next
+           action IS a call (or nothing is planned yet). -->
+      <BaseButton v-if="canLogCall() && pendingIsCall" variant="ghost" @click="showCall = true">
+        📞 Log call
+      </BaseButton>
     </div>
 
-    <!-- Open next actions -->
+    <!-- The open next action (the one pending log to fill), editable with a reason. -->
     <div v-if="store.timeline.next_actions.length" class="mb-3 space-y-1">
       <div
         v-for="na in store.timeline.next_actions"
         :key="na.id"
-        class="flex items-center justify-between rounded-token border border-border px-2 py-1 text-sm"
+        class="rounded-token border border-primary/40 bg-primary/5 px-2 py-1.5 text-sm"
         :class="na.is_overdue ? 'text-danger' : ''"
       >
-        <span>▸ {{ na.type.replace('_', ' ') }} · due {{ new Date(na.due_at).toLocaleDateString() }}</span>
-        <span class="opacity-60">{{ na.assigned_to?.name ?? '' }}</span>
+        <div class="flex items-center justify-between gap-2">
+          <span>▸ Next: <span class="font-medium">{{ na.type.replace(/_/g, ' ') }}</span> · due {{ new Date(na.due_at).toLocaleDateString() }}</span>
+          <span class="flex items-center gap-2">
+            <span class="opacity-60">{{ na.assigned_to?.name ?? '' }}</span>
+            <button
+              v-if="canLogCall()"
+              type="button"
+              class="opacity-60 hover:opacity-100"
+              title="Edit next action (with a reason)"
+              @click="openEditNa(na)"
+            >
+              ✎
+            </button>
+          </span>
+        </div>
+
+        <!-- Edit-with-reason form: switch a call into a visit, change when/who, etc. -->
+        <form
+          v-if="editNa.open && editNa.id === na.id"
+          class="mt-2 space-y-2 rounded-token bg-surface p-2"
+          @submit.prevent="submitEditNa"
+        >
+          <NextActionFields v-model="editNa.form" :field-agents="store.agents" />
+          <BaseInput v-model="editNa.reason" label="Reason for the change" />
+          <div class="flex gap-2">
+            <BaseButton type="submit" :disabled="store.saving || !editNa.reason.trim()">Save change</BaseButton>
+            <BaseButton type="button" variant="ghost" @click="editNa.open = false">Cancel</BaseButton>
+          </div>
+        </form>
       </div>
+
+      <!-- A pending visit's log is completed on the visit itself below. -->
+      <p v-if="!pendingIsCall && openVisits.length" class="px-1 text-xs opacity-60">
+        The pending log is the scheduled visit — fill it with its “Complete” button below.
+      </p>
     </div>
-
-    <!-- Log call form -->
-    <form v-if="showCall" class="mb-3 space-y-2 rounded-token bg-surface p-3" @submit.prevent="submitCall">
-      <div class="grid gap-2 sm:grid-cols-2">
-        <BaseSelect
-          v-model="callForm.direction"
-          label="Direction"
-          :clearable="false"
-          :options="[{ value: 'outbound', label: 'outbound' }, { value: 'inbound', label: 'inbound' }]"
-        />
-        <BaseSelect
-          v-model="callForm.outcome_id"
-          label="Outcome"
-          placeholder="None"
-          :options="callOutcomes.map((o) => ({ value: o.id, label: o.label }))"
-        />
-        <BaseInput v-model="callForm.notes" label="Notes" class="sm:col-span-2" />
-      </div>
-      <NextActionFields v-model="callForm.next_action" :agents="store.agents" />
-      <div class="flex gap-2">
-        <BaseButton type="submit" :disabled="store.saving">Save call</BaseButton>
-        <BaseButton type="button" variant="ghost" @click="showCall = false">Cancel</BaseButton>
-      </div>
-    </form>
-
-    <!-- Schedule visit form -->
-    <form v-if="showVisit" class="mb-3 space-y-2 rounded-token bg-surface p-3" @submit.prevent="submitVisit">
-      <div class="grid gap-2 sm:grid-cols-2">
-        <BaseSelect
-          v-model="visitForm.type"
-          label="Type"
-          :clearable="false"
-          :options="[{ value: 'office', label: 'office' }, { value: 'apartment', label: 'apartment' }]"
-        />
-        <BaseSelect
-          v-if="visitForm.type === 'apartment'"
-          v-model="visitForm.unit_id"
-          label="Unit"
-          placeholder="Select unit"
-          :options="units.map((u) => ({ value: u.id, label: u.reference }))"
-        />
-        <BaseSelect
-          v-model="visitForm.agent_id"
-          label="Agent"
-          placeholder="Select agent"
-          :options="store.agents.map((a) => ({ value: a.id, label: a.name }))"
-        />
-        <label class="block">
-          <span class="mb-1 block text-xs">When</span>
-          <input v-model="visitForm.scheduled_at" type="datetime-local" :class="selectClass" />
-        </label>
-      </div>
-      <div class="flex gap-2">
-        <BaseButton type="submit" :disabled="store.saving">Schedule</BaseButton>
-        <BaseButton type="button" variant="ghost" @click="showVisit = false">Cancel</BaseButton>
-      </div>
-    </form>
 
     <!-- Timeline entries -->
     <div class="space-y-2">
@@ -178,14 +165,17 @@ async function submitComplete() {
           <span class="opacity-60"> · {{ new Date(e.data.called_at).toLocaleString() }}</span>
           <span v-if="e.data.outcome"> · {{ e.data.outcome.label }}</span>
           <span v-if="e.data.agent" class="opacity-60"> · {{ e.data.agent.name }}</span>
-          <p v-if="e.data.notes" class="opacity-80">{{ e.data.notes }}</p>
+          <p v-if="e.data.notes" class="whitespace-pre-line opacity-80">{{ e.data.notes }}</p>
+          <p v-if="e.data.edited" class="text-xs italic opacity-60">
+            ✎ edited{{ e.data.edit_reason ? ' — ' + e.data.edit_reason : '' }}
+          </p>
         </template>
         <template v-else>
           <div class="flex items-center justify-between">
             <div>
-              <span class="font-medium">🏠 {{ e.data.type }} visit</span>
+              <span class="font-medium">🏠 {{ e.data.type.replace('_', '-') }} visit</span>
               <span class="opacity-60"> · {{ new Date(e.data.scheduled_at).toLocaleString() }}</span>
-              <span v-if="e.data.unit"> · {{ e.data.unit.reference }}</span>
+              <span v-if="e.data.unit"> · {{ e.data.unit.reference }}<template v-if="e.data.unit.property_type"> ({{ e.data.unit.property_type }})</template></span>
               <span v-if="e.data.agent" class="opacity-60"> · {{ e.data.agent.name }}</span>
               <span
                 class="ml-1 rounded-token px-1.5 py-0.5 text-xs"
@@ -193,37 +183,49 @@ async function submitComplete() {
               >
                 {{ e.data.is_completed ? 'done' : 'scheduled' }}
               </span>
+              <span v-if="e.data.outcome" class="ml-1 text-xs opacity-70">{{ e.data.outcome.label }}</span>
+              <span v-if="e.data.edited" class="ml-1 text-xs italic opacity-60" :title="e.data.edit_reason">✎ edited</span>
             </div>
             <BaseButton
-              v-if="canConduct() && !e.data.is_completed"
+              v-if="canComplete(e.data) && !e.data.is_completed"
               variant="ghost"
-              @click="openComplete(e.data)"
+              @click="completing = e.data"
             >
               Complete
             </BaseButton>
           </div>
-
-          <!-- Complete visit form (inline) -->
-          <form
-            v-if="completingId === e.data.id"
-            class="mt-2 space-y-2 rounded-token bg-surface p-3"
-            @submit.prevent="submitComplete"
-          >
-            <BaseSelect
-              v-model="completeForm.outcome_id"
-              label="Outcome"
-              placeholder="None"
-              :options="outcomes.map((o) => ({ value: o.id, label: o.label }))"
-            />
-            <NextActionFields v-model="completeForm.next_action" :agents="store.agents" />
-            <div class="flex gap-2">
-              <BaseButton type="submit" :disabled="store.saving">Complete visit</BaseButton>
-              <BaseButton type="button" variant="ghost" @click="completingId = null">Cancel</BaseButton>
-            </div>
-          </form>
+          <p v-if="e.data.notes" class="whitespace-pre-line opacity-80">{{ e.data.notes }}</p>
         </template>
       </div>
       <p v-if="!entries.length" class="py-2 text-sm opacity-60">No calls or visits yet.</p>
     </div>
-  </BaseCard>
+
+    <!-- Log call — the fast-entry qualification form (properties / desire). -->
+    <BaseModal v-if="showCall" title="Log a call" @close="showCall = false">
+      <CallLogForm
+        :client="store.current"
+        :field-agents="store.agents"
+        :saving="store.saving"
+        :desire="store.desire"
+        @submit="submitCall"
+        @cancel="showCall = false"
+      />
+    </BaseModal>
+
+    <!-- Complete visit (rapid log; office variant embeds the shortlist + deal step). -->
+    <BaseModal
+      v-if="completing"
+      :title="`Complete ${completing.type.replace('_', '-')} visit`"
+      @close="completing = null"
+    >
+      <CompleteVisitForm
+        :visit="completing"
+        :field-agents="store.agents"
+        :saving="store.saving"
+        :can-deal="auth.can('visits.conduct')"
+        @submit="submitComplete"
+        @cancel="completing = null"
+      />
+    </BaseModal>
+  </div>
 </template>

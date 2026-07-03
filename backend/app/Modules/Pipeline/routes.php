@@ -12,6 +12,7 @@ declare(strict_types=1);
 */
 
 use App\Modules\Pipeline\Http\Controllers\CallController;
+use App\Modules\Pipeline\Http\Controllers\NextActionController;
 use App\Modules\Pipeline\Http\Controllers\TaskController;
 use App\Modules\Pipeline\Http\Controllers\TimelineController;
 use App\Modules\Pipeline\Http\Controllers\VisitController;
@@ -26,8 +27,12 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Logging a call always leaves a next action (LogCallRequest enforces it).
+    // Corrections (call + next action) also run under calls.log — every edit is a
+    // cancel + new version, captured in history with a reason.
     Route::middleware('can:calls.log')->group(function () {
         Route::post('/clients/{client}/calls', [CallController::class, 'store']);
+        Route::post('/calls/{call}/correct', [CallController::class, 'correct']);
+        Route::post('/next-actions/{nextAction}/correct', [NextActionController::class, 'correct']);
     });
 
     // Scheduling / assigning a visit picks an agent (agent-only).
@@ -35,6 +40,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/visits', [VisitController::class, 'store']);
         Route::post('/visits/{visit}/assign', [VisitController::class, 'assign']);
     });
+
+    // Correcting a visit: visit admins (visits.assign) for any visit, or the
+    // assigned field agent for their own in-site log — CorrectVisitRequest is
+    // the gate, so no permission middleware here.
+    Route::post('/visits/{visit}/correct', [VisitController::class, 'correct']);
 
     // Completing a visit (conducting it) always leaves a next action.
     Route::middleware('can:visits.conduct')->group(function () {

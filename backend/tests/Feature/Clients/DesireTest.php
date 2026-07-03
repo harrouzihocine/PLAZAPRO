@@ -8,6 +8,7 @@ use App\Modules\Clients\Models\Client;
 use App\Modules\Clients\Models\Desire;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
+use App\Modules\Pipeline\Models\Call;
 use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
@@ -41,6 +42,7 @@ class DesireTest extends TestCase
     public function test_desire_is_upserted_one_per_client(): void
     {
         $client = Client::factory()->create();
+        Call::factory()->create(['client_id' => $client->id]); // call-first rule
         Sanctum::actingAs($this->agent());
 
         $this->putJson("/api/v1/clients/{$client->id}/desire", ['floor_pref' => 'floor_2', 'budget_max' => 5000000])
@@ -58,6 +60,7 @@ class DesireTest extends TestCase
     public function test_max_budget_below_min_is_rejected(): void
     {
         $client = Client::factory()->create();
+        Call::factory()->create(['client_id' => $client->id]); // call-first rule
         Sanctum::actingAs($this->agent());
 
         $this->putJson("/api/v1/clients/{$client->id}/desire", ['budget_min' => 5000000, 'budget_max' => 1000000])

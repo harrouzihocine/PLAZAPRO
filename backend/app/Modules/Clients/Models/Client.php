@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Clients\Models;
 
 use App\Core\Models\BaseModel;
+use App\Modules\Pipeline\Models\Call;
 use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\User;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -26,8 +27,16 @@ class Client extends BaseModel
 
     protected $fillable = [
         'first_name', 'last_name', 'phone', 'email',
-        'source_id', 'rating_id', 'assigned_agent_id', 'notes',
+        'source_id', 'rating_id', 'assigned_agent_id', 'notes', 'interests',
     ];
+
+    /** @var list<string> Ids of the `property_interests` items the client wants. */
+    protected function casts(): array
+    {
+        return array_merge(parent::casts(), [
+            'interests' => 'array',
+        ]);
+    }
 
     /** Title-case each name on read and write so names are always standardized. */
     protected function firstName(): Attribute
@@ -101,6 +110,20 @@ class Client extends BaseModel
     public function projects(): HasMany
     {
         return $this->hasMany(ClientProject::class);
+    }
+
+    public function calls(): HasMany
+    {
+        return $this->hasMany(Call::class);
+    }
+
+    /**
+     * Workflow rule: a call log is the very first entity captured for a client —
+     * visits, deals and desires all come after the qualifying phone call.
+     */
+    public function hasActiveCall(): bool
+    {
+        return $this->calls()->active()->exists();
     }
 
     /** The client-level desire (the one not tied to a specific deal). */

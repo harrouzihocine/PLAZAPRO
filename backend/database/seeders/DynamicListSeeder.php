@@ -89,13 +89,93 @@ class DynamicListSeeder extends Seeder
             ],
             'unit_types' => [
                 'name' => 'Unit Types',
-                'description' => 'Apartment / property layout.',
+                'description' => 'Apartment / property layout (incl. commercial "local").',
                 'items' => [
                     ['label' => 'Studio', 'value' => 'studio'],
                     ['label' => 'F2', 'value' => 'f2'],
                     ['label' => 'F3', 'value' => 'f3'],
                     ['label' => 'F4', 'value' => 'f4'],
                     ['label' => 'Duplex', 'value' => 'duplex'],
+                    ['label' => 'Local / Commercial', 'value' => 'local'],
+                ],
+            ],
+            // Sale contract a project is marketed under. Attached to a location
+            // (project) and surfaced on its units. Editable in-app.
+            'contract_types' => [
+                'name' => 'Contract Types',
+                'description' => 'The sale contract a project is sold under (VEFA, turnkey, …).',
+                'items' => [
+                    ['label' => 'VEFA (off-plan)', 'value' => 'vefa'],
+                    ['label' => 'Turnkey (ready)', 'value' => 'turnkey'],
+                    ['label' => 'Rent-to-own', 'value' => 'rent_to_own'],
+                    ['label' => 'Cash sale', 'value' => 'cash_sale'],
+                ],
+            ],
+            // What a client is shopping for — captured at lead creation, drives
+            // qualification & the office-visit shortlist. Multi-select.
+            'property_interests' => [
+                'name' => 'Property Interests',
+                'description' => 'What the client wants to buy (apartment / box / local). Multi-select.',
+                'items' => [
+                    ['label' => 'Apartment', 'value' => 'apartment'],
+                    ['label' => 'Box', 'value' => 'box'],
+                    ['label' => 'Local / Commercial', 'value' => 'local'],
+                ],
+            ],
+            // Fast checkbox talking-points logged against a phone call. The former
+            // separate "call outcome" reasons live here too — one Discussed list.
+            'call_topics' => [
+                'name' => 'Call Topics',
+                'description' => 'What was discussed on a call (checkboxes, fast logging).',
+                'items' => [
+                    ['label' => 'Introduced the project', 'value' => 'introduced_project'],
+                    ['label' => 'Discussed budget', 'value' => 'discussed_budget'],
+                    ['label' => 'Sent brochure / media', 'value' => 'sent_media'],
+                    ['label' => 'Interested', 'value' => 'interested'],
+                    ['label' => 'Not interested (now)', 'value' => 'not_interested'],
+                    ['label' => 'Requested a callback', 'value' => 'requested_callback'],
+                    ['label' => 'Requested an office visit', 'value' => 'requested_office_visit'],
+                    ['label' => 'Price negotiation', 'value' => 'price_negotiation'],
+                    ['label' => 'No answer', 'value' => 'no_answer'],
+                    ['label' => 'Wrong number', 'value' => 'wrong_number'],
+                ],
+            ],
+            // Fast checkbox checklist logged against an office visit.
+            'office_visit_checklist' => [
+                'name' => 'Office Visit Checklist',
+                'description' => 'What happened during the office visit (checkboxes).',
+                'items' => [
+                    ['label' => 'Showed stacking plan', 'value' => 'showed_stacking_plan'],
+                    ['label' => 'Presented units', 'value' => 'presented_units'],
+                    ['label' => 'Discussed price', 'value' => 'discussed_price'],
+                    ['label' => 'Discussed payment plan', 'value' => 'discussed_payment_plan'],
+                    ['label' => 'Showed media', 'value' => 'showed_media'],
+                    ['label' => 'Client satisfied', 'value' => 'client_satisfied'],
+                    ['label' => 'Requested an in-site visit', 'value' => 'requested_insite_visit'],
+                ],
+            ],
+            // Per-property result recorded by the site agent during a field visit.
+            'insite_outcomes' => [
+                'name' => 'In-site Visit Outcomes',
+                'description' => 'Per-property result of a field (in-site) visit.',
+                'items' => [
+                    ['label' => 'Not visited', 'value' => 'not_visited'],
+                    ['label' => 'Visited – interested', 'value' => 'visited_interested'],
+                    ['label' => 'Visited – not interested', 'value' => 'visited_not_interested'],
+                    ['label' => 'Needs a second visit', 'value' => 'needs_second_visit'],
+                ],
+            ],
+            // Why a deal was archived (required when archiving / losing a deal).
+            'archive_reasons' => [
+                'name' => 'Archive Reasons',
+                'description' => 'Why a deal was archived or lost (required to archive).',
+                'items' => [
+                    ['label' => 'Changed mind', 'value' => 'changed_mind'],
+                    ['label' => 'Found an alternative', 'value' => 'found_alternative'],
+                    ['label' => 'Price too high', 'value' => 'price_too_high'],
+                    ['label' => 'Financing fell through', 'value' => 'financing_failed'],
+                    ['label' => 'Postponed', 'value' => 'postponed'],
+                    ['label' => 'Other', 'value' => 'other'],
                 ],
             ],
             'box_types' => [

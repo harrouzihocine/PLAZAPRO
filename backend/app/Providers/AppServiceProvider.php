@@ -6,8 +6,12 @@ namespace App\Providers;
 
 use App\Modules\Clients\Models\Client;
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Clients\Models\Deal;
+use App\Modules\Clients\Models\DealItem;
+use App\Modules\Clients\Models\ShortlistItem;
 use App\Modules\Collaboration\Models\Conversation;
 use App\Modules\Collaboration\Models\Message;
+use App\Modules\Inventory\Models\Box;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Payments\Models\Document;
@@ -49,8 +53,12 @@ class AppServiceProvider extends ServiceProvider
         Relation::morphMap([
             'location' => Location::class,
             'unit' => Unit::class,
+            'box' => Box::class,
             'client' => Client::class,
             'client_project' => ClientProject::class,
+            'shortlist_item' => ShortlistItem::class,
+            'deal' => Deal::class,
+            'deal_item' => DealItem::class,
             'call' => Call::class,
             'visit' => Visit::class,
             'payment_schedule' => PaymentSchedule::class,

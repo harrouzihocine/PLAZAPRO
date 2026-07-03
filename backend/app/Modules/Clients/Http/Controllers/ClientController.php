@@ -26,6 +26,7 @@ class ClientController extends Controller
     {
         $clients = Client::query()
             ->with(['source', 'rating', 'assignedAgent', 'creator'])
+            ->withExists(['calls' => fn ($q) => $q->active()])
             ->when($request->query('status') !== 'all', fn ($q) => $q->active())
             ->when($request->filled('assigned_agent_id'), fn ($q) => $q->where('assigned_agent_id', $request->integer('assigned_agent_id')))
             ->when($request->filled('source_id'), fn ($q) => $q->where('source_id', $request->integer('source_id')))
@@ -55,7 +56,10 @@ class ClientController extends Controller
 
     public function show(Client $client): ClientResource
     {
-        return new ClientResource($client->load(['source', 'rating', 'assignedAgent', 'creator']));
+        return new ClientResource(
+            $client->load(['source', 'rating', 'assignedAgent', 'creator'])
+                ->loadExists(['calls' => fn ($q) => $q->active()]),
+        );
     }
 
     public function store(StoreClientRequest $request, CreateClient $action): ClientResource

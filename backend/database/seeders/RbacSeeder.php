@@ -23,8 +23,10 @@ use Illuminate\Support\Str;
  *                   analytics reports. Flagged is_agent so a manager can also
  *                   be assigned visits.
  *   - sales-agent : calls rapports + office-visit rapports.
- *   - site-agent  : outside (apartment) visit rapports only. The field agent —
+ *   - site-agent  : outside (in-site / field) visit rapports only. The field agent —
  *                   flagged is_agent so they can be assigned visits.
+ *   - financer    : the payment desk — records versements, manages schedules and
+ *                   generates branded documents. Not an agent.
  *
  * Idempotent: roles/permissions/users are firstOrCreate'd and permissions are
  * synced, so re-running only reconciles the grants.
@@ -42,6 +44,8 @@ class RbacSeeder extends Seeder
         // Clients & pipeline
         'clients.view', 'clients.create', 'clients.manage',
         'calls.log', 'visits.assign', 'visits.conduct', 'tasks.manage',
+        // A deal normally comes from a visit log; this allows opening one directly.
+        'deals.direct',
         // Payments
         'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
         // Collaboration & analytics
@@ -90,11 +94,17 @@ class RbacSeeder extends Seeder
         // Calls + office-visit rapports.
         $salesAgent = [...$this->baseline, 'clients.view', 'clients.create', 'calls.log', 'visits.conduct'];
 
+        // The payment desk: record versements, manage schedules, generate documents.
+        $financer = [
+            ...$this->baseline, 'clients.view',
+            'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
+        ];
+
         // Every rapport type + all analytics reports + operational oversight.
         $manager = [
             ...$this->baseline, 'reports.view',
             'clients.view', 'clients.create', 'clients.manage',
-            'calls.log', 'visits.assign', 'visits.conduct', 'tasks.manage',
+            'calls.log', 'visits.assign', 'visits.conduct', 'tasks.manage', 'deals.direct',
             'units.view', 'units.reserve', 'units.manage', 'media.manage',
             'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
         ];
@@ -105,6 +115,7 @@ class RbacSeeder extends Seeder
             'manager' => ['name' => 'Manager', 'is_agent' => true, 'grants' => $manager],
             'sales-agent' => ['name' => 'Sales Agent', 'is_agent' => false, 'grants' => $salesAgent],
             'site-agent' => ['name' => 'Site Agent', 'is_agent' => true, 'grants' => $siteAgent],
+            'financer' => ['name' => 'Financer', 'is_agent' => false, 'grants' => $financer],
         ];
 
         $roles = [];
@@ -142,6 +153,8 @@ class RbacSeeder extends Seeder
 
             ['name' => 'Bilal Field', 'email' => 'site1@plaza.local', 'role' => 'site-agent'],
             ['name' => 'Imene Field', 'email' => 'site2@plaza.local', 'role' => 'site-agent'],
+
+            ['name' => 'Farid Finance', 'email' => 'finance1@plaza.local', 'role' => 'financer'],
         ];
 
         foreach ($users as $data) {

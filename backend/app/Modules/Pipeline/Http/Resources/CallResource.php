@@ -21,8 +21,14 @@ class CallResource extends JsonResource
             'client_project_id' => $this->client_project_id,
             'direction' => $this->direction?->value,
             'notes' => $this->notes,
+            'topics' => $this->topics ?? [],
             'called_at' => $this->called_at,
+            'created_at' => $this->created_at,
             'status' => $this->status?->value,
+            // A superseded (edited) version links back via supersedes_id; the reason
+            // lives on the cancelled original. The FE shows an "edited" chip.
+            'edited' => $this->supersedes_id !== null,
+            'edit_reason' => $this->whenLoaded('supersedes', fn () => $this->supersedes?->cancellation_reason),
             'agent' => $this->whenLoaded('agent', fn () => $this->agent ? [
                 'id' => $this->agent->id,
                 'name' => $this->agent->name,

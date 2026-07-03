@@ -68,6 +68,29 @@ export const desireApi = {
 // Reserve a unit (48h hold) — reused from the matches panel's one-tap "reserve".
 export const reserveUnit = (unitId, payload = {}) => useApi().post(`/units/${unitId}/reserve`, payload)
 
+// The deal's property shortlist (units/boxes the client wants), set at the office
+// visit. `sync` replaces the active set with the given list (add / keep / remove).
+export const shortlistApi = {
+  async list(projectId) {
+    const { data } = await useApi().get(`/projects/${projectId}/shortlist`)
+    return data.data
+  },
+
+  async sync(projectId, items, officeVisitId = null) {
+    const { data } = await useApi().put(`/projects/${projectId}/shortlist`, {
+      items,
+      office_visit_id: officeVisitId,
+    })
+    return data.data
+  },
+
+  // Phase-6 closure: win (with total_price) or lose an interested property.
+  async outcome(itemId, payload) {
+    const { data } = await useApi().post(`/shortlist-items/${itemId}/outcome`, payload)
+    return data.data
+  },
+}
+
 // Deals (client_projects) hanging off a client. Stage moves through /advance.
 export const projectsApi = {
   async list(clientId, status) {
@@ -91,15 +114,54 @@ export const projectsApi = {
     return data.data
   },
 
-  archive(projectId) {
-    return useApi().post(`/projects/${projectId}/archive`)
+  archive(projectId, payload) {
+    return useApi().post(`/projects/${projectId}/archive`, payload)
   },
 
   reactivate(projectId) {
     return useApi().post(`/projects/${projectId}/reactivate`)
   },
 
+  // Client changed their mind: archive the deal + put them back on the desire list.
+  shiftToDesire(projectId, payload) {
+    return useApi().post(`/projects/${projectId}/shift-to-desire`, payload)
+  },
+
   cancel(projectId, reason) {
     return useApi().delete(`/projects/${projectId}`, { data: { reason } })
+  },
+}
+
+// The dedicated "Desire matches" board — waiting clients whose criteria now fit
+// available inventory (agent-scoped on the server).
+export const desireMatchesApi = {
+  async list() {
+    const { data } = await useApi().get('/desires/matches')
+    return data.data
+  },
+}
+
+// Deals on a project: opened from a visit log with the properties the client is
+// interested in (auto-reserved), then closed won (agreed price) or lost. Boxes
+// reserved alongside the apartment can be re-set while the deal is open.
+export const dealsApi = {
+  async list(projectId) {
+    const { data } = await useApi().get(`/projects/${projectId}/deals`)
+    return data.data
+  },
+
+  async create(projectId, payload) {
+    const { data } = await useApi().post(`/projects/${projectId}/deals`, payload)
+    return data.data
+  },
+
+  async close(dealId, payload) {
+    const { data } = await useApi().post(`/deals/${dealId}/close`, payload)
+    return data.data
+  },
+
+  async syncBoxes(dealId, boxIds) {
+    const { data } = await useApi().put(`/deals/${dealId}/boxes`, { box_ids: boxIds })
+    return data.data
   },
 }

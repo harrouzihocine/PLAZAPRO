@@ -7,6 +7,7 @@ namespace App\Modules\Inventory\Models;
 use App\Core\Models\BaseModel;
 use App\Modules\Inventory\Enums\GtmPriority;
 use App\Modules\Settings\Models\Commune;
+use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\Wilaya;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,8 +23,8 @@ class Location extends BaseModel
     use HasFactory;
 
     protected $fillable = [
-        'name', 'code', 'wilaya_id', 'commune_id', 'address', 'description',
-        'expected_delivery_date', 'gtm_priority', 'latitude', 'longitude',
+        'name', 'code', 'wilaya_id', 'commune_id', 'contract_type_id', 'address',
+        'description', 'expected_delivery_date', 'gtm_priority', 'latitude', 'longitude',
     ];
 
     protected function casts(): array
@@ -44,6 +45,12 @@ class Location extends BaseModel
     public function commune(): BelongsTo
     {
         return $this->belongsTo(Commune::class);
+    }
+
+    /** The sale contract type (a `contract_types` dynamic-list item). */
+    public function contractType(): BelongsTo
+    {
+        return $this->belongsTo(DynamicListItem::class, 'contract_type_id');
     }
 
     public function units(): HasMany

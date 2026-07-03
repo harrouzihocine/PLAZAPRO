@@ -6,9 +6,11 @@ namespace App\Modules\Pipeline\Http\Controllers;
 
 use App\Modules\Pipeline\Actions\AssignVisit;
 use App\Modules\Pipeline\Actions\CompleteInteraction;
+use App\Modules\Pipeline\Actions\CorrectVisit;
 use App\Modules\Pipeline\Actions\ScheduleVisit;
 use App\Modules\Pipeline\Http\Requests\AssignVisitRequest;
 use App\Modules\Pipeline\Http\Requests\CompleteVisitRequest;
+use App\Modules\Pipeline\Http\Requests\CorrectVisitRequest;
 use App\Modules\Pipeline\Http\Requests\ScheduleVisitRequest;
 use App\Modules\Pipeline\Http\Resources\VisitResource;
 use App\Modules\Pipeline\Models\Visit;
@@ -56,6 +58,18 @@ class VisitController extends Controller
     {
         return new VisitResource(
             $action->handle($visit, $request->validated())->load(['agent', 'unit', 'outcome']),
+        );
+    }
+
+    /**
+     * Correct a visit's details with a reason: cancels the original and returns the
+     * new version, keeping both in history (CorrectVisit → supersedeWith).
+     */
+    public function correct(CorrectVisitRequest $request, Visit $visit, CorrectVisit $action): VisitResource
+    {
+        return new VisitResource(
+            $action->handle($visit, $request->safe()->except('reason'), $request->validated('reason'))
+                ->load(['agent', 'unit', 'outcome']),
         );
     }
 }

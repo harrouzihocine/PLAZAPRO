@@ -28,6 +28,7 @@ class UnitResource extends JsonResource
                 'wilaya' => $this->location?->wilaya?->name,
                 'commune_id' => $this->location?->commune_id,
                 'commune' => $this->location?->commune?->name,
+                'contract_type' => $this->location?->contractType?->label,
                 'expected_delivery_date' => $this->location?->expected_delivery_date?->toDateString(),
                 'gtm_priority' => $this->location?->gtm_priority?->value,
             ]),

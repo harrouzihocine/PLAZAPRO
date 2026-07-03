@@ -34,14 +34,19 @@ trait Cancellable
         return $this;
     }
 
-    /** Put the record away: hidden from active lists, but reversible. */
-    public function archive(): static
+    /**
+     * Put the record away: hidden from active lists, but reversible. An optional
+     * reason (why it was archived) is kept in `cancellation_reason` — the same
+     * "why did this leave active" column cancel() uses — and cleared on reactivate.
+     */
+    public function archive(?string $reason = null): static
     {
         $this->forceFill([
             'status' => RecordStatus::Archived->value,
+            'cancellation_reason' => $reason,
         ])->saveQuietly();
 
-        $this->logActivity('archive');
+        $this->logActivity('archive', $reason !== null ? ['reason' => $reason] : []);
 
         return $this;
     }
@@ -58,11 +63,12 @@ trait Cancellable
         return $this;
     }
 
-    /** Bring an archived record back to active. */
+    /** Bring an archived record back to active, clearing the archive reason. */
     public function reactivate(): static
     {
         $this->forceFill([
             'status' => RecordStatus::Active->value,
+            'cancellation_reason' => null,
         ])->saveQuietly();
 
         $this->logActivity('reactivate');

@@ -33,10 +33,10 @@ class VisitFactory extends Factory
         ];
     }
 
-    public function apartment(): static
+    public function inSite(): static
     {
         return $this->state(fn () => [
-            'type' => VisitType::Apartment->value,
+            'type' => VisitType::InSite->value,
             'unit_id' => Unit::factory(),
         ]);
     }

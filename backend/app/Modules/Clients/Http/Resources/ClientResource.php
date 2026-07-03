@@ -28,6 +28,12 @@ class ClientResource extends JsonResource
             'phone' => $this->phone,
             'email' => $this->email,
             'notes' => $this->notes,
+            // Ids of property_interests items — the FE maps them to labels via the
+            // property_interests dynamic list it already loads.
+            'interests' => $this->interests ?? [],
+            // Workflow gate: a client's first entity is a call — until one exists the
+            // FE hides deals/desire/visits behind a "log the first call" CTA.
+            'has_calls' => $this->when(isset($this->calls_exists), fn () => (bool) $this->calls_exists),
             'status' => $this->status?->value,
             'source' => $this->whenLoaded('source', fn () => $this->source ? [
                 'id' => $this->source->id,

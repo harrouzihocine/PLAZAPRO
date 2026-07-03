@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Inventory;
 
 use App\Modules\Inventory\Models\Location;
+use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
@@ -100,6 +101,61 @@ class LocationTest extends TestCase
         ])
             ->assertStatus(422)
             ->assertJsonValidationErrorFor('gtm_priority');
+    }
+
+    public function test_manager_can_set_a_contract_type(): void
+    {
+        $contractType = DynamicListItem::factory()->create(['label' => 'VEFA (off-plan)']);
+        Sanctum::actingAs($this->manager());
+
+        $this->postJson('/api/v1/locations', [
+            'name' => 'Résidence VEFA', 'code' => 'VEFA-1', 'contract_type_id' => $contractType->id,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.contract_type_id', $contractType->id)
+            ->assertJsonPath('data.contract_type', 'VEFA (off-plan)');
+
+        $this->assertDatabaseHas('locations', [
+            'code' => 'VEFA-1', 'contract_type_id' => $contractType->id,
+        ]);
+    }
+
+    public function test_contract_type_must_reference_an_existing_list_item(): void
+    {
+        Sanctum::actingAs($this->manager());
+
+        $this->postJson('/api/v1/locations', [
+            'name' => 'X', 'code' => 'CT-BAD-1', 'contract_type_id' => 999999,
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('contract_type_id');
+    }
+
+    public function test_manager_can_clear_the_contract_type(): void
+    {
+        $contractType = DynamicListItem::factory()->create();
+        $location = Location::factory()->create(['contract_type_id' => $contractType->id]);
+        Sanctum::actingAs($this->manager());
+
+        $this->putJson("/api/v1/locations/{$location->id}", ['contract_type_id' => null])
+            ->assertOk()
+            ->assertJsonPath('data.contract_type_id', null)
+            ->assertJsonPath('data.contract_type', null);
+
+        $this->assertDatabaseHas('locations', [
+            'id' => $location->id, 'contract_type_id' => null,
+        ]);
+    }
+
+    public function test_index_includes_the_contract_type_label(): void
+    {
+        $contractType = DynamicListItem::factory()->create(['label' => 'Turnkey (ready)']);
+        Location::factory()->create(['name' => 'Le Parc', 'contract_type_id' => $contractType->id]);
+        Sanctum::actingAs($this->userWithPermissions(['units.view']));
+
+        $this->getJson('/api/v1/locations')
+            ->assertOk()
+            ->assertJsonFragment(['contract_type' => 'Turnkey (ready)']);
     }
 
     public function test_manager_can_update_the_expected_delivery_date(): void

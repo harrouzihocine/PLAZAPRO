@@ -1,17 +1,30 @@
 <script setup>
+import { computed } from 'vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 
 // The enforced next-action fieldset, shared by the log-call and complete-visit
 // forms. Emits a merged object so the parent owns the value (no prop mutation).
+//
+// Who: a call defaults server-side to the client's sales agent, so we hide the
+// assignee for everything EXCEPT an in-site (field) visit — which must be
+// handed to a field agent (is_agent), picked from `fieldAgents`.
+// When: a required date + an OPTIONAL time (agents usually only know the day).
 const props = defineProps({
   modelValue: { type: Object, required: true },
-  agents: { type: Array, default: () => [] },
+  fieldAgents: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['update:modelValue'])
 
-const types = ['call', 'office_visit', 'apartment_visit', 'follow_up', 'send_docs']
-const selectClass =
+const types = [
+  { value: 'call', label: 'call' },
+  { value: 'office_visit', label: 'office visit' },
+  { value: 'in_site_visit', label: 'in-site visit' },
+]
+
+const inputClass =
   'w-full rounded-token border border-border bg-bg px-3 py-2 min-h-[44px] text-ink outline-none focus:border-primary'
+
+const needsFieldAgent = computed(() => props.modelValue.type === 'in_site_visit')
 
 function update(field, value) {
   emit('update:modelValue', { ...props.modelValue, [field]: value })
@@ -25,23 +38,36 @@ function update(field, value) {
       label="Type"
       :model-value="modelValue.type"
       :clearable="false"
-      :options="types.map((t) => ({ value: t, label: t.replace('_', ' ') }))"
+      :options="types"
       @change="(v) => update('type', v)"
     />
     <label class="block">
-      <span class="mb-1 block text-xs">Due</span>
+      <span class="mb-1 block text-xs">Due date</span>
       <input
-        type="datetime-local"
-        :value="modelValue.due_at"
-        :class="selectClass"
-        @input="update('due_at', $event.target.value)"
+        type="date"
+        :value="modelValue.due_date"
+        :class="inputClass"
+        @input="update('due_date', $event.target.value)"
       />
     </label>
+    <label class="block">
+      <span class="mb-1 block text-xs">Time <span class="opacity-50">(optional)</span></span>
+      <input
+        type="time"
+        :value="modelValue.due_time"
+        :class="inputClass"
+        @input="update('due_time', $event.target.value)"
+      />
+    </label>
+    <!-- Only in-site visits pick an assignee (a field agent); other types default
+         to the client's sales agent on the server. -->
     <BaseSelect
-      label="Assign to"
+      v-if="needsFieldAgent"
+      class="sm:col-span-3"
+      label="Assign to (field agent)"
       :model-value="modelValue.assigned_to"
-      placeholder="Select agent"
-      :options="agents.map((a) => ({ value: a.id, label: a.name }))"
+      placeholder="Select field agent"
+      :options="fieldAgents.map((a) => ({ value: a.id, label: a.name }))"
       @change="(v) => update('assigned_to', v)"
     />
   </fieldset>

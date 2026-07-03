@@ -32,6 +32,7 @@ class UpdateLocationRequest extends FormRequest
             'code' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('locations', 'code')->ignore($id)],
             'wilaya_id' => ['sometimes', 'nullable', 'integer', 'exists:wilayas,id'],
             'commune_id' => ['sometimes', 'nullable', 'integer', 'exists:communes,id'],
+            'contract_type_id' => ['sometimes', 'nullable', 'integer', 'exists:dynamic_list_items,id'],
             'address' => ['sometimes', 'nullable', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string'],
             'expected_delivery_date' => ['sometimes', 'nullable', 'date'],

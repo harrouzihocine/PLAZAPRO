@@ -36,7 +36,7 @@ class UnitController extends Controller
         ));
 
         $units = Unit::query()
-            ->with(['type', 'floor', 'location.wilaya', 'location.commune'])
+            ->with(['type', 'floor', 'location.wilaya', 'location.commune', 'location.contractType'])
             ->when($request->query('status') !== 'all', fn ($q) => $q->active())
             ->when($request->filled('location_id'), fn ($q) => $q->where('location_id', $request->query('location_id')))
             ->when($asList('type_id'), fn ($q, $ids) => $q->whereIn('type_id', $ids))
@@ -60,7 +60,7 @@ class UnitController extends Controller
 
     public function show(Unit $unit): UnitResource
     {
-        return new UnitResource($unit->load(['type', 'floor', 'location.wilaya', 'location.commune']));
+        return new UnitResource($unit->load(['type', 'floor', 'location.wilaya', 'location.commune', 'location.contractType']));
     }
 
     public function store(StoreUnitRequest $request, Location $location, CreateUnit $action): UnitResource

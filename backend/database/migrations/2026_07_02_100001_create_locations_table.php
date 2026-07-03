@@ -23,6 +23,10 @@ return new class extends Migration
                 ->constrained('wilayas')->nullOnDelete();
             $table->foreignId('commune_id')->nullable()
                 ->constrained('communes')->nullOnDelete();
+            // Sale contract the project is marketed under (dynamic list
+            // `contract_types`); surfaced on the project and its units.
+            $table->foreignId('contract_type_id')->nullable()
+                ->constrained('dynamic_list_items')->nullOnDelete();
             $table->string('address')->nullable();
             $table->text('description')->nullable();
             // Estimated hand-over / readiness date for the project (delivery).

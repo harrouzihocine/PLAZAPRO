@@ -202,6 +202,9 @@ function reset() {
                 <RouterLink :to="{ name: 'inventory.location', params: { id: u.location_id } }" class="hover:text-primary">
                   {{ locationName[u.location_id] ?? u.location_id }}
                 </RouterLink>
+                <span v-if="u.location?.contract_type" class="block text-xs opacity-60">
+                  📄 {{ u.location.contract_type }}
+                </span>
               </td>
               <td class="py-2 pr-3">{{ u.type || '—' }}</td>
               <td class="py-2 pr-3">{{ u.floor || '—' }}</td>

@@ -40,6 +40,9 @@ class StoreClientRequest extends FormRequest
             'rating_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
             'assigned_agent_id' => ['nullable', 'integer', new CanFollowUpClient],
             'notes' => ['nullable', 'string', 'max:5000'],
+            // What the client is shopping for (property_interests items). Multi-select.
+            'interests' => ['nullable', 'array'],
+            'interests.*' => ['integer', 'distinct', 'exists:dynamic_list_items,id'],
         ];
     }
 }

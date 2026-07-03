@@ -24,14 +24,25 @@ class VisitResource extends JsonResource
             'completed_at' => $this->completed_at,
             'is_completed' => $this->completed_at !== null,
             'notes' => $this->notes,
+            'checklist' => $this->checklist ?? [],
+            'created_at' => $this->created_at,
             'status' => $this->status?->value,
+            'edited' => $this->supersedes_id !== null,
+            'edit_reason' => $this->whenLoaded('supersedes', fn () => $this->supersedes?->cancellation_reason),
             'agent' => $this->whenLoaded('agent', fn () => $this->agent ? [
                 'id' => $this->agent->id,
                 'name' => $this->agent->name,
             ] : null),
+            // The full property card (not just the code) — the deal step and the
+            // timeline both show what was actually visited.
             'unit' => $this->whenLoaded('unit', fn () => $this->unit ? [
                 'id' => $this->unit->id,
                 'reference' => $this->unit->reference,
+                'location_id' => $this->unit->location_id,
+                'property_type' => $this->unit->type?->label,
+                'floor' => $this->unit->floor?->label,
+                'area_sqm' => $this->unit->area_sqm,
+                'price' => $this->unit->price,
             ] : null),
             'outcome' => $this->whenLoaded('outcome', fn () => $this->outcome ? [
                 'id' => $this->outcome->id,

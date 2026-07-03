@@ -8,7 +8,6 @@ enum NextActionType: string
 {
     case Call = 'call';
     case OfficeVisit = 'office_visit';
-    case ApartmentVisit = 'apartment_visit';
-    case FollowUp = 'follow_up';
-    case SendDocs = 'send_docs';
+    // In-site (field) visit. Was 'apartment_visit'; renamed to match VisitType::InSite.
+    case InSiteVisit = 'in_site_visit';
 }

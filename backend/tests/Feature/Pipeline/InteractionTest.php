@@ -6,8 +6,13 @@ namespace Tests\Feature\Pipeline;
 
 use App\Modules\Clients\Models\Client;
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Clients\Models\ShortlistItem;
+use App\Modules\Inventory\Models\Unit;
+use App\Modules\Pipeline\Models\Call;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
+use App\Modules\Settings\Models\DynamicList;
+use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
@@ -38,7 +43,7 @@ class InteractionTest extends TestCase
 
     private function nextActionPayload(User $assignee): array
     {
-        return ['type' => 'follow_up', 'due_at' => now()->addDay()->toDateTimeString(), 'assigned_to' => $assignee->id];
+        return ['type' => 'call', 'due_date' => now()->addDay()->toDateString(), 'assigned_to' => $assignee->id];
     }
 
     public function test_logging_a_call_records_it_and_creates_a_pending_next_action(): void
@@ -69,6 +74,23 @@ class InteractionTest extends TestCase
         $this->assertSame(0, NextAction::count());
     }
 
+    public function test_retired_next_action_types_are_rejected(): void
+    {
+        $client = Client::factory()->create();
+        $agent = $this->agent();
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+
+        // The workflow allows exactly call / office_visit / in_site_visit.
+        foreach (['follow_up', 'send_docs'] as $retired) {
+            $this->postJson("/api/v1/clients/{$client->id}/calls", [
+                'direction' => 'outbound',
+                'next_action' => ['type' => $retired, 'due_date' => now()->addDay()->toDateString(), 'assigned_to' => $agent->id],
+            ])->assertStatus(422)->assertJsonValidationErrorFor('next_action.type');
+        }
+
+        $this->assertSame(0, NextAction::count());
+    }
+
     public function test_a_subject_keeps_exactly_one_open_pending_next_action(): void
     {
         $client = Client::factory()->create();
@@ -85,6 +107,229 @@ class InteractionTest extends TestCase
             ->where('subject_type', 'client')->where('subject_id', $client->id)->count());
     }
 
+    public function test_a_call_next_action_defaults_the_assignee_to_the_clients_sales_agent(): void
+    {
+        $salesAgent = $this->agent();
+        $client = Client::factory()->create(['assigned_agent_id' => $salesAgent->id]);
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+
+        // assigned_to omitted — a call next action should fall back to the sales agent.
+        $this->postJson("/api/v1/clients/{$client->id}/calls", [
+            'direction' => 'outbound',
+            'next_action' => ['type' => 'call', 'due_date' => now()->addDay()->toDateString()],
+        ])->assertCreated();
+
+        $this->assertSame($salesAgent->id, NextAction::query()->pending()
+            ->where('subject_type', 'client')->where('subject_id', $client->id)->value('assigned_to'));
+    }
+
+    public function test_an_in_site_visit_next_action_requires_a_field_agent_assignee(): void
+    {
+        $client = Client::factory()->create();
+        $nonAgent = $this->userWithPermissions(['clients.view']); // role not is_agent
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+
+        // No assignee → rejected (in-site must be handed to a field agent).
+        $this->postJson("/api/v1/clients/{$client->id}/calls", [
+            'direction' => 'outbound',
+            'next_action' => ['type' => 'in_site_visit', 'due_date' => now()->addDay()->toDateString()],
+        ])->assertStatus(422)->assertJsonValidationErrorFor('next_action.assigned_to');
+
+        // A non-agent assignee → rejected.
+        $this->postJson("/api/v1/clients/{$client->id}/calls", [
+            'direction' => 'outbound',
+            'next_action' => ['type' => 'in_site_visit', 'due_date' => now()->addDay()->toDateString(), 'assigned_to' => $nonAgent->id],
+        ])->assertStatus(422)->assertJsonValidationErrorFor('next_action.assigned_to');
+
+        $this->assertSame(0, NextAction::count());
+    }
+
+    public function test_next_action_time_is_optional_and_composed_into_due_at(): void
+    {
+        $agent = $this->agent();
+        $client = Client::factory()->create();
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+
+        // Date only → time defaults to start of day.
+        $this->postJson("/api/v1/clients/{$client->id}/calls", [
+            'direction' => 'outbound',
+            'next_action' => ['type' => 'call', 'due_date' => '2026-08-01', 'assigned_to' => $agent->id],
+        ])->assertCreated();
+        $this->assertSame('2026-08-01 00:00:00', NextAction::query()->latest('id')->value('due_at')->toDateTimeString());
+
+        // Date + time → composed.
+        $this->postJson("/api/v1/clients/{$client->id}/calls", [
+            'direction' => 'outbound',
+            'next_action' => ['type' => 'call', 'due_date' => '2026-08-02', 'due_time' => '14:30', 'assigned_to' => $agent->id],
+        ])->assertCreated();
+        $this->assertSame('2026-08-02 14:30:00', NextAction::query()->latest('id')->value('due_at')->toDateTimeString());
+    }
+
+    public function test_correcting_a_call_supersedes_the_original_and_keeps_both(): void
+    {
+        $agent = $this->agent();
+        $client = Client::factory()->create();
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+
+        $callId = $this->postJson("/api/v1/clients/{$client->id}/calls", [
+            'direction' => 'outbound',
+            'next_action' => $this->nextActionPayload($agent),
+        ])->assertCreated()->json('data.id');
+
+        $this->postJson("/api/v1/calls/{$callId}/correct", [
+            'reason' => 'Wrong direction', 'direction' => 'inbound', 'notes' => 'Fixed',
+        ])->assertSuccessful()
+            ->assertJsonPath('data.direction', 'inbound')
+            ->assertJsonPath('data.edited', true);
+
+        // Original cancelled with the reason; the new version links back via supersedes_id.
+        $this->assertDatabaseHas('calls', ['id' => $callId, 'status' => 'cancelled', 'cancellation_reason' => 'Wrong direction']);
+        $this->assertDatabaseHas('calls', ['supersedes_id' => $callId, 'status' => 'active', 'direction' => 'inbound']);
+        // The edit is audited as a "duplicate" on the append-only activity log.
+        $this->assertDatabaseHas('activity_log', ['subject_type' => Call::class, 'action' => 'duplicate']);
+    }
+
+    public function test_correcting_a_next_action_changes_type_and_keeps_one_pending(): void
+    {
+        $sales = $this->agent();
+        $fieldAgent = $this->agent();
+        $client = Client::factory()->create(['assigned_agent_id' => $sales->id]);
+        $unit = Unit::factory()->create();
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+
+        // Qualify with a property so the deal + shortlist exist (an in-site plan
+        // needs shortlisted units to materialize field visits from).
+        $this->postJson("/api/v1/clients/{$client->id}/calls", [
+            'direction' => 'outbound',
+            'properties' => [['shortlistable_type' => 'unit', 'shortlistable_id' => $unit->id]],
+            'next_action' => ['type' => 'call', 'due_date' => now()->addDay()->toDateString()],
+        ])->assertCreated();
+        $project = ClientProject::query()->where('client_id', $client->id)->sole();
+        $na = NextAction::query()->active()->pending()->firstOrFail();
+
+        // Change the plan: a follow-up call becomes an in-site visit for a field agent.
+        $this->postJson("/api/v1/next-actions/{$na->id}/correct", [
+            'reason' => 'Client asked to visit', 'type' => 'in_site_visit',
+            'due_date' => now()->addDays(3)->toDateString(), 'assigned_to' => $fieldAgent->id,
+        ])->assertSuccessful()->assertJsonPath('data.type', 'in_site_visit');
+
+        $this->assertDatabaseHas('next_actions', ['id' => $na->id, 'status' => 'cancelled']);
+        $this->assertSame(1, NextAction::query()->active()->pending()
+            ->where('subject_type', 'client_project')->where('subject_id', $project->id)->count());
+    }
+
+    public function test_completing_an_office_visit_with_in_site_next_generates_field_visits(): void
+    {
+        $fieldAgent = $this->agent();
+        $client = Client::factory()->create();
+        $project = ClientProject::factory()->create(['client_id' => $client->id]);
+        $unitA = Unit::factory()->create();
+        $unitB = Unit::factory()->create();
+        foreach ([$unitA, $unitB] as $u) {
+            ShortlistItem::factory()->create([
+                'client_project_id' => $project->id, 'shortlistable_type' => 'unit', 'shortlistable_id' => $u->id,
+            ]);
+        }
+        $office = Visit::factory()->create(['client_id' => $client->id, 'client_project_id' => $project->id, 'type' => 'office']);
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'visits.conduct']));
+
+        $this->postJson("/api/v1/visits/{$office->id}/complete", [
+            'next_action' => ['type' => 'in_site_visit', 'due_date' => now()->addDay()->toDateString(), 'assigned_to' => $fieldAgent->id],
+        ])->assertOk();
+
+        // One pending in-site visit per shortlisted unit, assigned to the field agent.
+        $this->assertSame(2, Visit::query()->where('type', 'in_site')->where('client_project_id', $project->id)
+            ->whereNull('completed_at')->where('agent_id', $fieldAgent->id)->count());
+    }
+
+    public function test_completing_a_deal_office_visit_without_a_shortlist_is_rejected(): void
+    {
+        $agent = $this->agent();
+        $client = Client::factory()->create();
+        $project = ClientProject::factory()->create(['client_id' => $client->id]);
+        $office = Visit::factory()->create(['client_id' => $client->id, 'client_project_id' => $project->id, 'type' => 'office']);
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'visits.conduct']));
+
+        $this->postJson("/api/v1/visits/{$office->id}/complete", [
+            'next_action' => $this->nextActionPayload($agent),
+        ])->assertStatus(422);
+
+        // The completion rolled back with the rule.
+        $this->assertNull($office->fresh()->completed_at);
+    }
+
+    public function test_completing_an_office_visit_syncs_the_shortlist_payload(): void
+    {
+        $agent = $this->agent();
+        $client = Client::factory()->create();
+        $project = ClientProject::factory()->create(['client_id' => $client->id]);
+        $unit = Unit::factory()->create();
+        $office = Visit::factory()->create(['client_id' => $client->id, 'client_project_id' => $project->id, 'type' => 'office']);
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'visits.conduct']));
+
+        $this->postJson("/api/v1/visits/{$office->id}/complete", [
+            'shortlist' => [['shortlistable_type' => 'unit', 'shortlistable_id' => $unit->id]],
+            'next_action' => $this->nextActionPayload($agent),
+        ])->assertOk();
+
+        $this->assertNotNull($office->fresh()->completed_at);
+        $this->assertDatabaseHas('shortlist_items', [
+            'client_project_id' => $project->id, 'office_visit_id' => $office->id,
+            'shortlistable_type' => 'unit', 'shortlistable_id' => $unit->id, 'status' => 'active',
+        ]);
+    }
+
+    public function test_emptying_the_shortlist_on_office_completion_is_rejected_atomically(): void
+    {
+        $agent = $this->agent();
+        $client = Client::factory()->create();
+        $project = ClientProject::factory()->create(['client_id' => $client->id]);
+        $unit = Unit::factory()->create();
+        $item = ShortlistItem::factory()->create([
+            'client_project_id' => $project->id, 'shortlistable_type' => 'unit', 'shortlistable_id' => $unit->id,
+        ]);
+        $office = Visit::factory()->create(['client_id' => $client->id, 'client_project_id' => $project->id, 'type' => 'office']);
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'visits.conduct']));
+
+        $this->postJson("/api/v1/visits/{$office->id}/complete", [
+            'shortlist' => [],
+            'next_action' => $this->nextActionPayload($agent),
+        ])->assertStatus(422);
+
+        // Nothing persisted: the visit stays open and the item stays active.
+        $this->assertNull($office->fresh()->completed_at);
+        $this->assertDatabaseHas('shortlist_items', ['id' => $item->id, 'status' => 'active']);
+    }
+
+    public function test_completing_an_in_site_visit_advances_the_shortlisted_property(): void
+    {
+        $agent = $this->agent();
+        $client = Client::factory()->create();
+        $project = ClientProject::factory()->create(['client_id' => $client->id]);
+        $unit = Unit::factory()->create();
+        $item = ShortlistItem::factory()->create([
+            'client_project_id' => $project->id, 'shortlistable_type' => 'unit', 'shortlistable_id' => $unit->id,
+        ]);
+        $list = DynamicList::create(['key' => 'insite_outcomes', 'name' => 'In-site', 'is_system' => false]);
+        $interested = DynamicListItem::create([
+            'dynamic_list_id' => $list->id, 'label' => 'Interested', 'value' => 'visited_interested', 'is_active' => true,
+        ]);
+        // In-site logs are completed by their assigned agent (Phase-5 access rule).
+        $actor = $this->userWithPermissions(['clients.view', 'visits.conduct']);
+        $visit = Visit::factory()->inSite()->create([
+            'client_id' => $client->id, 'client_project_id' => $project->id,
+            'unit_id' => $unit->id, 'agent_id' => $actor->id,
+        ]);
+        Sanctum::actingAs($actor);
+
+        $this->postJson("/api/v1/visits/{$visit->id}/complete", [
+            'outcome_id' => $interested->id,
+            'next_action' => $this->nextActionPayload($agent),
+        ])->assertOk();
+
+        $this->assertSame('visited_interested', $item->fresh()->state->value);
+    }
+
     public function test_a_visit_can_only_be_assigned_to_an_agent(): void
     {
         $client = Client::factory()->create();
@@ -97,14 +342,14 @@ class InteractionTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrorFor('agent_id');
     }
 
-    public function test_scheduling_an_apartment_visit_requires_a_unit(): void
+    public function test_scheduling_an_in_site_visit_requires_a_unit(): void
     {
         $client = Client::factory()->create();
         $agent = $this->agent();
         Sanctum::actingAs($this->userWithPermissions(['clients.view', 'visits.assign']));
 
         $this->postJson('/api/v1/visits', [
-            'client_id' => $client->id, 'type' => 'apartment',
+            'client_id' => $client->id, 'type' => 'in_site',
             'agent_id' => $agent->id, 'scheduled_at' => now()->addDay()->toDateTimeString(),
         ])->assertStatus(422)->assertJsonValidationErrorFor('unit_id');
     }
@@ -112,6 +357,7 @@ class InteractionTest extends TestCase
     public function test_scheduling_a_valid_office_visit_works(): void
     {
         $client = Client::factory()->create();
+        Call::factory()->create(['client_id' => $client->id]); // call-first rule
         $agent = $this->agent();
         Sanctum::actingAs($this->userWithPermissions(['clients.view', 'visits.assign']));
 
@@ -145,9 +391,10 @@ class InteractionTest extends TestCase
 
     public function test_completing_a_visit_records_completion_and_a_next_action(): void
     {
-        $visit = Visit::factory()->apartment()->create();
         $agent = $this->agent();
-        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'visits.conduct']));
+        $actor = $this->userWithPermissions(['clients.view', 'visits.conduct']);
+        $visit = Visit::factory()->inSite()->create(['agent_id' => $actor->id]);
+        Sanctum::actingAs($actor);
 
         $this->postJson("/api/v1/visits/{$visit->id}/complete", [
             'next_action' => $this->nextActionPayload($agent),
@@ -156,6 +403,41 @@ class InteractionTest extends TestCase
         $this->assertNotNull($visit->fresh()->completed_at);
         $this->assertSame(1, NextAction::query()->pending()
             ->where('subject_type', 'client')->where('subject_id', $visit->client_id)->count());
+    }
+
+    public function test_an_in_site_visit_is_completed_only_by_its_agent_or_a_visit_admin(): void
+    {
+        $assigned = $this->userWithPermissions(['clients.view', 'visits.conduct']);
+        $visit = Visit::factory()->inSite()->create(['agent_id' => $assigned->id]);
+        $payload = fn () => ['next_action' => $this->nextActionPayload($this->agent())];
+
+        // Another conducting user (not the assigned agent) is rejected.
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'visits.conduct']));
+        $this->postJson("/api/v1/visits/{$visit->id}/complete", $payload())->assertForbidden();
+
+        // A visit admin (visits.assign) may step in.
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'visits.conduct', 'visits.assign']));
+        $this->postJson("/api/v1/visits/{$visit->id}/complete", $payload())->assertOk();
+
+        // Office visits keep the plain visits.conduct rule.
+        $office = Visit::factory()->create();
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'visits.conduct']));
+        $this->postJson("/api/v1/visits/{$office->id}/complete", $payload())->assertOk();
+    }
+
+    public function test_the_assigned_agent_corrects_their_own_in_site_log_but_not_others(): void
+    {
+        $assigned = $this->userWithPermissions(['clients.view', 'visits.conduct']);
+        $mine = Visit::factory()->inSite()->create(['agent_id' => $assigned->id]);
+        $someoneElses = Visit::factory()->inSite()->create();
+        $correction = fn (Visit $v) => [
+            'reason' => 'Wrong slot', 'type' => 'in_site', 'unit_id' => $v->unit_id,
+            'scheduled_at' => now()->addDays(2)->toDateTimeString(),
+        ];
+
+        Sanctum::actingAs($assigned);
+        $this->postJson("/api/v1/visits/{$mine->id}/correct", $correction($mine))->assertSuccessful();
+        $this->postJson("/api/v1/visits/{$someoneElses->id}/correct", $correction($someoneElses))->assertForbidden();
     }
 
     public function test_logging_a_call_rejects_a_project_from_another_client(): void

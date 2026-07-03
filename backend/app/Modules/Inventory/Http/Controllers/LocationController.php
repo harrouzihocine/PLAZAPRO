@@ -29,7 +29,7 @@ class LocationController extends Controller
         $status = $request->query('status');
 
         $locations = Location::query()
-            ->with(['wilaya', 'commune'])
+            ->with(['wilaya', 'commune', 'contractType'])
             ->when($status === 'archived', fn ($q) => $q->archived())
             ->when(! in_array($status, ['archived', 'all'], true), fn ($q) => $q->active())
             ->when($request->filled('wilaya_id'), fn ($q) => $q->where('wilaya_id', $request->query('wilaya_id')))
@@ -49,17 +49,17 @@ class LocationController extends Controller
 
     public function show(Location $location): LocationResource
     {
-        return new LocationResource($location->load(['wilaya', 'commune']));
+        return new LocationResource($location->load(['wilaya', 'commune', 'contractType']));
     }
 
     public function store(StoreLocationRequest $request, CreateLocation $action): LocationResource
     {
-        return new LocationResource($action->handle($request->validated())->load(['wilaya', 'commune']));
+        return new LocationResource($action->handle($request->validated())->load(['wilaya', 'commune', 'contractType']));
     }
 
     public function update(UpdateLocationRequest $request, Location $location, UpdateLocation $action): LocationResource
     {
-        return new LocationResource($action->handle($location, $request->validated())->load(['wilaya', 'commune']));
+        return new LocationResource($action->handle($location, $request->validated())->load(['wilaya', 'commune', 'contractType']));
     }
 
     public function destroy(Request $request, Location $location, CancelLocation $action): LocationResource
@@ -72,12 +72,12 @@ class LocationController extends Controller
     /** Archive the project + its inventory (reversible; hidden until reactivated). */
     public function archive(Location $location, ArchiveLocation $action): LocationResource
     {
-        return new LocationResource($action->handle($location)->load(['wilaya', 'commune']));
+        return new LocationResource($action->handle($location)->load(['wilaya', 'commune', 'contractType']));
     }
 
     /** Bring an archived project (and the inventory archived with it) back to active. */
     public function reactivate(Location $location, ReactivateLocation $action): LocationResource
     {
-        return new LocationResource($action->handle($location)->load(['wilaya', 'commune']));
+        return new LocationResource($action->handle($location)->load(['wilaya', 'commune', 'contractType']));
     }
 }

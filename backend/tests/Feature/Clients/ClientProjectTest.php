@@ -8,6 +8,7 @@ use App\Modules\Clients\Enums\ClientProjectStage;
 use App\Modules\Clients\Models\Client;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Inventory\Models\Unit;
+use App\Modules\Pipeline\Models\Call;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
@@ -39,6 +40,7 @@ class ClientProjectTest extends TestCase
     public function test_a_deal_opens_at_the_lead_stage(): void
     {
         $client = Client::factory()->create();
+        Call::factory()->create(['client_id' => $client->id]); // call-first rule
         Sanctum::actingAs($this->manager());
 
         $this->postJson("/api/v1/clients/{$client->id}/projects", [])

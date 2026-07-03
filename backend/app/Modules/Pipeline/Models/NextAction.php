@@ -58,6 +58,12 @@ class NextAction extends BaseModel
         return $this->hasMany(Reminder::class);
     }
 
+    /** Visits materialized from this plan (SyncVisitFromNextAction). */
+    public function visits(): HasMany
+    {
+        return $this->hasMany(Visit::class);
+    }
+
     public function scopePending(Builder $query): Builder
     {
         return $query->where('state', NextActionState::Pending->value);

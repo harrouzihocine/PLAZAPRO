@@ -214,6 +214,10 @@ async function remove(u) {
             <dd>{{ locations.current.expected_delivery_date || '—' }}</dd>
           </div>
           <div>
+            <dt class="text-xs opacity-60">Contract type</dt>
+            <dd>{{ locations.current.contract_type || '—' }}</dd>
+          </div>
+          <div>
             <dt class="text-xs opacity-60">GTM priority</dt>
             <dd>
               <GtmPriorityBadge

@@ -58,6 +58,12 @@ const routes = [
         meta: { permission: 'clients.view' },
       },
       {
+        path: 'desires/matches',
+        name: 'desires.matches',
+        component: () => import('@/features/clients/views/DesireMatchesView.vue'),
+        meta: { permission: 'clients.view' },
+      },
+      {
         path: 'clients/:id',
         name: 'clients.file',
         props: true,

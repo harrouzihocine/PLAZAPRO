@@ -23,6 +23,11 @@ class ReactivateClientProject
             $project->paymentSchedules()->archived()->get()->each->reactivate();
             $project->versements()->archived()->get()->each->reactivate();
 
+            // No longer waiting on the desire list once it's back in play.
+            if ($project->closed_to_desire_at !== null) {
+                $project->update(['closed_to_desire_at' => null]);
+            }
+
             return $project->reactivate();
         });
     }

@@ -25,13 +25,14 @@ class Visit extends BaseModel
 
     protected $fillable = [
         'client_id', 'client_project_id', 'type', 'unit_id', 'agent_id',
-        'scheduled_at', 'completed_at', 'outcome_id', 'notes',
+        'next_action_id', 'scheduled_at', 'completed_at', 'outcome_id', 'notes', 'checklist',
     ];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
             'type' => VisitType::class,
+            'checklist' => 'array',
             'scheduled_at' => 'datetime',
             'completed_at' => 'datetime',
         ]);
@@ -65,6 +66,12 @@ class Visit extends BaseModel
     public function nextActions(): MorphMany
     {
         return $this->morphMany(NextAction::class, 'source');
+    }
+
+    /** The next action (plan) this visit was materialized from, if any. */
+    public function nextAction(): BelongsTo
+    {
+        return $this->belongsTo(NextAction::class);
     }
 
     public function isCompleted(): bool

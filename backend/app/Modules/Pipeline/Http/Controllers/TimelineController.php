@@ -13,27 +13,44 @@ use App\Modules\Pipeline\Models\Call;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 
 /**
  * The interaction timeline shown on the client file: the client's calls and
  * visits, plus the open pending next action(s) for the client and its deals.
+ *
+ * ?project_id scopes it to ONE project's story: the logs linked to that project
+ * plus the client-level ones (the qualifying calls that precede any project).
  */
 class TimelineController extends Controller
 {
-    public function show(Client $client): JsonResponse
+    public function show(Request $request, Client $client): JsonResponse
     {
+        $projectId = $request->query('project_id');
+        $scoped = fn ($q) => $q->where(fn ($s) => $s
+            ->where('client_project_id', $projectId)
+            ->orWhereNull('client_project_id'));
+
         $calls = Call::query()
             ->where('client_id', $client->id)->active()
-            ->with(['agent', 'outcome'])->latest('called_at')->get();
+            ->when($projectId, $scoped)
+            ->with(['agent', 'outcome', 'supersedes'])->latest('called_at')->get();
 
         $visits = Visit::query()
             ->where('client_id', $client->id)->active()
-            ->with(['agent', 'unit', 'outcome'])->orderByDesc('scheduled_at')->get();
+            ->when($projectId, $scoped)
+            ->with(['agent', 'unit.type', 'unit.floor', 'outcome', 'supersedes'])->orderByDesc('scheduled_at')->get();
 
-        $projectIds = ClientProject::query()->where('client_id', $client->id)->pluck('id');
+        $projectIds = ClientProject::query()
+            ->where('client_id', $client->id)
+            ->when($projectId, fn ($q) => $q->whereKey($projectId))
+            ->pluck('id');
 
+        // Only active pending actions — a superseded (cancelled) row keeps its
+        // 'pending' state value but must not surface as the open action.
         $nextActions = NextAction::query()
+            ->active()
             ->pending()
             ->with('assignedTo')
             ->where(function ($q) use ($client, $projectIds) {

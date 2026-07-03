@@ -12,8 +12,8 @@ class UpdateLocation
     public function handle(Location $location, array $data): Location
     {
         $location->update(Arr::only($data, [
-            'name', 'code', 'wilaya_id', 'commune_id', 'address', 'description',
-            'expected_delivery_date', 'gtm_priority', 'latitude', 'longitude',
+            'name', 'code', 'wilaya_id', 'commune_id', 'contract_type_id', 'address',
+            'description', 'expected_delivery_date', 'gtm_priority', 'latitude', 'longitude',
         ]));
 
         return $location->fresh();

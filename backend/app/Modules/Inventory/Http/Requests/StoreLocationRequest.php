@@ -29,6 +29,7 @@ class StoreLocationRequest extends FormRequest
             'code' => ['required', 'string', 'max:255', 'unique:locations,code'],
             'wilaya_id' => ['nullable', 'integer', 'exists:wilayas,id'],
             'commune_id' => ['nullable', 'integer', 'exists:communes,id'],
+            'contract_type_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
             'address' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'expected_delivery_date' => ['nullable', 'date'],

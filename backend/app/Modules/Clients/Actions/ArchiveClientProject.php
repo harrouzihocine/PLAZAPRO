@@ -19,15 +19,21 @@ use Illuminate\Support\Facades\DB;
  */
 class ArchiveClientProject
 {
-    public function handle(ClientProject $project): ClientProject
+    public function handle(ClientProject $project, ?string $reason = null): ClientProject
     {
         abort_unless($project->isActive(), 422, 'Only an active deal can be archived.');
 
-        return DB::transaction(function () use ($project) {
-            $project->paymentSchedules()->active()->get()->each->archive();
-            $project->versements()->active()->get()->each->archive();
+        // A deal with recorded payments cannot be archived — refund/remove them first.
+        abort_if(
+            $project->versements()->active()->exists(),
+            422,
+            'Archiving is blocked: payments have been recorded on this deal. Refund or remove them first.',
+        );
 
-            return $project->archive();
+        return DB::transaction(function () use ($project, $reason) {
+            $project->paymentSchedules()->active()->get()->each->archive();
+
+            return $project->archive($reason);
         });
     }
 }

@@ -5,6 +5,7 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCard from '@/components/base/BaseCard.vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import { useDynamicList } from '@/composables/useDynamicList'
 import { useWilayas, useCommunes } from '@/composables/useGeography'
 import { GTM_PRIORITIES } from '@/features/inventory/api'
 import GtmPriorityBadge from '@/features/inventory/components/GtmPriorityBadge.vue'
@@ -17,13 +18,14 @@ import { confirmAction } from '@/composables/useConfirm'
 const store = useLocationsStore()
 const auth = useAuthStore()
 const { wilayas } = useWilayas()
+const { items: contractTypes } = useDynamicList('contract_types')
 // Independent dependent-commune lists for the filter bar and the form.
 const { communes: filterCommunes, load: loadFilterCommunes } = useCommunes()
 const { communes: formCommunes, load: loadFormCommunes } = useCommunes()
 
 const canManage = auth.can('locations.manage')
 
-const blank = { name: '', code: '', wilaya_id: '', commune_id: '', address: '', description: '', expected_delivery_date: '', gtm_priority: 'medium', latitude: null, longitude: null }
+const blank = { name: '', code: '', wilaya_id: '', commune_id: '', contract_type_id: '', address: '', description: '', expected_delivery_date: '', gtm_priority: 'medium', latitude: null, longitude: null }
 const form = reactive({ ...blank })
 const editingId = ref(null)
 const showForm = ref(false)
@@ -65,6 +67,7 @@ function openEdit(loc) {
     code: loc.code,
     wilaya_id: loc.wilaya_id ?? '',
     commune_id: loc.commune_id ?? '',
+    contract_type_id: loc.contract_type_id ?? '',
     address: loc.address ?? '',
     description: loc.description ?? '',
     expected_delivery_date: loc.expected_delivery_date ?? '',
@@ -84,6 +87,7 @@ async function submit() {
     code: form.code.trim(),
     wilaya_id: form.wilaya_id || null,
     commune_id: form.commune_id || null,
+    contract_type_id: form.contract_type_id || null,
     address: form.address.trim() || null,
     description: form.description.trim() || null,
     expected_delivery_date: form.expected_delivery_date || null,
@@ -200,6 +204,12 @@ function toggleArchived() {
             :disabled="!form.wilaya_id"
             :options="formCommunes.map((c) => ({ value: c.id, label: c.name }))"
           />
+          <BaseSelect
+            v-model="form.contract_type_id"
+            label="Contract type"
+            placeholder="— none —"
+            :options="contractTypes.map((t) => ({ value: t.id, label: t.label }))"
+          />
           <div>
             <BaseInput v-model="form.address" label="Address" />
             <a
@@ -284,6 +294,9 @@ function toggleArchived() {
               {{ loc.code
               }}<template v-if="loc.wilaya"> · {{ loc.wilaya.name }}</template
               ><template v-if="loc.commune"> ({{ loc.commune.name }})</template>
+            </span>
+            <span v-if="loc.contract_type" class="ml-2 text-xs opacity-60">
+              📄 {{ loc.contract_type }}
             </span>
             <span v-if="loc.expected_delivery_date" class="ml-2 text-xs opacity-60">
               🏁 Delivery {{ loc.expected_delivery_date }}
