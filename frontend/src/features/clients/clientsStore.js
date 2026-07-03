@@ -29,6 +29,7 @@ export const useClientsStore = defineStore('clients', {
     timeline: { calls: [], visits: [], next_actions: [], next_action_history: [] },
     timelineProjectId: null,
     filters: { assigned_agent_id: '', source_id: '', rating_id: '', search: '' },
+    _fetchTicket: 0, // stale-response guard for auto-applied filters
     loading: false,
     saving: false,
     error: '',
@@ -37,21 +38,26 @@ export const useClientsStore = defineStore('clients', {
   actions: {
     async fetch() {
       this.loading = true
+      // Filters auto-apply on every change (useAutoFilter): tag the request so
+      // a slower, older response can never overwrite a newer one.
+      const ticket = ++this._fetchTicket
       try {
         const params = {}
         for (const [k, v] of Object.entries(this.filters)) {
           if (v !== '' && v !== null) params[k] = v
         }
+        // The agent catalogues don't depend on the filters — fetch them once.
         const [clients, agents, followUpAgents] = await Promise.all([
           clientsApi.list(params),
-          agentsApi.list(),
-          followUpAgentsApi.list(),
+          this.agents.length ? this.agents : agentsApi.list(),
+          this.followUpAgents.length ? this.followUpAgents : followUpAgentsApi.list(),
         ])
+        if (ticket !== this._fetchTicket) return // superseded by a newer fetch
         this.items = clients
         this.agents = agents
         this.followUpAgents = followUpAgents
       } finally {
-        this.loading = false
+        if (ticket === this._fetchTicket) this.loading = false
       }
     },
 

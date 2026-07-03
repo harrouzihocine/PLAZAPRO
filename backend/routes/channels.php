@@ -13,9 +13,12 @@ use Illuminate\Support\Facades\Broadcast;
 | Authorisation callbacks for private/presence channels. Loaded via
 | ->withBroadcasting() in bootstrap/app.php. See docs/phase-5-collaboration.md.
 |
-| NOTE: channel auth callbacks are NOT subject to Gate::before, so the
-| super-admin shortcut does not silently widen channel access here — each
-| callback must return true only for users who genuinely belong on the channel.
+| NOTE: the participant checks below are plain pivot queries, immune to the
+| Gate::before super-admin shortcut. The conversation channel additionally
+| delegates to Conversation::isReadableBy, whose PROJECT-chat oversight branch
+| uses $user->can(...) — which Gate::before DOES satisfy for super-admins.
+| That widening is intentional and limited to project chats; direct/group
+| threads remain strictly participant-only for everyone.
 */
 
 // A user's private notification channel. The User model overrides

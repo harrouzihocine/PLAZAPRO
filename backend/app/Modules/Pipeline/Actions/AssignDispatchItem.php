@@ -65,15 +65,30 @@ class AssignDispatchItem
             $updates['due_at'] = $dueDate->setTime(9, 0);
         }
         $action->update($updates);
+        $action->refresh();
 
-        // Assigned: materialize the field visits (notifies agent + contributors).
         // Un-assigned (returned to the pool): retire its open visits.
-        if ($action->assigned_to !== null) {
-            $this->syncVisitFromNextAction->handle($action->fresh());
-        } else {
+        if ($action->assigned_to === null) {
             $action->visits()->active()->whereNull('completed_at')->get()
                 ->each->cancel('Returned to the dispatch pool');
+
+            return;
         }
+
+        // Assigned: visits already materialized from this plan FOLLOW it — a
+        // re-assignment must move them too (GenerateInSiteVisits would skip
+        // them as "already open" and leave them on the previous agent).
+        $openVisits = $action->visits()->active()->whereNull('completed_at')->get();
+
+        foreach ($openVisits as $visit) {
+            $visit->update(['scheduled_at' => $action->due_at]);
+            if ((int) $visit->agent_id !== (int) $action->assigned_to) {
+                $this->assignVisit->handle($visit->fresh(), (int) $action->assigned_to);
+            }
+        }
+
+        // First assignment (or new shortlisted units): materialize the rest.
+        $this->syncVisitFromNextAction->handle($action);
     }
 
     private function moveVisit(array $change, ?Carbon $dueDate): void

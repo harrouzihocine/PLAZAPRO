@@ -11,6 +11,7 @@ use App\Modules\Pipeline\Models\Task;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Settings\Models\User;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
  * Everything coming up that involves ONE user — the single inclusion rule
@@ -47,7 +48,9 @@ class BuildUpcomingWork
                 ->orWhere(fn ($s) => $s
                     ->where('subject_type', 'client_project')
                     ->whereIn('subject_id', $projectIds)))
-            ->with(['assignedTo:id,name', 'subject'])
+            // Morph-aware: project subjects nest the client (clientNameOf/linkOf
+            // read it — a plain 'subject' load would lazy-load one client per row).
+            ->with(['assignedTo:id,name', 'subject' => fn (MorphTo $m) => $m->morphWith([ClientProject::class => ['client:id,first_name,last_name']])])
             ->orderBy('due_at')
             ->get()
             ->map(fn (NextAction $a) => [
@@ -79,9 +82,7 @@ class BuildUpcomingWork
                 'unit' => $v->unit?->reference,
                 'location' => $v->unit?->location?->name,
                 // The field agent opens the site straight in Google Maps.
-                'maps_url' => $v->unit?->location?->latitude !== null && $v->unit?->location?->longitude !== null
-                    ? sprintf('https://www.google.com/maps/search/?api=1&query=%s,%s', $v->unit->location->latitude, $v->unit->location->longitude)
-                    : null,
+                'maps_url' => $v->unit?->location?->mapsUrl(),
                 'link' => $v->client_project_id
                     ? '/clients/'.$v->client_id.'/projects/'.$v->client_project_id
                     : '/clients/'.$v->client_id,

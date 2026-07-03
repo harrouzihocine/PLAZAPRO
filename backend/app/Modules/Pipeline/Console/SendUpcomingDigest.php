@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Pipeline\Console;
 
-use App\Modules\Pipeline\Actions\BuildUpcomingWork;
 use App\Modules\Collaboration\Notifications\DomainNotification;
+use App\Modules\Pipeline\Actions\BuildUpcomingWork;
 use App\Modules\Settings\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * The daily "what's coming up" reminder: every morning, each user is notified
@@ -19,7 +20,7 @@ use Illuminate\Console\Command;
  */
 class SendUpcomingDigest extends Command
 {
-    protected $signature = 'reminders:upcoming-digest';
+    protected $signature = 'reminders:upcoming-digest {--force : Send even if today\'s digest already went out}';
 
     protected $description = 'Notify each user of their upcoming calls / visits / tasks (due today or tomorrow)';
 
@@ -32,6 +33,15 @@ class SendUpcomingDigest extends Command
 
     public function handle(BuildUpcomingWork $build): int
     {
+        // One digest per day, whoever calls: a manual artisan run, a re-deploy,
+        // or a second scheduler host must not double-notify every user.
+        // --force bypasses (testing).
+        if (! $this->option('force') && ! Cache::add('digest:sent:'.now()->toDateString(), 1, now()->endOfDay())) {
+            $this->warn('Digest already sent today — use --force to resend.');
+
+            return self::SUCCESS;
+        }
+
         $sent = 0;
 
         User::query()->active()->where('is_active', true)

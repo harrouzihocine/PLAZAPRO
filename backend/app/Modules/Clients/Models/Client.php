@@ -97,7 +97,10 @@ class Client extends BaseModel
 
     /**
      * Visibility rule (clients.view_all): without the grant a user sees only
-     * the clients they created or are assigned to follow up.
+     * the clients they created or are assigned to follow up — plus clients
+     * whose PROJECT they contribute to (creator or non-hidden viewer): being
+     * shared a project must include its client, or the project workspace 404s
+     * on its own client.
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
@@ -107,7 +110,12 @@ class Client extends BaseModel
 
         return $query->where(fn (Builder $q) => $q
             ->where('created_by', $user->id)
-            ->orWhere('assigned_agent_id', $user->id));
+            ->orWhere('assigned_agent_id', $user->id)
+            ->orWhereHas('projects', fn (Builder $p) => $p
+                ->where('created_by', $user->id)
+                ->orWhereHas('viewers', fn (Builder $v) => $v
+                    ->whereKey($user->id)
+                    ->whereNull('client_project_viewers.hidden_at'))));
     }
 
     public function source(): BelongsTo

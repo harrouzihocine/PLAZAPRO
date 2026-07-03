@@ -51,7 +51,9 @@ class RbacSeeder extends Seeder
         // people on its visibility list).
         'projects.view_all', 'projects.contributors',
         // visits.dispatch: the weekly board — sees the pending (unassigned)
-        // in-site pool and hands tasks to field agents.
+        // in-site pool and hands tasks to field agents. NOTE: the board is by
+        // nature company-wide (client names, sites, agent workload across ALL
+        // visibility scopes) — grant it only to roles trusted with that view.
         'calls.log', 'visits.assign', 'visits.dispatch', 'visits.conduct', 'tasks.manage',
         // A deal normally comes from a visit log; this allows opening one directly.
         'deals.direct',

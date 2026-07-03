@@ -32,6 +32,7 @@ class LogCall
 {
     public function __construct(
         private CreateNextAction $createNextAction,
+        private ClosePendingNextActions $closePendingNextActions,
         private SyncVisitFromNextAction $syncVisitFromNextAction,
         private EnsureActiveClientProject $ensureActiveClientProject,
         private ReactivateClientProject $reactivateClientProject,
@@ -79,6 +80,10 @@ class LogCall
 
                 // A visit-type next step IS the scheduling — materialize the visit(s).
                 $this->syncVisitFromNextAction->handle($nextAction);
+            } else {
+                // No follow-up planned: the call still FULFILS the open plan —
+                // close it, or it lingers pending forever (stuck CTA, reminders).
+                $this->closePendingNextActions->handle($project ?? $client);
             }
 
             // Return the created instance (not a refetch) so the API responds 201.

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Pipeline\Actions;
 
-use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Pipeline\Enums\NextActionState;
 use App\Modules\Pipeline\Enums\NextActionType;
 use App\Modules\Pipeline\Models\NextAction;
@@ -15,7 +14,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * Create the enforced next action for a subject (client/project), keeping the
  * invariant that a subject has **exactly one** open `pending` action: any prior
- * pending action is marked done first. `source` is the call/visit that produced it.
+ * pending plan is closed first (ClosePendingNextActions). `source` is the
+ * call/visit that produced it.
  *
  * "When" arrives as `due_date` + optional `due_time` (the UI splits them because an
  * agent usually only knows the day); a legacy `due_at` is still accepted so internal
@@ -24,6 +24,8 @@ use Illuminate\Support\Facades\DB;
  */
 class CreateNextAction
 {
+    public function __construct(private ClosePendingNextActions $closePending) {}
+
     /**
      * @param  array<string, mixed>  $data
      */
@@ -41,33 +43,10 @@ class CreateNextAction
         }
 
         return DB::transaction(function () use ($subject, $source, $data, $assignedTo) {
-            // Close any prior open action so exactly one stays pending. Only active
-            // rows count (a superseded/cancelled action keeps its old state value).
-            // Done per model (not a bulk update) so each transition is audited.
-            // A project-level action ALSO closes the client-level pending (the
-            // qualifying call's plan) — the story keeps ONE pending log to fill.
-            $priorPending = NextAction::query()
-                ->active()
-                ->pending()
-                ->where(function ($q) use ($subject) {
-                    $q->where(fn ($s) => $s
-                        ->where('subject_type', $subject->getMorphClass())
-                        ->where('subject_id', $subject->getKey()));
-
-                    if ($subject instanceof ClientProject) {
-                        $q->orWhere(fn ($s) => $s
-                            ->where('subject_type', 'client')
-                            ->where('subject_id', $subject->client_id));
-                    }
-                })
-                ->get();
-
-            foreach ($priorPending as $prior) {
-                $prior->update([
-                    'state' => NextActionState::Done->value,
-                    'completed_at' => now(),
-                ]);
-            }
+            // Close any prior open plan so exactly one stays pending (fulfilled →
+            // done; an undispatched pool plan → cancelled). Shared rule — see
+            // ClosePendingNextActions.
+            $this->closePending->handle($subject, 'Replaced by a new plan before dispatch');
 
             return NextAction::create([
                 'subject_type' => $subject->getMorphClass(),

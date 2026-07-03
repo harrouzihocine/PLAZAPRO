@@ -52,10 +52,14 @@ export function useModalDraft({ key, label, getForm, setForm, active = null }) {
   }
 
   // Persist while open (deep watch; the store debounces localStorage writes).
+  // `initial === null` = the modal hasn't been open()ed yet this cycle — in
+  // active-getter mode this watcher fires BEFORE the isActive watcher on the
+  // opening tick, and saving then would persist the pristine form as a phantom
+  // draft that open() immediately "restores".
   watch(
     () => (isActive.value ? getForm() : null),
     (value) => {
-      if (value === null || settled) return
+      if (value === null || settled || initial === null) return
       if (JSON.stringify(value) === initial && !restored.value) return
       drafts.save(keyOf(), {
         label,
@@ -79,10 +83,21 @@ export function useModalDraft({ key, label, getForm, setForm, active = null }) {
 
   return {
     restored,
-    /** The submit went through — the draft served its purpose. */
+    /**
+     * Called when the form is SUBMITTED (before the async save resolves). The
+     * draft is cleared — but protection re-arms on the next tick with the
+     * submitted values as the new baseline: if the server rejects the save and
+     * the modal stays open, further edits are drafted again instead of being
+     * silently unprotected.
+     */
     complete() {
       settled = true
+      restored.value = false
       drafts.discard(keyOf())
+      nextTick(() => {
+        initial = snapshot()
+        settled = false
+      })
     },
     /** Explicit Cancel / "Discard draft": clear it and reset the form. */
     discard() {

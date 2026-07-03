@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Collection;
 
 /**
  * A project engagement the client is pursuing: it owns the interaction logs
@@ -53,6 +54,21 @@ class ClientProject extends BaseModel
             ->orWhereHas('viewers', fn (Builder $v) => $v
                 ->whereKey($user->id)
                 ->whereNull('client_project_viewers.hidden_at')));
+    }
+
+    /**
+     * THE contributor rule, in one place: the creator plus the non-hidden
+     * viewers. Chat participants, assignment notifications and the upcoming-work
+     * digest all derive membership from this — never re-encode it.
+     *
+     * @return Collection<int, int>
+     */
+    public function contributorIds(): Collection
+    {
+        return collect($this->created_by !== null ? [$this->created_by] : [])
+            ->merge($this->viewers()->whereNull('client_project_viewers.hidden_at')->pluck('users.id'))
+            ->unique()
+            ->values();
     }
 
     /** Single-model version of scopeVisibleTo — guards project-scoped reads. */

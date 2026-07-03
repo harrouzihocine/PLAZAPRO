@@ -27,6 +27,14 @@ class TimelineController extends Controller
 {
     public function show(Request $request, Client $client): JsonResponse
     {
+        // Same visibility rule as ClientController::show — a client outside the
+        // caller's scope reads as absent (the timeline is the client's whole
+        // interaction history, including corrected versions).
+        abort_unless(
+            Client::query()->visibleTo($request->user())->whereKey($client->id)->exists(),
+            404,
+        );
+
         $projectId = $request->query('project_id');
         $scoped = fn ($q) => $q->where(fn ($s) => $s
             ->where('client_project_id', $projectId)

@@ -9,6 +9,7 @@ export const useLocationsStore = defineStore('locations', {
     items: [],
     archivedItems: [],
     current: null,
+    _fetchTicket: 0, // stale-response guard for auto-applied filters
     loading: false,
     saving: false,
     error: '',
@@ -18,15 +19,20 @@ export const useLocationsStore = defineStore('locations', {
   actions: {
     async fetch() {
       this.loading = true
+      // Filters auto-apply (useAutoFilter): tag the request so a slower, older
+      // response can never overwrite a newer one.
+      const ticket = ++this._fetchTicket
       try {
         const params = {}
         if (this.filters.q) params.q = this.filters.q
         if (this.filters.wilaya_id) params.wilaya_id = this.filters.wilaya_id
         if (this.filters.commune_id) params.commune_id = this.filters.commune_id
         if (this.filters.priority) params.priority = this.filters.priority
-        this.items = await locationsApi.list(params)
+        const items = await locationsApi.list(params)
+        if (ticket !== this._fetchTicket) return
+        this.items = items
       } finally {
-        this.loading = false
+        if (ticket === this._fetchTicket) this.loading = false
       }
     },
 

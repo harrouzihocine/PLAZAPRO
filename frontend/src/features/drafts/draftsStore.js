@@ -3,11 +3,15 @@ import { defineStore } from 'pinia'
 // Unsaved-modal drafts, persisted in localStorage so a misclick outside a
 // modal (or a page change) never loses typed work. One entry per draft key;
 // the composable (useModalDraft) is the only writer.
-const STORAGE_KEY = 'plaza:drafts'
+//
+// Drafts contain client PII (names, notes), so storage is namespaced PER USER
+// and the in-memory store is emptied on logout: on a shared browser, user B
+// never sees (or silently restores) user A's drafts.
+const storageKey = (userId) => `plaza:drafts:${userId}`
 
-function load() {
+function load(userId) {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) ?? {}
+    return JSON.parse(localStorage.getItem(storageKey(userId))) ?? {}
   } catch {
     return {}
   }
@@ -17,7 +21,8 @@ let persistTimer = null
 
 export const useDraftsStore = defineStore('drafts', {
   state: () => ({
-    items: load(), // key -> { key, label, route, data, savedAt }
+    userId: null, // set by hydrate() once the session user is known
+    items: {}, // key -> { key, label, route, data, savedAt }
   }),
 
   getters: {
@@ -26,12 +31,26 @@ export const useDraftsStore = defineStore('drafts', {
   },
 
   actions: {
-    persist() {
+    /** Load the signed-in user's drafts (AppShell, once auth resolves). */
+    hydrate(userId) {
+      if (!userId || this.userId === userId) return
+      this.userId = userId
+      this.items = load(userId)
+    },
+
+    /** Forget everything in memory on logout (storage stays with its owner). */
+    reset() {
       clearTimeout(persistTimer)
-      persistTimer = setTimeout(
-        () => localStorage.setItem(STORAGE_KEY, JSON.stringify(this.items)),
-        300,
-      )
+      this.userId = null
+      this.items = {}
+    },
+
+    persist() {
+      if (!this.userId) return
+      clearTimeout(persistTimer)
+      const key = storageKey(this.userId)
+      const snapshot = () => localStorage.setItem(key, JSON.stringify(this.items))
+      persistTimer = setTimeout(snapshot, 300)
     },
 
     save(key, { label, route, data }) {

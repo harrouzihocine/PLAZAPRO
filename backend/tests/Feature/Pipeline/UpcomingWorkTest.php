@@ -6,6 +6,7 @@ namespace Tests\Feature\Pipeline;
 
 use App\Modules\Clients\Models\Client;
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Collaboration\Notifications\DomainNotification;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Settings\Models\Permission;
@@ -93,7 +94,7 @@ class UpcomingWorkTest extends TestCase
 
         Notification::assertSentTo(
             $assignee,
-            \App\Modules\Collaboration\Notifications\DomainNotification::class,
+            DomainNotification::class,
             fn ($n) => $n->kind === 'upcoming_digest' && str_contains($n->title, 'call'),
         );
         Notification::assertNothingSentTo($bystander);
@@ -116,6 +117,6 @@ class UpcomingWorkTest extends TestCase
         $action->update(['state' => 'done', 'completed_at' => now()]);
         $this->artisan('reminders:upcoming-digest')->assertSuccessful();
 
-        Notification::assertSentToTimes($assignee, \App\Modules\Collaboration\Notifications\DomainNotification::class, 1);
+        Notification::assertSentToTimes($assignee, DomainNotification::class, 1);
     }
 }

@@ -24,7 +24,10 @@ const weekStart = ref(null) // 'YYYY-MM-DD' (Monday)
 const agents = ref([])
 const pending = ref([]) // draggable list (pending strip)
 const cells = ref({}) // `${agentId}|${day}` -> draggable list
-const moves = ref([]) // accumulated drag moves, saved in one batch
+// One FINAL position per card (`kind:id` → move): dragging the same card
+// several times before saving must express only where it ended up — posting
+// every intermediate hop would assign/notify agents the card merely passed by.
+const moves = ref(new Map())
 
 // The board works entirely in UTC calendar dates. The backend (app timezone is
 // UTC) produces week_start, every item's `day`, and the "today onwards" guard in
@@ -60,11 +63,11 @@ const days = computed(() => {
 
 const cellKey = (agentId, day) => `${agentId}|${day}`
 const cellList = (agentId, day) => cells.value[cellKey(agentId, day)] ?? []
-const hasChanges = computed(() => moves.value.length > 0)
+const hasChanges = computed(() => moves.value.size > 0)
 
 async function load(week = weekStart.value) {
   loading.value = true
-  moves.value = []
+  moves.value = new Map()
   try {
     const data = await pipelineApi.dispatchBoard(week)
     weekStart.value = data.week_start
@@ -95,10 +98,16 @@ onMounted(() => load(null))
 // --- Drag & drop ----------------------------------------------------------
 // vuedraggable moves items between the bound lists; we record the intent and
 // send everything on Save. `checkMove`-style rejection: past days don't accept.
+function recordMove(item, move) {
+  const next = new Map(moves.value)
+  next.set(`${move.kind}:${move.id}`, move)
+  moves.value = next
+}
+
 function onDropToCell(evt, agentId, day) {
   const item = evt.added?.element
   if (!item) return
-  moves.value.push({
+  recordMove(item, {
     kind: item.kind === 'action' ? 'action' : 'visit',
     id: item.id,
     agent_id: agentId,
@@ -111,7 +120,7 @@ function onDropToCell(evt, agentId, day) {
 function onDropToPending(evt) {
   const item = evt.added?.element
   if (!item) return
-  moves.value.push({ kind: item.kind === 'action' ? 'action' : 'visit', id: item.id, agent_id: null })
+  recordMove(item, { kind: item.kind === 'action' ? 'action' : 'visit', id: item.id, agent_id: null })
 }
 
 // Pending tasks always drag; grid items only when the server said so — and a
@@ -122,17 +131,20 @@ const canReceive = (day) => !day.isPast
 function checkMove(evt) {
   const el = evt.draggedContext?.element
   if (!el) return false
+  // Pool plans have no `draggable` flag (always movable); GRID items — visits
+  // and the context-only call plans — carry it and must honour it, whatever
+  // their kind, or a rejected card poisons the whole saved batch (422).
+  if ('draggable' in el && !el.draggable) return false
   const toPending = evt.to?.classList?.contains('pending-zone')
   if (el.kind === 'action') return true
-  if (!el.draggable) return false
   return !toPending || el.can_unassign
 }
 
 async function save() {
-  if (!moves.value.length) return
+  if (!moves.value.size) return
   saving.value = true
   try {
-    await pipelineApi.dispatchAssign(moves.value)
+    await pipelineApi.dispatchAssign([...moves.value.values()])
     toastSuccess('Assignments saved — the agents and contributors were notified.')
     await load()
   } catch (e) {

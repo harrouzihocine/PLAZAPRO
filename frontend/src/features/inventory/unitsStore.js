@@ -9,6 +9,7 @@ export const useUnitsStore = defineStore('units', {
   state: () => ({
     items: [],
     current: null, // the unit open on its detail page
+    _fetchTicket: 0, // stale-response guard for auto-applied filters
     loading: false,
     saving: false,
     error: '',
@@ -31,6 +32,9 @@ export const useUnitsStore = defineStore('units', {
   actions: {
     async fetch() {
       this.loading = true
+      // Filters auto-apply (useAutoFilter): tag the request so a slower, older
+      // response can never overwrite a newer one.
+      const ticket = ++this._fetchTicket
       try {
         const params = {}
         for (const [k, v] of Object.entries(this.filters)) {
@@ -40,10 +44,12 @@ export const useUnitsStore = defineStore('units', {
             params[k] = v
           }
         }
+        const items = await unitsApi.list(params)
+        if (ticket !== this._fetchTicket) return
         this.scope = null
-        this.items = await unitsApi.list(params)
+        this.items = items
       } finally {
-        this.loading = false
+        if (ticket === this._fetchTicket) this.loading = false
       }
     },
 

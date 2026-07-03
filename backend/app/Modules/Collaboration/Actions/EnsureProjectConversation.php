@@ -22,11 +22,12 @@ class EnsureProjectConversation
     public function handle(ClientProject $project): Conversation
     {
         return DB::transaction(function () use ($project) {
-            $conversation = Conversation::query()
-                ->where('type', ConversationType::Project->value)
-                ->where('subject_type', $project->getMorphClass())
-                ->where('subject_id', $project->id)
-                ->first();
+            // Serialize per project: two users opening the chat concurrently (or
+            // a GET racing project creation) must not both see "no conversation"
+            // and create two threads for one project.
+            ClientProject::query()->whereKey($project->id)->lockForUpdate()->first();
+
+            $conversation = $this->find($project);
 
             if ($conversation === null) {
                 $project->loadMissing('client');
@@ -46,6 +47,15 @@ class EnsureProjectConversation
         });
     }
 
+    private function find(ClientProject $project): ?Conversation
+    {
+        return Conversation::query()
+            ->where('type', ConversationType::Project->value)
+            ->where('subject_type', $project->getMorphClass())
+            ->where('subject_id', $project->id)
+            ->first();
+    }
+
     /**
      * Who anchors the thread. Normally the project creator; legacy projects
      * (pre-created_by) fall back to the client's sales agent, then to the
@@ -60,27 +70,32 @@ class EnsureProjectConversation
     }
 
     /**
-     * Participants mirror the contributors exactly: the creator (admin) plus the
-     * non-hidden viewers. Newly added contributors join (and can read the whole
-     * history); hidden ones leave. Existing rows keep their joined_at.
+     * Participants mirror the contributors exactly (ClientProject::contributorIds
+     * — the one membership rule): the owner is admin, the rest members. Newly
+     * added contributors join (and can read the whole history); hidden ones
+     * leave. Existing rows keep their joined_at; no-op syncs issue no writes.
      */
     private function syncParticipants(Conversation $conversation, ClientProject $project): void
     {
-        $contributorRoles = collect([$this->ownerId($project) => 'admin']);
-
-        foreach ($project->viewers()->whereNull('client_project_viewers.hidden_at')->pluck('users.id') as $viewerId) {
-            $contributorRoles[$viewerId] ??= 'member';
-        }
+        $ownerId = $this->ownerId($project);
+        $contributorIds = $project->contributorIds()->push($ownerId)->unique();
 
         $current = $conversation->participants()->pluck('users.id');
 
-        $conversation->participants()->detach($current->diff($contributorRoles->keys())->all());
+        $toDetach = $current->diff($contributorIds);
+        if ($toDetach->isNotEmpty()) {
+            $conversation->participants()->detach($toDetach->all());
+        }
 
-        $now = now();
-        $conversation->participants()->attach(
-            $contributorRoles->keys()->diff($current)
-                ->mapWithKeys(fn ($id) => [$id => ['role' => $contributorRoles[$id], 'joined_at' => $now]])
-                ->all(),
-        );
+        $toAttach = $contributorIds->diff($current);
+        if ($toAttach->isNotEmpty()) {
+            $now = now();
+            $conversation->participants()->attach(
+                $toAttach->mapWithKeys(fn ($id) => [$id => [
+                    'role' => $id === $ownerId ? 'admin' : 'member',
+                    'joined_at' => $now,
+                ]])->all(),
+            );
+        }
     }
 }

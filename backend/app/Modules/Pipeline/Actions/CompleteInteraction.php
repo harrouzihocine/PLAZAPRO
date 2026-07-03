@@ -26,6 +26,7 @@ class CompleteInteraction
 {
     public function __construct(
         private CreateNextAction $createNextAction,
+        private ClosePendingNextActions $closePendingNextActions,
         private SyncVisitFromNextAction $syncVisitFromNextAction,
         private AdvanceShortlistFromVisit $advanceShortlist,
         private SyncShortlist $syncShortlist,
@@ -34,6 +35,10 @@ class CompleteInteraction
     public function handle(Visit $visit, array $data): Visit
     {
         abort_if($visit->isCompleted(), 422, 'This visit is already completed.');
+        // A cancelled (superseded / returned-to-pool) visit is a dead row — it
+        // must never be completed, or shortlist state advances off a visit that
+        // officially never happened.
+        abort_if($visit->isCancelled(), 422, 'This visit was cancelled — complete its replacement instead.');
 
         return DB::transaction(function () use ($visit, $data) {
             $visit->update([
@@ -72,6 +77,12 @@ class CompleteInteraction
             $nextAction = empty($data['next_action']) ? null : $this->createNextAction->handle(
                 $subject, $visit, $data['next_action'], $client->assigned_agent_id ?? $visit->agent_id,
             );
+
+            // No follow-up planned: completing the visit still FULFILS the open
+            // plan — close it, or it lingers pending forever.
+            if ($nextAction === null) {
+                $this->closePendingNextActions->handle($subject);
+            }
 
             // Completing an in-site visit moves the shortlisted property forward
             // (BEFORE materializing, so a "needs second visit" outcome re-arms the

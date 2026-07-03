@@ -27,11 +27,14 @@ class DispatchAssignRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'changes' => ['required', 'array', 'min:1'],
+            // Bounded: a board save is at most one screen of moves — an
+            // unbounded batch would be an authenticated notification/transaction
+            // amplifier.
+            'changes' => ['required', 'array', 'min:1', 'max:100'],
             'changes.*.kind' => ['required', 'in:action,visit'],
             'changes.*.id' => ['required', 'integer'],
             'changes.*.agent_id' => ['nullable', 'integer', new IsAgentUser],
-            'changes.*.due_date' => ['nullable', 'date'],
+            'changes.*.due_date' => ['nullable', 'date', 'before:+1 year'],
         ];
     }
 }

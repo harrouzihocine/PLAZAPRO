@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Pipeline\Actions;
 
 use App\Modules\Pipeline\Enums\NextActionState;
+use App\Modules\Pipeline\Enums\NextActionType;
 use App\Modules\Pipeline\Models\NextAction;
+use App\Modules\Settings\Models\User;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -33,7 +35,7 @@ class CorrectNextAction
             $corrected = $action->supersedeWith([
                 'type' => $data['type'],
                 'due_at' => CreateNextAction::resolveDueAt($data),
-                'assigned_to' => $data['assigned_to'] ?? $action->assigned_to,
+                'assigned_to' => $this->resolveAssignee($action, $data),
                 'state' => NextActionState::Pending->value,
                 'completed_at' => null,
             ], $reason);
@@ -48,5 +50,29 @@ class CorrectNextAction
 
             return $corrected;
         });
+    }
+
+    /**
+     * Who owns the corrected plan. Non-visit types keep the old assignee when
+     * the request leaves it blank. An IN-SITE plan must be held by a field
+     * agent: a blank assignee — or an inherited one who is not an agent (e.g. a
+     * call plan owned by a sales user corrected into an in-site visit) — routes
+     * the plan to the dispatch pool instead, never to a non-agent.
+     */
+    private function resolveAssignee(NextAction $action, array $data): ?int
+    {
+        $assignee = $data['assigned_to'] ?? $action->assigned_to;
+
+        if (($data['type'] ?? null) !== NextActionType::InSiteVisit->value) {
+            return $assignee !== null ? (int) $assignee : null;
+        }
+
+        if ($assignee === null) {
+            return null; // dispatch pool
+        }
+
+        $user = User::query()->with('role')->find($assignee);
+
+        return $user !== null && $user->isAgent() ? (int) $assignee : null;
     }
 }

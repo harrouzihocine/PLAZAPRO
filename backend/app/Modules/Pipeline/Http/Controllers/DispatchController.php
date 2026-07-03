@@ -41,6 +41,10 @@ class DispatchController extends Controller
         // so the dispatcher sees WHERE to send someone before assigning.
         $pending = NextAction::query()->active()->pending()
             ->where('type', NextActionType::InSiteVisit->value)
+            // In-site plans always live on a project (SyncVisitFromNextAction
+            // enforces it); the filter also shields the mapper from any legacy
+            // client-subject row.
+            ->where('subject_type', 'client_project')
             ->whereNull('assigned_to')
             // Morph-aware: only a project subject nests a client + shortlist.
             ->with(['subject' => fn (MorphTo $m) => $m->morphWith([ClientProject::class => [
@@ -76,7 +80,7 @@ class DispatchController extends Controller
         $visits = Visit::query()->active()
             ->whereBetween('scheduled_at', [$start, $end])
             ->whereNotNull('agent_id')
-            ->with(['client:id,first_name,last_name', 'unit.location', 'clientProject:id,client_id'])
+            ->with(['client:id,first_name,last_name', 'unit.location'])
             ->orderBy('scheduled_at')
             ->get()
             ->map(fn (Visit $v) => [
@@ -92,9 +96,7 @@ class DispatchController extends Controller
                 'client' => $v->client?->full_name,
                 'unit' => $v->unit?->reference,
                 'location' => $v->unit?->location?->name,
-                'maps_url' => $v->unit?->location?->latitude !== null && $v->unit?->location?->longitude !== null
-                    ? sprintf('https://www.google.com/maps/search/?api=1&query=%s,%s', $v->unit->location->latitude, $v->unit->location->longitude)
-                    : null,
+                'maps_url' => $v->unit?->location?->mapsUrl(),
                 'link' => $v->client_project_id
                     ? '/clients/'.$v->client_id.'/projects/'.$v->client_project_id
                     : ($v->client_id ? '/clients/'.$v->client_id : null),
@@ -172,9 +174,7 @@ class DispatchController extends Controller
             ->unique('id')
             ->map(fn ($loc) => [
                 'name' => $loc->name,
-                'maps_url' => $loc->latitude !== null && $loc->longitude !== null
-                    ? sprintf('https://www.google.com/maps/search/?api=1&query=%s,%s', $loc->latitude, $loc->longitude)
-                    : null,
+                'maps_url' => $loc->mapsUrl(),
             ])
             ->values()
             ->all();

@@ -10,6 +10,7 @@ export const useAuditStore = defineStore('audit', {
   state: () => ({
     items: [],
     meta: {},
+    _fetchTicket: 0, // stale-response guard for auto-applied filters
     filters: { user_id: '', action: '', subject_type: '', from: '', to: '' },
     page: 1,
     loading: false,
@@ -32,15 +33,20 @@ export const useAuditStore = defineStore('audit', {
     async fetch() {
       this.loading = true
       this.error = ''
+      // Filters auto-apply (useAutoFilter): tag the request so a slower, older
+      // response can never overwrite a newer one.
+      const ticket = ++this._fetchTicket
       try {
         const { items, meta } = await auditApi.list({ ...this.activeParams, page: this.page })
+        if (ticket !== this._fetchTicket) return
         this.items = items
         this.meta = meta
       } catch (e) {
+        if (ticket !== this._fetchTicket) return
         this.error = e.response?.data?.message ?? 'Could not load the audit feed.'
         toastError(this.error)
       } finally {
-        this.loading = false
+        if (ticket === this._fetchTicket) this.loading = false
       }
     },
 

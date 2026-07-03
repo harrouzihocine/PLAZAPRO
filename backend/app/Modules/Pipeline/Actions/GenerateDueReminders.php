@@ -23,6 +23,12 @@ class GenerateDueReminders
         NextAction::query()
             ->active()
             ->overdue()
+            // Unassigned plans sit in the dispatch pool — there is nobody to
+            // remind yet, and a reminder "sent" to nobody would consume the
+            // one-live-reminder slot forever (whereDoesntHave below). The
+            // dispatchers were already notified (InSiteDispatchRequested);
+            // the reminder generates once an agent is assigned.
+            ->whereNotNull('assigned_to')
             ->whereDoesntHave('reminders', fn ($q) => $q->whereIn('state', [
                 ReminderState::Pending->value,
                 ReminderState::Sent->value,

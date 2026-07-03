@@ -80,7 +80,9 @@ class InteractionTest extends TestCase
     {
         $client = Client::factory()->create();
         $agent = $this->agent();
-        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+        // view_all: this test exercises the planning mechanics, not visibility
+        // (ReviewRegressionTest covers the visibility rule).
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.view_all', 'calls.log']));
 
         // A call closed its thread; the plan arrives later, standalone.
         $this->postJson("/api/v1/clients/{$client->id}/calls", ['direction' => 'outbound'])->assertCreated();
@@ -516,7 +518,9 @@ class InteractionTest extends TestCase
         $this->postJson("/api/v1/clients/{$client->id}/calls", ['direction' => 'outbound', 'next_action' => $this->nextActionPayload($agent)])->assertCreated();
         Visit::factory()->create(['client_id' => $client->id]);
 
-        Sanctum::actingAs($this->userWithPermissions(['clients.view']));
+        // view_all: the timeline follows client visibility (a scoped user 404s —
+        // covered in ReviewRegressionTest); here we test the payload shape.
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.view_all']));
         $this->getJson("/api/v1/clients/{$client->id}/timeline")
             ->assertOk()
             ->assertJsonCount(1, 'data.calls')

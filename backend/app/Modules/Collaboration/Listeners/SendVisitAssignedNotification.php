@@ -7,6 +7,7 @@ namespace App\Modules\Collaboration\Listeners;
 use App\Modules\Collaboration\Notifications\DomainNotification;
 use App\Modules\Collaboration\Support\NotificationLink;
 use App\Modules\Pipeline\Events\VisitAssigned;
+use App\Modules\Settings\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
 
 /**
@@ -18,7 +19,7 @@ class SendVisitAssignedNotification implements ShouldQueue
 {
     public function handle(VisitAssigned $event): void
     {
-        $visit = $event->visit->loadMissing(['agent', 'client', 'clientProject.creator', 'unit.location']);
+        $visit = $event->visit->loadMissing(['agent', 'client', 'clientProject', 'unit.location']);
         $agent = $visit->agent;
 
         if ($agent === null) {
@@ -56,10 +57,8 @@ class SendVisitAssignedNotification implements ShouldQueue
             return;
         }
 
-        $contributors = collect([$project->creator])
-            ->merge($project->viewers()->whereNull('client_project_viewers.hidden_at')->get())
-            ->filter()
-            ->unique('id')
+        $contributors = User::query()
+            ->findMany($project->contributorIds())
             ->reject(fn ($u) => $u->id === $agent->id);
 
         foreach ($contributors as $contributor) {

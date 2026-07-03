@@ -16,6 +16,7 @@ import CompleteVisitForm from '@/features/pipeline/components/CompleteVisitForm.
 import NextActionFields from '@/features/pipeline/components/NextActionFields.vue'
 import { useAuthStore } from '@/features/settings/store'
 import { useDynamicList } from '@/composables/useDynamicList'
+import { googleMapsUrl } from '@/features/inventory/googleMaps'
 import { formatDate, formatDateTime, humanize } from '@/utils/format'
 
 // The interaction timeline — scoped to ONE project when projectId is set (its
@@ -137,10 +138,7 @@ const isCancelled = (row) => row.status === 'cancelled'
 const checklistLabels = (ids) =>
   (ids ?? []).map((id) => officeChecklist.value.find((c) => c.id === id)?.label ?? `#${id}`)
 
-const mapsUrl = (visit) =>
-  visit.unit?.location?.latitude != null && visit.unit?.location?.longitude != null
-    ? `https://www.google.com/maps/search/?api=1&query=${visit.unit.location.latitude},${visit.unit.location.longitude}`
-    : null
+const mapsUrl = (visit) => googleMapsUrl(visit.unit?.location ?? {})
 
 // Draft identities for the two modal forms; ?resume=<key> (from the drafts
 // indicator) reopens the right modal with its draft restored.
@@ -156,7 +154,11 @@ onMounted(async () => {
   if (resume === callDraftKey.value) showCall.value = true
   if (String(resume).startsWith('complete-visit:')) {
     const id = Number(String(resume).split(':')[1])
-    const visit = store.timeline.visits.find((v) => v.id === id && !v.is_completed)
+    // Only a LIVE visit may be completed — the payload now includes cancelled
+    // (superseded / returned-to-pool) versions, which are history, not work.
+    const visit = store.timeline.visits.find(
+      (v) => v.id === id && v.status === 'active' && !v.is_completed,
+    )
     if (visit) completing.value = visit
   }
 })

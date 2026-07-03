@@ -37,6 +37,20 @@ class Location extends BaseModel
         ]);
     }
 
+    /**
+     * The site's Google Maps deep link (null without coordinates) — THE single
+     * backend builder; the frontend twin is googleMapsUrl() in
+     * frontend/src/features/inventory/googleMaps.js.
+     */
+    public function mapsUrl(): ?string
+    {
+        if ($this->latitude === null || $this->longitude === null) {
+            return null;
+        }
+
+        return sprintf('https://www.google.com/maps/search/?api=1&query=%s,%s', $this->latitude, $this->longitude);
+    }
+
     public function wilaya(): BelongsTo
     {
         return $this->belongsTo(Wilaya::class);
