@@ -11,9 +11,10 @@ use Illuminate\Foundation\Http\FormRequest;
 class SendMessageRequest extends FormRequest
 {
     /**
-     * Authorised only for participants of this conversation. The participant
-     * check is a plain boolean (not a Gate call), so the super-admin Gate::before
-     * shortcut cannot widen it — a non-participant admin is still refused.
+     * Authorised for participants — and, on project chats, for holders of
+     * chat.participate_project_chats (isWritableBy). The check is a plain
+     * boolean (not a Gate call on the conversation), so the super-admin
+     * Gate::before shortcut cannot widen participation in direct/group chats.
      */
     public function authorize(): bool
     {
@@ -21,7 +22,7 @@ class SendMessageRequest extends FormRequest
 
         return $conversation instanceof Conversation
             && (bool) $this->user()?->can('chat.use')
-            && $conversation->hasParticipant($this->user());
+            && $conversation->isWritableBy($this->user());
     }
 
     /**

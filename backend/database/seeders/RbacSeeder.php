@@ -58,9 +58,13 @@ class RbacSeeder extends Seeder
         // Payments
         'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
         // Collaboration & analytics
-        // chat.view_project_chats: oversight — read ANY client-project chat
-        // without being a contributor (writing still requires joining).
-        'chat.use', 'chat.view_project_chats', 'notifications.view', 'dashboard.view', 'reports.view',
+        // Project-chat oversight, two levels (neither touches direct/group chats):
+        //  - chat.view_project_chats: READ any client-project chat without being
+        //    a contributor;
+        //  - chat.participate_project_chats: read AND write in any project chat
+        //    (implies view).
+        'chat.use', 'chat.view_project_chats', 'chat.participate_project_chats',
+        'notifications.view', 'dashboard.view', 'reports.view',
     ];
 
     /**
@@ -120,9 +124,11 @@ class RbacSeeder extends Seeder
         ];
 
         // Every rapport type + all analytics reports + operational oversight
-        // (incl. reading any project chat without being a contributor).
+        // (incl. reading AND writing in any project chat without being a
+        // contributor — untick participate to fall back to read-only view).
         $manager = [
-            ...$this->baseline, ...$fullVisibility, 'reports.view', 'chat.view_project_chats',
+            ...$this->baseline, ...$fullVisibility, 'reports.view',
+            'chat.view_project_chats', 'chat.participate_project_chats',
             'clients.view', 'clients.create', 'clients.manage', 'projects.contributors',
             'calls.log', 'visits.assign', 'visits.dispatch', 'visits.conduct', 'tasks.manage', 'deals.direct',
             'units.view', 'units.reserve', 'units.manage', 'media.manage',

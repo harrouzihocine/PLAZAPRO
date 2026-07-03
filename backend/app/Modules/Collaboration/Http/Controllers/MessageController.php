@@ -58,7 +58,9 @@ class MessageController extends Controller
         $user = $request->user();
         $conversation = $message->conversation;
 
-        abort_unless($conversation->hasParticipant($user), 403);
+        // Write-scoped (a participate-overseer may redact their OWN message);
+        // beyond your own, only a conversation admin redacts.
+        abort_unless($conversation->isWritableBy($user), 403);
         abort_unless($message->user_id === $user->id || $conversation->isAdmin($user), 403);
 
         $reason = (string) $request->input('reason', 'Message deleted');

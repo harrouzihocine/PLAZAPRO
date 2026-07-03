@@ -12,10 +12,11 @@ use Illuminate\Validation\Rule;
 class ShareRecordRequest extends FormRequest
 {
     /**
-     * A participant may share, but only a record they themselves can view — you
-     * cannot leak a record into a chat that you have no access to. Both checks are
-     * plain booleans (not Gate on the conversation), so the super-admin shortcut
-     * cannot widen participation.
+     * A writer (participant, or participate-overseer on a project chat) may
+     * share, but only a record they themselves can view — you cannot leak a
+     * record into a chat that you have no access to. The conversation check is
+     * a plain boolean (not Gate on the conversation), so the super-admin
+     * shortcut cannot widen participation in direct/group chats.
      */
     public function authorize(): bool
     {
@@ -24,7 +25,7 @@ class ShareRecordRequest extends FormRequest
 
         return $conversation instanceof Conversation
             && (bool) $this->user()?->can('chat.use')
-            && $conversation->hasParticipant($this->user())
+            && $conversation->isWritableBy($this->user())
             && $permission !== null
             && (bool) $this->user()?->can($permission);
     }

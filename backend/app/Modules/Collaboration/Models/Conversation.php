@@ -78,15 +78,27 @@ class Conversation extends BaseModel
     }
 
     /**
-     * Read access: participants always; holders of chat.view_project_chats may
-     * additionally READ any client-project chat (oversight) without being a
-     * contributor. Writing stays participant-only everywhere — an overseer who
-     * wants to talk joins the project as a contributor.
+     * Read access: participants always; on client-project chats, holders of the
+     * oversight grants may additionally read without being a contributor —
+     * chat.view_project_chats (read-only) or chat.participate_project_chats
+     * (read + write). Direct/group chats stay strictly participant-only.
      */
     public function isReadableBy(User $user): bool
     {
         return $this->hasParticipant($user)
-            || ($this->type === ConversationType::Project && $user->can('chat.view_project_chats'));
+            || ($this->type === ConversationType::Project
+                && ($user->can('chat.view_project_chats') || $user->can('chat.participate_project_chats')));
+    }
+
+    /**
+     * Write access: participants always; on client-project chats also holders
+     * of chat.participate_project_chats (talk in any project chat without being
+     * a contributor). View-only overseers stay read-only.
+     */
+    public function isWritableBy(User $user): bool
+    {
+        return $this->hasParticipant($user)
+            || ($this->type === ConversationType::Project && $user->can('chat.participate_project_chats'));
     }
 
     public function isAdmin(User $user): bool

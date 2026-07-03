@@ -127,9 +127,29 @@ class ProjectChatTest extends TestCase
             ->assertJsonPath('data.can_post', true);
     }
 
-    public function test_oversight_permission_does_not_open_direct_or_group_chats(): void
+    public function test_participate_permission_reads_and_writes_project_chats(): void
     {
-        $overseer = $this->userWith(['chat.use', 'chat.view_project_chats']);
+        $creator = $this->userWith(['clients.view', 'clients.manage', 'chat.use']);
+        $participant = $this->userWith(['chat.use', 'chat.participate_project_chats']);
+        $client = Client::factory()->create();
+
+        Sanctum::actingAs($creator);
+        $projectId = $this->postJson("/api/v1/clients/{$client->id}/projects", [])->json('data.id');
+        $chat = $this->projectChat(ClientProject::findOrFail($projectId));
+
+        // Not a contributor, yet a full chat member by permission: reads AND writes.
+        Sanctum::actingAs($participant);
+        $this->getJson("/api/v1/conversations/{$chat->id}")
+            ->assertOk()
+            ->assertJsonPath('data.can_post', true);
+        $this->postJson("/api/v1/conversations/{$chat->id}/messages", ['body' => 'joining the thread'])
+            ->assertCreated()
+            ->assertJsonPath('data.body', 'joining the thread');
+    }
+
+    public function test_oversight_permissions_do_not_open_direct_or_group_chats(): void
+    {
+        $overseer = $this->userWith(['chat.use', 'chat.view_project_chats', 'chat.participate_project_chats']);
         $a = $this->userWith(['chat.use']);
         $b = $this->userWith(['chat.use']);
 
@@ -142,6 +162,8 @@ class ProjectChatTest extends TestCase
         Sanctum::actingAs($overseer);
         $this->getJson("/api/v1/conversations/{$direct->id}/messages")->assertForbidden();
         $this->getJson("/api/v1/conversations/{$direct->id}")->assertForbidden();
+        $this->postJson("/api/v1/conversations/{$direct->id}/messages", ['body' => 'intruding'])
+            ->assertForbidden();
     }
 
     public function test_without_the_permission_a_non_participant_cannot_read_a_project_chat(): void
