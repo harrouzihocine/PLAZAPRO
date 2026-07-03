@@ -7,6 +7,7 @@ namespace App\Modules\Collaboration\Actions;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Collaboration\Enums\ConversationType;
 use App\Modules\Collaboration\Models\Conversation;
+use App\Modules\Settings\Models\User;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -35,7 +36,7 @@ class EnsureProjectConversation
                     'title' => trim(($project->client?->full_name ?? 'Client')." · Project #{$project->id}"),
                     'subject_type' => $project->getMorphClass(),
                     'subject_id' => $project->id,
-                    'created_by' => $project->created_by,
+                    'created_by' => $this->ownerId($project),
                 ]);
             }
 
@@ -46,13 +47,26 @@ class EnsureProjectConversation
     }
 
     /**
+     * Who anchors the thread. Normally the project creator; legacy projects
+     * (pre-created_by) fall back to the client's sales agent, then to the
+     * oldest account (the seeded super-admin) — conversations.created_by is
+     * NOT NULL.
+     */
+    private function ownerId(ClientProject $project): int
+    {
+        return $project->created_by
+            ?? $project->client?->assigned_agent_id
+            ?? User::query()->orderBy('id')->value('id');
+    }
+
+    /**
      * Participants mirror the contributors exactly: the creator (admin) plus the
      * non-hidden viewers. Newly added contributors join (and can read the whole
      * history); hidden ones leave. Existing rows keep their joined_at.
      */
     private function syncParticipants(Conversation $conversation, ClientProject $project): void
     {
-        $contributorRoles = collect($project->created_by !== null ? [$project->created_by => 'admin'] : []);
+        $contributorRoles = collect([$this->ownerId($project) => 'admin']);
 
         foreach ($project->viewers()->whereNull('client_project_viewers.hidden_at')->pluck('users.id') as $viewerId) {
             $contributorRoles[$viewerId] ??= 'member';
