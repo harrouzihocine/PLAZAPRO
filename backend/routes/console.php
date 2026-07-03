@@ -19,5 +19,9 @@ Schedule::command('holds:expire')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('actions:mark-overdue')->hourly()->withoutOverlapping();
 Schedule::command('reminders:dispatch')->everyMinute()->withoutOverlapping();
 
+// Every morning: remind each user of the calls / visits / tasks that involve
+// them and are due today or tomorrow (repeats daily until completed).
+Schedule::command('reminders:upcoming-digest')->dailyAt('08:00')->withoutOverlapping();
+
 // Flip past-due, unpaid payment-schedule instalments to overdue (daily).
 Schedule::command('schedules:mark-overdue')->dailyAt('00:15')->withoutOverlapping();

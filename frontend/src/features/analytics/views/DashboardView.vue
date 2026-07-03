@@ -30,6 +30,19 @@ const firstName = computed(() => (auth.user?.name ?? '').split(' ')[0] || 'there
 
 const scopeLabel = computed(() => (data.value?.scope === 'agent' ? 'Your book' : 'Company-wide'))
 
+// "My upcoming": personal work in the next 7 days, one card per type — calls,
+// office visits, in-site visits and tasks are never mixed together.
+const UPCOMING_GROUPS = [
+  { key: 'calls', label: 'Calls', icon: 'pi pi-phone' },
+  { key: 'office_visits', label: 'Office visits', icon: 'pi pi-building' },
+  { key: 'in_site_visits', label: 'In-site visits', icon: 'pi pi-map-marker' },
+  { key: 'tasks', label: 'Tasks', icon: 'pi pi-check-square' },
+]
+const myUpcoming = computed(() =>
+  UPCOMING_GROUPS.map((g) => ({ ...g, items: data.value?.my_upcoming?.[g.key] ?? [] })),
+)
+const hasUpcoming = computed(() => myUpcoming.value.some((g) => g.items.length))
+
 // Pipeline funnel in its natural order. Bars are one hue (magnitude of one
 // measure); stage identity lives in the labeled tag, never in bar colour.
 const STAGE_ORDER = ['lead', 'negotiating', 'reserved', 'won', 'lost']
@@ -117,6 +130,58 @@ onMounted(async () => {
           :loading="loading"
         />
       </div>
+
+      <!-- My upcoming — personal, per type, soonest first. -->
+      <SectionCard v-if="hasUpcoming" title="My upcoming (7 days)" icon="pi pi-calendar">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div
+            v-for="g in myUpcoming"
+            :key="g.key"
+            class="rounded-xl border border-line p-3"
+          >
+            <p class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-mute">
+              <i :class="g.icon" aria-hidden="true" />
+              {{ g.label }}
+              <span class="num ml-auto rounded-full bg-surface-100 px-2 py-0.5 text-ink dark:bg-surface-800">
+                {{ g.items.length }}
+              </span>
+            </p>
+            <p v-if="!g.items.length" class="py-2 text-sm text-mute">Nothing planned.</p>
+            <ul v-else class="space-y-1.5">
+              <li v-for="item in g.items.slice(0, 5)" :key="item.id">
+                <RouterLink
+                  :to="item.link ?? '/'"
+                  class="block rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-surface-50 dark:hover:bg-surface-800"
+                >
+                  <span class="block truncate font-medium text-ink">
+                    {{ item.client ?? item.title ?? '—' }}
+                  </span>
+                  <span class="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs">
+                    <span class="num" :class="item.is_overdue ? 'font-semibold text-danger' : 'text-mute'">
+                      {{ formatDateTime(item.due_at) }}
+                    </span>
+                    <span v-if="item.unit" class="text-mute">· {{ item.unit }}</span>
+                    <span v-if="item.location" class="text-mute">· {{ item.location }}</span>
+                    <a
+                      v-if="item.maps_url"
+                      :href="item.maps_url"
+                      target="_blank"
+                      rel="noopener"
+                      class="text-primary-600 hover:underline dark:text-primary-400"
+                      @click.stop
+                    >
+                      <i class="pi pi-map text-[10px]" aria-hidden="true" /> Maps
+                    </a>
+                  </span>
+                </RouterLink>
+              </li>
+              <li v-if="g.items.length > 5" class="px-2 text-xs text-mute">
+                … and {{ g.items.length - 5 }} more
+              </li>
+            </ul>
+          </div>
+        </div>
+      </SectionCard>
 
       <div class="grid grid-cols-1 gap-5 xl:grid-cols-5">
         <!-- Pipeline funnel -->

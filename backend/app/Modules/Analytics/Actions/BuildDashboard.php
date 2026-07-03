@@ -7,6 +7,7 @@ namespace App\Modules\Analytics\Actions;
 use App\Modules\Clients\Models\Client;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Payments\Models\PaymentSchedule;
+use App\Modules\Pipeline\Actions\BuildUpcomingWork;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Settings\Models\User;
@@ -25,6 +26,8 @@ use Illuminate\Support\Facades\DB;
  */
 class BuildDashboard
 {
+    public function __construct(private BuildUpcomingWork $upcomingWork) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -67,6 +70,9 @@ class BuildDashboard
                 ],
             ],
             'deals_by_stage' => $this->dealsByStage($agentId),
+            // Personal for EVERY user (the role scope never widens it): what
+            // involves ME in the next 7 days, grouped per type — never mixed.
+            'my_upcoming' => $this->upcomingWork->handle($user, now()->addDays(7)),
             'upcoming_visits' => (clone $upcomingVisits)
                 ->with(['client:id,first_name,last_name', 'unit:id,reference'])
                 ->orderBy('scheduled_at')

@@ -8,6 +8,7 @@ use App\Modules\Inventory\Console\ExpireHolds;
 use App\Modules\Payments\Console\MarkSchedulesOverdueCommand;
 use App\Modules\Pipeline\Console\DispatchReminders;
 use App\Modules\Pipeline\Console\MarkActionsOverdue;
+use App\Modules\Pipeline\Console\SendUpcomingDigest;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -30,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
         DispatchReminders::class,
         MarkSchedulesOverdueCommand::class,
         BackfillProjectChats::class,
+        SendUpcomingDigest::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         // Sanctum SPA (cookie) auth for the first-party frontend.
