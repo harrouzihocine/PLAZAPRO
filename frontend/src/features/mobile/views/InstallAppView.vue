@@ -1,0 +1,112 @@
+<script setup>
+import BaseButton from '@/components/base/BaseButton.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import SectionCard from '@/components/ui/SectionCard.vue'
+import { useInstallPrompt } from '@/composables/useInstallPrompt'
+
+// The "Mobile App" page every user can open from the navbar: installs PLAZA PRO
+// on the phone's home screen (same app, same login, fullscreen — no browser bar).
+// Android/desktop Chromium get a real one-tap install; iOS shows the manual
+// Add-to-Home-Screen steps Safari requires.
+const { canInstall, installed, isStandalone, isIOS, promptInstall } = useInstallPrompt()
+
+const appUrl = window.location.origin
+</script>
+
+<template>
+  <div>
+    <PageHeader
+      title="Mobile App"
+      subtitle="Install PLAZA PRO on your phone — same account, same features, opens fullscreen like a native app."
+    />
+
+    <div class="mx-auto max-w-2xl space-y-5">
+      <!-- Brand hero -->
+      <SectionCard>
+        <div class="flex items-center gap-4">
+          <img
+            src="/icons/icon-192.png"
+            alt="PLAZA PRO app icon"
+            class="h-16 w-16 rounded-2xl shadow-card"
+          />
+          <div>
+            <div class="text-base font-semibold text-ink">PLAZA PRO</div>
+            <div class="text-sm text-mute">
+              Works on iOS and Android. Updates automatically — you will always have the
+              latest version, no re-download needed.
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
+      <!-- Already installed -->
+      <SectionCard v-if="isStandalone || installed" title="Installed" icon="pi pi-check-circle">
+        <p class="text-sm text-ink">
+          You are using the installed app — nothing more to do. The icon is on your home
+          screen and stays signed in like the website.
+        </p>
+      </SectionCard>
+
+      <!-- Android / desktop: native one-tap install -->
+      <SectionCard v-else-if="canInstall" title="Install now" icon="pi pi-download">
+        <p class="mb-4 text-sm text-mute">
+          One tap adds PLAZA PRO to your home screen and opens it fullscreen.
+        </p>
+        <BaseButton label="Install PLAZA PRO" icon="pi pi-mobile" @click="promptInstall" />
+      </SectionCard>
+
+      <!-- iOS: Safari's manual flow -->
+      <SectionCard v-else-if="isIOS" title="Install on iPhone / iPad" icon="pi pi-apple">
+        <ol class="list-inside list-decimal space-y-2 text-sm text-ink">
+          <li>Open <span class="font-medium">{{ appUrl }}</span> in <span class="font-medium">Safari</span> (not Chrome).</li>
+          <li>Tap the <span class="font-medium">Share</span> button <i class="pi pi-upload text-mute" aria-hidden="true" /> in the toolbar.</li>
+          <li>Scroll and tap <span class="font-medium">"Add to Home Screen"</span>.</li>
+          <li>Tap <span class="font-medium">Add</span> — the PLAZA PRO icon appears on your home screen.</li>
+        </ol>
+      </SectionCard>
+
+      <!-- Fallback: browser without the install event (e.g. Firefox desktop) -->
+      <SectionCard v-else title="Install on your phone" icon="pi pi-mobile">
+        <div class="space-y-4 text-sm text-ink">
+          <div>
+            <div class="mb-1 font-medium">Android (Chrome)</div>
+            <p class="text-mute">
+              Open <span class="font-medium text-ink">{{ appUrl }}</span> in Chrome → menu
+              <i class="pi pi-ellipsis-v text-xs" aria-hidden="true" /> →
+              <span class="font-medium text-ink">"Add to Home screen"</span> → Install.
+            </p>
+          </div>
+          <div>
+            <div class="mb-1 font-medium">iPhone / iPad (Safari)</div>
+            <p class="text-mute">
+              Open <span class="font-medium text-ink">{{ appUrl }}</span> in Safari → Share →
+              <span class="font-medium text-ink">"Add to Home Screen"</span> → Add.
+            </p>
+          </div>
+        </div>
+      </SectionCard>
+
+      <!-- What you get -->
+      <SectionCard title="What you get" icon="pi pi-sparkles">
+        <ul class="space-y-2 text-sm text-mute">
+          <li class="flex items-start gap-2">
+            <i class="pi pi-check mt-0.5 text-primary" aria-hidden="true" />
+            <span>Everything from the web app: clients, inventory, deals, payments, chat.</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="pi pi-check mt-0.5 text-primary" aria-hidden="true" />
+            <span>Live notifications and chat while the app is open.</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="pi pi-check mt-0.5 text-primary" aria-hidden="true" />
+            <span>Fullscreen, its own icon and switcher entry — no browser bar.</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="pi pi-check mt-0.5 text-primary" aria-hidden="true" />
+            <span>Works in the office and outside — one address, secure HTTPS.</span>
+          </li>
+        </ul>
+      </SectionCard>
+    </div>
+  </div>
+</template>

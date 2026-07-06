@@ -168,6 +168,8 @@ const SECTIONS = [
     label: 'System',
     items: [
       { to: '/settings', label: 'Settings', icon: 'pi pi-cog', permission: 'settings.manage' },
+      // No permission: every user gets the install-the-app page.
+      { to: '/install', label: 'Mobile App', icon: 'pi pi-mobile' },
     ],
   },
 ]

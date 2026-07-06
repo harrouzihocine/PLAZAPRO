@@ -130,6 +130,12 @@ const routes = [
         meta: { permission: 'audit.view' },
       },
       {
+        // Install-the-mobile-app page — open to every authed user (no permission).
+        path: 'install',
+        name: 'install',
+        component: () => import('@/features/mobile/views/InstallAppView.vue'),
+      },
+      {
         path: 'oversight/duplicates',
         name: 'oversight.duplicates',
         component: () => import('@/features/oversight/views/DuplicateRequestsView.vue'),

@@ -29,3 +29,13 @@ app.use(PrimeVue, {
 app.directive('tooltip', Tooltip)
 
 app.mount('#app')
+
+// Installable app (PWA): register the service worker in production builds only —
+// the Vite dev server doesn't ship /sw.js, and caching would fight HMR anyway.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // Registration failing (old browser, private mode) must never break the app.
+    })
+  })
+}
