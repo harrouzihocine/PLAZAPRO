@@ -8,6 +8,7 @@ use App\Modules\Clients\Enums\ShortlistState;
 use App\Modules\Clients\Models\Client;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Clients\Models\Deal;
+use App\Modules\Clients\Models\DealItem;
 use App\Modules\Clients\Models\ShortlistItem;
 use App\Modules\Inventory\Models\Box;
 use App\Modules\Inventory\Models\Location;
@@ -37,15 +38,20 @@ class DealTest extends TestCase
         return User::factory()->create(['role_id' => $role->id]);
     }
 
+    // projects.view_all makes the acting user able to SEE the project — required
+    // to open/edit a deal on it (StoreDealRequest / SyncDealBoxesRequest). In the
+    // real flow the deal-opener reaches the project via a visit/call log they are
+    // part of; here the actor is created independently, so grant the oversight
+    // read that stands in for that relationship.
     private function agent(): User
     {
-        return $this->userWithPermissions(['clients.view', 'visits.conduct']);
+        return $this->userWithPermissions(['clients.view', 'visits.conduct', 'projects.view_all']);
     }
 
     private function manager(): User
     {
         return $this->userWithPermissions([
-            'clients.view', 'deals.manage', 'visits.conduct', 'deals.direct',
+            'clients.view', 'deals.manage', 'visits.conduct', 'deals.direct', 'projects.view_all',
         ]);
     }
 
@@ -110,6 +116,70 @@ class DealTest extends TestCase
 
         // The project sits at the reserved step.
         $this->assertSame('reserved', $project->fresh()->stage->value);
+    }
+
+    public function test_opening_a_deal_requires_visibility_of_the_project(): void
+    {
+        // An agent who can conduct visits but has NO visibility of the project
+        // (not its creator, not a viewer, not the client's owner, no view_all)
+        // cannot open a deal on it by guessing the project id (SEC-1 / IDOR).
+        [$project, $visit, $unit] = $this->projectWithVisitAndUnit();
+        $outsider = $this->userWithPermissions(['clients.view', 'visits.conduct']);
+        Sanctum::actingAs($outsider);
+
+        $this->postJson("/api/v1/projects/{$project->id}/deals", [
+            'visit_id' => $visit->id,
+            'units' => [['unit_id' => $unit->id]],
+        ])->assertForbidden();
+
+        // Nothing was reserved — the unit is untouched.
+        $this->assertSame('available', $unit->fresh()->sale_status->value);
+        $this->assertSame(0, $project->deals()->count());
+    }
+
+    public function test_a_unit_already_sold_cannot_be_won_a_second_time(): void
+    {
+        // Two projects hold the same unit as backups; once one wins it (sold),
+        // winning it on the other deal is refused rather than double-selling it
+        // (DB-1 — the close path re-checks the locked unit).
+        [$projectA, $visitA, $unit] = $this->projectWithVisitAndUnit();
+        $client = Client::factory()->create();
+        $projectB = ClientProject::factory()->create(['client_id' => $client->id]);
+        ShortlistItem::factory()->create([
+            'client_project_id' => $projectB->id,
+            'shortlistable_id' => $unit->id,
+            'state' => ShortlistState::VisitedInterested->value,
+        ]);
+        $visitB = Visit::factory()->completed()->create([
+            'client_id' => $client->id, 'client_project_id' => $projectB->id,
+        ]);
+
+        Sanctum::actingAs($this->manager());
+
+        $dealA = $this->postJson("/api/v1/projects/{$projectA->id}/deals", [
+            'visit_id' => $visitA->id, 'units' => [['unit_id' => $unit->id]],
+        ])->assertCreated()->json('data');
+        $dealB = $this->postJson("/api/v1/projects/{$projectB->id}/deals", [
+            'visit_id' => $visitB->id, 'units' => [['unit_id' => $unit->id]],
+        ])->assertCreated()->json('data');
+
+        // A wins the unit → sold.
+        $this->postJson("/api/v1/deals/{$dealA['id']}/items/{$dealA['units'][0]['item_id']}/close", [
+            'outcome' => 'won', 'agreed_price' => '500000.00',
+        ])->assertOk();
+        $this->assertSame('sold', $unit->fresh()->sale_status->value);
+
+        // B can no longer win the same unit.
+        $this->postJson("/api/v1/deals/{$dealB['id']}/items/{$dealB['units'][0]['item_id']}/close", [
+            'outcome' => 'won', 'agreed_price' => '500000.00',
+        ])->assertStatus(422);
+
+        // Still exactly one won apartment on this unit.
+        $this->assertSame(
+            1,
+            DealItem::query()
+                ->where('unit_id', $unit->id)->where('state', 'won')->count(),
+        );
     }
 
     public function test_a_deal_on_the_first_ever_call_ensures_the_project(): void

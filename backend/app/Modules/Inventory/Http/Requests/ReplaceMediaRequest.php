@@ -22,7 +22,8 @@ class ReplaceMediaRequest extends FormRequest
         return [
             'file' => [
                 'required', 'file',
-                'max:'.(200 * 1024),
+                // Ceiling from config/media.php — see the Cloudflare edge-cap note there.
+                'max:'.(int) config('media.max_upload_kb', 200 * 1024),
                 'mimetypes:'.implode(',', MediaType::allowedMimes()),
             ],
         ];

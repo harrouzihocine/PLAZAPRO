@@ -50,9 +50,13 @@ return [
     | considered expired. This will override any values set in the token's
     | "expires_at" attribute, but first-party sessions are not affected.
     |
+    | Bounded by default (30 days) so a mobile personal-access token can't live
+    | forever — a lost device's token stops working even if it is never revoked.
+    | The SPA is unaffected (it uses first-party cookie sessions, not tokens).
+    |
     */
 
-    'expiration' => null,
+    'expiration' => env('SANCTUM_TOKEN_EXPIRATION', 60 * 24 * 30),
 
     /*
     |--------------------------------------------------------------------------

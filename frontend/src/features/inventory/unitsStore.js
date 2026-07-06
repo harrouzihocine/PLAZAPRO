@@ -9,6 +9,9 @@ export const useUnitsStore = defineStore('units', {
   state: () => ({
     items: [],
     current: null, // the unit open on its detail page
+    page: 1, // current page (global browse, server-side pagination)
+    rows: 25, // page size
+    total: 0, // total matching rows (drives the paginator)
     _fetchTicket: 0, // stale-response guard for auto-applied filters
     loading: false,
     saving: false,
@@ -44,19 +47,38 @@ export const useUnitsStore = defineStore('units', {
             params[k] = v
           }
         }
-        const items = await unitsApi.list(params)
+        const { items, total } = await unitsApi.listPaged({
+          ...params,
+          page: this.page,
+          per_page: this.rows,
+        })
         if (ticket !== this._fetchTicket) return
         this.scope = null
         this.items = items
+        this.total = total
       } finally {
         if (ticket === this._fetchTicket) this.loading = false
       }
+    },
+
+    // Jump to a page (global browse paginator) and reload.
+    goToPage({ page, rows }) {
+      this.page = page
+      this.rows = rows
+      return this.fetch()
+    },
+
+    // A filter changed: go back to page 1, then reload.
+    applyFilters() {
+      this.page = 1
+      return this.fetch()
     },
 
     async fetchForLocation(locationId) {
       this.loading = true
       try {
         this.scope = locationId
+        // A location is bounded — the endpoint returns the whole set (no page).
         this.items = await unitsApi.list({ location_id: locationId })
       } finally {
         this.loading = false

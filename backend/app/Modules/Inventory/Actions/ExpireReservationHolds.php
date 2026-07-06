@@ -7,12 +7,15 @@ namespace App\Modules\Inventory\Actions;
 use App\Modules\Inventory\Enums\HoldStatus;
 use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Models\Reservation;
+use App\Modules\Inventory\Models\Unit;
 use Illuminate\Support\Facades\DB;
 
 /**
  * The scheduled sweeper: every active hold whose expires_at has passed is flipped
- * to expired and its unit returned to available. Runs on the queue/scheduler.
- * Returns the number of holds expired.
+ * to expired and its unit returned to the market — reserved if other projects
+ * still hold it as backups, else available (an On Hold lock held by a different
+ * project is left untouched). No-expiry deal holds are never swept. Runs on the
+ * queue/scheduler. Returns the number of holds expired.
  */
 class ExpireReservationHolds
 {
@@ -23,14 +26,27 @@ class ExpireReservationHolds
         Reservation::query()
             ->activeHold()
             ->where('expires_at', '<=', now())
-            ->with('unit')
             ->chunkById(200, function ($reservations) use (&$expired) {
                 foreach ($reservations as $reservation) {
                     DB::transaction(function () use ($reservation) {
+                        // Lock the unit so concurrent backups expiring together
+                        // resolve the status once, not race to Available.
+                        $unit = Unit::whereKey($reservation->unit_id)->lockForUpdate()->first();
+
                         $reservation->update(['hold_status' => HoldStatus::Expired->value]);
-                        // Only return the unit if it is still reserved by this hold.
-                        if ($reservation->unit && $reservation->unit->sale_status === SaleStatus::Reserved) {
-                            $reservation->unit->update(['sale_status' => SaleStatus::Available->value]);
+
+                        if ($unit === null || $unit->sale_status === SaleStatus::Sold) {
+                            return;
+                        }
+
+                        // Back to the market — reserved if OTHER projects still
+                        // hold it as backups, else available (revertToMarket
+                        // re-checks live holds). Never lift an On Hold lock held
+                        // by a different project.
+                        $heldByAnother = $unit->sale_status === SaleStatus::OnHold
+                            && (int) $unit->onhold_project_id !== (int) $reservation->client_project_id;
+                        if (! $heldByAnother) {
+                            $unit->revertToMarket();
                         }
                     });
                     $expired++;

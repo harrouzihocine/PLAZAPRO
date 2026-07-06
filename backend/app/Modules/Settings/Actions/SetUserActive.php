@@ -30,6 +30,13 @@ class SetUserActive
 
         $user->update(['is_active' => $active]);
 
+        // Deactivating revokes access immediately: drop every API token so a
+        // mobile client can't keep using a bearer token (the SPA session is
+        // rejected on its next request by EnsureUserActive).
+        if (! $active) {
+            $user->tokens()->delete();
+        }
+
         return $user->fresh(['role', 'department']);
     }
 }

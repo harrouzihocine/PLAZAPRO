@@ -37,7 +37,7 @@ x-php-base: &php-base
 
 services:
   nginx:
-    image: nginx:alpine
+    image: nginx:1.27-alpine
     # The ONLY published port. Office LAN access + local smoke tests; internet
     # traffic arrives through the cloudflared tunnel on the docker network.
     ports: ["${APP_PORT:-80}:80"]
@@ -59,7 +59,7 @@ services:
       start_period: 30s
 
   cloudflared: # outbound-only HTTPS tunnel — the public entry point
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2024.10.0
     command: tunnel --no-autoupdate run
     environment:
       # Required when the "tunnel" profile is active (see docs/production-runbook.md).
@@ -111,7 +111,9 @@ services:
       redis: { condition: service_healthy }
 
   mysql:
-    image: mysql:8
+    # Pinned to the 8.0 series to match the existing db-data volume — do NOT
+    # jump to 8.4 without a planned in-place upgrade + tested restore.
+    image: mysql:8.0
     # No ports: — unreachable from the host network entirely.
     command:
       - --innodb-buffer-pool-size=2G
@@ -135,7 +137,7 @@ services:
       retries: 5
 
   redis:
-    image: redis:alpine
+    image: redis:7.4-alpine
     # AOF (everysec): queued jobs survive a container restart, not just snapshots.
     command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes"]
     environment:

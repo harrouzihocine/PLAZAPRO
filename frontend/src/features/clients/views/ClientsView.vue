@@ -38,8 +38,17 @@ const editing = ref(null) // null = creating
 
 onMounted(() => store.fetch())
 
-// Filters apply themselves as they change — no "Filter" button.
-useAutoFilter(() => store.filters, () => store.fetch())
+// Filters apply themselves as they change — no "Filter" button. A filter change
+// resets to page 1 (results shrink/shift, so the old page number is meaningless).
+useAutoFilter(
+  () => store.filters,
+  () => store.applyFilters(),
+)
+
+// Server-side paginator: load the requested page from the API.
+function onPage(e) {
+  store.goToPage({ page: e.page + 1, rows: e.rows })
+}
 
 function openCreate() {
   editing.value = null
@@ -148,11 +157,15 @@ function openFile(event) {
       <DataTable
         :value="store.items"
         :loading="store.loading"
+        lazy
         paginator
-        :rows="25"
+        :rows="store.rows"
+        :first="(store.page - 1) * store.rows"
+        :total-records="store.total"
         :rows-per-page-options="[25, 50, 100]"
         data-key="id"
         class="cursor-pointer"
+        @page="onPage"
         @row-click="openFile"
       >
         <template #empty>
@@ -189,7 +202,12 @@ function openFile(event) {
 
         <Column v-if="canSeeDetails" header="Source">
           <template #body="{ data }">
-            <Tag v-if="data.source" :icon="data.source.icon || undefined" :value="data.source.label" severity="secondary" />
+            <Tag
+              v-if="data.source"
+              :icon="data.source.icon || undefined"
+              :value="data.source.label"
+              severity="secondary"
+            />
             <span v-else class="text-mute">—</span>
           </template>
         </Column>

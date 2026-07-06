@@ -55,10 +55,18 @@ class UnitController extends Controller
             ->when($request->filled('max_area'), fn ($q) => $q->where('area_sqm', '<=', $request->query('max_area')))
             // Highest GTM priority first so the vente team sees what to push on top.
             ->orderByRaw("FIELD(gtm_priority, 'critical', 'high', 'medium', 'low')")
-            ->orderBy('reference')
-            ->get();
+            ->orderBy('reference');
 
-        return UnitResource::collection($units);
+        // The global browse always sends ?page → server-paginated (per_page
+        // capped). Location-scoped reads (LocationDetailView / boxes) send no page
+        // and need the whole bounded set (one building), so return the full list —
+        // this keeps the lazy paginator correct even when the global browse is
+        // itself filtered by location.
+        return $request->filled('page')
+            ? UnitResource::collection(
+                $units->paginate(max(1, min((int) $request->query('per_page', 25), 100)))->withQueryString(),
+            )
+            : UnitResource::collection($units->get());
     }
 
     public function show(Unit $unit): UnitResource

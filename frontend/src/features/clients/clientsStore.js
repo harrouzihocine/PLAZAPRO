@@ -29,6 +29,9 @@ export const useClientsStore = defineStore('clients', {
     timeline: { calls: [], visits: [], next_actions: [], next_action_history: [] },
     timelineProjectId: null,
     filters: { assigned_agent_id: '', source_id: '', rating_id: '', search: '' },
+    page: 1, // current page (server-side pagination)
+    rows: 25, // page size
+    total: 0, // total matching rows (drives the paginator)
     _fetchTicket: 0, // stale-response guard for auto-applied filters
     loading: false,
     saving: false,
@@ -42,7 +45,7 @@ export const useClientsStore = defineStore('clients', {
       // a slower, older response can never overwrite a newer one.
       const ticket = ++this._fetchTicket
       try {
-        const params = {}
+        const params = { page: this.page, per_page: this.rows }
         for (const [k, v] of Object.entries(this.filters)) {
           if (v !== '' && v !== null) params[k] = v
         }
@@ -53,12 +56,26 @@ export const useClientsStore = defineStore('clients', {
           this.followUpAgents.length ? this.followUpAgents : followUpAgentsApi.list(),
         ])
         if (ticket !== this._fetchTicket) return // superseded by a newer fetch
-        this.items = clients
+        this.items = clients.items
+        this.total = clients.total
         this.agents = agents
         this.followUpAgents = followUpAgents
       } finally {
         if (ticket === this._fetchTicket) this.loading = false
       }
+    },
+
+    // Jump to a page (from the DataTable paginator) and reload.
+    goToPage({ page, rows }) {
+      this.page = page
+      this.rows = rows
+      return this.fetch()
+    },
+
+    // A filter changed: go back to page 1, then reload.
+    applyFilters() {
+      this.page = 1
+      return this.fetch()
     },
 
     async load(id) {
@@ -93,6 +110,8 @@ export const useClientsStore = defineStore('clients', {
       this.error = ''
       try {
         const result = await clientsApi.create(payload)
+        // Show the new client: it lands on page 1 (newest first).
+        this.page = 1
         await this.fetch()
         return result
       } catch (e) {

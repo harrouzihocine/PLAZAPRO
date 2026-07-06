@@ -56,7 +56,10 @@ class ClientController extends Controller
             // Newest clients first — a name is found via search, not by scanning.
             ->orderByDesc('created_at')
             ->orderByDesc('id')
-            ->get();
+            // Server-side pagination: the list grows unbounded, so never ship the
+            // whole table. per_page is capped so a client can't ask for everything.
+            ->paginate(max(1, min((int) $request->query('per_page', 25), 100)))
+            ->withQueryString();
 
         return ClientResource::collection($clients);
     }

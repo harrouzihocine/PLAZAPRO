@@ -27,6 +27,10 @@ class CancelUser
             'Only a super admin can remove a super admin.',
         );
 
+        // Revoke access immediately: drop every API token (the SPA session is
+        // rejected on its next request by EnsureUserActive).
+        $user->tokens()->delete();
+
         return $user->cancel($reason);
     }
 }

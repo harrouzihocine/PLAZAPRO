@@ -57,9 +57,17 @@ export const locationsApi = {
 // Units (apartments / lots). Created under a location; price/sale_status
 // corrections go through `correct` (cancel-and-duplicate versioning).
 export const unitsApi = {
+  // Full list — used location-scoped (bounded), returns just the array.
   async list(params = {}) {
     const { data } = await useApi().get('/units', { params })
     return data.data
+  },
+
+  // The unbounded global browse: server-paginated, returns the page + total for
+  // the lazy DataTable.
+  async listPaged(params = {}) {
+    const { data } = await useApi().get('/units', { params })
+    return { items: data.data, total: data.meta?.total ?? data.data.length }
   },
 
   async get(id) {

@@ -131,7 +131,10 @@ class Client extends BaseModel
             return $query->whereRaw('1 = 0');
         }
 
-        return $query->whereRaw("RIGHT(REGEXP_REPLACE(phone, '[^0-9]', ''), 9) = ?", [$nsn]);
+        // Exact match on the indexed, pre-normalized column (an index seek rather
+        // than a per-row RIGHT(REGEXP_REPLACE(phone)) scan). phone_nsn holds the
+        // same last-9-digits value this computes — see the add_phone_nsn migration.
+        return $query->where('phone_nsn', $nsn);
     }
 
     /**

@@ -24,7 +24,10 @@ class UploadMediaRequest extends FormRequest
         return [
             'file' => [
                 'required', 'file',
-                'max:'.(200 * 1024), // 200 MB ceiling (nginx client_max_body_size must match)
+                // Ceiling from config/media.php (default 200 MB; nginx +
+                // php must match). Cap it below Cloudflare's 100 MB edge limit via
+                // MEDIA_MAX_UPLOAD_KB when the tunnel is the primary upload path.
+                'max:'.(int) config('media.max_upload_kb', 200 * 1024),
                 // `mimetypes` validates the file's *detected* MIME (content-based),
                 // never the extension — per the security baseline.
                 'mimetypes:'.implode(',', MediaType::allowedMimes()),

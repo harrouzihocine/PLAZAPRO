@@ -81,8 +81,14 @@ watch(
 // Filters apply themselves as they change — no "Filter" button.
 useAutoFilter(
   () => units.filters,
-  () => units.fetch(),
+  // A filter change resets to page 1 (results shift, so the old page is moot).
+  () => units.applyFilters(),
 )
+
+// Server-side paginator: load the requested page from the API.
+function onPage(e) {
+  units.goToPage({ page: e.page + 1, rows: e.rows })
+}
 const statusOptions = [
   { value: 'available', label: 'Available' },
   { value: 'reserved', label: 'Reserved' },
@@ -293,11 +299,15 @@ async function removeUnit(u) {
       <DataTable
         :value="units.items"
         :loading="units.loading"
+        lazy
         paginator
-        :rows="25"
+        :rows="units.rows"
+        :first="(units.page - 1) * units.rows"
+        :total-records="units.total"
         :rows-per-page-options="[25, 50, 100]"
         data-key="id"
         class="cursor-pointer"
+        @page="onPage"
         @row-click="openUnit"
       >
         <template #empty>

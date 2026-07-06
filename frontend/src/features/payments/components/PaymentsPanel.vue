@@ -37,6 +37,10 @@ const versements = ref([])
 const meta = ref({})
 const loading = ref(false)
 
+// Guards double-submit on the financial writes: each button binds :loading +
+// :disabled to its flag, so a double-click can't record two versements.
+const submitting = reactive({ record: false, schedule: false, correct: false })
+
 async function load() {
   loading.value = true
   try {
@@ -75,12 +79,16 @@ function openBuilder() {
     : [{ due_date: '', amount: '' }]
 }
 async function saveSchedule() {
+  if (submitting.schedule) return
+  submitting.schedule = true
   try {
     await scheduleApi.save(props.projectId, builder.rows, props.unitId)
     builder.open = false
     await load()
   } catch (e) {
     toastError(e.response?.data?.message ?? 'Could not save the schedule.')
+  } finally {
+    submitting.schedule = false
   }
 }
 
@@ -104,6 +112,8 @@ function resetRecord() {
   })
 }
 async function recordPayment() {
+  if (submitting.record) return
+  submitting.record = true
   try {
     const payload = {
       unit_id: props.unitId || null,
@@ -118,6 +128,8 @@ async function recordPayment() {
     await load()
   } catch (e) {
     toastError(e.response?.data?.message ?? 'Could not record the payment.')
+  } finally {
+    submitting.record = false
   }
 }
 
@@ -141,6 +153,8 @@ function startCorrect(v) {
   })
 }
 async function submitCorrect() {
+  if (submitting.correct) return
+  submitting.correct = true
   try {
     await versementsApi.correct(correctForm.id, {
       amount: correctForm.amount,
@@ -153,6 +167,8 @@ async function submitCorrect() {
     await load()
   } catch (e) {
     toastError(e.response?.data?.message ?? 'Could not correct the payment.')
+  } finally {
+    submitting.correct = false
   }
 }
 
@@ -253,7 +269,14 @@ async function receipt(v) {
         <!-- Schedule builder -->
         <div v-if="builder.open" class="mt-3 space-y-3 rounded-xl border border-line p-3">
           <div v-for="(row, i) in builder.rows" :key="i" class="flex items-end gap-2">
-            <BaseInput v-model="row.due_date" type="date" label="Due" required :min="todayInput()" class="flex-1" />
+            <BaseInput
+              v-model="row.due_date"
+              type="date"
+              label="Due"
+              required
+              :min="todayInput()"
+              class="flex-1"
+            />
             <MoneyInput v-model="row.amount" label="Amount" required class="w-40" />
             <Button
               icon="pi pi-times"
@@ -277,7 +300,14 @@ async function receipt(v) {
             </span>
           </div>
           <div class="flex gap-2">
-            <Button label="Save schedule" icon="pi pi-check" size="small" @click="saveSchedule" />
+            <Button
+              label="Save schedule"
+              icon="pi pi-check"
+              size="small"
+              :loading="submitting.schedule"
+              :disabled="submitting.schedule"
+              @click="saveSchedule"
+            />
             <Button
               label="Cancel"
               size="small"
@@ -329,7 +359,14 @@ async function receipt(v) {
           />
           <BaseInput v-model="recordForm.reference" label="Reference" class="sm:col-span-2" />
           <div class="flex gap-2 sm:col-span-2">
-            <Button label="Record" icon="pi pi-check" size="small" @click="recordPayment" />
+            <Button
+              label="Record"
+              icon="pi pi-check"
+              size="small"
+              :loading="submitting.record"
+              :disabled="submitting.record"
+              @click="recordPayment"
+            />
             <Button
               label="Cancel"
               size="small"
@@ -388,8 +425,8 @@ async function receipt(v) {
             </div>
 
             <p v-if="v.refunded_at" class="mt-1 text-xs text-mute">
-              Refunded {{ formatDate(v.refunded_at) }}<template v-if="v.refunded_by?.name">
-                by {{ v.refunded_by.name }}</template
+              Refunded {{ formatDate(v.refunded_at)
+              }}<template v-if="v.refunded_by?.name"> by {{ v.refunded_by.name }}</template
               ><template v-if="v.refund_reason"> — {{ v.refund_reason }}</template>
             </p>
 
@@ -408,12 +445,19 @@ async function receipt(v) {
                 :options="methods.map((m) => ({ value: m.id, label: m.label }))"
               />
               <BaseInput v-model="correctForm.reference" label="Reference" />
-              <BaseInput v-model="correctForm.reason" label="Reason" required class="sm:col-span-2" />
+              <BaseInput
+                v-model="correctForm.reason"
+                label="Reason"
+                required
+                class="sm:col-span-2"
+              />
               <div class="flex gap-2 sm:col-span-2">
                 <Button
                   label="Save correction"
                   icon="pi pi-check"
                   size="small"
+                  :loading="submitting.correct"
+                  :disabled="submitting.correct"
                   @click="submitCorrect"
                 />
                 <Button

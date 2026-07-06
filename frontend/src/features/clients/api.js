@@ -13,9 +13,7 @@ export const duplicateRequestsApi = {
   // Inspect one of the existing client's projects (activity, stage, the brief)
   // before deciding — deny / share / start a separate project.
   async previewProject(id, projectId) {
-    const { data } = await useApi().get(
-      `/clients/duplicate-requests/${id}/projects/${projectId}`,
-    )
+    const { data } = await useApi().get(`/clients/duplicate-requests/${id}/projects/${projectId}`)
     return data.data
   },
 }
@@ -23,9 +21,10 @@ export const duplicateRequestsApi = {
 // Network calls for the Clients feature. State lives in clientsStore.js; these
 // functions are the only place the feature talks to the API (via shared useApi).
 export const clientsApi = {
+  // Server-paginated: returns the current page + total for the lazy DataTable.
   async list(params = {}) {
     const { data } = await useApi().get('/clients', { params })
-    return data.data
+    return { items: data.data, total: data.meta?.total ?? data.data.length }
   },
 
   async get(id) {

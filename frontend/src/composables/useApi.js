@@ -18,8 +18,10 @@ api.interceptors.response.use(
     if (status === 401) {
       useAuthStore().clear() // session expired → clear local auth state
     }
-    if (status === 419) {
-      // CSRF token mismatch → refresh the cookie and retry once
+    if (status === 419 && !error.config?._csrfRetried) {
+      // CSRF token mismatch → refresh the cookie and retry ONCE. The flag stops
+      // a still-failing replay from looping (refresh → 419 → refresh → …).
+      error.config._csrfRetried = true
       await getCsrf()
       return api(error.config)
     }

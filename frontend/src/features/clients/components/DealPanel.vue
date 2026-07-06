@@ -49,6 +49,10 @@ const depositFlow = ref({
   paid_on: new Date().toISOString().slice(0, 10),
   method_id: '',
 })
+// Guards double-submit: the deposit records a versement directly (not via a
+// store action), so store.saving never covers it — a double-click would book
+// two deposits without this.
+const depositSubmitting = ref(false)
 
 function openDeposit(unit) {
   depositFlow.value = {
@@ -66,6 +70,8 @@ async function submitDeposit() {
     toastError('Enter a deposit amount and a payment method.')
     return
   }
+  if (depositSubmitting.value) return
+  depositSubmitting.value = true
   try {
     await versementsApi.record(props.projectId, {
       unit_id: f.unit.id,
@@ -80,6 +86,8 @@ async function submitDeposit() {
     emit('changed')
   } catch (e) {
     toastError(e.response?.data?.message ?? 'Could not record the deposit.')
+  } finally {
+    depositSubmitting.value = false
   }
 }
 
@@ -381,9 +389,15 @@ async function saveBoxes() {
                 <span class="truncate text-ink">{{ unitLine(u) }}</span>
                 <StatusTag v-if="u.state !== 'reserved'" :value="u.state" />
                 <!-- A deposit put this reserved apartment On Hold. -->
-                <SaleStatusBadge v-if="u.state === 'reserved' && u.sale_status === 'onhold'" status="onhold" />
+                <SaleStatusBadge
+                  v-if="u.state === 'reserved' && u.sale_status === 'onhold'"
+                  status="onhold"
+                />
               </span>
-              <span class="num shrink-0 text-xs" :class="u.agreed_price ? 'font-semibold text-ink' : 'text-mute'">
+              <span
+                class="num shrink-0 text-xs"
+                :class="u.agreed_price ? 'font-semibold text-ink' : 'text-mute'"
+              >
                 {{ formatMoney(u.agreed_price ?? u.price) }}
               </span>
             </div>
@@ -526,7 +540,10 @@ async function saveBoxes() {
           {{ deal.notes }}
         </p>
 
-        <div v-if="deal.state === 'reserved' && canClose() && reservedUnits(deal).length > 1" class="mt-3">
+        <div
+          v-if="deal.state === 'reserved' && canClose() && reservedUnits(deal).length > 1"
+          class="mt-3"
+        >
           <Button
             label="Release everything (lost)"
             icon="pi pi-times"
@@ -623,7 +640,8 @@ async function saveBoxes() {
         <Button
           label="Record deposit"
           icon="pi pi-check"
-          :loading="store.saving"
+          :loading="depositSubmitting"
+          :disabled="depositSubmitting"
           @click="submitDeposit"
         />
         <Button label="Cancel" severity="secondary" outlined @click="depositFlow.open = false" />
@@ -638,8 +656,8 @@ async function saveBoxes() {
       @close="boxEditor.open = false"
     >
       <p class="mb-3 text-sm text-mute">
-        Tap to reserve / release boxes with this apartment. Only its linked boxes and the
-        project's unlinked ones are offered — picking an unlinked box links it here.
+        Tap to reserve / release boxes with this apartment. Only its linked boxes and the project's
+        unlinked ones are offered — picking an unlinked box links it here.
       </p>
       <UnitBoxPicker
         v-model="boxEditor.selected"
@@ -700,9 +718,9 @@ async function saveBoxes() {
       @close="releaseWonFlow.open = false"
     >
       <p class="mb-3 text-sm text-mute">
-        Releasing {{ releaseWonFlow.unit?.reference }} un-wins the project — nothing sold remains
-        on it. Its recorded payments stay as history (refund them from the payments panel).
-        How should this project continue?
+        Releasing {{ releaseWonFlow.unit?.reference }} un-wins the project — nothing sold remains on
+        it. Its recorded payments stay as history (refund them from the payments panel). How should
+        this project continue?
       </p>
       <div class="space-y-2">
         <label
@@ -713,12 +731,17 @@ async function saveBoxes() {
               : 'border-line hover:border-primary-300'
           "
         >
-          <input v-model="releaseWonFlow.resolution" type="radio" value="reopen" class="mt-0.5 accent-primary" />
+          <input
+            v-model="releaseWonFlow.resolution"
+            type="radio"
+            value="reopen"
+            class="mt-0.5 accent-primary"
+          />
           <span>
             <span class="font-medium text-ink">Reopen the pipeline</span>
             <span class="mt-0.5 block text-xs text-mute">
-              Step back so the logs resume and a fresh deal can start. The released win is kept
-              as history.
+              Step back so the logs resume and a fresh deal can start. The released win is kept as
+              history.
             </span>
           </span>
         </label>
@@ -730,7 +753,12 @@ async function saveBoxes() {
               : 'border-line hover:border-primary-300'
           "
         >
-          <input v-model="releaseWonFlow.resolution" type="radio" value="archive" class="mt-0.5 accent-primary" />
+          <input
+            v-model="releaseWonFlow.resolution"
+            type="radio"
+            value="archive"
+            class="mt-0.5 accent-primary"
+          />
           <span>
             <span class="font-medium text-ink">Archive the project</span>
             <span class="mt-0.5 block text-xs text-mute">
@@ -783,12 +811,17 @@ async function saveBoxes() {
               : 'border-line hover:border-primary-300'
           "
         >
-          <input v-model="lostFlow.resolution" type="radio" value="reopen" class="mt-0.5 accent-primary" />
+          <input
+            v-model="lostFlow.resolution"
+            type="radio"
+            value="reopen"
+            class="mt-0.5 accent-primary"
+          />
           <span>
             <span class="font-medium text-ink">Reopen the pipeline</span>
             <span class="mt-0.5 block text-xs text-mute">
-              Step back to negotiating so the logs reopen and a fresh deal can start. The lost
-              deal is kept as history.
+              Step back to negotiating so the logs reopen and a fresh deal can start. The lost deal
+              is kept as history.
             </span>
           </span>
         </label>
@@ -800,11 +833,17 @@ async function saveBoxes() {
               : 'border-line hover:border-primary-300'
           "
         >
-          <input v-model="lostFlow.resolution" type="radio" value="archive" class="mt-0.5 accent-primary" />
+          <input
+            v-model="lostFlow.resolution"
+            type="radio"
+            value="archive"
+            class="mt-0.5 accent-primary"
+          />
           <span>
             <span class="font-medium text-ink">Archive the project</span>
             <span class="mt-0.5 block text-xs text-mute">
-              Close it. Any recorded payments are kept as history — add a note (e.g. refund handling).
+              Close it. Any recorded payments are kept as history — add a note (e.g. refund
+              handling).
             </span>
           </span>
         </label>

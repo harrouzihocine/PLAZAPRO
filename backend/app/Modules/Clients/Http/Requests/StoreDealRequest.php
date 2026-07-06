@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace App\Modules\Clients\Http\Requests;
 
+use App\Modules\Clients\Models\ClientProject;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Open the deal on a project from the properties the client wants. The visiting
  * agent creates it from a visit log (visits.conduct); a direct deal (no visit_id)
  * additionally needs deals.direct — enforced in CreateDeal, where the provenance
- * is checked against the project.
+ * is checked against the project. The project must also be VISIBLE to the actor:
+ * the permission alone must not let an agent open a deal (and place holds) on a
+ * project they cannot see — same gate as ProposeInSiteVisitRequest.
  */
 class StoreDealRequest extends FormRequest
 {
@@ -18,7 +21,13 @@ class StoreDealRequest extends FormRequest
     {
         $user = $this->user();
 
-        return $user !== null && ($user->can('visits.conduct') || $user->can('deals.direct'));
+        if ($user === null || ! ($user->can('visits.conduct') || $user->can('deals.direct'))) {
+            return false;
+        }
+
+        $project = $this->route('project');
+
+        return $project instanceof ClientProject && $project->isVisibleTo($user);
     }
 
     /**

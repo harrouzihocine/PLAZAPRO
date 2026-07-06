@@ -55,6 +55,17 @@ class CloseDealUnit
         abort_if($item->state->isClosed(), 422, 'This apartment is already resolved.');
 
         $deal = DB::transaction(function () use ($deal, $item, $outcome, $agreedPrice, $resolution, $note, $credits) {
+            // Serialize on the unit row so two concurrent closes on the same unit
+            // (via different deals, or a double-clicked "Mark won") can never both
+            // sell it — the same lock ReserveUnit takes. Holding the lock, re-read
+            // the deal and this apartment and re-assert they are still open before
+            // acting, since the pre-transaction guards ran on a stale snapshot.
+            Unit::whereKey($item->unit_id)->lockForUpdate()->firstOrFail();
+            $item->refresh();
+            $freshDeal = $deal->fresh();
+            abort_unless($freshDeal->isActive() && ! $freshDeal->state->isClosed(), 422, 'This deal is not open.');
+            abort_if($item->state->isClosed(), 422, 'This apartment is already resolved.');
+
             $outcome === 'won'
                 ? $this->win($item, $agreedPrice, $credits)
                 : $this->lose($item);
@@ -110,6 +121,10 @@ class CloseDealUnit
 
         $item->load(['unit', 'boxItems' => fn ($q) => $q->active(), 'boxItems.box']);
         $unit = $item->unit;
+
+        // The unit row is locked by the caller's transaction: refuse the win if a
+        // concurrent close has just sold it (belt-and-braces against a double-sale).
+        abort_if($unit->sale_status === SaleStatus::Sold, 422, 'This unit has just been sold.');
 
         // On Hold locks the sale to its holder: only that project may buy it.
         abort_if(

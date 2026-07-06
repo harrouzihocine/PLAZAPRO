@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\EnsureUserActive;
 use App\Http\Middleware\SecurityHeaders;
 use App\Modules\Clients\Console\FlagEmptyClients;
 use App\Modules\Collaboration\Console\BackfillProjectChats;
@@ -50,6 +51,11 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Security-baseline headers on every response.
         $middleware->append(SecurityHeaders::class);
+
+        // Reject requests from users deactivated/cancelled after they signed in
+        // (login checks is_active only at sign-in). Appended to the api group so
+        // it runs after Sanctum's stateful session is resolved.
+        $middleware->api(append: [EnsureUserActive::class]);
 
         // Global API rate limiting (named limiter defined in RbacServiceProvider).
         $middleware->throttleApi('api');
