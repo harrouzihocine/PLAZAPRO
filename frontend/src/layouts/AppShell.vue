@@ -31,8 +31,8 @@ const OVERSIGHT_PERMS = [
   'oversight.deals',
   'oversight.drafts',
   'oversight.archive',
+  'oversight.matches',
   'clients.duplicates.resolve',
-  'clients.view',
 ]
 // Live announcements reach EVERY logged-in user (sold celebration, status moves,
 // new units) over the public channel — subscribe once for the whole session.
@@ -103,7 +103,9 @@ const SECTIONS = [
     label: 'Insights',
     items: [
       { to: '/analytics', label: 'Reports', icon: 'pi pi-chart-line', permission: 'reports.view' },
-      { to: '/team-logs', label: 'Team logs', icon: 'pi pi-list-check', permission: 'logs.view_all' },
+      // Open to everyone: a user without logs.view_all sees only their own logs
+      // (the label reads "My logs" for them, "Team logs" for the company-wide view).
+      { to: '/team-logs', label: 'Team logs', icon: 'pi pi-list-check' },
       { to: '/audit', label: 'Audit', icon: 'pi pi-shield', permission: 'audit.view' },
     ],
   },
@@ -149,7 +151,7 @@ const SECTIONS = [
         to: '/desires/matches',
         label: 'Matches',
         icon: 'pi pi-heart',
-        permission: 'clients.view',
+        permission: 'oversight.matches',
         badgeKey: 'matches',
       },
       {
@@ -172,7 +174,13 @@ const SECTIONS = [
 const sections = computed(() =>
   SECTIONS.map((s) => ({
     ...s,
-    items: s.items.filter((i) => !i.permission || auth.can(i.permission)),
+    items: s.items
+      .filter((i) => !i.permission || auth.can(i.permission))
+      // Team logs is self-scoped for users without logs.view_all — call it what it
+      // is for them so the label never over-promises a company-wide view.
+      .map((i) =>
+        i.to === '/team-logs' && !auth.can('logs.view_all') ? { ...i, label: 'My logs' } : i,
+      ),
   })).filter((s) => s.items.length > 0),
 )
 

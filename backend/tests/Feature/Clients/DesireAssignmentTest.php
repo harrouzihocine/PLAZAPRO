@@ -18,8 +18,8 @@ use Tests\TestCase;
 
 /**
  * Delegating a desire match: a manager (clients.manage) assigns a waiting client
- * to a sales agent (calls.log), who is notified and takes the lead onto their
- * own agent-scoped board. The manager triages; the agent does the calling.
+ * to a sales agent (calls.log), who is notified and reconnects from the client
+ * file. The manager triages on the company-wide oversight board; the agent calls.
  */
 class DesireAssignmentTest extends TestCase
 {
@@ -59,7 +59,7 @@ class DesireAssignmentTest extends TestCase
         Notification::assertSentTo(
             $agent,
             DomainNotification::class,
-            fn ($n) => $n->kind === 'desire_assigned' && $n->link === '/desires/matches',
+            fn ($n) => $n->kind === 'desire_assigned' && $n->link === "/clients/{$client->id}",
         );
     }
 
@@ -102,14 +102,10 @@ class DesireAssignmentTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_assigning_moves_the_lead_onto_the_agents_own_board(): void
+    public function test_assigning_tags_the_owner_on_the_company_wide_matches_board(): void
     {
-        $manager = $this->userWith(['clients.view', 'clients.manage', 'units.view']);
+        $manager = $this->userWith(['clients.view', 'clients.manage', 'oversight.matches']);
         $agent = $this->salesAgent();
-        // The agent needs units.view to see the board at all.
-        $agent->role->permissions()->syncWithoutDetaching([
-            Permission::firstOrCreate(['slug' => 'units.view'], ['name' => 'units.view'])->id,
-        ]);
 
         $client = Client::factory()->create(['assigned_agent_id' => null]);
         Desire::factory()->create([
@@ -119,20 +115,20 @@ class DesireAssignmentTest extends TestCase
         ]);
         Unit::factory()->create(['price' => '1000.00', 'sale_status' => 'available']);
 
-        // Before assignment the agent's (own-book) board is empty.
-        Sanctum::actingAs($agent);
-        $this->getJson('/api/v1/desires/matches')->assertOk()->assertJsonCount(0, 'data');
-
-        // The manager delegates.
+        // The oversight board shows the waiting client while it is still unassigned.
         Sanctum::actingAs($manager);
-        $this->postJson("/api/v1/clients/{$client->id}/assign-agent", ['agent_id' => $agent->id])->assertOk();
-
-        // Now it's on the agent's board, tagged with them as the owner.
-        Sanctum::actingAs($agent);
         $this->getJson('/api/v1/desires/matches')
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.client.id', $client->id)
+            ->assertJsonPath('data.0.client.assigned_agent', null);
+
+        // The manager delegates — the same row now carries the assigned owner.
+        $this->postJson("/api/v1/clients/{$client->id}/assign-agent", ['agent_id' => $agent->id])->assertOk();
+
+        $this->getJson('/api/v1/desires/matches')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.client.assigned_agent.id', $agent->id);
     }
 }

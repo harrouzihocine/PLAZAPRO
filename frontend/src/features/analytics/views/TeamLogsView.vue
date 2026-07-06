@@ -11,6 +11,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import { analyticsApi } from '@/features/analytics/api'
 import { staffApi } from '@/features/clients/api'
 import { useAutoFilter } from '@/composables/useAutoFilter'
+import { useAuthStore } from '@/features/settings/store'
 import { formatDateTime } from '@/utils/format'
 
 const KIND = {
@@ -18,6 +19,18 @@ const KIND = {
   office_visit: { label: 'Office visit', icon: 'pi pi-building' },
   in_site_visit: { label: 'In-site visit', icon: 'pi pi-map-marker' },
 }
+
+const auth = useAuthStore()
+// Only logs.view_all sees other users; everyone else is pinned to their own logs
+// (the server enforces this too — here it just drives the selector, the User column
+// and the page copy so the view never over-promises a company-wide feed).
+const canViewAll = computed(() => auth.can('logs.view_all'))
+const pageTitle = computed(() => (canViewAll.value ? 'Team logs' : 'My logs'))
+const pageSubtitle = computed(() =>
+  canViewAll.value
+    ? "Every user's rapports (calls, office & in-site visits) and planned work — company-wide."
+    : 'Your rapports (calls, office & in-site visits) and planned work.',
+)
 
 const filters = ref({ user_id: '', type: '', mode: 'logged', from: '', to: '' })
 const page = ref(1)
@@ -69,6 +82,7 @@ function goToPage(p) {
 
 onMounted(async () => {
   fetch()
+  if (!canViewAll.value) return // no user selector to populate for self-scoped logs
   try {
     staff.value = await staffApi.list()
   } catch {
@@ -88,10 +102,7 @@ useAutoFilter(
 
 <template>
   <div>
-    <PageHeader
-      title="Team logs"
-      subtitle="Every user's rapports (calls, office &amp; in-site visits) and planned work — company-wide."
-    />
+    <PageHeader :title="pageTitle" :subtitle="pageSubtitle" />
 
     <!-- Per-type scorecard for the current filters. -->
     <div class="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -109,7 +120,13 @@ useAutoFilter(
     <SectionCard flush>
       <!-- Filters -->
       <div class="grid grid-cols-2 items-end gap-2 border-b border-line px-4 py-3 sm:grid-cols-3 sm:px-5 lg:grid-cols-5">
-        <BaseSelect v-model="filters.user_id" label="User" :options="userOptions" searchable="auto" />
+        <BaseSelect
+          v-if="canViewAll"
+          v-model="filters.user_id"
+          label="User"
+          :options="userOptions"
+          searchable="auto"
+        />
         <BaseSelect v-model="filters.type" label="Type" :options="typeOptions" />
         <BaseSelect v-model="filters.mode" label="Show" :options="modeOptions" />
         <BaseInput v-model="filters.from" label="From" type="date" />
@@ -128,7 +145,7 @@ useAutoFilter(
           <thead>
             <tr class="text-left text-xs text-mute">
               <th class="px-4 py-2.5 font-medium sm:px-5">When</th>
-              <th class="py-2.5 pr-3 font-medium">User</th>
+              <th v-if="canViewAll" class="py-2.5 pr-3 font-medium">User</th>
               <th class="py-2.5 pr-3 font-medium">Type</th>
               <th class="py-2.5 pr-3 font-medium">Client</th>
               <th class="py-2.5 pr-4 font-medium">Detail</th>
@@ -141,7 +158,7 @@ useAutoFilter(
               class="border-t border-line transition-colors hover:bg-surface-50 dark:hover:bg-surface-900"
             >
               <td class="num whitespace-nowrap px-4 py-2.5 sm:px-5">{{ formatDateTime(row.at) }}</td>
-              <td class="py-2.5 pr-3">{{ row.user ?? '—' }}</td>
+              <td v-if="canViewAll" class="py-2.5 pr-3">{{ row.user ?? '—' }}</td>
               <td class="py-2.5 pr-3">
                 <span class="inline-flex items-center gap-1.5">
                   <i :class="(KIND[row.kind] ?? {}).icon ?? 'pi pi-circle'" class="text-mute" aria-hidden="true" />

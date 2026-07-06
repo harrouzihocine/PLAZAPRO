@@ -56,9 +56,14 @@ Route::middleware('auth:sanctum')->group(function () {
         // Desire → inventory matches also require the ability to view units.
         Route::middleware('can:units.view')->group(function () {
             Route::get('/clients/{client}/matches', [DesireController::class, 'matches']);
-            // The dedicated "Desire matches" board (agent-scoped waiting clients).
-            Route::get('/desires/matches', [DesireMatchController::class, 'index']);
         });
+    });
+
+    // The "Desire matches" board is a company-wide oversight monitor (waiting
+    // clients whose wishlist now fits available inventory) — gated by its own
+    // oversight permission, not the per-client "view clients / units" reads above.
+    Route::middleware('can:oversight.matches')->group(function () {
+        Route::get('/desires/matches', [DesireMatchController::class, 'index']);
     });
 
     // Creating a client (agents can capture leads).

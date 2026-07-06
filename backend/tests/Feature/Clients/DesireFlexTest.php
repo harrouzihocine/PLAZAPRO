@@ -47,9 +47,10 @@ class DesireFlexTest extends TestCase
         $this->assertDatabaseHas('desires', ['client_id' => $client->id, 'budget_max' => '3000000.00']);
     }
 
-    public function test_desire_matches_board_is_agent_scoped(): void
+    public function test_desire_matches_board_is_company_wide_for_oversight(): void
     {
-        $agent = $this->userWith(['clients.view', 'units.view'], isAgent: true);
+        $overseer = $this->userWith(['oversight.matches']);
+        $agent = $this->userWith(['clients.view'], isAgent: true);
         $client = Client::factory()->create(['assigned_agent_id' => $agent->id]);
         Desire::factory()->create([
             'client_id' => $client->id, 'client_project_id' => null,
@@ -58,22 +59,22 @@ class DesireFlexTest extends TestCase
         ]);
         Unit::factory()->create(['price' => '1000.00', 'sale_status' => 'available']);
 
-        // The owning agent sees the waiting client with its matches.
-        Sanctum::actingAs($agent);
+        // The oversight board lists every waiting client with a match, whoever owns it.
+        Sanctum::actingAs($overseer);
         $this->getJson('/api/v1/desires/matches')
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.client.id', $client->id);
 
-        // A different agent's board is empty — scoped to their own book.
-        Sanctum::actingAs($this->userWith(['clients.view', 'units.view'], isAgent: true));
-        $this->getJson('/api/v1/desires/matches')->assertOk()->assertJsonCount(0, 'data');
+        // A regular agent (no oversight.matches) cannot open the board at all.
+        Sanctum::actingAs($agent);
+        $this->getJson('/api/v1/desires/matches')->assertForbidden();
     }
 
-    public function test_summary_carries_the_matches_count_agent_scoped_for_the_sidebar_badge(): void
+    public function test_summary_carries_the_company_wide_matches_count_for_the_sidebar_badge(): void
     {
-        $agent = $this->userWith(['clients.view', 'units.view'], isAgent: true);
-        $client = Client::factory()->create(['assigned_agent_id' => $agent->id]);
+        $overseer = $this->userWith(['oversight.matches']);
+        $client = Client::factory()->create();
         Desire::factory()->create([
             'client_id' => $client->id, 'client_project_id' => null,
             'budget_min' => null, 'budget_max' => '2000.00', 'type_id' => null,
@@ -81,22 +82,18 @@ class DesireFlexTest extends TestCase
         ]);
         Unit::factory()->create(['price' => '1000.00', 'sale_status' => 'available']);
 
-        // The owning agent's badge counts the waiting client.
-        Sanctum::actingAs($agent);
+        // The oversight badge counts every waiting client with a match, company-wide.
+        Sanctum::actingAs($overseer);
         $this->getJson('/api/v1/oversight/summary')->assertOk()->assertJsonPath('data.matches', 1);
 
-        // A different agent's badge is 0 — scoped to their own book, same as the board.
-        Sanctum::actingAs($this->userWith(['clients.view', 'units.view'], isAgent: true));
-        $this->getJson('/api/v1/oversight/summary')->assertOk()->assertJsonPath('data.matches', 0);
-
-        // Without units.view (the board's own gate), the key is absent, not zero.
-        Sanctum::actingAs($this->userWith(['clients.view']));
+        // Without oversight.matches (the board's own gate) the key is absent, not zero.
+        Sanctum::actingAs($this->userWith(['clients.view', 'units.view']));
         $this->assertArrayNotHasKey('matches', $this->getJson('/api/v1/oversight/summary')->assertOk()->json('data'));
     }
 
     public function test_the_board_ships_the_full_property_card_and_the_desire_brief(): void
     {
-        $agent = $this->userWith(['clients.view', 'units.view'], isAgent: true);
+        $agent = $this->userWith(['clients.view', 'units.view', 'oversight.matches'], isAgent: true);
         $client = Client::factory()->create(['assigned_agent_id' => $agent->id]);
         Desire::factory()->create([
             'client_id' => $client->id, 'client_project_id' => null,
@@ -121,7 +118,7 @@ class DesireFlexTest extends TestCase
 
     public function test_the_board_links_back_to_the_project_the_desire_was_shifted_from(): void
     {
-        $agent = $this->userWith(['clients.view', 'units.view', 'projects.manage', 'clients.create'], isAgent: true);
+        $agent = $this->userWith(['clients.view', 'units.view', 'projects.manage', 'clients.create', 'oversight.matches'], isAgent: true);
         $client = Client::factory()->create(['assigned_agent_id' => $agent->id]);
         $location = Location::factory()->create();
         $project = ClientProject::factory()->create(['client_id' => $client->id, 'location_id' => $location->id]);
@@ -218,7 +215,7 @@ class DesireFlexTest extends TestCase
 
     public function test_a_reconnected_client_drops_off_the_desire_matches_board(): void
     {
-        $agent = $this->userWith(['clients.view', 'units.view', 'calls.log'], isAgent: true);
+        $agent = $this->userWith(['clients.view', 'units.view', 'calls.log', 'oversight.matches'], isAgent: true);
         $client = Client::factory()->create(['assigned_agent_id' => $agent->id]);
         Desire::factory()->create([
             'client_id' => $client->id, 'client_project_id' => null,

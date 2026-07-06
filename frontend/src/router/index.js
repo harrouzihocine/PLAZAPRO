@@ -61,7 +61,7 @@ const routes = [
         path: 'desires/matches',
         name: 'desires.matches',
         component: () => import('@/features/clients/views/DesireMatchesView.vue'),
-        meta: { permission: 'clients.view' },
+        meta: { permission: 'oversight.matches' },
       },
       {
         path: 'clients/:id',
@@ -117,10 +117,11 @@ const routes = [
         meta: { permission: 'reports.view' },
       },
       {
+        // Open to any authed user; the view self-scopes to the caller's own logs
+        // unless they have logs.view_all (which unlocks the all-users selector).
         path: 'team-logs',
         name: 'team-logs',
         component: () => import('@/features/analytics/views/TeamLogsView.vue'),
-        meta: { permission: 'logs.view_all' },
       },
       {
         path: 'audit',

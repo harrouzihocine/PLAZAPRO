@@ -152,9 +152,9 @@ class OversightController extends Controller
         if ($user->can('oversight.archive')) {
             $out['archive'] = $this->buildArchive->baseQuery([])->count();
         }
-        // Same clients.view + units.view gate as GET /desires/matches.
-        if ($user->can('clients.view') && $user->can('units.view')) {
-            $out['matches'] = $this->desireMatches->count($user->isAgent() ? $user->id : null);
+        // Same gate as GET /desires/matches — a company-wide oversight monitor.
+        if ($user->can('oversight.matches')) {
+            $out['matches'] = $this->desireMatches->count(null);
         }
 
         return response()->json(['data' => $out]);

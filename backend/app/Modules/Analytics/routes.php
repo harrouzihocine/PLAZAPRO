@@ -41,10 +41,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/activity/{type}/{id}', [RecordActivityController::class, 'index'])
         ->whereNumber('id');
 
-    // Company-wide Team Logs — every user's rapports + planned work, gated by
-    // logs.view_all (crosses all visibility scopes by design). The personal
-    // dashboard above never widens; this is the manager/admin "who did what" view.
-    Route::middleware('can:logs.view_all')->get('/team-logs', [TeamLogsController::class, 'index']);
+    // Team activity logs — every user's rapports + planned work. Open to any authed
+    // user, but self-scoped by default: without logs.view_all a caller only ever
+    // sees their OWN logs (the controller forces user_id to self). logs.view_all
+    // widens it company-wide and unlocks the user selector — the manager/admin
+    // "who did what" view that crosses all visibility scopes by design.
+    Route::get('/team-logs', [TeamLogsController::class, 'index']);
 
     // Admin audit feed over the append-only activity log.
     Route::middleware('can:audit.view')->get('/audit', [AuditController::class, 'index']);

@@ -14,6 +14,7 @@ use App\Modules\Inventory\Enums\HoldStatus;
 use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Events\UnitSold;
 use App\Modules\Inventory\Models\Reservation;
+use App\Modules\Inventory\Models\Unit;
 use App\Modules\Payments\Support\Money;
 use App\Modules\Settings\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -37,7 +38,7 @@ class CloseDealUnit
 
     /**
      * @param  array{sale?: list<int>, insite?: list<int>, other?: list<int>}|null  $credits
-     *         who gets credit for the sale (only used on a win)
+     *                                                                                        who gets credit for the sale (only used on a win)
      */
     public function handle(
         DealItem $item,
@@ -145,7 +146,7 @@ class CloseDealUnit
     }
 
     /** A readable one-line address for the unit's project: street · commune · wilaya. */
-    private function composeAddress(?\App\Modules\Inventory\Models\Unit $unit): ?string
+    private function composeAddress(?Unit $unit): ?string
     {
         $location = $unit?->location;
         if ($location === null) {

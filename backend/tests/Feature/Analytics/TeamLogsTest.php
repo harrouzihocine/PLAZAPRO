@@ -30,11 +30,27 @@ class TeamLogsTest extends TestCase
         return User::factory()->create(['role_id' => $role->id]);
     }
 
-    public function test_team_logs_requires_the_view_all_permission(): void
+    public function test_without_view_all_a_user_sees_only_their_own_logs(): void
     {
-        Sanctum::actingAs($this->user(['dashboard.view']));
+        $viewer = $this->user(['dashboard.view']);
+        $other = $this->user([]);
 
-        $this->getJson('/api/v1/team-logs')->assertForbidden();
+        Call::factory()->create(['agent_id' => $viewer->id, 'called_at' => now()]);
+        Call::factory()->count(2)->create(['agent_id' => $other->id, 'called_at' => now()]);
+
+        Sanctum::actingAs($viewer);
+
+        // The feed is pinned to their own logs — the two others' calls never show.
+        $this->getJson('/api/v1/team-logs')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('summary.calls', 1);
+
+        // …and a user_id in the request cannot widen it to someone else.
+        $this->getJson('/api/v1/team-logs?user_id='.$other->id)
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('summary.calls', 1);
     }
 
     public function test_team_logs_returns_every_users_rapports(): void

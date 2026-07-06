@@ -22,7 +22,8 @@ import { formatMoney } from '@/features/payments/money'
 
 // The "Desire matches" board: waiting clients (on the desire list, no deal yet)
 // whose criteria now fit available inventory — the reconnect signal that
-// complements the unit-match notifications. Agent-scoped on the server.
+// complements the unit-match notifications. A company-wide oversight monitor —
+// the server gates it behind oversight.matches and lists every waiting client.
 //
 // The board is role-split around who owns the lead (client.assigned_agent):
 //  - a MANAGER (clients.manage) sees the whole company and DELEGATES — assign a

@@ -9,14 +9,16 @@ use App\Modules\Collaboration\Notifications\DomainNotification;
 use App\Modules\Settings\Models\User;
 
 /**
- * Hand a waiting client (a desire on the matches board) to the sales agent who
- * will do the reconnect — the manager delegates, the agent does the calling.
+ * Hand a waiting client (a desire on the company-wide matches board) to the sales
+ * agent who will do the reconnect — the manager triages on the oversight board and
+ * delegates, the agent does the calling.
  *
- * Assignment is just the client's `assigned_agent_id`: it is what scopes the
- * Desire Matches board (an agent sees only their own book), so setting it moves
- * the lead onto that agent's board and off everyone else's. The agent is
- * notified in real time so they know to reconnect; a no-op re-assign (same
- * agent) neither re-notifies nor re-logs.
+ * Assignment is just the client's `assigned_agent_id`: it records who owns the
+ * reconnect and tags the owner on the (oversight-only) Desire Matches board. The
+ * agent is notified in real time and the notification links straight to the client
+ * file — where they reconnect (log the call) — since the board itself is an
+ * oversight monitor they do not see. A no-op re-assign (same agent) neither
+ * re-notifies nor re-logs.
  *
  * Validation (the assignee is an active sales agent who can follow a client up)
  * lives in AssignClientAgentRequest — the same CanFollowUpClient rule the client
@@ -37,7 +39,7 @@ class AssignClientAgent
             kind: 'desire_assigned',
             title: 'A waiting client was assigned to you',
             body: "Reconnect with {$client->full_name} — their wishlist now fits available inventory.",
-            link: '/desires/matches',
+            link: '/clients/'.$client->id,
             subjectType: 'client',
             subjectId: $client->id,
         ));

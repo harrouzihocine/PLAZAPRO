@@ -87,6 +87,9 @@ class RbacSeeder extends Seeder
         'notifications.view', 'dashboard.view', 'reports.view',
         // Team-oversight monitors (follow up anomalies / lazy work), one per area.
         'oversight.clients', 'oversight.pipeline', 'oversight.deals', 'oversight.drafts',
+        // The desire-matches board: waiting clients whose wishlist now fits available
+        // inventory — the company-wide reconnect signal, an oversight monitor.
+        'oversight.matches',
         // The archive desk: review + reactivate archived (lost/closed) projects.
         'oversight.archive',
         // The dashboard is personal for everyone (own book only). logs.view_all
@@ -154,6 +157,7 @@ class RbacSeeder extends Seeder
         'oversight.pipeline' => 'Monitor pipeline and visit anomalies across the team.',
         'oversight.deals' => 'Monitor deal anomalies (e.g. stale holds) across the team.',
         'oversight.drafts' => 'Monitor abandoned drafts across the team.',
+        'oversight.matches' => 'Open the company-wide Desire Matches board: waiting clients whose wishlist now fits available inventory.',
         'oversight.archive' => 'Review and reactivate archived (lost/closed) projects across the team.',
         'logs.view_all' => 'Open the company-wide Team Logs (everyone\'s calls & visits).',
     ];
@@ -307,7 +311,7 @@ class RbacSeeder extends Seeder
         $manager = [
             ...$this->baseline, ...$fullVisibility, 'reports.view', 'logs.view_all',
             'oversight.clients', 'oversight.pipeline', 'oversight.deals', 'oversight.drafts',
-            'oversight.archive',
+            'oversight.archive', 'oversight.matches',
             'chat.view_project_chats', 'chat.participate_project_chats',
             'clients.view', 'clients.create', 'clients.manage', 'clients.duplicates.resolve',
             'projects.create', 'projects.manage', 'projects.contributors', 'projects.freeze',

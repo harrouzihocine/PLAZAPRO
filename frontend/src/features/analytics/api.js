@@ -23,8 +23,9 @@ export const analyticsApi = {
     return data.data
   },
 
-  // Company-wide Team Logs feed (gated by logs.view_all). Returns the paginated
-  // feed rows, a per-type summary and pagination meta.
+  // Team Logs feed — self-scoped to the caller unless they hold logs.view_all,
+  // which widens it company-wide (user_id then filters to one person). Returns
+  // the paginated feed rows, a per-type summary and pagination meta.
   // params: { user_id, type, from, to, mode (logged|upcoming), page }.
   async teamLogs(params = {}) {
     const { data } = await useApi().get('/team-logs', { params })
