@@ -49,7 +49,7 @@ services:
     restart: unless-stopped
     security_opt: ["no-new-privileges:true"]
     logging: *logging
-    networks: [internal, edge]
+    networks: [internal, tunnel]   # backends one side, cloudflared the other; no egress needed
     healthcheck:
       # Exercises the full chain: nginx → php-fpm → Laravel /up.
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/up"]
@@ -58,7 +58,12 @@ services:
       retries: 3
       start_period: 30s
 
-  cloudflared: # outbound-only HTTPS tunnel — the public entry point
+  # Outbound-only HTTPS tunnel — the public entry point. Quarantined on the
+  # `tunnel` network where the ONLY other container is nginx: even a hijacked
+  # Cloudflare account rewiring the tunnel's service target can reach nothing
+  # but nginx:80 — not php-fpm (raw FastCGI = code execution), not Reverb,
+  # and never mysql/redis.
+  cloudflared:
     image: cloudflare/cloudflared:2024.10.0
     command: tunnel --no-autoupdate run
     environment:
@@ -68,7 +73,7 @@ services:
     restart: unless-stopped
     security_opt: ["no-new-privileges:true"]
     logging: *logging
-    networks: [edge]           # needs internet egress; nothing internal
+    networks: [tunnel]         # egress to Cloudflare + nginx; nothing else
     profiles: ["tunnel"]       # enable with: docker compose --profile tunnel up -d
 
   app: # Laravel + PHP-FPM
@@ -158,6 +163,7 @@ volumes:
   redis-data:
 
 networks:
-  edge: # nginx ↔ cloudflared; has internet egress
+  tunnel: # cloudflared ↔ nginx ONLY (+ egress to Cloudflare) — the tunnel's blast radius
+  edge: # php services' internet egress (mail, composer on deploy)
   internal: # app ↔ mysql/redis/reverb; no route to the outside world
     internal: true

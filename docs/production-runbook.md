@@ -112,6 +112,10 @@ Media restore: `zstd -dc ~/backups/plaza/media/plaza-media-....tar.zst | tar -x 
 - **No inbound ports**: cloudflared dials *out* to Cloudflare; the router forwards nothing.
 - **DB cannot leak**: MySQL/Redis have no published ports and sit on an `internal: true` network —
   even a compromised container in there has **no route to the internet** to exfiltrate over.
+- **Tunnel blast radius = nginx only**: cloudflared lives on its own `tunnel` network shared solely
+  with nginx. Even someone controlling the Cloudflare account (rewiring the tunnel's service target)
+  can reach nothing but nginx:80 — not php-fpm's FastCGI port, not Reverb, never mysql/redis. Keep
+  **2FA on the Cloudflare account**; anyone in it can still repoint DNS at a phishing clone.
 - **Secrets**: 192-bit random, mode-600 env files, never in git, never in images; mysqldump reads
   credentials from the container env.
 - **Edge → app**: real client IPs recovered from `CF-Connecting-IP`; `trustProxies` makes Laravel
