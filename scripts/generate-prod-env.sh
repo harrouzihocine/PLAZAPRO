@@ -69,5 +69,7 @@ echo "Wrote .env, backend/.env, frontend/.env.production for https://$DOMAIN (mo
 echo
 echo "Next steps:"
 echo "  1. Paste your Cloudflare tunnel token into .env (CLOUDFLARE_TUNNEL_TOKEN=...)"
+echo "     and a DNS-edit API token (CLOUDFLARE_DNS_API_TOKEN=...) for LAN HTTPS"
 echo "  2. ./scripts/deploy.sh            (first deploy generates APP_KEY)"
 echo "  3. docker compose --profile tunnel up -d"
+echo "  4. ./scripts/setup-lan-tls.sh $DOMAIN   (trusted HTTPS on the office LAN)"

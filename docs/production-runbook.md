@@ -6,7 +6,9 @@ Operations manual for the PLAZA PRO production stack. The *why* behind every cho
 **Topology:** one office server runs the prod stack via `docker-compose.prod.yml`. The only public
 entry point is a **Cloudflare Tunnel** (outbound-only — zero ports opened on the router). MySQL and
 Redis live on an internal-only docker network: no published ports, no internet egress. TLS is free
-and terminates at Cloudflare's edge.
+and terminates at Cloudflare's edge for internet traffic; the **office LAN** talks straight to
+nginx:443 with its own trusted Let's Encrypt certificate under the same hostname (§1.5), so office
+traffic never hairpins through the internet and keeps working when the uplink is down.
 
 ---
 
@@ -53,6 +55,42 @@ docker compose --profile tunnel up -d  # start the tunnel
 ```
 
 Seed the first super-admin user, then verify §3.
+
+### 1.5 LAN HTTPS (split-horizon — office devices talk to the server directly)
+
+Same hostname on both sides: the internet resolves `plaza.example.com` to the Cloudflare tunnel,
+the **office LAN resolves it to the server's LAN IP** and gets nginx:443 with a real Let's Encrypt
+certificate. Because the hostname never changes, cookies, Sanctum, CSP and websockets all just
+work; nothing in the app config knows the difference. The cert is issued/renewed via **DNS-01
+through the Cloudflare API**, so no inbound port opens — the tunnel-only posture stands.
+
+1. Cloudflare dashboard → **My Profile → API Tokens → Create token**: one permission only,
+   **Zone → DNS → Edit**, scoped to this site's zone. Paste into `/srv/plaza/.env` →
+   `CLOUDFLARE_DNS_API_TOKEN=...`
+2. ```bash
+   ./scripts/setup-lan-tls.sh plaza.example.com
+   ```
+   Issues the cert (stored in the `letsencrypt` docker volume), points nginx at it, reloads, and
+   installs a twice-daily renewal cron (`scripts/renew-lan-cert.sh`, logs to
+   `~/backups/plaza/cert-renew.log`). Idempotent — rerun any time.
+3. **Office DNS override** (the split-horizon half): make the office router/DNS answer
+   `plaza.example.com` with the server's LAN IP — dnsmasq/Pi-hole:
+   `address=/plaza.example.com/192.168.x.y`; most routers call it "DNS host mapping" or "local
+   DNS record". Give the server a static LAN IP (DHCP reservation).
+4. Verify from a LAN machine: `curl -v https://plaza.example.com/up` → 200 with a **Let's
+   Encrypt** cert (not Cloudflare's), and `nslookup plaza.example.com` returns the LAN IP.
+   Plain `http://` on the LAN answers 301 → https.
+
+Notes:
+- If the router does DNS-rebind protection, whitelist the domain (the override itself is fine on
+  most firmwares; only *upstream* answers with private IPs get filtered).
+- Port 80 stays published for the container healthcheck and the HTTP→HTTPS redirect; the tunnel
+  path is exempt from the redirect (Cloudflare already terminated TLS), so nothing loops.
+- nginx loads the cert from stable copies at `letsencrypt` volume path `/etc/letsencrypt/nginx/`;
+  until the first successful issuance a self-signed placeholder sits there (deploy.sh seeds it)
+  so nginx always boots — browsers warn, tunnel traffic is unaffected.
+- Token rotation: edit `CLOUDFLARE_DNS_API_TOKEN` in `.env` — the renew script re-derives its
+  credentials file from `.env` on every run.
 
 ## 2. Routine operations
 
@@ -119,8 +157,10 @@ Media restore: `zstd -dc ~/backups/plaza/media/plaza-media-....tar.zst | tar -x 
 - **Secrets**: 192-bit random, mode-600 env files, never in git, never in images; mysqldump reads
   credentials from the container env.
 - **Edge → app**: real client IPs recovered from `CF-Connecting-IP`; `trustProxies` makes Laravel
-  see HTTPS + true IPs, so per-user/per-IP rate limits actually work. nginx adds a 10 req/min
-  brute-force shield on `/auth/login` + `/auth/token` on top of Laravel's throttles.
+  see HTTPS + true IPs, so per-user/per-IP rate limits actually work. nginx overwrites
+  `X-Forwarded-For` with the resolved client IP before php-fpm sees it — a forged header (from
+  the internet *or* a LAN device) can't spoof throttle keys or audit-log IPs. nginx adds a
+  10 req/min brute-force shield on `/auth/login` + `/auth/token` on top of Laravel's throttles.
 - **Headers/CSP** on the SPA at nginx; API headers from Laravel middleware; HSTS on.
 - **PHP**: `/index.php` marked `internal` (no direct probing), `expose_php off`, debug off,
   display_errors off; uploads stream to private disks served only via permission-gated endpoints.
@@ -130,12 +170,12 @@ Media restore: `zstd -dc ~/backups/plaza/media/plaza-media-....tar.zst | tar -x 
 
 ### Known trade-offs
 
-- `SESSION_SECURE_COOKIE=true` means login only works over HTTPS — office users must also use
-  `https://plaza.example.com` (fine: LAN → Cloudflare → tunnel → same box). The LAN port published
-  by nginx (`APP_PORT`) exists for smoke tests and emergencies; plain-HTTP login there will not
-  session (by design).
-- Cloudflare free caps request bodies at **100 MB** — the 200 MB media ceiling only applies on the
-  LAN. Chunked uploads become a mobile-app work item if field agents ever need huge files.
+- `SESSION_SECURE_COOKIE=true` means login only works over HTTPS — satisfied everywhere: internet
+  users via Cloudflare, office users via the LAN TLS listener (§1.5). Plain HTTP on the LAN
+  redirects to HTTPS; nothing sessions over cleartext (by design).
+- Cloudflare free caps request bodies at **100 MB** — from outside. On the LAN (§1.5 path) the
+  full 200 MB media ceiling applies. Chunked uploads become a mobile-app work item if field
+  agents ever need huge files from outside the office.
 - `deploy.sh` takes a short maintenance window (`artisan down` → migrate → `up`). At 30 users,
   deploy off-hours; zero-downtime deploys are not worth their complexity here yet.
 

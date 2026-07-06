@@ -1,6 +1,7 @@
 # Secrets & local env
 .env
 *.env.local
+/secrets/
 
 # Backend (Laravel)
 /backend/vendor/

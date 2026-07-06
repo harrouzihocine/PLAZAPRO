@@ -22,7 +22,7 @@ grep -q '^COMPOSE_FILE=docker-compose.prod.yml' .env || {
     exit 1
 }
 
-APP_PORT=$(grep -oP '^APP_PORT=\K.*' .env || echo 80)
+APP_TLS_PORT=$(grep -oP '^APP_TLS_PORT=\K.*' .env || echo 443)
 
 if [[ "${1:-}" != "--no-pull" ]]; then
     git pull --ff-only
@@ -57,6 +57,11 @@ docker compose run --rm app php artisan migrate --force
 # config / routes / views / events all cached for prod speed.
 docker compose run --rm app php artisan optimize
 
+# nginx refuses to start when its cert files are missing; seed a self-signed
+# placeholder if scripts/setup-lan-tls.sh hasn't issued the real one yet.
+echo "==> Ensuring LAN TLS cert files exist"
+"$ROOT/scripts/setup-lan-tls.sh" --bootstrap-only
+
 echo "==> Starting the full stack"
 docker compose up -d --remove-orphans
 # Workers reload code/config on their next job.
@@ -65,7 +70,10 @@ docker compose exec -T app php artisan up
 
 echo "==> Smoke test"
 sleep 3
-curl -fsS "http://127.0.0.1:${APP_PORT}/up" > /dev/null && echo "  /up OK"
-curl -fsS "http://127.0.0.1:${APP_PORT}/api/v1/ping" > /dev/null && echo "  /api/v1/ping OK"
+# Through the LAN TLS listener (the path office users take). -k because the
+# cert is for the domain (or still the bootstrap self-signed), not 127.0.0.1 —
+# this probes the nginx→php chain, cert validity is verified in setup-lan-tls.
+curl -fsSk "https://127.0.0.1:${APP_TLS_PORT}/up" > /dev/null && echo "  /up OK"
+curl -fsSk "https://127.0.0.1:${APP_TLS_PORT}/api/v1/ping" > /dev/null && echo "  /api/v1/ping OK"
 
 echo "Deploy complete. If the tunnel should run here: docker compose --profile tunnel up -d"
