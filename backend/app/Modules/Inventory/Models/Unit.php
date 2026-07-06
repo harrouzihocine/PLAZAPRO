@@ -21,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 /**
  * An apartment / lot inside a location. price and sale_status corrections go
  * through HasVersions::supersedeWith (cancel-and-duplicate); ordinary spec edits
- * and reservation lifecycle transitions are plain updates.
+ * and interest-hold lifecycle transitions are plain updates.
  */
 class Unit extends BaseModel
 {
@@ -29,7 +29,7 @@ class Unit extends BaseModel
 
     protected $fillable = [
         'location_id', 'reference', 'room_number_id', 'floor_id', 'area_sqm',
-        'price', 'sale_status', 'onhold_expires_at', 'onhold_project_id',
+        'price', 'sale_status', 'reserved_expires_at', 'reserved_project_id',
         'block', 'stack_floor', 'position', 'gtm_priority',
     ];
 
@@ -39,7 +39,7 @@ class Unit extends BaseModel
             'price' => 'decimal:2',
             'area_sqm' => 'decimal:2',
             'sale_status' => SaleStatus::class,
-            'onhold_expires_at' => 'datetime',
+            'reserved_expires_at' => 'datetime',
             'gtm_priority' => GtmPriority::class,
         ]);
     }
@@ -52,7 +52,7 @@ class Unit extends BaseModel
     protected static function booted(): void
     {
         static::updated(function (Unit $unit): void {
-            if ($unit->wasChanged('sale_status') || $unit->wasChanged('onhold_expires_at')) {
+            if ($unit->wasChanged('sale_status') || $unit->wasChanged('reserved_expires_at')) {
                 UnitStatusChanged::dispatch($unit, $unit->wasChanged('sale_status'));
             }
         });
@@ -84,13 +84,13 @@ class Unit extends BaseModel
         return $this->hasMany(Reservation::class);
     }
 
-    /** The client project that has this unit On Hold (paid a deposit), if any. */
-    public function onholdProject(): BelongsTo
+    /** The client project that has this unit Reserved (paid a deposit), if any. */
+    public function reservedProject(): BelongsTo
     {
-        return $this->belongsTo(ClientProject::class, 'onhold_project_id');
+        return $this->belongsTo(ClientProject::class, 'reserved_project_id');
     }
 
-    /** The most-recent active hold (the On Hold holder's, or the latest backup). */
+    /** The most-recent active hold (the Reserved holder's, or the latest backup). */
     public function activeReservation(): HasOne
     {
         return $this->hasOne(Reservation::class)
@@ -98,7 +98,7 @@ class Unit extends BaseModel
             ->latest('id');
     }
 
-    /** All live holds — several projects can reserve the same unit as backups. */
+    /** All live interest holds — several projects can queue on a unit as backups. */
     public function activeReservations(): HasMany
     {
         return $this->hasMany(Reservation::class)
@@ -113,8 +113,8 @@ class Unit extends BaseModel
             ->exists();
     }
 
-    /** Distinct client projects holding this unit — the "Reserved N" counter. */
-    public function reservedCount(): int
+    /** Distinct client projects holding this unit — the "Interested N" counter. */
+    public function interestedCount(): int
     {
         return (int) $this->reservations()
             ->where('hold_status', HoldStatus::Active->value)
@@ -124,9 +124,10 @@ class Unit extends BaseModel
     }
 
     /**
-     * Return a unit to the market after a hold ends (deal lost / On Hold lapsed):
-     * clear the On Hold lock and fall back to reserved if backups remain, else
-     * available. Never touches a sold unit (that reversal is ReleaseWonDealUnit).
+     * Return a unit to the market after a hold ends (deal lost / deposit lapsed):
+     * clear the Reserved deposit lock and fall back to interested if backups
+     * remain, else available. Never touches a sold unit (that reversal is
+     * ReleaseWonDealUnit).
      */
     public function revertToMarket(): void
     {
@@ -135,10 +136,10 @@ class Unit extends BaseModel
         }
 
         $this->update([
-            'onhold_expires_at' => null,
-            'onhold_project_id' => null,
+            'reserved_expires_at' => null,
+            'reserved_project_id' => null,
             'sale_status' => $this->hasActiveHold()
-                ? SaleStatus::Reserved->value
+                ? SaleStatus::Interested->value
                 : SaleStatus::Available->value,
         ]);
     }

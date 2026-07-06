@@ -30,8 +30,8 @@ class ArchiveClientProject
     {
         abort_unless($project->isActive(), 422, 'Only an active deal can be archived.');
 
-        // An open deal holds reserved inventory — archiving around it would leave
-        // the units and boxes stuck "reserved" forever. Close the deal first
+        // An open deal holds Interested inventory — archiving around it would
+        // leave the units and boxes stuck "interested" forever. Close the deal first
         // (its own lost→archive path passes here AFTER the deal resolves).
         abort_if(
             $project->activeDeal()->exists(),

@@ -15,7 +15,7 @@ use App\Modules\Settings\Models\User;
 
 /**
  * The interaction logs (calls + visits) of every client project that has ever
- * touched THIS unit — visited it, shortlisted it, dealt on it, reserved it, or
+ * touched THIS unit — visited it, shortlisted it, dealt on it, held it, or
  * carries it as the project's stamped unit. Grouped per project so the unit
  * page can render each project's story with the same timeline design used on
  * the project detail page.
@@ -32,7 +32,7 @@ class BuildUnitProjectLogs
      */
     public function handle(Unit $unit, User $user): array
     {
-        // Projects that reserved this unit — Reservation has no ClientProject
+        // Projects with an interest hold on this unit — Reservation has no ClientProject
         // relation the other way, so resolve the ids first and fold them in.
         $reservedProjectIds = Reservation::query()
             ->where('unit_id', $unit->id)

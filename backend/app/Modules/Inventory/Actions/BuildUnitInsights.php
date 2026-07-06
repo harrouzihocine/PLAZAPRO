@@ -43,13 +43,13 @@ class BuildUnitInsights
                 'area_sqm' => $unit->area_sqm,
                 'reservations' => (clone $reservations)->count(),
                 'has_active_hold' => (clone $reservations)->where('hold_status', 'active')->exists(),
-                // Distinct client projects holding it now — the "Reserved N" counter.
-                'reserved_count' => (clone $reservations)
+                // Distinct client projects holding it now — the "Interested N" counter.
+                'interested_count' => (clone $reservations)
                     ->where('hold_status', 'active')
                     ->whereNotNull('client_project_id')
                     ->distinct()
                     ->count('client_project_id'),
-                'onhold_expires_at' => $unit->onhold_expires_at?->toIso8601String(),
+                'reserved_expires_at' => $unit->reserved_expires_at?->toIso8601String(),
                 'times_shortlisted' => $timesShortlisted,
                 'deals' => $dealAppearances,
             ],

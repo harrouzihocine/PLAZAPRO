@@ -31,14 +31,19 @@ Route::middleware('auth:sanctum')->group(function () {
     // next-action form). Personal data only — no permission beyond being signed in.
     Route::get('/me/agenda', [NextActionController::class, 'agenda']);
 
-    // Logging a call may leave a next action; one can also be planned later on
-    // its own (store). Corrections (call + next action) also run under calls.log
-    // — every edit is a cancel + new version, captured in history with a reason.
+    // Logging a call may leave a next action. Corrections (call + next action)
+    // also run under calls.log — every edit is a cancel + new version, captured
+    // in history with a reason.
     Route::middleware('can:calls.log')->group(function () {
         Route::post('/clients/{client}/calls', [CallController::class, 'store']);
-        Route::post('/clients/{client}/next-actions', [NextActionController::class, 'store']);
         Route::post('/calls/{call}/correct', [CallController::class, 'correct']);
         Route::post('/next-actions/{nextAction}/correct', [NextActionController::class, 'correct']);
+    });
+
+    // Planning a standalone next action ("Plan next action") has its own grant,
+    // split from calls.log so it can be handed out person-by-person.
+    Route::middleware('can:next_actions.plan')->group(function () {
+        Route::post('/clients/{client}/next-actions', [NextActionController::class, 'store']);
     });
 
     // The dispatch board: pending in-site pool + agents × weekdays, drag & drop.
@@ -59,8 +64,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/visits/{visit}/correct', [VisitController::class, 'correct']);
 
     // Add apartment(s) to visit on a project, standalone (no need to complete an
-    // open visit first). Conducting agents who can see the project — the request
-    // is the gate, so no permission middleware here.
+    // open visit first). visits.propose holders who can see the project — the
+    // request is the gate, so no permission middleware here.
     Route::post('/projects/{project}/in-site-visits', [VisitController::class, 'proposeInSite']);
 
     // Completing a visit (conducting it) always leaves a next action.

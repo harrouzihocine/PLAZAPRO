@@ -22,6 +22,12 @@ mkdir -p "$BACKUP_ROOT"
 
 block=$(cat <<CRON
 $MARK_BEGIN
+# Business runs on Algeria time. TZ fixes the scripts' own date math wherever
+# cron fires; CRON_TZ moves the schedule itself on crons that support it
+# (harmless env var otherwise). Best set the HOST tz to Africa/Algiers too:
+#   sudo timedatectl set-timezone Africa/Algiers
+TZ=Africa/Algiers
+CRON_TZ=Africa/Algiers
 */30 7-18 * * * $ROOT/scripts/backup-db.sh >> $LOG 2>&1
 0 19-23,0-6 * * * $ROOT/scripts/backup-db.sh >> $LOG 2>&1
 30 21 * * * $ROOT/scripts/backup-media.sh >> $LOG 2>&1

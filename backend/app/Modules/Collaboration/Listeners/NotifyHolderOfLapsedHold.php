@@ -6,19 +6,19 @@ namespace App\Modules\Collaboration\Listeners;
 
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Collaboration\Notifications\DomainNotification;
-use App\Modules\Inventory\Events\OnHoldLapsed;
+use App\Modules\Inventory\Events\ReservedLapsed;
 use App\Modules\Settings\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
 
 /**
- * A unit's On Hold deposit window lapsed: tell the agent who held it that it went
+ * A unit's Reserved deposit window lapsed: tell the agent who held it that it went
  * back on the market (their client did not finalize in time). Targeted to the
  * project's owner — the everyone-sees-it status change rides the live status
  * broadcast. Runs on the queue.
  */
 class NotifyHolderOfLapsedHold implements ShouldQueue
 {
-    public function handle(OnHoldLapsed $event): void
+    public function handle(ReservedLapsed $event): void
     {
         $project = ClientProject::query()->with('creator')->find($event->projectId);
         $agent = $project?->creator;
@@ -31,9 +31,9 @@ class NotifyHolderOfLapsedHold implements ShouldQueue
         $where = $unit->location?->name !== null ? ' at '.$unit->location->name : '';
 
         $agent->notify(new DomainNotification(
-            kind: 'onhold_lapsed',
-            title: 'Hold expired',
-            body: 'The hold on '.$unit->reference.$where.' lapsed — it is back on the market.',
+            kind: 'reserved_lapsed',
+            title: 'Reservation expired',
+            body: 'The reservation on '.$unit->reference.$where.' lapsed — it is back on the market.',
             link: '/inventory/units/'.$unit->id,
             subjectType: 'unit',
             subjectId: $unit->id,

@@ -13,7 +13,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * A 48-hour reservation hold on a unit. Flips to expired by the scheduled sweeper
+ * A 48-hour interest hold on a unit — the record behind the Interested status
+ * ("Interested N" = active holds). Flips to expired by the scheduled sweeper
  * (ExpireReservationHolds) if not converted or released first.
  */
 class Reservation extends BaseModel
@@ -43,7 +44,7 @@ class Reservation extends BaseModel
         return $this->belongsTo(User::class, 'held_by');
     }
 
-    /** The deal this hold belongs to, if the agent linked one when reserving. */
+    /** The deal this hold belongs to, if the agent linked one when marking interest. */
     public function clientProject(): BelongsTo
     {
         return $this->belongsTo(ClientProject::class);

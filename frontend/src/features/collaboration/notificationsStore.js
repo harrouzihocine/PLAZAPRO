@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { notificationsApi } from '@/features/collaboration/api'
 import { getEcho } from '@/composables/useEcho'
+import { useChatDockStore } from '@/features/collaboration/chatDockStore'
+import { playNotificationSound } from '@/utils/notificationSound'
 
 // In-app notification feed backing the AppShell bell. Loads the latest page over
 // HTTP and keeps the unread badge live over Reverb (the user's private channel).
@@ -88,6 +90,13 @@ export const useNotificationsStore = defineStore('notifications', {
         created_at: payload.created_at ?? new Date().toISOString(),
       })
       this.unreadCount += 1
+      // Chat messages get the dock treatment (head + pop sound, suppressed when
+      // the thread is open); everything else chimes the bell.
+      if (payload.kind === 'chat_message') {
+        useChatDockStore().noteIncoming(payload)
+      } else {
+        playNotificationSound()
+      }
     },
 
     // Subscribe to the current user's private channel for live notifications.

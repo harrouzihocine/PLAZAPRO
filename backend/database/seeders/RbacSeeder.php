@@ -40,7 +40,7 @@ class RbacSeeder extends Seeder
         // Settings / admin
         'users.manage', 'roles.manage', 'settings.manage', 'audit.view', 'audit.export',
         // Inventory
-        'locations.manage', 'units.view', 'units.reserve', 'units.manage', 'media.manage',
+        'locations.manage', 'units.view', 'units.interest', 'units.manage', 'media.manage',
         // Clients — the client record itself. clients.manage covers ONLY the
         // client (edit / reassign / archive); projects have their own grants.
         'clients.view', 'clients.create', 'clients.manage',
@@ -74,7 +74,12 @@ class RbacSeeder extends Seeder
         // in-site pool and hands tasks to field agents. NOTE: the board is by
         // nature company-wide (client names, sites, agent workload across ALL
         // visibility scopes) — grant it only to roles trusted with that view.
-        'calls.log', 'visits.assign', 'visits.dispatch', 'visits.conduct', 'tasks.manage',
+        // visits.propose: the standalone "Add unit to visit" button (send
+        // apartment(s) out as in-site visits, pooled or pre-assigned).
+        // next_actions.plan: the standalone "Plan next action" button (a log's
+        // own next action still rides on calls.log / visits.conduct).
+        'calls.log', 'next_actions.plan',
+        'visits.assign', 'visits.dispatch', 'visits.conduct', 'visits.propose', 'tasks.manage',
         // Payments
         'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
         // Collaboration & analytics
@@ -115,7 +120,7 @@ class RbacSeeder extends Seeder
         // Inventory
         'locations.manage' => 'Add and edit buildings, sites and their locations.',
         'units.view' => 'See apartments/units and their availability.',
-        'units.reserve' => 'Put a unit on hold for a client.',
+        'units.interest' => 'Mark a unit as Interested for a client (places a hold).',
         'units.manage' => 'Add, edit and change the status of units.',
         'media.manage' => 'Upload and manage photos and files on units and projects.',
         // Clients
@@ -135,11 +140,13 @@ class RbacSeeder extends Seeder
         'projects.advance' => 'Move a project\'s workflow step forward or back.',
         'deals.direct' => 'Open a deal directly without going through a visit log.',
         'deals.manage' => 'Close a deal or one of its apartments (won / lost), release a won apartment, add boxes and record shortlist outcomes.',
-        'shortlist.manage' => 'Add properties to a project\'s shortlist while logging an office visit. Keeping or dropping the listed properties stays open to anyone conducting the visit; others add new ones from "Add unit to visit".',
+        'shortlist.manage' => 'Curate a project\'s standalone shortlist panel: add and drop properties directly, outside any visit log. (Anyone completing an office visit can add properties inside that log.)',
         'calls.log' => 'Record call rapports with clients.',
+        'next_actions.plan' => 'Use the "Plan next action" button to schedule a follow-up (call, office or in-site visit) when nothing is pending.',
         'visits.assign' => 'Assign visits to agents.',
         'visits.dispatch' => 'Use the weekly dispatch board and hand out field visits company-wide.',
         'visits.conduct' => 'Carry out visits and write their rapports.',
+        'visits.propose' => 'Use the "Add unit to visit" button — send apartment(s) out as in-site visits (into the dispatch pool; dispatchers may pre-assign the agent).',
         'tasks.manage' => 'Create and manage follow-up tasks.',
         // Payments
         'versements.view' => 'See payment records (versements) and schedules.',
@@ -206,6 +213,11 @@ class RbacSeeder extends Seeder
         // Split from deals.manage: every management role that could close deals
         // keeps the office-visit shortlist picker; agents (no deals.manage) don't.
         'shortlist.manage' => 'deals.manage',
+        // Split so the two standalone timeline buttons ("Plan next action" /
+        // "Add unit to visit") can be granted person-by-person. Roles that could
+        // use them before (via the broad grant) keep doing so.
+        'next_actions.plan' => 'calls.log',
+        'visits.propose' => 'visits.conduct',
     ];
 
     /**
@@ -290,13 +302,17 @@ class RbacSeeder extends Seeder
         $fullVisibility = ['clients.view_all', 'clients.view_details', 'projects.view_all'];
 
         // Outside/apartment visit rapports (the field agent).
-        $siteAgent = [...$this->baseline, ...$fullVisibility, 'clients.view', 'units.view', 'visits.conduct'];
+        $siteAgent = [
+            ...$this->baseline, ...$fullVisibility,
+            'clients.view', 'units.view', 'visits.conduct', 'visits.propose',
+        ];
 
         // Calls + office-visit rapports. Opening a project is part of the lead
         // workflow (the "New project" flow starts with its opening call).
         $salesAgent = [
             ...$this->baseline, ...$fullVisibility,
-            'clients.view', 'clients.create', 'projects.create', 'calls.log', 'visits.conduct',
+            'clients.view', 'clients.create', 'projects.create',
+            'calls.log', 'next_actions.plan', 'visits.conduct', 'visits.propose',
         ];
 
         // The payment desk: record versements, manage schedules, generate documents.
@@ -316,8 +332,9 @@ class RbacSeeder extends Seeder
             'clients.view', 'clients.create', 'clients.manage', 'clients.duplicates.resolve',
             'projects.create', 'projects.manage', 'projects.contributors', 'projects.freeze',
             'projects.advance', 'deals.direct', 'deals.manage', 'shortlist.manage',
-            'calls.log', 'visits.assign', 'visits.dispatch', 'visits.conduct', 'tasks.manage',
-            'units.view', 'units.reserve', 'units.manage', 'media.manage',
+            'calls.log', 'next_actions.plan',
+            'visits.assign', 'visits.dispatch', 'visits.conduct', 'visits.propose', 'tasks.manage',
+            'units.view', 'units.interest', 'units.manage', 'media.manage',
             'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
         ];
 

@@ -21,7 +21,7 @@ class DealFactory extends Factory
         return [
             'client_project_id' => ClientProject::factory(),
             'visit_id' => null,
-            'state' => DealState::Reserved->value,
+            'state' => DealState::Open->value,
             'total_price' => null,
             'notes' => null,
             'created_by' => null,

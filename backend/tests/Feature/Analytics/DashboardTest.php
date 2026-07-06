@@ -68,16 +68,16 @@ class DashboardTest extends TestCase
         $me = $this->user(['dashboard.view'], isAgent: true);
         $other = $this->user(['dashboard.view'], isAgent: true);
 
-        // Mine: a project I created still in play, plus its open (reserved) deal.
+        // Mine: a project I created still in play, plus its open deal.
         $myProject = ClientProject::factory()->create(['created_by' => $me->id]);
-        Deal::factory()->create(['client_project_id' => $myProject->id, 'created_by' => $me->id, 'state' => 'reserved']);
+        Deal::factory()->create(['client_project_id' => $myProject->id, 'created_by' => $me->id, 'state' => 'open']);
 
         // Mine but WON — terminal, must not count as "active".
         $wonProject = ClientProject::factory()->create(['created_by' => $me->id, 'stage' => 'won']);
 
         // Someone else's project + deal — must not leak into my counts.
         $theirProject = ClientProject::factory()->create(['created_by' => $other->id]);
-        Deal::factory()->create(['client_project_id' => $theirProject->id, 'created_by' => $other->id, 'state' => 'reserved']);
+        Deal::factory()->create(['client_project_id' => $theirProject->id, 'created_by' => $other->id, 'state' => 'open']);
 
         Sanctum::actingAs($me);
 

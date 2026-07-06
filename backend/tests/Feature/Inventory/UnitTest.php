@@ -171,12 +171,12 @@ class UnitTest extends TestCase
     {
         $location = Location::factory()->create();
         Unit::factory()->for($location)->create(['sale_status' => 'available', 'area_sqm' => 60, 'reference' => 'A-1']);
-        Unit::factory()->for($location)->reserved()->create(['area_sqm' => 90, 'reference' => 'A-2']);
+        Unit::factory()->for($location)->interested()->create(['area_sqm' => 90, 'reference' => 'A-2']);
         Unit::factory()->for($location)->sold()->create(['area_sqm' => 150, 'reference' => 'A-3']);
         Sanctum::actingAs($this->manager());
 
-        // Multi-select statuses (available OR reserved).
-        $this->getJson('/api/v1/units?sale_status[]=available&sale_status[]=reserved')
+        // Multi-select statuses (available OR interested).
+        $this->getJson('/api/v1/units?sale_status[]=available&sale_status[]=interested')
             ->assertOk()
             ->assertJsonCount(2, 'data');
 
@@ -205,9 +205,9 @@ class UnitTest extends TestCase
             ->assertJsonPath('data.0.location.wilaya_id', $alger->id);
     }
 
-    public function test_a_reserved_unit_cannot_be_cancelled(): void
+    public function test_an_interested_unit_cannot_be_cancelled(): void
     {
-        $unit = Unit::factory()->reserved()->create();
+        $unit = Unit::factory()->interested()->create();
         Sanctum::actingAs($this->manager());
 
         $this->deleteJson("/api/v1/units/{$unit->id}")->assertStatus(422);
@@ -223,12 +223,12 @@ class UnitTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_cannot_remove_a_location_with_reserved_or_sold_units(): void
+    public function test_cannot_remove_a_location_with_interested_or_sold_units(): void
     {
         // Removing a project now cascades over AVAILABLE inventory, but is still
-        // refused while a unit is reserved or sold, so a live sale is never lost.
+        // refused while a unit is interested or sold, so a live sale is never lost.
         $location = Location::factory()->create();
-        Unit::factory()->for($location)->reserved()->create();
+        Unit::factory()->for($location)->interested()->create();
         Sanctum::actingAs($this->userWithPermissions(['units.view', 'locations.manage']));
 
         $this->deleteJson("/api/v1/locations/{$location->id}")->assertStatus(422);

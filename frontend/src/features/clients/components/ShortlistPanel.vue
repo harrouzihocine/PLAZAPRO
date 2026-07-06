@@ -16,9 +16,9 @@ import { useAuthStore } from '@/features/settings/store'
 const props = defineProps({ projectId: { type: [String, Number], required: true } })
 const emit = defineEmits(['changed'])
 const auth = useAuthStore()
-// Curating the standalone shortlist (add / drop / save) needs shortlist.manage
-// — the same senior grant as the office-visit picker. Everyone else sees it
-// read-only and adds properties via "Add unit to visit".
+// Curating the standalone shortlist (add / drop / save) needs shortlist.manage.
+// Everyone else sees it read-only and adds properties from a log instead — the
+// office-visit completion picker or "Add unit to visit" (visits.propose).
 const canEdit = () => auth.can('shortlist.manage')
 
 const items = ref([]) // working copy: { shortlistable_type, shortlistable_id, state, property }

@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 
 /**
- * The cross-project payment follow-up hub (/payments): holdings on hold,
+ * The cross-project payment follow-up hub (/payments): reserved units,
  * reservations, and the instalments to chase. Read-only; gated versements.view.
  */
 class PaymentsOverviewController extends Controller

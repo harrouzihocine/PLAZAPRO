@@ -7,13 +7,14 @@ namespace App\Modules\Clients\Enums;
 /**
  * The stage of a deal (client_project) in the sales pipeline. Movement between
  * stages is constrained: you go forward, or drop out to `lost`; `won`/`lost` are
- * terminal. The single source of truth for allowed transitions.
+ * terminal. The single source of truth for allowed transitions. `deal` = an
+ * open deal carries the project (its properties are marked Interested).
  */
 enum ClientProjectStage: string
 {
     case Lead = 'lead';
     case Negotiating = 'negotiating';
-    case Reserved = 'reserved';
+    case Deal = 'deal';
     case Won = 'won';
     case Lost = 'lost';
 
@@ -23,9 +24,9 @@ enum ClientProjectStage: string
     public function allowedNext(): array
     {
         return match ($this) {
-            self::Lead => [self::Negotiating, self::Reserved, self::Lost],
-            self::Negotiating => [self::Reserved, self::Won, self::Lost],
-            self::Reserved => [self::Won, self::Lost],
+            self::Lead => [self::Negotiating, self::Deal, self::Lost],
+            self::Negotiating => [self::Deal, self::Won, self::Lost],
+            self::Deal => [self::Won, self::Lost],
             self::Won, self::Lost => [],
         };
     }

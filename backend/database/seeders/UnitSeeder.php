@@ -16,7 +16,7 @@ use Illuminate\Database\Seeder;
  * Comprehensive unit test data covering:
  * - All unit types (studio, f2, f3, f4, duplex, commercial, etc.)
  * - All floors (ground, floor_1 through floor_5+, terrace)
- * - All sale statuses (available, reserved, sold, draft)
+ * - All sale statuses (available, interested, sold, draft)
  * - Various sizes and prices
  * - Different blocks and positions
  * - GTM priorities
@@ -68,7 +68,7 @@ class UnitSeeder extends Seeder
             // Room layouts (F2 / F3 / …) — the per-apartment size attribute.
             $roomLayouts = ['studio', 'f2', 'f3', 'f4', 'duplex', 'f2', 'f3'];
             $floors = ['ground', 'floor_1', 'floor_2', 'floor_3', 'floor_4', 'floor_5'];
-            $saleStatuses = [SaleStatus::Available, SaleStatus::Reserved, SaleStatus::Available, SaleStatus::Sold, SaleStatus::Available];
+            $saleStatuses = [SaleStatus::Available, SaleStatus::Interested, SaleStatus::Available, SaleStatus::Sold, SaleStatus::Available];
 
             $type = $roomLayouts[$i % count($roomLayouts)];
             $floor = $floors[$i % count($floors)];
@@ -112,7 +112,7 @@ class UnitSeeder extends Seeder
                 $status === SaleStatus::Sold => GtmPriority::Low,
                 $status === SaleStatus::Available && $type === 'f4' => GtmPriority::Critical,
                 $status === SaleStatus::Available => GtmPriority::High,
-                $status === SaleStatus::Reserved => GtmPriority::Medium,
+                $status === SaleStatus::Interested => GtmPriority::Medium,
                 default => GtmPriority::Low,
             };
 

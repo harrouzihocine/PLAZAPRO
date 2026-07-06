@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Re-set the boxes riding with ONE apartment on an open deal: boxes dropped
  * from the list are released (and unlinked when this deal linked them), new
- * ones are reserved. Only a box already linked to this apartment or not linked
+ * ones are marked Interested. Only a box already linked to this apartment or not linked
  * to any apartment can be picked — never one belonging to another apartment or
  * taken by someone else.
  */
@@ -43,7 +43,7 @@ class SyncDealUnitBoxes
 
                 $box = $item->box;
                 $box->update([
-                    'sale_status' => $box->sale_status === SaleStatus::Reserved
+                    'sale_status' => $box->sale_status === SaleStatus::Interested
                         ? SaleStatus::Available->value
                         : $box->sale_status,
                     // A link created by this deal is reverted with it.
@@ -52,7 +52,7 @@ class SyncDealUnitBoxes
                 $item->cancel('Removed from deal');
             }
 
-            // Reserve the newly added ones (linked here when not linked yet).
+            // Mark the newly added ones Interested (linked here when not linked yet).
             $kept = $current->pluck('box_id')->map(fn ($id) => (int) $id)->all();
             foreach ($wanted as $boxId) {
                 if (in_array($boxId, $kept, true)) {
@@ -79,7 +79,7 @@ class SyncDealUnitBoxes
 
                 $linkedHere = $box->unit_id === null;
                 $box->update([
-                    'sale_status' => SaleStatus::Reserved->value,
+                    'sale_status' => SaleStatus::Interested->value,
                     'unit_id' => $unit->id,
                 ]);
 

@@ -3,6 +3,7 @@
 services:
   nginx:
     image: nginx:alpine
+    environment: { TZ: Africa/Algiers }
     ports: ["${APP_PORT:-8080}:80"]
     volumes:
       - ./backend:/var/www/html
@@ -16,6 +17,7 @@ services:
       args:
         UID: ${UID:-1000}
         GID: ${GID:-1000}
+    environment: { TZ: Africa/Algiers }
     volumes: ["./backend:/var/www/html"]
     depends_on:
       mysql: { condition: service_healthy }
@@ -28,7 +30,11 @@ services:
       args:
         UID: ${UID:-1000}
         GID: ${GID:-1000}
-    command: php artisan queue:work --tries=3 --timeout=120
+    # queue:listen (not queue:work) so the worker picks up backend code changes
+    # per job — queue:work caches classes in memory and silently runs stale
+    # listeners until restarted. Prod uses its own compose with recycled workers.
+    command: php artisan queue:listen --tries=3 --timeout=120
+    environment: { TZ: Africa/Algiers }
     user: "${UID:-1000}:${GID:-1000}" # write storage/ as the host UID, not root
     volumes: ["./backend:/var/www/html"]
     depends_on:
@@ -45,6 +51,7 @@ services:
         UID: ${UID:-1000}
         GID: ${GID:-1000}
     command: php artisan schedule:work
+    environment: { TZ: Africa/Algiers }
     user: "${UID:-1000}:${GID:-1000}" # write storage/ as the host UID, not root
     volumes: ["./backend:/var/www/html"]
     depends_on:
@@ -61,6 +68,7 @@ services:
         UID: ${UID:-1000}
         GID: ${GID:-1000}
     command: php artisan reverb:start --host=0.0.0.0 --port=8081
+    environment: { TZ: Africa/Algiers }
     user: "${UID:-1000}:${GID:-1000}" # write storage/ as the host UID, not root
     ports: ["${REVERB_PORT:-8081}:8081"]
     volumes: ["./backend:/var/www/html"]
@@ -72,6 +80,7 @@ services:
 
   node: # Vue dev server (Vite)
     image: node:20-alpine
+    environment: { TZ: Africa/Algiers }
     working_dir: /app
     command: sh -c "npm install && npm run dev -- --host"
     ports: ["${VITE_PORT:-5173}:5173"]
@@ -80,7 +89,11 @@ services:
 
   mysql:
     image: mysql:8
+    # Algeria is UTC+1 year-round (no DST), so the fixed offset is exact. This
+    # aligns DB-side defaults (CURRENT_TIMESTAMP / NOW()) with the app clock.
+    command: --default-time-zone=+01:00
     environment:
+      TZ: Africa/Algiers
       MYSQL_DATABASE: ${MYSQL_DATABASE:-plaza}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-secret}
     ports: ["${MYSQL_PORT:-3306}:3306"]
@@ -94,6 +107,7 @@ services:
 
   redis:
     image: redis:alpine
+    environment: { TZ: Africa/Algiers }
     networks: [plaza-net]
 
   mailpit: # catches dev e-mails — UI at http://localhost:8025

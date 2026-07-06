@@ -14,8 +14,9 @@ use Illuminate\Support\Collection;
  * whose criteria it satisfies (wilaya / commune / type / floor / area / budget /
  * preferred sites), eager-loading each desire's client + assigned agent so the
  * caller can notify. Only criteria the client actually set are applied — the
- * mirror image of the forward matcher. A SOLD unit matches nothing; a reserved
- * or on-hold one still does (it can be taken as a backup / 2nd place).
+ * mirror image of the forward matcher. A SOLD unit matches nothing; an
+ * interested or reserved one still does (it can be taken as a backup / 2nd
+ * place).
  */
 class MatchInventoryToDesires
 {

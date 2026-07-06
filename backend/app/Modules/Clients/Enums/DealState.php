@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace App\Modules\Clients\Enums;
 
 /**
- * A deal's lifecycle. Born `reserved` (its properties are auto-reserved on
+ * A deal's lifecycle. Born `open` (its properties are auto-marked Interested on
  * creation), then closed `won` (the client buys) or `lost` (the client passes,
  * the properties are released back to inventory).
  */
 enum DealState: string
 {
-    case Reserved = 'reserved';
+    case Open = 'open';
     case Won = 'won';
     case Lost = 'lost';
 
     public function isClosed(): bool
     {
-        return $this !== self::Reserved;
+        return $this !== self::Open;
     }
 }

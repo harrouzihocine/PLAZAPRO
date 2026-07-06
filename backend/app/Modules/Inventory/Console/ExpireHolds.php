@@ -8,19 +8,19 @@ use App\Modules\Inventory\Actions\ExpireReservationHolds;
 use Illuminate\Console\Command;
 
 /**
- * Expire reservation holds past their 48h window and return their units to
+ * Expire interest holds past their 48h window and return their units to
  * available. Scheduled every five minutes (see routes/console.php).
  */
 class ExpireHolds extends Command
 {
     protected $signature = 'holds:expire';
 
-    protected $description = 'Expire reservation holds past their 48h window and free their units';
+    protected $description = 'Expire interest holds past their 48h window and free their units';
 
     public function handle(ExpireReservationHolds $action): int
     {
         $count = $action->handle();
-        $this->info("Expired {$count} reservation hold(s).");
+        $this->info("Expired {$count} interest hold(s).");
 
         return self::SUCCESS;
     }

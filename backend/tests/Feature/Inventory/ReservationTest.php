@@ -33,7 +33,7 @@ class ReservationTest extends TestCase
 
     private function agent(): User
     {
-        return $this->userWithPermissions(['units.view', 'units.reserve']);
+        return $this->userWithPermissions(['units.view', 'units.interest']);
     }
 
     public function test_reserving_an_available_unit_holds_it_for_48h(): void
@@ -41,26 +41,26 @@ class ReservationTest extends TestCase
         $unit = Unit::factory()->create(['sale_status' => 'available']);
         Sanctum::actingAs($this->agent());
 
-        $this->postJson("/api/v1/units/{$unit->id}/reserve")
+        $this->postJson("/api/v1/units/{$unit->id}/interest")
             ->assertCreated()
             ->assertJsonPath('data.hold_status', 'active');
 
         $unit->refresh();
-        $this->assertSame('reserved', $unit->sale_status->value);
+        $this->assertSame('interested', $unit->sale_status->value);
 
         $reservation = Reservation::latest('id')->first();
         $this->assertSame(48, (int) round($reservation->held_at->diffInHours($reservation->expires_at)));
     }
 
-    public function test_reserving_a_reserved_unit_adds_a_backup(): void
+    public function test_marking_interest_in_an_interested_unit_adds_a_backup(): void
     {
-        // Reservations are multi-project now: a reserved unit can be held again
-        // as a backup ("2nd place"). It stays reserved and the count grows.
-        $unit = Unit::factory()->reserved()->create();
+        // Interest holds are multi-project: an interested unit can be held again
+        // as a backup ("2nd place"). It stays interested and the count grows.
+        $unit = Unit::factory()->interested()->create();
         Sanctum::actingAs($this->agent());
 
-        $this->postJson("/api/v1/units/{$unit->id}/reserve")->assertCreated();
-        $this->assertSame('reserved', $unit->fresh()->sale_status->value);
+        $this->postJson("/api/v1/units/{$unit->id}/interest")->assertCreated();
+        $this->assertSame('interested', $unit->fresh()->sale_status->value);
         $this->assertSame(1, Reservation::count());
     }
 
@@ -69,7 +69,7 @@ class ReservationTest extends TestCase
         $unit = Unit::factory()->create(['sale_status' => 'sold']);
         Sanctum::actingAs($this->agent());
 
-        $this->postJson("/api/v1/units/{$unit->id}/reserve")->assertStatus(422);
+        $this->postJson("/api/v1/units/{$unit->id}/interest")->assertStatus(422);
         $this->assertSame(0, Reservation::count());
     }
 
@@ -77,7 +77,7 @@ class ReservationTest extends TestCase
     {
         $unit = Unit::factory()->create(['sale_status' => 'available']);
         Sanctum::actingAs($this->agent());
-        $this->postJson("/api/v1/units/{$unit->id}/reserve")->assertCreated();
+        $this->postJson("/api/v1/units/{$unit->id}/interest")->assertCreated();
 
         // Jump 49 hours forward; the hold is now past its window.
         Carbon::setTestNow(now()->addHours(49));
@@ -94,11 +94,11 @@ class ReservationTest extends TestCase
     {
         $unit = Unit::factory()->create(['sale_status' => 'available']);
         Sanctum::actingAs($this->agent());
-        $this->postJson("/api/v1/units/{$unit->id}/reserve")->assertCreated();
+        $this->postJson("/api/v1/units/{$unit->id}/interest")->assertCreated();
 
         Carbon::setTestNow(now()->addHours(47));
         $this->assertSame(0, app(ExpireReservationHolds::class)->handle());
-        $this->assertSame('reserved', $unit->fresh()->sale_status->value);
+        $this->assertSame('interested', $unit->fresh()->sale_status->value);
         Carbon::setTestNow();
     }
 
@@ -106,7 +106,7 @@ class ReservationTest extends TestCase
     {
         $unit = Unit::factory()->create(['sale_status' => 'available']);
         Sanctum::actingAs($this->agent());
-        $id = $this->postJson("/api/v1/units/{$unit->id}/reserve")->json('data.id');
+        $id = $this->postJson("/api/v1/units/{$unit->id}/interest")->json('data.id');
 
         $this->postJson("/api/v1/reservations/{$id}/release")
             ->assertOk()
@@ -119,7 +119,7 @@ class ReservationTest extends TestCase
     {
         $unit = Unit::factory()->create(['sale_status' => 'available']);
         Sanctum::actingAs($this->agent());
-        $id = $this->postJson("/api/v1/units/{$unit->id}/reserve")->json('data.id');
+        $id = $this->postJson("/api/v1/units/{$unit->id}/interest")->json('data.id');
 
         $this->postJson("/api/v1/reservations/{$id}/convert")
             ->assertOk()
@@ -128,12 +128,12 @@ class ReservationTest extends TestCase
         $this->assertSame('sold', $unit->fresh()->sale_status->value);
     }
 
-    public function test_reserve_requires_units_reserve_permission(): void
+    public function test_marking_interest_requires_units_interest_permission(): void
     {
         $unit = Unit::factory()->create(['sale_status' => 'available']);
         Sanctum::actingAs($this->userWithPermissions(['units.view']));
 
-        $this->postJson("/api/v1/units/{$unit->id}/reserve")->assertForbidden();
+        $this->postJson("/api/v1/units/{$unit->id}/interest")->assertForbidden();
     }
 
     public function test_holds_expire_command_runs(): void

@@ -18,11 +18,11 @@ use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
- * "Add unit to visit", standalone: a conducting agent adds apartment(s) to visit
- * on a project without first completing an open in-site visit — the standalone
- * twin of the "another apartment" step, freed from its "only on the last open
- * visit" gate. Assigned → materializes the pending visit(s); unassigned → lands
- * in the dispatch pool. See ProposeInSiteVisit.
+ * "Add unit to visit", standalone: a visits.propose holder adds apartment(s) to
+ * visit on a project without first completing an open in-site visit — the
+ * standalone twin of the "another apartment" step, freed from its "only on the
+ * last open visit" gate. Assigned → materializes the pending visit(s);
+ * unassigned → lands in the dispatch pool. See ProposeInSiteVisit.
  */
 class AddUnitToVisitTest extends TestCase
 {
@@ -74,7 +74,7 @@ class AddUnitToVisitTest extends TestCase
 
     public function test_it_adds_a_unit_to_the_dispatch_pool_without_completing_the_open_visits(): void
     {
-        $actor = $this->userWith(['clients.view', 'visits.conduct']);
+        $actor = $this->userWith(['clients.view', 'visits.propose']);
         [$project, , $visits] = $this->projectWithTwoOpenVisits($actor->id);
         $newUnit = Unit::factory()->create();
 
@@ -103,7 +103,7 @@ class AddUnitToVisitTest extends TestCase
 
     public function test_a_dispatcher_may_add_a_unit_assigned_straight_to_a_field_agent(): void
     {
-        $actor = $this->userWith(['clients.view', 'visits.conduct', 'visits.dispatch', 'projects.view_all']);
+        $actor = $this->userWith(['clients.view', 'visits.propose', 'visits.dispatch', 'projects.view_all']);
         [$project, $fieldAgent, $visits] = $this->projectWithTwoOpenVisits();
         $newUnit = Unit::factory()->create();
 
@@ -127,8 +127,8 @@ class AddUnitToVisitTest extends TestCase
 
     public function test_a_non_dispatcher_addition_is_pooled_even_if_an_agent_is_named(): void
     {
-        // Only dispatchers pre-assign; a conductor's named agent is ignored.
-        $actor = $this->userWith(['clients.view', 'visits.conduct']);
+        // Only dispatchers pre-assign; anyone else's named agent is ignored.
+        $actor = $this->userWith(['clients.view', 'visits.propose']);
         [$project, $fieldAgent] = $this->projectWithTwoOpenVisits($actor->id);
         $newUnit = Unit::factory()->create();
 
@@ -145,9 +145,11 @@ class AddUnitToVisitTest extends TestCase
         );
     }
 
-    public function test_it_requires_visits_conduct(): void
+    public function test_it_requires_visits_propose(): void
     {
-        $actor = $this->userWith(['clients.view', 'projects.view_all']);
+        // visits.conduct alone no longer opens the button — the grant was split
+        // so "Add unit to visit" can be handed out person-by-person.
+        $actor = $this->userWith(['clients.view', 'projects.view_all', 'visits.conduct']);
         [$project] = $this->projectWithTwoOpenVisits();
         $newUnit = Unit::factory()->create();
 
@@ -159,8 +161,8 @@ class AddUnitToVisitTest extends TestCase
 
     public function test_it_requires_the_project_to_be_visible(): void
     {
-        // A conductor who cannot see the project (no view_all, not a member) is out.
-        $actor = $this->userWith(['clients.view', 'visits.conduct']);
+        // A proposer who cannot see the project (no view_all, not a member) is out.
+        $actor = $this->userWith(['clients.view', 'visits.propose']);
         [$project] = $this->projectWithTwoOpenVisits();
         $newUnit = Unit::factory()->create();
 

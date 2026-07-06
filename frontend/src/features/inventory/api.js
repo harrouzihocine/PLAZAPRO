@@ -116,10 +116,10 @@ export const stackingApi = {
   },
 }
 
-// The 48-hour reservation hold lifecycle.
+// The 48-hour interest-hold lifecycle.
 export const reservationsApi = {
-  async reserve(unitId, payload = {}) {
-    const { data } = await useApi().post(`/units/${unitId}/reserve`, payload)
+  async markInterest(unitId, payload = {}) {
+    const { data } = await useApi().post(`/units/${unitId}/interest`, payload)
     return data.data
   },
 

@@ -121,10 +121,6 @@ export const desireApi = {
   },
 }
 
-// Reserve a unit (48h hold) — reused from the matches panel's one-tap "reserve".
-export const reserveUnit = (unitId, payload = {}) =>
-  useApi().post(`/units/${unitId}/reserve`, payload)
-
 // The deal's property shortlist (units/boxes the client wants), set at the office
 // visit. `sync` replaces the active set with the given list (add / keep / remove).
 export const shortlistApi = {
@@ -219,7 +215,7 @@ export const desireMatchesApi = {
 }
 
 // Deals on a project: opened from an interaction log (visit or call) with the
-// properties the client is interested in (auto-reserved). Each APARTMENT closes
+// properties the client is interested in (auto-marked Interested). Each APARTMENT closes
 // won (its own agreed price) or lost on its own; the whole-deal close is the
 // bulk face of the same flow. Boxes are edited per apartment while it's open.
 export const dealsApi = {

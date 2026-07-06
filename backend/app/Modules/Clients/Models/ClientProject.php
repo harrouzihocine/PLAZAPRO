@@ -250,12 +250,12 @@ class ClientProject extends BaseModel
         return $this->hasMany(Deal::class);
     }
 
-    /** The latest open (reserved) deal, when one exists. */
+    /** The latest open deal, when one exists. */
     public function activeDeal(): HasOne
     {
         return $this->hasOne(Deal::class)
             ->where('deals.status', 'active')
-            ->where('state', DealState::Reserved->value)
+            ->where('state', DealState::Open->value)
             ->latest('id');
     }
 

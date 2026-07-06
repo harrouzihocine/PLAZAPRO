@@ -34,7 +34,7 @@ class DealResource extends JsonResource
             'created_at' => $this->created_at,
             // Split so the UI renders apartments/locals and their boxes apart. The
             // full property card (not just the code) rides along on each item; each
-            // apartment carries its OWN lifecycle (reserved → won/lost + agreed
+            // apartment carries its OWN lifecycle (open → won/lost + agreed
             // price) and its boxes point back via parent_item_id.
             'units' => $this->whenLoaded('items', fn () => $this->items
                 ->filter(fn (DealItem $i) => $i->unit_id !== null && $i->isActive())
@@ -51,10 +51,10 @@ class DealResource extends JsonResource
                     'area_sqm' => $i->unit->area_sqm,
                     'price' => $i->unit->price,
                     'sale_status' => $i->unit->sale_status?->value,
-                    // On Hold deposit context: when the client paid a holding
-                    // deposit on this apartment it shows On Hold with the money
+                    // Reserved deposit context: when the client paid a holding
+                    // deposit on this apartment it shows Reserved with the money
                     // collected so far and, if held, the deadline.
-                    'onhold_expires_at' => $i->unit->onhold_expires_at,
+                    'reserved_expires_at' => $i->unit->reserved_expires_at,
                     'collected' => (string) Versement::query()->active()
                         ->where('client_project_id', $this->client_project_id)
                         ->where('unit_id', $i->unit_id)

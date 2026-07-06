@@ -84,7 +84,7 @@ class ShortlistTest extends TestCase
         $this->assertDatabaseHas('shortlist_items', ['shortlistable_id' => $unitA->id, 'status' => 'cancelled']);
     }
 
-    public function test_cannot_remove_a_unit_reserved_on_an_open_deal(): void
+    public function test_cannot_remove_a_unit_carried_on_an_open_deal(): void
     {
         $project = ClientProject::factory()->create();
         $unit = Unit::factory()->create();
@@ -98,10 +98,10 @@ class ShortlistTest extends TestCase
             'shortlistable_id' => $otherUnit->id, 'state' => 'shortlisted',
         ]);
         $deal = Deal::factory()->create(['client_project_id' => $project->id]);
-        DealItem::factory()->create(['deal_id' => $deal->id, 'unit_id' => $unit->id, 'state' => 'reserved']);
+        DealItem::factory()->create(['deal_id' => $deal->id, 'unit_id' => $unit->id, 'state' => 'open']);
         Sanctum::actingAs($this->userWith(['clients.view', 'shortlist.manage']));
 
-        // Payload keeps `otherUnit` but drops the reserved `unit` — must be rejected.
+        // Payload keeps `otherUnit` but drops the deal-locked `unit` — must be rejected.
         $this->putJson("/api/v1/projects/{$project->id}/shortlist", [
             'items' => [['shortlistable_type' => 'unit', 'shortlistable_id' => $otherUnit->id]],
         ])->assertStatus(422);
@@ -153,10 +153,10 @@ class ShortlistTest extends TestCase
         $this->assertDatabaseHas('shortlist_items', ['shortlistable_id' => $unit->id, 'status' => 'cancelled']);
     }
 
-    public function test_cannot_remove_a_unit_on_hold_for_this_project(): void
+    public function test_cannot_remove_a_unit_reserved_on_a_deposit_for_this_project(): void
     {
         $project = ClientProject::factory()->create();
-        $unit = Unit::factory()->create(['sale_status' => 'onhold', 'onhold_project_id' => $project->id]);
+        $unit = Unit::factory()->create(['sale_status' => 'reserved', 'reserved_project_id' => $project->id]);
         $otherUnit = Unit::factory()->create();
         ShortlistItem::factory()->create([
             'client_project_id' => $project->id, 'shortlistable_type' => 'unit',
@@ -182,10 +182,10 @@ class ShortlistTest extends TestCase
             'shortlistable_id' => $unit->id, 'state' => 'shortlisted',
         ]);
         $deal = Deal::factory()->create(['client_project_id' => $project->id]);
-        DealItem::factory()->create(['deal_id' => $deal->id, 'unit_id' => $unit->id, 'state' => 'reserved']);
+        DealItem::factory()->create(['deal_id' => $deal->id, 'unit_id' => $unit->id, 'state' => 'open']);
         Sanctum::actingAs($this->userWith(['clients.view', 'projects.view_all']));
 
         $this->getJson("/api/v1/projects/{$project->id}/shortlist")
-            ->assertOk()->assertJsonPath('data.0.locked_reason', 'reserved');
+            ->assertOk()->assertJsonPath('data.0.locked_reason', 'deal');
     }
 }

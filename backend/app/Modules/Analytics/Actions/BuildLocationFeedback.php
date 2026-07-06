@@ -114,7 +114,7 @@ class BuildLocationFeedback
             ->filter(fn ($row) => in_array($row->state, $s, true))->count();
         $interested = $stateCount(ShortlistState::VisitedInterested, ShortlistState::Won);
         $notInterested = $stateCount(ShortlistState::VisitedNotInterested, ShortlistState::Lost);
-        $reserved = $dealRows->filter(fn ($d) => $d->state === DealState::Reserved)->count();
+        $inDeal = $dealRows->filter(fn ($d) => $d->state === DealState::Open)->count();
         $won = $dealRows->filter(fn ($d) => $d->state === DealState::Won)->count();
 
         // Compute the heavier aggregates once, then reuse them for both the payload
@@ -137,7 +137,7 @@ class BuildLocationFeedback
                 'in_site_visits' => $inSiteVisits,
                 'shortlisted' => $shortlisted,
                 'interested' => $interested,
-                'reserved' => $reserved,
+                'deals' => $inDeal,
                 'won' => $won,
             ],
             'objections' => $objectionsRanked,
@@ -256,7 +256,7 @@ class BuildLocationFeedback
                 'visits' => $visits,
                 'interested' => $interested,
                 'not_interested' => $notInterested,
-                'reserved' => $deal->filter(fn ($d) => $d->state === DealState::Reserved)->count(),
+                'deals' => $deal->filter(fn ($d) => $d->state === DealState::Open)->count(),
                 'won' => $deal->filter(fn ($d) => $d->state === DealState::Won)->count(),
                 // Of the clients who saw it, how many liked it (null when nobody has).
                 'interest_ratio' => $seen > 0 ? round($interested / $seen, 2) : null,

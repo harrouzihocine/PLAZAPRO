@@ -21,9 +21,10 @@ use Illuminate\Support\Facades\DB;
  * updating that item's paid_amount/state — all in one transaction. The versement
  * is immutable afterwards: corrections go through CorrectVersement (supersedeWith).
  *
- * A payment on a not-yet-sold unit is a holding deposit: it takes the unit On
- * Hold for this project (off the market for everyone else, backups aside) until
- * it is sold or the hold lapses. Post-sale instalments never re-trigger this.
+ * A payment on a not-yet-sold unit is a holding deposit: it Reserves the unit
+ * for this project (off the market for everyone else, backups aside) until it
+ * is sold or the deposit window lapses. Post-sale instalments never re-trigger
+ * this.
  */
 class RecordVersement
 {
@@ -68,10 +69,10 @@ class RecordVersement
                 $this->allocate->handle($item, (string) $versement->amount);
             }
 
-            // A deposit on a not-yet-sold unit is a holding deposit: take it On
-            // Hold for this project.
+            // A deposit on a not-yet-sold unit is a holding deposit: Reserve it
+            // for this project.
             if ($unitId !== null) {
-                $this->placeOnHold($project, $unitId, $actor);
+                $this->placeReservedLock($project, $unitId, $actor);
             }
 
             // Return the created instance (not a refetch) so the API responds 201.
@@ -85,14 +86,14 @@ class RecordVersement
     }
 
     /**
-     * The holding-deposit effect: a payment on a unit that is not yet sold takes
-     * it On Hold for this project (available/reserved → onhold) and starts the
-     * expiry timer. Nobody else can buy it until it sells or the hold lapses,
-     * though other projects may still queue as reserved backups. Recording
-     * further payments while already on hold does NOT reset the timer, and a
-     * payment can never steal a unit held by another project.
+     * The holding-deposit effect: a payment on a unit that is not yet sold
+     * Reserves it for this project (available/interested → reserved) and starts
+     * the expiry timer. Nobody else can buy it until it sells or the deposit
+     * window lapses, though other projects may still queue as interested
+     * backups. Recording further payments while already reserved does NOT reset
+     * the timer, and a payment can never steal a unit held by another project.
      */
-    private function placeOnHold(ClientProject $project, int $unitId, User $actor): void
+    private function placeReservedLock(ClientProject $project, int $unitId, User $actor): void
     {
         $unit = Unit::whereKey($unitId)->lockForUpdate()->first();
 
@@ -101,14 +102,14 @@ class RecordVersement
         }
 
         abort_if(
-            $unit->sale_status === SaleStatus::OnHold
-                && (int) $unit->onhold_project_id !== (int) $project->id,
+            $unit->sale_status === SaleStatus::Reserved
+                && (int) $unit->reserved_project_id !== (int) $project->id,
             422,
-            'This unit is on hold for another client.',
+            'This unit is reserved for another client.',
         );
 
         // The deposit backs a non-expiring hold for this project (so it counts
-        // as a reservation and survives the On Hold window either way).
+        // as an interest hold and survives the deposit window either way).
         $hasHold = Reservation::query()
             ->where('unit_id', $unitId)
             ->where('client_project_id', $project->id)
@@ -126,13 +127,13 @@ class RecordVersement
             ]);
         }
 
-        // Only the available/reserved → onhold transition arms the timer; a later
+        // Only the available/interested → reserved transition arms the timer; a later
         // instalment on an already-held unit leaves the deadline untouched.
-        if ($unit->sale_status !== SaleStatus::OnHold) {
+        if ($unit->sale_status !== SaleStatus::Reserved) {
             $unit->update([
-                'sale_status' => SaleStatus::OnHold->value,
-                'onhold_project_id' => $project->id,
-                'onhold_expires_at' => now()->addHours(AppSetting::integer('onhold_hold_hours', 72)),
+                'sale_status' => SaleStatus::Reserved->value,
+                'reserved_project_id' => $project->id,
+                'reserved_expires_at' => now()->addHours(AppSetting::integer('reserved_hold_hours', 72)),
             ]);
         }
     }

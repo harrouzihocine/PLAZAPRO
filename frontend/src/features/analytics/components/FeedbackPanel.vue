@@ -11,7 +11,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
 import { analyticsApi } from '@/features/analytics/api'
 import { formatMoney } from '@/features/payments/money'
-import { formatDate } from '@/utils/format'
+import { formatDate, todayInput } from '@/utils/format'
 
 // The "Voice of Client" panel — reused on the Location page (whole development)
 // and on a Unit page (drill-down). It reads BuildLocationFeedback and renders the
@@ -38,7 +38,7 @@ function windowParams() {
   if (range.value === 'all') return {}
   const from = new Date()
   from.setDate(from.getDate() - Number(range.value))
-  const fmt = (d) => d.toISOString().slice(0, 10)
+  const fmt = (d) => todayInput(d)
   return { from: fmt(from), to: fmt(new Date()) }
 }
 
@@ -74,7 +74,7 @@ const funnelStages = computed(() => {
     { key: 'in_site_visits', label: 'Site visits', value: f.in_site_visits, icon: 'pi pi-map-marker' },
     { key: 'shortlisted', label: 'Shortlisted', value: f.shortlisted, icon: 'pi pi-star', tone: 'info' },
     { key: 'interested', label: 'Interested', value: f.interested, icon: 'pi pi-heart', tone: 'success' },
-    { key: 'reserved', label: 'Reserved', value: f.reserved, icon: 'pi pi-lock', tone: 'warning' },
+    { key: 'deals', label: 'In deal', value: f.deals, icon: 'pi pi-file-edit', tone: 'warning' },
     { key: 'won', label: 'Won', value: f.won, icon: 'pi pi-trophy', tone: 'success' },
   ]
   return all.filter((s) => isLocation.value || !s.locationOnly)

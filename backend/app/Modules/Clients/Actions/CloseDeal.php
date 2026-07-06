@@ -37,10 +37,10 @@ class CloseDeal
 
         return DB::transaction(function () use ($deal, $outcome, $items, $resolution, $note) {
             $open = $deal->unitItems()->active()
-                ->where('state', DealState::Reserved->value)
+                ->where('state', DealState::Open->value)
                 ->get();
 
-            abort_if($open->isEmpty(), 422, 'The deal has no reserved apartment left to close.');
+            abort_if($open->isEmpty(), 422, 'The deal has no open apartment left to close.');
 
             if ($outcome === 'won') {
                 $prices = collect($items)->keyBy('item_id');

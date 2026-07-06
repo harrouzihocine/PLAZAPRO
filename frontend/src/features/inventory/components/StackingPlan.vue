@@ -41,17 +41,17 @@ async function toggleHeat() {
 const cellClass = {
   available:
     'border-green-300 bg-green-100 text-green-800 hover:border-green-400 dark:border-green-500/40 dark:bg-green-500/15 dark:text-green-300',
-  reserved:
+  interested:
     'border-amber-300 bg-amber-100 text-amber-800 hover:border-amber-400 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300',
-  onhold:
+  reserved:
     'border-slate-400 bg-slate-200 text-slate-800 hover:border-slate-500 dark:border-slate-400/40 dark:bg-slate-400/20 dark:text-slate-200',
   sold: 'border-sky-300 bg-sky-100 text-sky-800 hover:border-sky-400 dark:border-sky-500/40 dark:bg-sky-500/15 dark:text-sky-300',
 }
 
 const LEGEND = [
   { status: 'available', swatch: 'bg-green-400 dark:bg-green-500' },
-  { status: 'reserved', swatch: 'bg-amber-400 dark:bg-amber-500' },
-  { status: 'on hold', swatch: 'bg-slate-400 dark:bg-slate-400' },
+  { status: 'interested', swatch: 'bg-amber-400 dark:bg-amber-500' },
+  { status: 'reserved', swatch: 'bg-slate-400 dark:bg-slate-400' },
   { status: 'sold', swatch: 'bg-sky-400 dark:bg-sky-500' },
 ]
 
@@ -69,7 +69,7 @@ function pick(unit) {
   emit('select', unit)
 }
 
-// Live countdown to a reserved unit's expiry (updates each second).
+// Live countdown to a held unit's expiry (updates each second).
 const now = ref(Date.now())
 let ticker
 const countdown = computed(() => {
@@ -82,7 +82,7 @@ const countdown = computed(() => {
   return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
 })
 
-// Let the parent refresh the plan (e.g. after a reservation flips a status).
+// Let the parent refresh the plan (e.g. after a hold flips a status).
 defineExpose({
   reload: async () => {
     await load()
@@ -184,12 +184,12 @@ watch(
       <div>
         <p class="flex items-center gap-2 font-semibold text-ink">
           {{ selected.reference }}
-          <SaleStatusBadge :status="selected.sale_status" :reserved-count="selected.reserved_count" />
+          <SaleStatusBadge :status="selected.sale_status" :interested-count="selected.interested_count" />
         </p>
         <p class="num mt-0.5 text-xs text-mute">{{ formatMoney(selected.price) }}</p>
         <p v-if="countdown" class="num mt-0.5 text-xs font-semibold text-warning">
           <i class="pi pi-hourglass text-[10px]" aria-hidden="true" />
-          {{ selected.sale_status === 'onhold' ? 'On hold expires in' : 'Hold expires in' }}
+          {{ selected.sale_status === 'reserved' ? 'Reservation expires in' : 'Hold expires in' }}
           {{ countdown }}
         </p>
       </div>

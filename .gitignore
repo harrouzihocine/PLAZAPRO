@@ -32,3 +32,7 @@ Thumbs.db
 
 # Docker
 /docker/**/data/
+
+# Real-data exports (legacy CRM import source, schema dumps) — never in git
+/backend/database/data/
+/db-export/

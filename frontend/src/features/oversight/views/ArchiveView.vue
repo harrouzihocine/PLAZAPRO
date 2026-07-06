@@ -19,7 +19,7 @@ import { useDynamicList } from '@/composables/useDynamicList'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction, toastSuccess, toastError } from '@/composables/useConfirm'
 import { formatMoney } from '@/features/payments/money'
-import { formatDateTime } from '@/utils/format'
+import { formatDateTime, todayInput } from '@/utils/format'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -193,7 +193,7 @@ async function exportCsv() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `archive-${new Date().toISOString().slice(0, 10)}.csv`
+    link.download = `archive-${todayInput()}.csv`
     document.body.appendChild(link)
     link.click()
     link.remove()

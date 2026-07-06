@@ -8,7 +8,7 @@ use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Models\Box;
 
 /**
- * Cancel (no-delete) a box. A reserved or sold box can't be cancelled — settle
+ * Cancel (no-delete) a box. An interested or sold box can't be cancelled — settle
  * the sale first.
  */
 class CancelBox

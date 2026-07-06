@@ -14,7 +14,7 @@ use App\Modules\Inventory\Models\Unit;
 use Illuminate\Routing\Controller;
 
 /**
- * The 48-hour reservation lifecycle. All actions require units.reserve.
+ * The 48-hour interest-hold lifecycle. All actions require units.interest.
  */
 class ReservationController extends Controller
 {

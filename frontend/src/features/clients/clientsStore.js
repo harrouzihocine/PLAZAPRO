@@ -7,7 +7,6 @@ import {
   desireApi,
   followUpAgentsApi,
   projectsApi,
-  reserveUnit,
 } from '@/features/clients/api'
 import { pipelineApi } from '@/features/pipeline/api'
 
@@ -224,11 +223,6 @@ export const useClientsStore = defineStore('clients', {
       return this.matches
     },
 
-    async reserveMatch(clientId, unitId) {
-      await this.mutate(() => reserveUnit(unitId))
-      // The unit is now held → no longer available, so refresh the candidate list.
-      return this.loadMatches(clientId)
-    },
 
     // --- Deals on a project (created from visit logs; several may be open) ---
 

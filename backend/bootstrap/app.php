@@ -7,7 +7,7 @@ use App\Http\Middleware\SecurityHeaders;
 use App\Modules\Clients\Console\FlagEmptyClients;
 use App\Modules\Collaboration\Console\BackfillProjectChats;
 use App\Modules\Inventory\Console\ExpireHolds;
-use App\Modules\Inventory\Console\ExpireOnHold;
+use App\Modules\Inventory\Console\ExpireReserved;
 use App\Modules\Payments\Console\MarkSchedulesOverdueCommand;
 use App\Modules\Pipeline\Console\DispatchReminders;
 use App\Modules\Pipeline\Console\MarkActionsOverdue;
@@ -30,7 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withCommands([
         // Modular commands (auto-discovery only covers app/Console).
         ExpireHolds::class,
-        ExpireOnHold::class,
+        ExpireReserved::class,
         MarkActionsOverdue::class,
         DispatchReminders::class,
         MarkSchedulesOverdueCommand::class,

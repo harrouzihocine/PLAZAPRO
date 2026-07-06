@@ -80,7 +80,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // with a colleague" picker. Reference data, any authed user.
     Route::get('/staff', [UserController::class, 'staff']);
 
-    // Scalar app settings (e.g. the reservation hold duration). Read is open —
+    // Scalar app settings (e.g. the interest hold duration). Read is open —
     // the UI surfaces the values; writes require settings.manage below.
     Route::get('/app-settings', [AppSettingController::class, 'index']);
 

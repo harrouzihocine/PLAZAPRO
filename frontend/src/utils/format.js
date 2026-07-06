@@ -24,6 +24,25 @@ export function todayInput(date = new Date()) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
+// Server instant → local "YYYY-MM-DD" / "HH:mm" for prefilling date/time inputs
+// (edit forms round-trip through these; slicing the raw ISO string would show
+// the UTC parts, one hour off for Algeria). timeInput returns '' for a local
+// midnight — the backend's "no time chosen" sentinel (see formatTimeIfSet).
+export function dateInputValue(value) {
+  if (!value) return ''
+  const d = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(d.getTime()) ? '' : todayInput(d)
+}
+
+export function timeInputValue(value) {
+  if (!value) return ''
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  if (d.getHours() === 0 && d.getMinutes() === 0) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 export function formatDate(value) {
   if (!value) return '—'
   const d = value instanceof Date ? value : new Date(value)

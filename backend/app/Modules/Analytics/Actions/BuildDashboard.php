@@ -67,9 +67,9 @@ class BuildDashboard
                     ->whereIn('id', $projectIds)
                     ->where('stage', '!=', ClientProjectStage::Won->value)
                     ->count(),
-                // My deals still reserved (not yet closed won / lost).
+                // My deals still open (not yet closed won / lost).
                 'open_deals' => Deal::query()->active()
-                    ->where('state', DealState::Reserved->value)
+                    ->where('state', DealState::Open->value)
                     ->where(fn ($q) => $q
                         ->where('created_by', $user->id)
                         ->orWhereIn('client_project_id', $projectIds))

@@ -18,8 +18,8 @@ class AppSettingController extends Controller
 {
     /** The editable keys and their validation rules. */
     private const KEYS = [
-        'reservation_hold_hours' => ['required', 'integer', 'min:1', 'max:8760'],
-        'onhold_hold_hours' => ['required', 'integer', 'min:1', 'max:8760'],
+        'interest_hold_hours' => ['required', 'integer', 'min:1', 'max:8760'],
+        'reserved_hold_hours' => ['required', 'integer', 'min:1', 'max:8760'],
     ];
 
     public function index(): JsonResponse

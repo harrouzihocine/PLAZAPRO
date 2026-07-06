@@ -39,7 +39,7 @@ use Illuminate\Support\Facades\Auth;
 
 /**
  * Realistic sample data so the app "looks alive" for a walkthrough: agents,
- * inventory (with a live 48h hold and a sold unit), clients, deals across every
+ * inventory (with a live 48h interest hold and a sold unit), clients, deals across every
  * pipeline stage, calls/visits/tasks (some overdue), a won deal with a part-paid
  * payment plan, and two chat threads.
  *
@@ -129,7 +129,7 @@ class DemoSeeder extends Seeder
         $u($elFeth, 'A-11', 'f2', 'floor_1', 55.0, '4600000.00', 'A', 1, 1);
         $unitA21 = $u($elFeth, 'A-21', 'f3', 'floor_2', 78.0, '6800000.00', 'A', 2, 1);
         $unitA31 = $u($elFeth, 'A-31', 'f4', 'floor_3', 96.0, '8400000.00', 'A', 3, 1); // -> sold
-        $unitA41 = $u($elFeth, 'A-41', 'f3', 'floor_4', 80.0, '7000000.00', 'A', 4, 1); // -> reserved
+        $unitA41 = $u($elFeth, 'A-41', 'f3', 'floor_4', 80.0, '7000000.00', 'A', 4, 1); // -> interested
         // Block B @ Oran
         $u($oran, 'B-01', 'f2', 'ground', 52.0, '4200000.00', 'B', 0, 2);
         $u($oran, 'B-12', 'f3', 'floor_1', 75.0, '6300000.00', 'B', 1, 2);
@@ -158,14 +158,14 @@ class DemoSeeder extends Seeder
 
         // --- Deals (one per stage) -------------------------------------------
         $mkDeal = app(CreateClientProject::class);
-        // Won: negotiate -> reserve -> convert (unit sold, deal won, price stamped).
+        // Won: negotiate -> hold -> convert (unit sold, deal won, price stamped).
         $d1 = $mkDeal->handle($c1, ['location_id' => $elFeth->id, 'unit_id' => $unitA31->id, 'stage' => ClientProjectStage::Negotiating->value]);
         $resA31 = app(ReserveUnit::class)->handle($unitA31, ['client_project_id' => $d1->id], $sarah);
         app(ConvertReservation::class)->handle($resA31);
         $d1->refresh();
 
-        // Reserved: live 48h hold on A-41 (countdown in the UI).
-        $d2 = $mkDeal->handle($c2, ['location_id' => $elFeth->id, 'unit_id' => $unitA41->id, 'stage' => ClientProjectStage::Reserved->value]);
+        // Interested: live 48h hold on A-41 (countdown in the UI).
+        $d2 = $mkDeal->handle($c2, ['location_id' => $elFeth->id, 'unit_id' => $unitA41->id, 'stage' => ClientProjectStage::Deal->value]);
         app(ReserveUnit::class)->handle($unitA41, ['client_project_id' => $d2->id], $karim);
 
         // Negotiating, lead x2, lost.

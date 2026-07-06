@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Analytics\Actions;
 
+use App\Modules\Clients\Enums\ClientProjectStage;
 use App\Modules\Clients\Models\Client;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Clients\Models\Deal;
@@ -53,7 +54,11 @@ class BuildOversight
     private function stuckProjectsQuery(array $f): Builder
     {
         $q = ClientProject::query()->active()
-            ->whereIn('stage', ['lead', 'negotiating', 'reserved'])
+            ->whereIn('stage', [
+                ClientProjectStage::Lead->value,
+                ClientProjectStage::Negotiating->value,
+                ClientProjectStage::Deal->value,
+            ])
             ->where('created_at', '<', now()->subDays(3))
             ->whereDoesntHave('nextActions', fn (Builder $n) => $n->where('state', 'pending'));
 

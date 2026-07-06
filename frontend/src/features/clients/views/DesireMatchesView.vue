@@ -146,8 +146,8 @@ function unitLabel(u) {
 }
 
 function onHoldNote(u) {
-  if (u.sale_status === 'onhold' && u.onhold_expires_at) return `On hold until ${formatDate(u.onhold_expires_at)} — open as a backup`
-  if (u.sale_status === 'reserved') return 'Reserved elsewhere — still open as a backup'
+  if (u.sale_status === 'reserved' && u.reserved_expires_at) return `Reserved until ${formatDate(u.reserved_expires_at)} — open as a backup`
+  if (u.sale_status === 'interested') return 'Another client is interested — still open as a backup'
   return null
 }
 
@@ -394,7 +394,7 @@ async function submitReconnect(payload) {
     >
       <p class="mb-4 text-sm text-mute">
         Logging this call is what reopens the client — the properties picked below ride with it
-        as the shortlist (or a reserved deal, if it goes that far).
+        as the shortlist (or an open deal, if it goes that far).
       </p>
       <CallLogForm
         :client="reconnectRow?.client"

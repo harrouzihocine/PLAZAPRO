@@ -12,9 +12,10 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * A unit's sale state moved (reserved / on hold / available / sold) or its On
- * Hold timer changed. Broadcasts to the public "announcements" channel so every
- * open unit view repaints its badge + "Reserved N" counter live, no refresh.
+ * A unit's sale state moved (interested / reserved / available / sold) or its
+ * deposit timer changed. Broadcasts to the public "announcements" channel so
+ * every open unit view repaints its badge + "Interested N" counter live, no
+ * refresh.
  * Fired by the Unit model's updated hook, so it covers ALL transition sites.
  * Ephemeral UI only — durable bell records go through DomainNotification.
  */
@@ -25,9 +26,9 @@ class UnitStatusChanged implements ShouldBroadcast
     use SerializesModels;
 
     /**
-     * $saleStatusChanged is true when sale_status itself moved (vs. only the On
-     * Hold timer changing) — the durable bell notification fires only on a real
-     * state move (AnnounceUnitStatusChange).
+     * $saleStatusChanged is true when sale_status itself moved (vs. only the
+     * deposit timer changing) — the durable bell notification fires only on a
+     * real state move (AnnounceUnitStatusChange).
      */
     public function __construct(
         public Unit $unit,
@@ -59,8 +60,8 @@ class UnitStatusChanged implements ShouldBroadcast
             'reference' => $this->unit->reference,
             'location_id' => $this->unit->location_id,
             'sale_status' => $this->unit->sale_status?->value,
-            'reserved_count' => $this->unit->reservedCount(),
-            'onhold_expires_at' => $this->unit->onhold_expires_at?->toIso8601String(),
+            'interested_count' => $this->unit->interestedCount(),
+            'reserved_expires_at' => $this->unit->reserved_expires_at?->toIso8601String(),
         ];
     }
 }

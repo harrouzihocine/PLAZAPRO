@@ -49,40 +49,41 @@ const { items: roomNumbers } = useDynamicList('room_numbers')
 const { items: floors } = useDynamicList('floors')
 
 const canManage = auth.can('units.manage')
-const canReserve = auth.can('units.reserve')
+const canMarkInterest = auth.can('units.interest')
 // Voice-of-Client analytics is manager-level commercial intelligence.
 const canSeeFeedback = auth.can('reports.view')
 
 const mapsUrl = computed(() => googleMapsUrl(locations.current ?? {}))
 
 const stackingRef = ref(null)
-const reserving = ref(false)
+const holdBusy = ref(false)
 const insights = ref(null)
 
 // Sale-status mix across the project's units — the at-a-glance commercial state.
 const statusCounts = computed(() => {
-  const counts = { available: 0, reserved: 0, onhold: 0, sold: 0 }
+  const counts = { available: 0, interested: 0, reserved: 0, sold: 0 }
   for (const u of units.items) {
     if (u.sale_status in counts) counts[u.sale_status] += 1
   }
   return counts
 })
 
-// Reservation lifecycle from the stacking-plan cell. Refresh both the plan (for
-// the colour + countdown) and the units table (for the sale_status) afterwards.
+// Interest-hold lifecycle from the stacking-plan cell. Refresh both the plan
+// (for the colour + countdown) and the units table (for the sale_status)
+// afterwards.
 async function afterHold(fn) {
-  reserving.value = true
+  holdBusy.value = true
   try {
     await fn()
     await Promise.all([stackingRef.value?.reload(), units.fetchForLocation(props.id)])
   } catch (e) {
     units.error = e.response?.data?.message ?? 'Action failed.'
   } finally {
-    reserving.value = false
+    holdBusy.value = false
   }
 }
 
-const reserveUnit = (unit) => afterHold(() => reservationsApi.reserve(unit.id))
+const markInterested = (unit) => afterHold(() => reservationsApi.markInterest(unit.id))
 const releaseHold = (unit) => afterHold(() => reservationsApi.release(unit.reservation_id))
 const convertHold = (unit) => afterHold(() => reservationsApi.convert(unit.reservation_id))
 
@@ -267,11 +268,11 @@ async function remove(u) {
           :loading="units.loading"
         />
         <StatCard
-          label="Reserved"
-          :value="statusCounts.reserved"
-          icon="pi pi-lock"
+          label="Interested"
+          :value="statusCounts.interested"
+          icon="pi pi-thumbs-up"
           tone="warning"
-          :hint="statusCounts.onhold ? `${statusCounts.onhold} on hold` : ''"
+          :hint="statusCounts.reserved ? `${statusCounts.reserved} reserved` : ''"
           :loading="units.loading"
         />
         <StatCard
@@ -407,7 +408,7 @@ async function remove(u) {
                 <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
                   <StatCard label="Units" :value="insights.units.total" icon="pi pi-th-large" />
                   <StatCard label="Available" :value="insights.units.available" icon="pi pi-check-circle" tone="success" />
-                  <StatCard label="Reserved" :value="insights.units.reserved" icon="pi pi-lock" tone="warning" />
+                  <StatCard label="Interested" :value="insights.units.interested" icon="pi pi-thumbs-up" tone="warning" />
                   <StatCard label="Sold" :value="insights.units.sold" icon="pi pi-flag-fill" tone="info" />
                 </div>
                 <div v-if="insights.boxes.total" class="mt-3 grid grid-cols-3 gap-3 sm:gap-4">
@@ -448,24 +449,24 @@ async function remove(u) {
           <!-- ── Stacking plan (colour-coded by sale status) ── -->
           <TabPanel value="stacking">
             <StackingPlan ref="stackingRef" :location-id="props.id">
-              <template v-if="canReserve" #actions="{ unit }">
+              <template v-if="canMarkInterest" #actions="{ unit }">
                 <Button
                   v-if="unit.sale_status === 'available'"
-                  label="Reserve (48h)"
-                  icon="pi pi-lock"
+                  label="Mark interested (48h)"
+                  icon="pi pi-thumbs-up"
                   size="small"
-                  :disabled="reserving"
-                  @click="reserveUnit(unit)"
+                  :disabled="holdBusy"
+                  @click="markInterested(unit)"
                 />
                 <div
-                  v-else-if="unit.sale_status === 'reserved' && unit.reservation_id"
+                  v-else-if="unit.sale_status === 'interested' && unit.reservation_id"
                   class="flex gap-1.5"
                 >
                   <Button
                     label="Convert to sale"
                     icon="pi pi-flag"
                     size="small"
-                    :disabled="reserving"
+                    :disabled="holdBusy"
                     @click="convertHold(unit)"
                   />
                   <Button
@@ -473,7 +474,7 @@ async function remove(u) {
                     size="small"
                     severity="secondary"
                     outlined
-                    :disabled="reserving"
+                    :disabled="holdBusy"
                     @click="releaseHold(unit)"
                   />
                 </div>
@@ -666,7 +667,7 @@ async function remove(u) {
             :clearable="false"
             :options="[
               { value: 'available', label: 'Available' },
-              { value: 'reserved', label: 'Reserved' },
+              { value: 'interested', label: 'Interested' },
               { value: 'sold', label: 'Sold' },
             ]"
           />

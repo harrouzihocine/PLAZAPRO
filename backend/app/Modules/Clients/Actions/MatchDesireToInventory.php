@@ -12,7 +12,7 @@ use Illuminate\Support\Collection;
 
 /**
  * Match a client's desire to inventory: return the still-purchasable units (not
- * yet sold — available, reserved or on hold, since a reserved/held unit can be
+ * yet sold — available, interested or reserved, since an interested/reserved unit can be
  * taken as a backup / 2nd place) that fit the desire's wilaya / commune / type /
  * floor / area / budget / preferred sites, ranked by closeness (best first). Only
  * criteria the client actually set are applied. This is a key rule to test.

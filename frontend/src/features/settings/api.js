@@ -38,7 +38,7 @@ export const authApi = {
   },
 }
 
-// Scalar app-wide settings (e.g. the reservation hold duration in hours).
+// Scalar app-wide settings (e.g. the interest hold duration in hours).
 // Read is open to any authed user; writes require settings.manage.
 export const appSettingsApi = {
   async get() {

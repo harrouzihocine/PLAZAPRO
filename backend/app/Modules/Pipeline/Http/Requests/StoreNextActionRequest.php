@@ -14,13 +14,15 @@ use Illuminate\Validation\Rules\Enum;
  * Plan a next action AFTER the fact — for a log that didn't need one at the
  * time (next actions are optional on call/visit completion). Subject is the
  * client, or one of their projects when client_project_id is sent. Mirrors the
- * ValidatesNextAction rules, flat (no next_action wrapper).
+ * ValidatesNextAction rules, flat (no next_action wrapper). Needs
+ * next_actions.plan — its own grant (split from calls.log) so the "Plan next
+ * action" button can be handed out person-by-person.
  */
 class StoreNextActionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->can('calls.log');
+        return (bool) $this->user()?->can('next_actions.plan');
     }
 
     /**

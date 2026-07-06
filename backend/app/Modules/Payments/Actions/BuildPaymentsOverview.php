@@ -16,15 +16,15 @@ use App\Modules\Payments\Support\Money;
 use App\Modules\Settings\Models\User;
 
 /**
- * The cross-project payment / holding / reservation follow-up view backing the
- * /payments page. Three lists in one read:
- *  - holdings:     units On Hold (deposit paid) with the deposit collected and a
- *                  live expiry countdown;
- *  - reservations: units reserved by ≥1 project (the "Reserved N" counter);
- *  - due:          the instalments to chase — overdue / partial / soon-due —
- *                  across the projects the caller may see.
+ * The cross-project payment follow-up view backing the /payments page. Three
+ * lists in one read:
+ *  - reserved:   units Reserved (deposit paid) with the deposit collected and a
+ *                live expiry countdown;
+ *  - interested: units with ≥1 interested project (the "Interested N" counter);
+ *  - due:        the instalments to chase — overdue / partial / soon-due —
+ *                across the projects the caller may see.
  *
- * Inventory rows (holdings/reservations) are unit-level, so client identity is
+ * Inventory rows (reserved/interested) are unit-level, so client identity is
  * never exposed here; the instalment rows are scoped to the caller's visible
  * projects (they carry a client link).
  */
@@ -35,33 +35,33 @@ class BuildPaymentsOverview
      */
     public function handle(User $user): array
     {
-        $holdings = Unit::query()->active()
-            ->where('sale_status', SaleStatus::OnHold->value)
-            ->with(['location:id,name', 'onholdProject:id,client_id'])
-            ->orderBy('onhold_expires_at')
-            ->get(['id', 'reference', 'price', 'location_id', 'onhold_expires_at', 'onhold_project_id'])
+        $reserved = Unit::query()->active()
+            ->where('sale_status', SaleStatus::Reserved->value)
+            ->with(['location:id,name', 'reservedProject:id,client_id'])
+            ->orderBy('reserved_expires_at')
+            ->get(['id', 'reference', 'price', 'location_id', 'reserved_expires_at', 'reserved_project_id'])
             ->map(function (Unit $unit) {
-                // The open reserved deal item lets the page declare the sale from
+                // The open deal item lets the page declare the sale from
                 // here (the same win path the deal panel uses).
-                $item = $this->openDealItemFor((int) $unit->onhold_project_id, $unit->id);
+                $item = $this->openDealItemFor((int) $unit->reserved_project_id, $unit->id);
 
                 return [
                     'id' => $unit->id,
                     'reference' => $unit->reference,
                     'location' => $unit->location?->name,
                     'price' => (string) $unit->price,
-                    'project_id' => $unit->onhold_project_id,
-                    'client_id' => $unit->onholdProject?->client_id,
+                    'project_id' => $unit->reserved_project_id,
+                    'client_id' => $unit->reservedProject?->client_id,
                     'deal_id' => $item?->deal_id,
                     'item_id' => $item?->id,
-                    'onhold_expires_at' => $unit->onhold_expires_at?->toIso8601String(),
-                    'deposit' => $this->depositFor((int) $unit->onhold_project_id, $unit->id),
+                    'reserved_expires_at' => $unit->reserved_expires_at?->toIso8601String(),
+                    'deposit' => $this->depositFor((int) $unit->reserved_project_id, $unit->id),
                 ];
             })
             ->all();
 
-        $reservations = Unit::query()->active()
-            ->where('sale_status', SaleStatus::Reserved->value)
+        $interested = Unit::query()->active()
+            ->where('sale_status', SaleStatus::Interested->value)
             ->with(['location:id,name', 'activeReservations:id,unit_id,client_project_id'])
             ->orderBy('reference')
             ->get(['id', 'reference', 'price', 'location_id'])
@@ -70,7 +70,7 @@ class BuildPaymentsOverview
                 'reference' => $unit->reference,
                 'location' => $unit->location?->name,
                 'price' => (string) $unit->price,
-                'reserved_count' => $unit->activeReservations
+                'interested_count' => $unit->activeReservations
                     ->pluck('client_project_id')->filter()->unique()->count(),
             ])
             ->all();
@@ -111,19 +111,19 @@ class BuildPaymentsOverview
             ->reduce(fn (string $sum, array $row) => Money::add($sum, $row['balance']), '0.00');
 
         return [
-            'holdings' => $holdings,
-            'reservations' => $reservations,
+            'reserved' => $reserved,
+            'interested' => $interested,
             'due' => $due,
             'totals' => [
-                'on_hold' => count($holdings),
-                'reserved' => count($reservations),
+                'reserved' => count($reserved),
+                'interested' => count($interested),
                 'overdue' => collect($due)->where('state', ScheduleState::Overdue->value)->count(),
                 'overdue_amount' => $overdueTotal,
             ],
         ];
     }
 
-    /** The holder project's open reserved deal item on this unit (to win it). */
+    /** The holder project's open deal item on this unit (to win it). */
     private function openDealItemFor(int $projectId, int $unitId): ?DealItem
     {
         if ($projectId <= 0) {
@@ -132,11 +132,11 @@ class BuildPaymentsOverview
 
         return DealItem::query()->active()
             ->where('unit_id', $unitId)
-            ->where('state', DealState::Reserved->value)
+            ->where('state', DealState::Open->value)
             ->whereHas('deal', fn ($q) => $q
                 ->where('client_project_id', $projectId)
                 ->where('status', 'active')
-                ->where('state', DealState::Reserved->value))
+                ->where('state', DealState::Open->value))
             ->latest('id')
             ->first();
     }

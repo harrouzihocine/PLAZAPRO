@@ -39,7 +39,7 @@ class ClientProjectTest extends TestCase
         return $this->userWithPermissions([
             'clients.view', 'clients.view_all', 'clients.create', 'clients.manage',
             'projects.create', 'projects.manage', 'projects.advance',
-            'units.view', 'units.reserve',
+            'units.view', 'units.interest',
         ]);
     }
 
@@ -92,11 +92,11 @@ class ClientProjectTest extends TestCase
     public function test_converting_a_linked_reservation_wins_the_deal(): void
     {
         $client = Client::factory()->create();
-        $project = ClientProject::factory()->stage(ClientProjectStage::Reserved)->create(['client_id' => $client->id]);
+        $project = ClientProject::factory()->stage(ClientProjectStage::Deal)->create(['client_id' => $client->id]);
         $unit = Unit::factory()->create(['sale_status' => 'available', 'price' => 4500000]);
         Sanctum::actingAs($this->manager());
 
-        $reservationId = $this->postJson("/api/v1/units/{$unit->id}/reserve", [
+        $reservationId = $this->postJson("/api/v1/units/{$unit->id}/interest", [
             'client_project_id' => $project->id,
         ])->assertCreated()->json('data.id');
 

@@ -405,7 +405,7 @@ function submit() {
 
       <!-- Deal → the client commits: pick from the interested list (each
            apartment with its box decision); new apartments can be added on the
-           fly (they join the shortlist with the deal). Reserves immediately and
+           fly (they join the shortlist with the deal). Marks them Interested immediately and
            closes the log workflow until the deal resolves. -->
       <div v-else-if="conclusion === 'deal'" class="space-y-3">
         <div v-if="dealChoices.length" class="space-y-2">

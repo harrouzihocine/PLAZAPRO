@@ -3,7 +3,7 @@ import { useApi } from '@/composables/useApi'
 // Network calls for the Payments feature (schedules, versements, documents).
 // Kept as the single place the feature talks to the API, like the other features.
 
-// The cross-project follow-up hub (/payments): holdings on hold, reservations,
+// The cross-project follow-up hub (/payments): reserved units, interest holds,
 // and the instalments to chase.
 export const paymentsOverviewApi = {
   async get() {

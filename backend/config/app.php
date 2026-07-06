@@ -62,12 +62,17 @@ return [
     |--------------------------------------------------------------------------
     |
     | Here you may specify the default timezone for your application, which
-    | will be used by the PHP date and date-time functions. The timezone
-    | is set to "UTC" by default as it is suitable for most use cases.
+    | will be used by the PHP date and date-time functions. PLAZA PRO is a
+    | single-country app: every datetime a user types (call time, next-action
+    | due, visit schedule) is Algerian wall-clock, and every day-bucketed
+    | feature (dispatch board, agenda, digests) means Algerian days — so the
+    | app runs on Africa/Algiers (UTC+1, no DST) end to end. API responses
+    | still serialize as UTC instants (ISO-8601 "Z"), which the browser
+    | converts back to local time for display.
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'Africa/Algiers'),
 
     /*
     |--------------------------------------------------------------------------

@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
  * audited, never hard-deleted.
  *
  * Terminal, unlike ArchiveLocation. Guarded so a live sale is never silently
- * discarded: removal is refused while any unit or box is reserved or sold —
+ * discarded: removal is refused while any unit or box is interested, reserved or sold —
  * release or convert those first. Once every non-cancelled unit/box is available,
  * they are cancelled along with the project in one transaction.
  */
@@ -30,7 +30,7 @@ class CancelLocation
             $location->units()->where('status', '!=', $cancelled)->where('sale_status', '!=', $available)->exists()
                 || $location->boxes()->where('status', '!=', $cancelled)->where('sale_status', '!=', $available)->exists(),
             422,
-            "Release or convert this project's reserved or sold units and boxes before removing it.",
+            "Release or convert this project's interested, reserved or sold units and boxes before removing it.",
         );
 
         return DB::transaction(function () use ($location, $reason, $cancelled) {

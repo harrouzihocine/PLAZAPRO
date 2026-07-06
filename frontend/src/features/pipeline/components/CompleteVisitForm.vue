@@ -19,7 +19,7 @@ import { useModalDraft } from '@/composables/useModalDraft'
 // The rapid visit-completion log. It records the outcome + (office) the deal's
 // property shortlist, then MUST conclude — self-closing rule — into one of:
 //  - Next action → plan a call / office / in-site visit;
-//  - Deal        → open THE deal on the interested properties (auto-reserved);
+//  - Deal        → open THE deal on the interested properties (auto-marked Interested);
 //  - Desire      → the client goes to the desire list (its profile captured);
 //  - Archive     → the project is archived with a reason + a note.
 // Emits the ready payload (next_action | closure + shortlist); parent submits.
@@ -28,11 +28,6 @@ const props = defineProps({
   fieldAgents: { type: Array, default: () => [] },
   saving: { type: Boolean, default: false },
   canDeal: { type: Boolean, default: false },
-  // Adding properties to the office-visit shortlist needs the shortlist.manage
-  // permission (admin / manager / super-admin by default); everyone else builds
-  // the visit list from "Add unit to visit" instead. Keep / drop stays open to
-  // all. Absent → the picker is hidden (safe default).
-  canManageShortlist: { type: Boolean, default: false },
   // A project can have many open in-site visits. Only the LAST remaining one
   // concludes the thread (next action / deal / desire / archive); the earlier
   // ones just record their result — though each may still open its OWN deal
@@ -353,8 +348,9 @@ function submit() {
         </div>
       </fieldset>
 
-      <!-- The deal's property shortlist: keep / drop (all) · add (deals.manage
-           only — everyone else uses "Add unit to visit"). ≥1 unless bailing. -->
+      <!-- The deal's property shortlist: keep / drop the listed ones and add
+           new units or properties right here — the office-visit twin of the
+           call log's "Qualify the client" picker. ≥1 unless bailing. -->
       <fieldset v-if="hasDeal" class="rounded-xl border border-line p-3">
         <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">
           Property shortlist<template v-if="!bailing"> (at least one)</template>
@@ -378,11 +374,7 @@ function submit() {
             </button>
           </span>
         </div>
-        <ProjectUnitsPicker v-if="canManageShortlist" v-model="additions" :exclude="excludeKeys" />
-        <p v-else class="flex items-center gap-2 text-xs text-mute">
-          <i class="pi pi-map-marker" aria-hidden="true" />
-          Use “Add unit to visit” to add more properties.
-        </p>
+        <ProjectUnitsPicker v-model="additions" :exclude="excludeKeys" />
       </fieldset>
     </template>
 
@@ -472,7 +464,7 @@ function submit() {
         :current-unit="isOffice ? null : visit.unit"
       />
 
-      <!-- Deal → reserve the interested properties; each apartment carries its
+      <!-- Deal → commit the interested properties; each apartment carries its
            box decision (its linked boxes + the unlinked pool to link). -->
       <div v-else-if="conclusion === 'deal'" class="space-y-2">
         <div

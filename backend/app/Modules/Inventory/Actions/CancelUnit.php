@@ -8,8 +8,9 @@ use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Models\Unit;
 
 /**
- * Cancel (no-delete) a unit. A reserved or sold unit can't be cancelled — release
- * or convert the reservation first, so a live sale is never silently discarded.
+ * Cancel (no-delete) a unit. An interested, reserved or sold unit can't be
+ * cancelled — release or convert its holds first, so a live sale is never
+ * silently discarded.
  */
 class CancelUnit
 {

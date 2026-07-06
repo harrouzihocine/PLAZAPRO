@@ -8,10 +8,10 @@ use App\Modules\Clients\Actions\CloseDealUnit;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Clients\Models\Deal;
 use App\Modules\Clients\Models\DealItem;
-use App\Modules\Inventory\Actions\ExpireOnHoldUnits;
+use App\Modules\Inventory\Actions\ExpireReservedUnits;
 use App\Modules\Inventory\Actions\ReserveUnit;
 use App\Modules\Inventory\Enums\SaleStatus;
-use App\Modules\Inventory\Events\OnHoldLapsed;
+use App\Modules\Inventory\Events\ReservedLapsed;
 use App\Modules\Inventory\Events\UnitSold;
 use App\Modules\Inventory\Models\Reservation;
 use App\Modules\Inventory\Models\Unit;
@@ -25,11 +25,11 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 /**
- * The On Hold lifecycle: a holding deposit takes a not-yet-sold unit off the
+ * The Reserved lifecycle: a holding deposit takes a not-yet-sold unit off the
  * market (for everyone but backups), it lapses back to the market on the sweeper,
  * and a sale ends every backup.
  */
-class OnHoldTest extends TestCase
+class ReservedDepositTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -52,7 +52,7 @@ class OnHoldTest extends TestCase
         ], $agent);
     }
 
-    public function test_a_deposit_takes_a_reserved_unit_on_hold(): void
+    public function test_a_deposit_makes_an_interested_unit_reserved(): void
     {
         $agent = User::factory()->create();
         $unit = Unit::factory()->create(['sale_status' => 'available']);
@@ -62,9 +62,9 @@ class OnHoldTest extends TestCase
         $this->deposit($project, $unit, $agent);
 
         $unit->refresh();
-        $this->assertSame(SaleStatus::OnHold, $unit->sale_status);
-        $this->assertSame($project->id, (int) $unit->onhold_project_id);
-        $this->assertNotNull($unit->onhold_expires_at);
+        $this->assertSame(SaleStatus::Reserved, $unit->sale_status);
+        $this->assertSame($project->id, (int) $unit->reserved_project_id);
+        $this->assertNotNull($unit->reserved_expires_at);
     }
 
     public function test_a_backup_can_reserve_but_not_deposit_on_a_held_unit(): void
@@ -77,18 +77,18 @@ class OnHoldTest extends TestCase
         $this->reserve($unit, $a, $agent);
         $this->deposit($a, $unit, $agent);
 
-        // B queues as a backup (2nd place) — reserving an on-hold unit is fine.
+        // B queues as a backup (2nd place) — marking interest in a reserved unit is fine.
         $this->reserve($unit, $b, $agent);
-        $this->assertSame(2, $unit->fresh()->reservedCount());
+        $this->assertSame(2, $unit->fresh()->interestedCount());
 
         // But B cannot pay a deposit on a unit held by A.
         $this->expectException(HttpException::class);
         $this->deposit($b, $unit, $agent, '10000.00');
     }
 
-    public function test_the_sweeper_returns_a_lapsed_hold_to_reserved_with_backups(): void
+    public function test_the_sweeper_returns_a_lapsed_reservation_to_interested_with_backups(): void
     {
-        Event::fake([OnHoldLapsed::class, UnitSold::class]);
+        Event::fake([ReservedLapsed::class, UnitSold::class]);
         $agent = User::factory()->create();
         $unit = Unit::factory()->create(['sale_status' => 'available']);
         $a = ClientProject::factory()->create();
@@ -97,17 +97,17 @@ class OnHoldTest extends TestCase
         $this->reserve($unit, $a, $agent);
         $this->reserve($unit, $b, $agent);
         $this->deposit($a, $unit, $agent);
-        $this->assertSame(SaleStatus::OnHold, $unit->fresh()->sale_status);
+        $this->assertSame(SaleStatus::Reserved, $unit->fresh()->sale_status);
 
         Carbon::setTestNow(now()->addHours(100));
-        app(ExpireOnHoldUnits::class)->handle();
+        app(ExpireReservedUnits::class)->handle();
         Carbon::setTestNow();
 
         $unit->refresh();
-        $this->assertSame(SaleStatus::Reserved, $unit->sale_status);
-        $this->assertNull($unit->onhold_expires_at);
-        $this->assertSame(1, $unit->reservedCount()); // only B's backup remains
-        Event::assertDispatched(OnHoldLapsed::class);
+        $this->assertSame(SaleStatus::Interested, $unit->sale_status);
+        $this->assertNull($unit->reserved_expires_at);
+        $this->assertSame(1, $unit->interestedCount()); // only B's backup remains
+        Event::assertDispatched(ReservedLapsed::class);
     }
 
     public function test_the_sweeper_frees_a_lapsed_hold_with_no_backups(): void
@@ -120,7 +120,7 @@ class OnHoldTest extends TestCase
         $this->deposit($a, $unit, $agent);
 
         Carbon::setTestNow(now()->addHours(100));
-        app(ExpireOnHoldUnits::class)->handle();
+        app(ExpireReservedUnits::class)->handle();
         Carbon::setTestNow();
 
         $this->assertSame(SaleStatus::Available, $unit->fresh()->sale_status);
@@ -137,7 +137,7 @@ class OnHoldTest extends TestCase
         $this->reserve($unit, $a, $agent);
         $this->reserve($unit, $b, $agent);
         $dealA = Deal::factory()->create(['client_project_id' => $a->id]);
-        // refresh() loads the DB-default state ('reserved') onto the instance.
+        // refresh() loads the DB-default state ('open') onto the instance.
         $itemA = DealItem::factory()->create(['deal_id' => $dealA->id, 'unit_id' => $unit->id])->refresh();
         $dealB = Deal::factory()->create(['client_project_id' => $b->id]);
         $itemB = DealItem::factory()->create(['deal_id' => $dealB->id, 'unit_id' => $unit->id]);

@@ -98,8 +98,9 @@ class InteractionTest extends TestCase
         $client = Client::factory()->create();
         $agent = $this->agent();
         // view_all: this test exercises the planning mechanics, not visibility
-        // (ReviewRegressionTest covers the visibility rule).
-        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.view_all', 'calls.log']));
+        // (ReviewRegressionTest covers the visibility rule). Logging the call
+        // rides on calls.log; the standalone plan needs next_actions.plan.
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.view_all', 'calls.log', 'next_actions.plan']));
 
         // A call concluded onto the desire list; a standalone plan arrives later.
         $this->postJson("/api/v1/clients/{$client->id}/calls", [
@@ -115,6 +116,20 @@ class InteractionTest extends TestCase
 
         $this->assertSame(1, NextAction::query()->pending()
             ->where('subject_type', 'client')->where('subject_id', $client->id)->count());
+    }
+
+    public function test_standalone_planning_requires_next_actions_plan(): void
+    {
+        // calls.log alone no longer opens the "Plan next action" button — the
+        // grant was split so it can be handed out person-by-person. (A next
+        // action riding on a call log still works under calls.log.)
+        $client = Client::factory()->create();
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.view_all', 'calls.log']));
+
+        $this->postJson("/api/v1/clients/{$client->id}/next-actions", [
+            'type' => 'call',
+            'due_date' => now()->addDays(2)->toDateString(),
+        ])->assertForbidden();
     }
 
     public function test_an_archive_closure_archives_the_project_with_a_reason_and_note(): void

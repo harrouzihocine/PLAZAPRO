@@ -31,7 +31,7 @@ class StackingTest extends TestCase
     {
         $location = Location::factory()->create();
         Unit::factory()->for($location)->create(['block' => 'A', 'stack_floor' => 2, 'position' => 1, 'reference' => 'A-201', 'sale_status' => 'available']);
-        Unit::factory()->for($location)->reserved()->create(['block' => 'A', 'stack_floor' => 1, 'position' => 1, 'reference' => 'A-101']);
+        Unit::factory()->for($location)->interested()->create(['block' => 'A', 'stack_floor' => 1, 'position' => 1, 'reference' => 'A-101']);
         Unit::factory()->for($location)->sold()->create(['block' => 'B', 'stack_floor' => 1, 'position' => 1, 'reference' => 'B-101']);
 
         Sanctum::actingAs($this->viewer());
@@ -44,7 +44,7 @@ class StackingTest extends TestCase
         $this->assertCount(2, $data);
         $this->assertSame('A', $data[0]['block']);
         $this->assertSame(2, $data[0]['floors'][0]['floor']); // top floor first
-        $this->assertSame('reserved', $data[0]['floors'][1]['units'][0]['sale_status']);
+        $this->assertSame('interested', $data[0]['floors'][1]['units'][0]['sale_status']);
         $this->assertSame('sold', $data[1]['floors'][0]['units'][0]['sale_status']);
     }
 

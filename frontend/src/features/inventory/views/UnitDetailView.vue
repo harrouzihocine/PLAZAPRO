@@ -39,12 +39,12 @@ const insightsError = ref(false)
 const canSeeFeedback = auth.can('reports.view')
 
 // One-line context under the sale status: how many projects hold it, or that a
-// deposit put it On Hold.
+// deposit Reserved it.
 const saleHint = computed(() => {
   const s = insights.value?.stats
   if (!s) return ''
-  if (s.sale_status === 'onhold') return 'On hold (deposit paid)'
-  if (s.reserved_count > 1) return `${s.reserved_count} projects`
+  if (s.sale_status === 'reserved') return 'Reserved (deposit paid)'
+  if (s.interested_count > 1) return `${s.interested_count} projects`
   return ''
 })
 
@@ -83,7 +83,7 @@ onMounted(async () => {
         <template #badges>
           <SaleStatusBadge
             :status="units.current.sale_status"
-            :reserved-count="units.current.reserved_count"
+            :interested-count="units.current.interested_count"
           />
           <GtmPriorityBadge
             v-if="units.current.gtm_priority"
@@ -134,12 +134,12 @@ onMounted(async () => {
         Couldn't load this unit's stats and payments. Try refreshing the page.
       </div>
 
-      <!-- How the unit has moved: reservations, shortlists, deals -->
+      <!-- How the unit has moved: interest holds, shortlists, deals -->
       <div v-if="insights" class="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard
-          label="Reservations"
+          label="Interest holds"
           :value="insights.stats.reservations"
-          icon="pi pi-lock"
+          icon="pi pi-thumbs-up"
           :tone="insights.stats.has_active_hold ? 'warning' : 'default'"
           :hint="insights.stats.has_active_hold ? 'Active hold' : ''"
         />
@@ -152,7 +152,7 @@ onMounted(async () => {
           :tone="
             insights.stats.sale_status === 'sold'
               ? 'success'
-              : insights.stats.sale_status === 'onhold'
+              : insights.stats.sale_status === 'reserved'
                 ? 'warning'
                 : 'default'
           "

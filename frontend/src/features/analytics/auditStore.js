@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { toastError } from '@/composables/useConfirm'
 import { auditApi } from '@/features/analytics/api'
+import { todayInput } from '@/utils/format'
 
 // State for the admin audit feed. Filters are sent to the server (user, action,
 // subject type, date range); the feed is paginated and strictly read-only. Empty
@@ -71,7 +72,7 @@ export const useAuditStore = defineStore('audit', {
         const url = URL.createObjectURL(blob)
         const link = document.createElement('a')
         link.href = url
-        link.download = `audit-${new Date().toISOString().slice(0, 10)}.csv`
+        link.download = `audit-${todayInput()}.csv`
         document.body.appendChild(link)
         link.click()
         link.remove()

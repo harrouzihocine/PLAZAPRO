@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
- * A single RBAC permission (slug like "units.reserve"). Permissions are seeded
+ * A single RBAC permission (slug like "units.interest"). Permissions are seeded
  * configuration, so this is a plain Model (not audited/cancellable).
  */
 class Permission extends Model

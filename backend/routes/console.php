@@ -10,13 +10,13 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Sweep expired 48h reservation holds. Requires a running scheduler in the
+// Sweep expired 48h interest holds. Requires a running scheduler in the
 // container (schedule:work, or cron calling schedule:run). See Phase 7.
 Schedule::command('holds:expire')->everyFiveMinutes()->withoutOverlapping();
 
-// Return On Hold units whose holding-deposit window lapsed to the market
-// (reserved if backups remain, else available) and notify the former holder.
-Schedule::command('onhold:expire')->everyFiveMinutes()->withoutOverlapping();
+// Return Reserved units whose holding-deposit window lapsed to the market
+// (interested if backups remain, else available) and notify the former holder.
+Schedule::command('reserved:expire')->everyFiveMinutes()->withoutOverlapping();
 
 // Pipeline reminders: generate reminders for due/overdue next actions (hourly),
 // then dispatch the pending ones to their assigned agents (every minute).

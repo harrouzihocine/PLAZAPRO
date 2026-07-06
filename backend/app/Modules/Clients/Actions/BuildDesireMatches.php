@@ -136,7 +136,7 @@ class BuildDesireMatches
             'price' => $unit->price,
             'area_sqm' => $unit->area_sqm,
             'sale_status' => $unit->sale_status?->value,
-            'onhold_expires_at' => $unit->onhold_expires_at?->toIso8601String(),
+            'reserved_expires_at' => $unit->reserved_expires_at?->toIso8601String(),
             // A unit can override its project's push; fall back to the project's.
             'gtm_priority' => ($unit->gtm_priority ?? $unit->location?->gtm_priority)?->value,
             'floor' => $unit->floor?->label,

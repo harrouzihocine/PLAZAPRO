@@ -19,7 +19,7 @@ import { actionEntries, byNewest, callEntries, visitEntries } from '@/features/p
 import { useAuthStore } from '@/features/settings/store'
 import { useDynamicList } from '@/composables/useDynamicList'
 import { toastSuccess } from '@/composables/useConfirm'
-import { formatDate, formatTimeIfSet, humanize } from '@/utils/format'
+import { dateInputValue, formatDate, formatTimeIfSet, humanize, timeInputValue } from '@/utils/format'
 
 // The interaction timeline — scoped to ONE project when projectId is set (its
 // logs + the client-level qualifying calls). The pipeline keeps exactly one
@@ -36,7 +36,7 @@ const props = defineProps({
   // A frozen (explicitly frozen / archived / cancelled) project is closed to
   // new activity — hide the log / plan / complete affordances (the server
   // also rejects them). Won alone does NOT freeze, and neither do open deals:
-  // the client may keep hunting more apartments while one is reserved.
+  // the client may keep hunting more apartments while a deal is open.
   frozen: { type: Boolean, default: false },
   // The project's conclusion already exists (open or won deal) — completing a
   // visit needs no conclusion of its own (it may still open another deal).
@@ -48,15 +48,19 @@ const auth = useAuthStore()
 const { items: changeReasons } = useDynamicList('next_action_change_reasons')
 
 const canLogCall = () => auth.can('calls.log')
+// Planning a standalone next action has its own grant (split from calls.log)
+// so the button can be handed out person-by-person — mirrors the server rule.
+const canPlanNextAction = computed(() => auth.can('next_actions.plan'))
 // An in-site log is completed by its assigned agent (or a visit admin); office
 // visits by any conducting user — mirrors the server rule.
 const canComplete = (visit) =>
   auth.can('visits.conduct') &&
   (visit.type !== 'in_site' || visit.agent?.id === auth.user?.id || auth.can('visits.assign'))
 
-// Adding apartment(s) to visit is an in-site (field) action — offered on a
-// project story only, to conducting agents, on an open project.
-const canAddUnitVisit = computed(() => !!props.projectId && auth.can('visits.conduct'))
+// Adding apartment(s) to visit is offered on a project story only, on an open
+// project, under its own grant (split from visits.conduct) — hand it out
+// person-by-person like the server does.
+const canAddUnitVisit = computed(() => !!props.projectId && auth.can('visits.propose'))
 
 const showCall = ref(false)
 const showAddUnit = ref(false)
@@ -180,15 +184,14 @@ async function submitAddUnit(payload) {
 
 // --- Edit the open next action (change type/when/assignee) with a reason ---
 function openEditNa(na) {
-  const d = na.due_at ? new Date(na.due_at) : null
   editNa.open = true
   editNa.id = na.id
   editNa.reasonId = null
   editNa.note = ''
   Object.assign(editNa.form, {
     type: na.type,
-    due_date: d ? d.toISOString().slice(0, 10) : '',
-    due_time: '',
+    due_date: dateInputValue(na.due_at),
+    due_time: timeInputValue(na.due_at),
     assigned_to: na.assigned_to?.id ?? '',
   })
 }
@@ -216,7 +219,7 @@ async function submitEditNa() {
            action IS a call (or nothing is planned yet). -->
       <span class="flex items-center gap-2">
         <Button
-          v-if="canLogCall() && !pending && !frozen"
+          v-if="canPlanNextAction && !pending && !frozen"
           label="Plan next action"
           icon="pi pi-flag"
           size="small"
@@ -427,7 +430,6 @@ async function submitEditNa() {
         :field-agents="store.agents"
         :saving="store.saving"
         :can-deal="auth.can('visits.conduct')"
-        :can-manage-shortlist="auth.can('shortlist.manage')"
         :is-last-in-site="completingIsLastInSite"
         :deal-settled="dealSettled"
         :draft-key="completeDraftKey(completing)"

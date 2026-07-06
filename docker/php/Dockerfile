@@ -5,7 +5,7 @@ FROM php:8.3-fpm-alpine
 # linux-headers provides <linux/sock_diag.h>, required to compile the sockets ext.
 RUN apk add --no-cache \
       git curl zip unzip icu-dev oniguruma-dev libzip-dev \
-      libpng-dev libjpeg-turbo-dev freetype-dev mysql-client linux-headers \
+      libpng-dev libjpeg-turbo-dev freetype-dev mysql-client linux-headers tzdata \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     # pcntl: signal handling for `queue:work --timeout` and the Reverb server's
     # graceful shutdown. sockets: transport for the Reverb websocket loop.
@@ -23,6 +23,11 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Raise the file-upload limits above PHP's 2M/8M defaults so media uploads
 # (presentations, plans) aren't rejected with a 413 before reaching Laravel.
 COPY uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+
+# The whole business runs on Algeria time. Laravel sets its own tz from
+# APP_TIMEZONE, but standalone php, fpm error logs and `date` should agree.
+ENV TZ=Africa/Algiers
+RUN echo 'date.timezone = Africa/Algiers' > /usr/local/etc/php/conf.d/zz-timezone.ini
 
 WORKDIR /var/www/html
 

@@ -45,16 +45,16 @@ class ReleaseWonDealUnit
             $item->load(['unit', 'boxItems' => fn ($q) => $q->active(), 'boxItems.box']);
 
             // Reverse the win: the converted hold releases and the properties
-            // go back on the market — reserved if any other project still holds
+            // go back on the market — interested if any other project still holds
             // it (a backup that survived), else available.
             $this->convertedHold($item)?->update(['hold_status' => HoldStatus::Released->value]);
 
             if ($item->unit->sale_status === SaleStatus::Sold) {
                 $item->unit->update([
-                    'onhold_expires_at' => null,
-                    'onhold_project_id' => null,
+                    'reserved_expires_at' => null,
+                    'reserved_project_id' => null,
                     'sale_status' => $item->unit->hasActiveHold()
-                        ? SaleStatus::Reserved->value
+                        ? SaleStatus::Interested->value
                         : SaleStatus::Available->value,
                 ]);
             }
@@ -99,11 +99,11 @@ class ReleaseWonDealUnit
         }
 
         $stillReserved = $deal->unitItems()->active()
-            ->where('state', DealState::Reserved->value)
+            ->where('state', DealState::Open->value)
             ->exists();
 
         $deal->update([
-            'state' => $stillReserved ? DealState::Reserved->value : DealState::Lost->value,
+            'state' => $stillReserved ? DealState::Open->value : DealState::Lost->value,
             'total_price' => null,
         ]);
     }
@@ -122,15 +122,15 @@ class ReleaseWonDealUnit
         }
 
         // Another deal is still open: the project keeps living on it — there
-        // is nothing to resolve here, it just steps back to the reserved stage
+        // is nothing to resolve here, it just steps back to the deal stage
         // (an API-sent resolution is moot and deliberately ignored).
         $anotherOpen = $project->deals()->active()
-            ->where('state', DealState::Reserved->value)
+            ->where('state', DealState::Open->value)
             ->exists();
         if ($anotherOpen) {
             if ($project->isActive()) {
                 $project->update([
-                    'stage' => ClientProjectStage::Reserved->value,
+                    'stage' => ClientProjectStage::Deal->value,
                     'unit_id' => null,
                     'total_price' => null,
                 ]);

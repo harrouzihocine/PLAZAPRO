@@ -43,11 +43,11 @@ class UnitResource extends JsonResource
             'area_sqm' => $this->area_sqm,
             'price' => $this->price,
             'sale_status' => $this->sale_status?->value,
-            // How many distinct client projects hold this unit — the "Reserved N"
-            // counter. On Hold adds its deposit timer + holder project id.
-            'reserved_count' => $this->reservedCountForResource(),
-            'onhold_expires_at' => $this->onhold_expires_at?->toIso8601String(),
-            'onhold_project_id' => $this->onhold_project_id,
+            // How many distinct client projects hold this unit — the "Interested
+            // N" counter. Reserved adds its deposit timer + holder project id.
+            'interested_count' => $this->interestedCountForResource(),
+            'reserved_expires_at' => $this->reserved_expires_at?->toIso8601String(),
+            'reserved_project_id' => $this->reserved_project_id,
             'gtm_priority' => $this->gtm_priority?->value,
             'block' => $this->block,
             'stack_floor' => $this->stack_floor,
@@ -63,7 +63,7 @@ class UnitResource extends JsonResource
      * activeReservations collection when present (list view — no N+1), else a
      * scoped count (detail view).
      */
-    private function reservedCountForResource(): int
+    private function interestedCountForResource(): int
     {
         if ($this->resource->relationLoaded('activeReservations')) {
             return $this->activeReservations
@@ -73,6 +73,6 @@ class UnitResource extends JsonResource
                 ->count();
         }
 
-        return $this->reservedCount();
+        return $this->interestedCount();
     }
 }

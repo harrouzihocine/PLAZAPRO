@@ -14,8 +14,8 @@ use Illuminate\Support\ServiceProvider;
 /**
  * Wires RBAC and rate limiting into the framework.
  *
- * A single Gate::before resolves ANY permission slug (e.g. "units.reserve")
- * against the user's one role — so `can:units.reserve` middleware just works,
+ * A single Gate::before resolves ANY permission slug (e.g. "units.interest")
+ * against the user's one role — so `can:units.interest` middleware just works,
  * without defining a gate per permission.
  */
 class RbacServiceProvider extends ServiceProvider

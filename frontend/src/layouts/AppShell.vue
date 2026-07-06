@@ -10,6 +10,7 @@ import { useTheme } from '@/composables/useTheme'
 import { useAuthStore } from '@/features/settings/store'
 import { initials } from '@/utils/format'
 import NotificationBell from '@/features/collaboration/components/NotificationBell.vue'
+import ChatDock from '@/features/collaboration/components/ChatDock.vue'
 import DraftsIndicator from '@/components/shell/DraftsIndicator.vue'
 import GlobalSearch from '@/components/shell/GlobalSearch.vue'
 import BrandLogo from '@/components/BrandLogo.vue'
@@ -528,6 +529,9 @@ async function logout() {
 
     <!-- Full-screen "unit sold" celebration for all users (teleports to body). -->
     <UnitSoldCelebration />
+
+    <!-- Floating chat dock (heads + popup thread), hidden on the /chat page. -->
+    <ChatDock v-if="auth.can('chat.use')" />
 
     <!-- Self-service profile editor (opened from the account menu). -->
     <ProfileModal v-if="showProfile" @close="showProfile = false" />

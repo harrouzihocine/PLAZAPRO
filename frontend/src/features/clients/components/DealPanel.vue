@@ -18,7 +18,7 @@ import { useAuthStore } from '@/features/settings/store'
 import { useDynamicList } from '@/composables/useDynamicList'
 import { versementsApi } from '@/features/payments/api'
 import { toastError, toastSuccess } from '@/composables/useConfirm'
-import { formatDate } from '@/utils/format'
+import { formatDate, todayInput } from '@/utils/format'
 import { dzdToMil, formatMoney, milToDzd, MIL_LABEL } from '@/features/payments/money'
 
 // THE deal on a project — each APARTMENT tracked alone: its own card, its own
@@ -41,12 +41,12 @@ const canRecord = () => auth.can('versements.record')
 
 const { items: methods } = useDynamicList('payment_methods')
 
-// --- Record a holding deposit → the apartment goes On Hold ------------------
+// --- Record a holding deposit → the apartment goes Reserved -----------------
 const depositFlow = ref({
   open: false,
   unit: null,
   amount: '',
-  paid_on: new Date().toISOString().slice(0, 10),
+  paid_on: todayInput(),
   method_id: '',
 })
 // Guards double-submit: the deposit records a versement directly (not via a
@@ -59,7 +59,7 @@ function openDeposit(unit) {
     open: true,
     unit,
     amount: '',
-    paid_on: new Date().toISOString().slice(0, 10),
+    paid_on: todayInput(),
     method_id: '',
   }
 }
@@ -80,8 +80,8 @@ async function submitDeposit() {
       method_id: f.method_id,
     })
     depositFlow.value.open = false
-    toastSuccess(`Deposit recorded — ${f.unit.reference} is on hold.`)
-    // Reload the deals so the apartment card shows the deposit + On Hold state.
+    toastSuccess(`Deposit recorded — ${f.unit.reference} is reserved.`)
+    // Reload the deals so the apartment card shows the deposit + Reserved state.
     await store.loadDeals(props.projectId)
     emit('changed')
   } catch (e) {
@@ -92,8 +92,8 @@ async function submitDeposit() {
 }
 
 const deals = computed(() => store.deals[props.projectId] ?? [])
-const openDeal = computed(() => deals.value.find((d) => d.state === 'reserved'))
-const closedDeals = computed(() => deals.value.filter((d) => d.state !== 'reserved'))
+const openDeal = computed(() => deals.value.find((d) => d.state === 'open'))
+const closedDeals = computed(() => deals.value.filter((d) => d.state !== 'open'))
 
 const unitLine = (u) =>
   [u.reference, u.type, u.floor, u.area_sqm ? `${u.area_sqm} m²` : null, u.location]
@@ -109,7 +109,7 @@ const orphanBoxes = (deal) => (deal.boxes ?? []).filter((b) => b.parent_item_id 
 const suggestedFor = (deal, unit) =>
   [unit, ...boxesOf(deal, unit)].reduce((sum, p) => sum + Number(p.price ?? 0), 0)
 
-const reservedUnits = (deal) => (deal.units ?? []).filter((u) => u.state === 'reserved')
+const openUnits = (deal) => (deal.units ?? []).filter((u) => u.state === 'open')
 const wonUnits = (deal) => (deal.units ?? []).filter((u) => u.state === 'won')
 
 onMounted(() => store.loadDeals(props.projectId))
@@ -182,19 +182,19 @@ async function confirmWin() {
 
 // --- Release (lose) an apartment / the whole rest of the deal --------------
 // The project only needs a resolution (reopen / archive) when NOTHING remains
-// committed on it — no apartment reserved or won on ANY of its deals. While
+// committed on it — no apartment open or won on ANY of its deals. While
 // another deal (or apartment) is still in play, a release is just a release:
 // the work continues over there.
 const lostFlow = ref({ open: false, deal: null, unit: null, resolution: 'reopen', note: '' })
 
 // Anything still committed once `unit` on `deal` closes? (this deal's other
-// apartments and every other deal count — reserved or won.)
+// apartments and every other deal count — open or won.)
 const stillEngagedAfter = (deal, unit) =>
   deals.value.some((d) =>
     (d.units ?? []).some(
       (u) =>
         !(d.id === deal.id && unit && u.item_id === unit.item_id) &&
-        ['reserved', 'won'].includes(u.state),
+        ['open', 'won'].includes(u.state),
     ),
   )
 
@@ -209,7 +209,7 @@ function releaseUnit(deal, unit) {
 async function confirmRelease(deal, unit) {
   const { isConfirmed } = await Swal.fire({
     title: `Release ${unit.reference}?`,
-    text: 'The apartment and its boxes return to available inventory. The project continues on what is still reserved or won.',
+    text: 'The apartment and its boxes return to available inventory. The project continues on what is still open or won.',
     showCancelButton: true,
     confirmButtonText: 'Release',
     customClass: { confirmButton: 'plaza-swal-confirm', cancelButton: 'plaza-swal-cancel' },
@@ -225,7 +225,7 @@ function closeLostAll(deal) {
   const engagedElsewhere =
     wonUnits(deal).length > 0 ||
     deals.value.some(
-      (d) => d.id !== deal.id && (d.units ?? []).some((u) => ['reserved', 'won'].includes(u.state)),
+      (d) => d.id !== deal.id && (d.units ?? []).some((u) => ['open', 'won'].includes(u.state)),
     )
   if (!engagedElsewhere) {
     lostFlow.value = { open: true, deal, unit: null, resolution: 'reopen', note: '' }
@@ -268,7 +268,7 @@ async function confirmLost() {
 // --- Release a WON apartment (the sale fell through, even after the win) ---
 // The apartment and its boxes return to the market; recorded payments stay as
 // refundable history. Releasing the LAST won apartment (nothing else won or
-// still reserved anywhere) un-wins the project — ask how it continues.
+// still open anywhere) un-wins the project — ask how it continues.
 const releaseWonFlow = ref({ open: false, deal: null, unit: null, resolution: 'reopen', note: '' })
 
 const releaseWonReady = computed(
@@ -327,7 +327,7 @@ async function submitAddBoxes() {
   emit('changed')
 }
 
-// --- Boxes editor, per apartment (open deal, apartment still reserved) -----
+// --- Boxes editor, per apartment (open deal, apartment still open) ---------
 const boxEditor = ref({ open: false, deal: null, unit: null, selected: [], current: [] })
 
 function openBoxEditor(deal, unit) {
@@ -364,7 +364,7 @@ async function saveBoxes() {
         :key="deal.id"
         class="rounded-lg border p-3"
         :class="
-          deal.state === 'reserved'
+          deal.state === 'open'
             ? 'border-primary-300 bg-primary-50/50 dark:border-primary-500/30 dark:bg-primary-500/5'
             : 'border-line'
         "
@@ -387,11 +387,11 @@ async function saveBoxes() {
               <span class="flex min-w-0 items-center gap-2">
                 <i class="pi pi-home shrink-0 text-mute" aria-hidden="true" />
                 <span class="truncate text-ink">{{ unitLine(u) }}</span>
-                <StatusTag v-if="u.state !== 'reserved'" :value="u.state" />
-                <!-- A deposit put this reserved apartment On Hold. -->
+                <StatusTag v-if="u.state !== 'open'" :value="u.state" />
+                <!-- A deposit Reserved this open apartment. -->
                 <SaleStatusBadge
-                  v-if="u.state === 'reserved' && u.sale_status === 'onhold'"
-                  status="onhold"
+                  v-if="u.state === 'open' && u.sale_status === 'reserved'"
+                  status="reserved"
                 />
               </span>
               <span
@@ -404,14 +404,14 @@ async function saveBoxes() {
 
             <!-- Holding deposit collected for this apartment (pre-sale). -->
             <p
-              v-if="u.state === 'reserved' && Number(u.collected) > 0"
+              v-if="u.state === 'open' && Number(u.collected) > 0"
               class="mt-1 flex items-center gap-1.5 text-xs text-mute"
             >
               <i class="pi pi-wallet text-[10px] text-primary-500" aria-hidden="true" />
               Deposit paid
               <span class="num font-semibold text-ink">{{ formatMoney(u.collected) }}</span>
-              <span v-if="u.sale_status === 'onhold' && u.onhold_expires_at">
-                · on hold until {{ formatDate(u.onhold_expires_at) }}
+              <span v-if="u.sale_status === 'reserved' && u.reserved_expires_at">
+                · reserved until {{ formatDate(u.reserved_expires_at) }}
               </span>
             </p>
 
@@ -477,7 +477,7 @@ async function saveBoxes() {
 
             <!-- Per-apartment actions while the deal is open. -->
             <div
-              v-if="deal.state === 'reserved' && u.state === 'reserved'"
+              v-if="deal.state === 'open' && u.state === 'open'"
               class="mt-2 flex flex-wrap gap-1.5 border-t border-line pt-2"
             >
               <Button
@@ -541,7 +541,7 @@ async function saveBoxes() {
         </p>
 
         <div
-          v-if="deal.state === 'reserved' && canClose() && reservedUnits(deal).length > 1"
+          v-if="deal.state === 'open' && canClose() && openUnits(deal).length > 1"
           class="mt-3"
         >
           <Button
@@ -613,7 +613,7 @@ async function saveBoxes() {
       </div>
     </BaseModal>
 
-    <!-- Holding deposit — records a payment and takes the apartment On Hold. -->
+    <!-- Holding deposit — records a payment and Reserves the apartment. -->
     <BaseModal
       v-if="depositFlow.open"
       :title="`Holding deposit — ${depositFlow.unit.reference}`"
@@ -621,7 +621,7 @@ async function saveBoxes() {
       @close="depositFlow.open = false"
     >
       <p class="mb-3 text-sm text-mute">
-        Recording a deposit takes this apartment <strong>On Hold</strong> — off the market for
+        Recording a deposit makes this apartment <strong>Reserved</strong> — off the market for
         everyone else (others may still queue as backups) until it is sold or the hold lapses.
       </p>
       <div class="grid gap-3 sm:grid-cols-2">
@@ -656,7 +656,7 @@ async function saveBoxes() {
       @close="boxEditor.open = false"
     >
       <p class="mb-3 text-sm text-mute">
-        Tap to reserve / release boxes with this apartment. Only its linked boxes and the project's
+        Tap to add / release boxes with this apartment. Only its linked boxes and the project's
         unlinked ones are offered — picking an unlinked box links it here.
       </p>
       <UnitBoxPicker

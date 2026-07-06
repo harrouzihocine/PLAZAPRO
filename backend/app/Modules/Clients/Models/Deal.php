@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * The reservation-stage commitment on a client project: the properties the client
- * actually wants, auto-reserved together. A project may carry SEVERAL deals at
+ * actually wants, auto-marked Interested together. A project may carry SEVERAL deals at
  * once — typically one per apartment committed at an in-site visit.
  * Provenance: visit_id / call_id is the interaction log the deal came from —
  * one is required unless the creator holds deals.direct. Each apartment item
@@ -63,7 +63,7 @@ class Deal extends BaseModel
         return $this->hasMany(DealItem::class);
     }
 
-    /** The reserved apartments / locals on the deal. */
+    /** The apartments / locals carried on the deal. */
     public function unitItems(): HasMany
     {
         return $this->hasMany(DealItem::class)->whereNotNull('unit_id');

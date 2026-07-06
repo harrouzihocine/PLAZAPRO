@@ -78,7 +78,7 @@ class ReviewRegressionTest extends TestCase
 
     public function test_a_new_plan_cancels_an_undispatched_pool_plan_instead_of_faking_done(): void
     {
-        $actor = $this->userWith(['clients.view', 'clients.view_all', 'calls.log']);
+        $actor = $this->userWith(['clients.view', 'clients.view_all', 'next_actions.plan']);
         $client = Client::factory()->create();
         $project = ClientProject::factory()->create(['client_id' => $client->id]);
         ShortlistItem::factory()->create([
@@ -109,7 +109,7 @@ class ReviewRegressionTest extends TestCase
 
     public function test_planning_a_next_action_is_atomic_when_visit_sync_rejects(): void
     {
-        $actor = $this->userWith(['clients.view', 'clients.view_all', 'calls.log']);
+        $actor = $this->userWith(['clients.view', 'clients.view_all', 'next_actions.plan']);
         $client = Client::factory()->create();
         $prior = NextAction::factory()->create([
             'subject_type' => 'client', 'subject_id' => $client->id,
@@ -185,7 +185,7 @@ class ReviewRegressionTest extends TestCase
     public function test_timeline_and_next_action_planning_respect_client_visibility(): void
     {
         // No clients.view_all: other agents' clients read as absent.
-        $outsider = $this->userWith(['clients.view', 'calls.log']);
+        $outsider = $this->userWith(['clients.view', 'next_actions.plan']);
         $client = Client::factory()->create(); // created_by/assigned elsewhere
 
         Sanctum::actingAs($outsider);

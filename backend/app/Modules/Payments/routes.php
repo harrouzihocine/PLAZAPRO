@@ -21,7 +21,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Reads: the instalment plan, recorded versements (+ running balance) and
     // generated documents. Open to anyone who can view payments.
     Route::middleware('can:versements.view')->group(function () {
-        // Cross-project follow-up hub: holdings, reservations, instalments due.
+        // Cross-project follow-up hub: reserved, interested, instalments due.
         Route::get('/payments/overview', [PaymentsOverviewController::class, 'index']);
         Route::get('/projects/{project}/schedule', [PaymentScheduleController::class, 'index']);
         Route::get('/projects/{project}/versements', [VersementController::class, 'index']);

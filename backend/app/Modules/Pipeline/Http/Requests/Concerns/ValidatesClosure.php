@@ -31,7 +31,7 @@ trait ValidatesClosure
             // archive → a controlled reason + the story behind it.
             'closure.reason_id' => ['required_if:closure.type,archive', 'integer', 'exists:dynamic_list_items,id'],
             'closure.note' => ['required_if:closure.type,archive', 'string', 'max:2000'],
-            // deal → the units to reserve (specific boxes optional per unit —
+            // deal → the units the client commits to (specific boxes optional per unit —
             // each gets linked to its apartment; CreateDeal enforces the rules).
             'closure.units' => ['required_if:closure.type,deal', 'array', 'min:1'],
             'closure.units.*.unit_id' => ['required_with:closure.units', 'integer', 'exists:units,id'],

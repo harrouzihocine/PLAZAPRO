@@ -115,7 +115,7 @@ async function remove(b) {
         :clearable="false"
         :options="[
           { value: 'available', label: 'Available' },
-          { value: 'reserved', label: 'Reserved' },
+          { value: 'interested', label: 'Interested' },
           { value: 'sold', label: 'Sold' },
         ]"
       />

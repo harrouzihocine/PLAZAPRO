@@ -13,14 +13,14 @@ use App\Modules\Settings\Models\User;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Place a hold on a unit: create the reservation and, if the unit was free, flip
- * it to reserved — atomically. Reservations are MULTI-PROJECT: several client
- * projects can hold the same unit as backups ("2nd place"), so the only thing
- * that blocks a hold is a finalized sale. A unit already reserved or On Hold
- * keeps its (stronger) status — the new backup simply bumps the derived
- * "Reserved N" count. The hold window comes from the reservation_hold_hours app
- * setting; a hold backing an open deal never expires (expires_at null) — only
- * closing the deal releases or converts it.
+ * Place an interest hold on a unit: create the hold record and, if the unit was
+ * free, flip it to Interested — atomically. Interest holds are MULTI-PROJECT:
+ * several client projects can hold the same unit as backups ("2nd place"), so
+ * the only thing that blocks a hold is a finalized sale. A unit already
+ * Interested or Reserved (deposit paid) keeps its (stronger) status — the new
+ * backup simply bumps the derived "Interested N" count. The hold window comes
+ * from the interest_hold_hours app setting; a hold backing an open deal never
+ * expires (expires_at null) — only closing the deal releases or converts it.
  */
 class ReserveUnit
 {
@@ -51,14 +51,14 @@ class ReserveUnit
                 'held_at' => $heldAt,
                 'expires_at' => ($data['no_expiry'] ?? false)
                     ? null
-                    : $heldAt->copy()->addHours(AppSetting::integer('reservation_hold_hours', 48)),
+                    : $heldAt->copy()->addHours(AppSetting::integer('interest_hold_hours', 48)),
                 'hold_status' => HoldStatus::Active->value,
             ]);
 
-            // Available → reserved; reserved / on-hold stay as-is (stronger state
-            // wins; the backup only raises the count).
+            // Available → interested; interested / reserved stay as-is (stronger
+            // state wins; the backup only raises the count).
             if ($fresh->sale_status === SaleStatus::Available) {
-                $fresh->update(['sale_status' => SaleStatus::Reserved->value]);
+                $fresh->update(['sale_status' => SaleStatus::Interested->value]);
             }
 
             return $reservation;

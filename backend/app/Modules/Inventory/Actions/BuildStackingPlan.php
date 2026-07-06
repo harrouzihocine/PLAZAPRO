@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Actions;
 
+use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Models\Location;
 
 /**
@@ -28,7 +29,7 @@ class BuildStackingPlan
             ->orderByDesc('stack_floor')
             ->orderBy('position')
             ->orderBy('reference')
-            ->get(['id', 'reference', 'sale_status', 'price', 'block', 'stack_floor', 'position', 'onhold_expires_at']);
+            ->get(['id', 'reference', 'sale_status', 'price', 'block', 'stack_floor', 'position', 'reserved_expires_at']);
 
         return $units
             ->groupBy(fn ($unit) => $unit->block ?? 'Unassigned')
@@ -45,12 +46,12 @@ class BuildStackingPlan
                             'price' => $unit->price,
                             'position' => $unit->position,
                             'reservation_id' => $unit->activeReservation?->id,
-                            // Reservation hold countdown, or the On Hold deposit
-                            // countdown when the unit is on hold.
-                            'expires_at' => $unit->sale_status?->value === 'onhold'
-                                ? $unit->onhold_expires_at
+                            // Interest-hold countdown, or the deposit
+                            // countdown when the unit is reserved.
+                            'expires_at' => $unit->sale_status === SaleStatus::Reserved
+                                ? $unit->reserved_expires_at
                                 : $unit->activeReservation?->expires_at,
-                            'reserved_count' => $unit->activeReservations
+                            'interested_count' => $unit->activeReservations
                                 ->pluck('client_project_id')->filter()->unique()->count(),
                         ])->values()->all(),
                     ])->values()->all(),

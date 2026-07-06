@@ -86,30 +86,30 @@ class ShortlistItem extends BaseModel
     }
 
     /**
-     * Whether this property is locked to the project by an open deal (reserved
-     * or won) or a deposit-backed On Hold — those can't be dropped from the
-     * shortlist until released. Returns 'reserved' | 'sold' | 'onhold' | null.
+     * Whether this property is locked to the project by an open deal (open or
+     * won) or a deposit-backed Reserved lock — those can't be dropped from the
+     * shortlist until released. Returns 'deal' | 'sold' | 'reserved' | null.
      */
     public function lockedReason(): ?string
     {
         $dealItem = DealItem::query()
             ->active()
-            ->whereIn('state', [DealState::Reserved->value, DealState::Won->value])
+            ->whereIn('state', [DealState::Open->value, DealState::Won->value])
             ->where($this->shortlistable_type === 'unit' ? 'unit_id' : 'box_id', $this->shortlistable_id)
             ->whereHas('deal', fn ($q) => $q->active()->where('client_project_id', $this->client_project_id))
             ->first();
 
         if ($dealItem) {
-            return $dealItem->state === DealState::Won ? 'sold' : 'reserved';
+            return $dealItem->state === DealState::Won ? 'sold' : 'deal';
         }
 
         if ($this->shortlistable_type === 'unit') {
-            $onholdProjectId = $this->relationLoaded('shortlistable')
-                ? $this->shortlistable?->onhold_project_id
-                : Unit::query()->whereKey($this->shortlistable_id)->value('onhold_project_id');
+            $reservedProjectId = $this->relationLoaded('shortlistable')
+                ? $this->shortlistable?->reserved_project_id
+                : Unit::query()->whereKey($this->shortlistable_id)->value('reserved_project_id');
 
-            if ($onholdProjectId !== null && (int) $onholdProjectId === $this->client_project_id) {
-                return 'onhold';
+            if ($reservedProjectId !== null && (int) $reservedProjectId === $this->client_project_id) {
+                return 'reserved';
             }
         }
 

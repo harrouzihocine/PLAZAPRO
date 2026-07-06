@@ -25,6 +25,8 @@ x-php-base: &php-base
     args:
       UID: ${UID:-1000}
       GID: ${GID:-1000}
+  environment:
+    TZ: Africa/Algiers
   volumes:
     - ./backend:/var/www/html
     - ./docker/php/production.ini:/usr/local/etc/php/conf.d/zz-production.ini:ro
@@ -38,6 +40,7 @@ x-php-base: &php-base
 services:
   nginx:
     image: nginx:1.27-alpine
+    environment: { TZ: Africa/Algiers }
     # The ONLY published port. Office LAN access + local smoke tests; internet
     # traffic arrives through the cloudflared tunnel on the docker network.
     ports: ["${APP_PORT:-80}:80"]
@@ -121,11 +124,15 @@ services:
     image: mysql:8.0
     # No ports: — unreachable from the host network entirely.
     command:
+      # Algeria is UTC+1 year-round (no DST) — align DB-side defaults
+      # (CURRENT_TIMESTAMP / NOW()) with the app clock.
+      - --default-time-zone=+01:00
       - --innodb-buffer-pool-size=2G
       - --slow-query-log=ON
       - --slow-query-log-file=/var/lib/mysql/slow.log
       - --long-query-time=1
     environment:
+      TZ: Africa/Algiers
       MYSQL_DATABASE: ${MYSQL_DATABASE:-plaza}
       MYSQL_USER: ${MYSQL_USER:-plaza}                # least-privilege app user (single schema)
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}

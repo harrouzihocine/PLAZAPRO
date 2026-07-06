@@ -13,9 +13,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * One reserved property on a deal — either a unit (apartment / local) or a box
+ * One property on a deal — either a unit (apartment / local) or a box
  * riding with it (parent_item_id = the apartment's item). Each APARTMENT item
- * has its own lifecycle: reserved → won (agreed_price set, payments start) or
+ * has its own lifecycle: open → won (agreed_price set, payments start) or
  * lost (released back); its box items follow it. `box_linked` marks a box this
  * deal linked to the apartment — reverted when the item is lost / removed.
  * Cancelled (not deleted) when removed from the deal, so history stays.

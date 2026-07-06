@@ -19,8 +19,8 @@ use Tests\TestCase;
  * The project (location) lifecycle beyond active, both cascading to the project's
  * units + boxes:
  *   - Archive (POST /archive)   → reversible; hidden until reactivated. Safe over
- *                                 reserved/sold inventory (sale_status untouched).
- *   - Remove  (DELETE)          → terminal; refused while a unit/box is reserved or
+ *                                 interested/sold inventory (sale_status untouched).
+ *   - Remove  (DELETE)          → terminal; refused while a unit/box is interested or
  *                                 sold, else cancels the project + its inventory.
  */
 class ArchiveLocationTest extends TestCase
@@ -122,7 +122,7 @@ class ArchiveLocationTest extends TestCase
         $this->assertDatabaseHas('boxes', ['id' => $box->id, 'status' => 'cancelled']);
     }
 
-    public function test_removing_a_project_is_blocked_by_a_reserved_or_sold_unit(): void
+    public function test_removing_a_project_is_blocked_by_an_interested_or_sold_unit(): void
     {
         $location = Location::factory()->create();
         $sold = Unit::factory()->create(['location_id' => $location->id, 'sale_status' => SaleStatus::Sold->value]);

@@ -17,15 +17,15 @@ import { dzdToMil, formatMoney, milToDzd, MIL_LABEL } from '@/features/payments/
 import { useAuthStore } from '@/features/settings/store'
 import { formatDate } from '@/utils/format'
 
-// The payment / holding / reservation follow-up hub. Three lists in one place:
-// units On Hold (deposit paid, with a live expiry countdown), units reserved
-// (the "Reserved N" pool), and the instalments to chase across the projects the
-// user may see. A holding can be turned into a sale from here (same win path as
-// the deal panel).
+// The payment follow-up hub. Three lists in one place: units Reserved (deposit
+// paid, with a live expiry countdown), units with interested clients (the
+// "Interested N" pool), and the instalments to chase across the projects the
+// user may see. A reserved unit can be turned into a sale from here (same win
+// path as the deal panel).
 const auth = useAuthStore()
 const canDeclare = computed(() => auth.can('deals.manage'))
 
-const data = ref({ holdings: [], reservations: [], due: [], totals: {} })
+const data = ref({ reserved: [], interested: [], due: [], totals: {} })
 const loading = ref(false)
 
 async function load() {
@@ -40,7 +40,7 @@ async function load() {
 }
 onMounted(load)
 
-// Live On-hold countdown (all rows share one ticking clock).
+// Live reservation countdown (all rows share one ticking clock).
 const now = ref(Date.now())
 let ticker
 onMounted(() => (ticker = setInterval(() => (now.value = Date.now()), 1000)))
@@ -89,21 +89,21 @@ const t = computed(() => data.value.totals ?? {})
   <div>
     <PageHeader
       title="Payments"
-      subtitle="Follow up holdings, reservations and the instalments to chase — across every project."
+      subtitle="Follow up reserved units, interested clients and the instalments to chase — across every project."
     />
 
     <div class="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-      <StatCard label="On hold" :value="t.on_hold ?? 0" icon="pi pi-pause-circle" tone="warning" />
-      <StatCard label="Reserved" :value="t.reserved ?? 0" icon="pi pi-lock" />
+      <StatCard label="Reserved" :value="t.reserved ?? 0" icon="pi pi-lock" tone="warning" />
+      <StatCard label="Interested" :value="t.interested ?? 0" icon="pi pi-thumbs-up" />
       <StatCard label="Overdue instalments" :value="t.overdue ?? 0" icon="pi pi-exclamation-circle" tone="danger" />
       <StatCard label="Overdue amount" :value="formatMoney(t.overdue_amount ?? 0)" icon="pi pi-money-bill" tone="danger" />
     </div>
 
-    <!-- Holdings: units off the market on a deposit -->
-    <SectionCard title="On hold (holding deposits)" icon="pi pi-pause-circle" class="mb-5" flush>
-      <DataTable :value="data.holdings" :loading="loading" data-key="id" class="text-sm">
+    <!-- Reserved: units off the market on a deposit -->
+    <SectionCard title="Reserved (holding deposits)" icon="pi pi-lock" class="mb-5" flush>
+      <DataTable :value="data.reserved" :loading="loading" data-key="id" class="text-sm">
         <template #empty>
-          <EmptyState icon="pi pi-pause-circle" title="Nothing on hold" body="No unit is currently held on a deposit." />
+          <EmptyState icon="pi pi-lock" title="Nothing reserved" body="No unit is currently reserved on a deposit." />
         </template>
         <Column header="Unit">
           <template #body="{ data: h }">
@@ -124,7 +124,7 @@ const t = computed(() => data.value.totals ?? {})
         </Column>
         <Column header="Expires in">
           <template #body="{ data: h }">
-            <span class="num font-semibold text-warning">{{ remaining(h.onhold_expires_at) ?? '—' }}</span>
+            <span class="num font-semibold text-warning">{{ remaining(h.reserved_expires_at) ?? '—' }}</span>
           </template>
         </Column>
         <Column header="">
@@ -150,11 +150,11 @@ const t = computed(() => data.value.totals ?? {})
       </DataTable>
     </SectionCard>
 
-    <!-- Reservations: the "Reserved N" pool -->
-    <SectionCard title="Reserved" icon="pi pi-lock" class="mb-5" flush>
-      <DataTable :value="data.reservations" :loading="loading" data-key="id" class="text-sm">
+    <!-- Interested: the "Interested N" pool -->
+    <SectionCard title="Interested" icon="pi pi-thumbs-up" class="mb-5" flush>
+      <DataTable :value="data.interested" :loading="loading" data-key="id" class="text-sm">
         <template #empty>
-          <EmptyState icon="pi pi-lock" title="Nothing reserved" body="No unit is currently reserved." />
+          <EmptyState icon="pi pi-thumbs-up" title="No interested clients" body="No unit currently has an interested client." />
         </template>
         <Column header="Unit">
           <template #body="{ data: r }">
@@ -169,7 +169,7 @@ const t = computed(() => data.value.totals ?? {})
         </Column>
         <Column header="Held by">
           <template #body="{ data: r }">
-            <StatusTag value="reserved" :label="`${r.reserved_count} project${r.reserved_count === 1 ? '' : 's'}`" />
+            <StatusTag value="interested" :label="`${r.interested_count} project${r.interested_count === 1 ? '' : 's'}`" />
           </template>
         </Column>
         <Column header="Price">

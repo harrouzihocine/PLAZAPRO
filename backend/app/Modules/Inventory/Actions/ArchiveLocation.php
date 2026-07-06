@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
  * disappear from every normal list until ReactivateLocation brings them back.
  *
  * Reversible and non-destructive: unlike Remove, archiving is safe even over
- * reserved/sold units — sale_status is untouched and restored intact on
+ * interested/reserved/sold units — sale_status is untouched and restored intact on
  * reactivate. Only active children are archived, so anything cancelled
  * beforehand stays cancelled.
  */

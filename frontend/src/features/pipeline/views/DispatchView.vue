@@ -10,7 +10,7 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import { pipelineApi } from '@/features/pipeline/api'
 import { toastError, toastSuccess } from '@/composables/useConfirm'
 import { copyToClipboard } from '@/composables/useClipboard'
-import { formatDateTime, humanize } from '@/utils/format'
+import { formatDateTime, humanize, todayInput } from '@/utils/format'
 
 // The dispatch board: unassigned in-site plans in the PENDING strip, and one
 // row per field agent × the 7 days of the shown week. Drag a pending task onto
@@ -30,24 +30,24 @@ const cells = ref({}) // `${agentId}|${day}` -> draggable list
 // every intermediate hop would assign/notify agents the card merely passed by.
 const moves = ref(new Map())
 
-// The board works entirely in UTC calendar dates. The backend (app timezone is
-// UTC) produces week_start, every item's `day`, and the "today onwards" guard in
-// UTC — so the columns, the dropped due_date and the highlights must use UTC too.
-// Using the browser's local offset (e.g. toISOString on a locally-parsed date)
-// shifted every column a day back for east-of-UTC users, so dropping on "today"
-// sent yesterday and the server rejected it as a past day.
-function addUtcDays(isoDate, n) {
+// The board works in Algerian calendar dates: the backend (app timezone
+// Africa/Algiers) produces week_start, every item's `day`, and the "today
+// onwards" guard in local wall-clock — so "today" must be the browser's local
+// date too (toISOString would give the UTC date, a day back before 01:00).
+// addDays is pure Y-m-d string arithmetic (parse at UTC midnight, add, slice)
+// — timezone-neutral on purpose.
+function addDays(isoDate, n) {
   const d = new Date(isoDate + 'T00:00:00Z')
   d.setUTCDate(d.getUTCDate() + n)
   return d.toISOString().slice(0, 10)
 }
-const todayUtc = () => new Date().toISOString().slice(0, 10)
+const localToday = () => todayInput()
 
 const days = computed(() => {
   if (!weekStart.value) return []
-  const today = todayUtc()
+  const today = localToday()
   return Array.from({ length: 7 }, (_, i) => {
-    const date = addUtcDays(weekStart.value, i)
+    const date = addDays(weekStart.value, i)
     return {
       date,
       label: new Date(date + 'T00:00:00Z').toLocaleDateString(undefined, {
@@ -87,11 +87,11 @@ async function load(week = weekStart.value) {
 }
 
 function dayDates(start) {
-  return Array.from({ length: 7 }, (_, i) => addUtcDays(start, i))
+  return Array.from({ length: 7 }, (_, i) => addDays(start, i))
 }
 
 function shiftWeek(deltaDays) {
-  load(addUtcDays(weekStart.value, deltaDays))
+  load(addDays(weekStart.value, deltaDays))
 }
 
 onMounted(() => load(null))

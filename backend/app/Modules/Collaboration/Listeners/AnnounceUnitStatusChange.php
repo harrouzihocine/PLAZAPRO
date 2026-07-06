@@ -13,17 +13,17 @@ use Illuminate\Support\Facades\Notification;
 
 /**
  * Drop a durable "unit status changed" record in every active user's bell when a
- * unit moves state (reserved / on hold / back on the market) — so the change
+ * unit moves state (interested / reserved / back on the market) — so the change
  * persists, not just the live toast. A SALE has its own richer notification
- * (AnnounceUnitSold) + celebration, so `sold` is skipped here; pure On Hold timer
+ * (AnnounceUnitSold) + celebration, so `sold` is skipped here; pure deposit-timer
  * changes (no state move) are skipped too. Runs on the queue.
  */
 class AnnounceUnitStatusChange implements ShouldQueue
 {
     /** Human wording per state the bell can announce. */
     private const LABELS = [
+        'interested' => 'interested',
         'reserved' => 'reserved',
-        'onhold' => 'on hold',
         'available' => 'back on the market',
     ];
 

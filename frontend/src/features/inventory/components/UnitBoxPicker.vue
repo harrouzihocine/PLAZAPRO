@@ -8,7 +8,7 @@ import { formatMoney } from '@/features/payments/money'
 //  - the location's available UNLINKED boxes (picking one links it to the
 //    apartment, server-side).
 // Boxes linked to ANOTHER apartment are never shown — they are not this
-// apartment's to take. `current` carries the boxes already reserved on the
+// apartment's to take. `current` carries the boxes already carried on the
 // deal for this apartment (they are not "available" anymore, but they must
 // stay offered while editing).
 const props = defineProps({

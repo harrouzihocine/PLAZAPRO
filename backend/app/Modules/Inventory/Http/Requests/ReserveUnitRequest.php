@@ -10,7 +10,7 @@ class ReserveUnitRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->can('units.reserve');
+        return (bool) $this->user()?->can('units.interest');
     }
 
     /**

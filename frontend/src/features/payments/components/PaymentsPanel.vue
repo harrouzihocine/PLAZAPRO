@@ -96,7 +96,7 @@ async function saveSchedule() {
 const recordForm = reactive({
   open: false,
   amount: '',
-  paid_on: new Date().toISOString().slice(0, 10),
+  paid_on: todayInput(),
   method_id: '',
   reference: '',
   schedule_item_id: '',
@@ -105,7 +105,7 @@ function resetRecord() {
   Object.assign(recordForm, {
     open: false,
     amount: '',
-    paid_on: new Date().toISOString().slice(0, 10),
+    paid_on: todayInput(),
     method_id: '',
     reference: '',
     schedule_item_id: '',

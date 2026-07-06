@@ -31,7 +31,7 @@ use Illuminate\Support\Facades\DB;
  *    project); creating one with no log requires the deals.direct permission;
  *  - a unit the client already rejected cannot enter the deal; a unit not yet
  *    shortlisted is shortlisted on the fly (added during the log itself);
- *  - every unit is reserved with a NO-EXPIRY hold (only closing the deal
+ *  - every unit gets a NO-EXPIRY interest hold (only closing the deal
  *    releases or converts it) and its boxes ride with it: a box already linked
  *    to the apartment, or an unlinked one that gets linked here (box_linked,
  *    reverted if the apartment is lost). A box linked to ANOTHER apartment is
@@ -87,7 +87,7 @@ class CreateDeal
                 'client_project_id' => $project->id,
                 'visit_id' => $visit?->id,
                 'call_id' => $call?->id,
-                'state' => DealState::Reserved->value,
+                'state' => DealState::Open->value,
                 'notes' => $data['notes'] ?? null,
                 'created_by' => $actor->id,
             ]);
@@ -98,7 +98,7 @@ class CreateDeal
                 $this->assertClientWantsUnit($project, $unit);
 
                 // No-expiry hold: locks the row, refuses a non-available unit,
-                // flips it to reserved and records the hold against this project.
+                // flips it to interested and records the hold against this project.
                 $this->reserveUnit->handle(
                     $unit,
                     ['client_project_id' => $project->id, 'no_expiry' => true],
@@ -119,10 +119,10 @@ class CreateDeal
             // can still conclude into its own deal.
             $this->closePendingNextActions->handle($project, 'Superseded by the deal');
 
-            // The properties are committed — the project sits at the reserved
+            // The properties are committed — the project sits at the deal
             // step (a project already won by an earlier deal stays won).
-            if (! in_array($project->stage, [ClientProjectStage::Reserved, ClientProjectStage::Won], true)) {
-                $project->update(['stage' => ClientProjectStage::Reserved->value]);
+            if (! in_array($project->stage, [ClientProjectStage::Deal, ClientProjectStage::Won], true)) {
+                $project->update(['stage' => ClientProjectStage::Deal->value]);
             }
 
             return $deal;
@@ -161,7 +161,8 @@ class CreateDeal
     }
 
     /**
-     * Reserve the chosen boxes with the apartment. Only a box already linked to
+     * Attach the chosen boxes with the apartment (they go Interested with it).
+     * Only a box already linked to
      * THIS apartment or not linked to any apartment may ride along; an unlinked
      * box is linked here (box_linked → reverted if the apartment is lost).
      *
@@ -191,7 +192,7 @@ class CreateDeal
 
             $linkedHere = $box->unit_id === null;
             $box->update([
-                'sale_status' => SaleStatus::Reserved->value,
+                'sale_status' => SaleStatus::Interested->value,
                 'unit_id' => $unit->id,
             ]);
 

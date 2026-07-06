@@ -38,20 +38,20 @@ export const useAnnouncementsStore = defineStore('announcements', {
     // the viewer dismisses it (no auto-timeout).
     celebrate(payload) {
       this.celebration = payload
-      this.patchUnit(payload.unit_id, { sale_status: 'sold', reserved_count: 0 })
+      this.patchUnit(payload.unit_id, { sale_status: 'sold', interested_count: 0 })
     },
 
     dismissCelebration() {
       this.celebration = null
     },
 
-    // A status move (reserved / on hold / available / sold) — repaint open views
-    // and surface a quiet toast so people notice the change live.
+    // A status move (interested / reserved / available / sold) — repaint open
+    // views and surface a quiet toast so people notice the change live.
     applyStatus(payload) {
       this.patchUnit(payload.id, {
         sale_status: payload.sale_status,
-        reserved_count: payload.reserved_count,
-        onhold_expires_at: payload.onhold_expires_at,
+        interested_count: payload.interested_count,
+        reserved_expires_at: payload.reserved_expires_at,
       })
       if (payload.reference) {
         toastInfo(`${payload.reference} · ${humanize(payload.sale_status)}`)

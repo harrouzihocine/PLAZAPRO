@@ -56,12 +56,12 @@ async function loadCandidates() {
   if (!locationId.value) return
   loading.value = true
   try {
-    // Reserved / on-hold units can still be shortlisted and reserved as backups
+    // Interested / reserved units can still be shortlisted and held as backups
     // ("2nd place") — only a sold unit is off the table. Boxes stay single-tenant
     // (available only).
     const params = {
       location_id: locationId.value,
-      sale_status: ['available', 'reserved', 'onhold'],
+      sale_status: ['available', 'interested', 'reserved'],
     }
     for (const [k, v] of Object.entries(filters)) {
       if (Array.isArray(v) ? v.length : v !== '' && v != null) params[k] = v

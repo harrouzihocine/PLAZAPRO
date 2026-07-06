@@ -86,7 +86,7 @@ class CompleteVisitRequest extends FormRequest
     }
 
     /**
-     * The visit's project already carries an open (reserved) or won deal — the
+     * The visit's project already carries an open or won deal — the
      * thread has its conclusion, so completing this visit needs no closure of
      * its own (though a `deal` closure may still open another deal).
      */
@@ -100,7 +100,7 @@ class CompleteVisitRequest extends FormRequest
 
         return Deal::query()->active()
             ->where('client_project_id', $visit->client_project_id)
-            ->whereIn('state', [DealState::Reserved->value, DealState::Won->value])
+            ->whereIn('state', [DealState::Open->value, DealState::Won->value])
             ->exists();
     }
 

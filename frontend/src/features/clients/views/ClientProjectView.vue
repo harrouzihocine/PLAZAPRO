@@ -222,7 +222,7 @@ async function removeProject() {
   }
 }
 
-// --- Direct deal (permission-gated): pick properties + boxes, reserve now ---
+// --- Direct deal (permission-gated): pick properties + boxes, open it now ---
 const directDealOpen = ref(false)
 const directDealUnits = ref([])
 const directDealNotes = ref('')
@@ -346,7 +346,7 @@ async function submitDirectDeal() {
               :disabled="!!project.frozen"
               @click="directDealOpen = true"
             />
-            <!-- An open deal holds reserved inventory — close it (won / lost)
+            <!-- An open deal holds Interested inventory — close it (won / lost)
                  before the project can leave the pipeline. -->
             <Button
               v-if="canManage()"
@@ -539,7 +539,7 @@ async function submitDirectDeal() {
       @close="directDealOpen = false"
     >
       <p class="mb-4 text-sm text-mute">
-        Deals normally come from a visit log — this direct path reserves the selected properties
+        Deals normally come from a visit log — this direct path marks the selected properties Interested
         immediately.
       </p>
       <form class="space-y-4" @submit.prevent="submitDirectDeal">
@@ -550,7 +550,7 @@ async function submitDirectDeal() {
         <div class="flex gap-2">
           <Button
             type="submit"
-            label="Open deal (reserve)"
+            label="Open deal"
             icon="pi pi-lock"
             :loading="store.saving"
           />

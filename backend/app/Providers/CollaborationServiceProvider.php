@@ -21,7 +21,7 @@ use App\Modules\Collaboration\Listeners\SendPaymentNotification;
 use App\Modules\Collaboration\Listeners\SendVisitAssignedNotification;
 use App\Modules\Inventory\Events\BoxEdited;
 use App\Modules\Inventory\Events\BoxPublished;
-use App\Modules\Inventory\Events\OnHoldLapsed;
+use App\Modules\Inventory\Events\ReservedLapsed;
 use App\Modules\Inventory\Events\UnitEdited;
 use App\Modules\Inventory\Events\UnitPublished;
 use App\Modules\Inventory\Events\UnitRepriced;
@@ -59,7 +59,7 @@ class CollaborationServiceProvider extends ServiceProvider
         BoxEdited::class => [AnnounceBoxEdited::class],
         UnitSold::class => [AnnounceUnitSold::class],
         UnitStatusChanged::class => [AnnounceUnitStatusChange::class],
-        OnHoldLapsed::class => [NotifyHolderOfLapsedHold::class],
+        ReservedLapsed::class => [NotifyHolderOfLapsedHold::class],
     ];
 
     public function boot(): void

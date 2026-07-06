@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Actions;
 
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Models\Box;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
@@ -32,14 +33,14 @@ class BuildLocationInsights
         $data = [
             'units' => [
                 'total' => (clone $units)->count(),
-                'available' => (clone $units)->where('sale_status', 'available')->count(),
-                'reserved' => (clone $units)->where('sale_status', 'reserved')->count(),
-                'sold' => (clone $units)->where('sale_status', 'sold')->count(),
+                'available' => (clone $units)->where('sale_status', SaleStatus::Available->value)->count(),
+                'interested' => (clone $units)->where('sale_status', SaleStatus::Interested->value)->count(),
+                'sold' => (clone $units)->where('sale_status', SaleStatus::Sold->value)->count(),
             ],
             'boxes' => [
                 'total' => (clone $boxes)->count(),
-                'available' => (clone $boxes)->where('sale_status', 'available')->count(),
-                'sold' => (clone $boxes)->where('sale_status', 'sold')->count(),
+                'available' => (clone $boxes)->where('sale_status', SaleStatus::Available->value)->count(),
+                'sold' => (clone $boxes)->where('sale_status', SaleStatus::Sold->value)->count(),
             ],
             'pipeline' => [
                 'active_projects' => (clone $projects)->active()->count(),

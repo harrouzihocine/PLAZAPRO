@@ -24,7 +24,7 @@ class ShortlistItemResource extends JsonResource
             'note' => $this->note,
             'shortlistable_type' => $this->shortlistable_type,
             'shortlistable_id' => $this->shortlistable_id,
-            // Non-null when an open deal (reserved/won) or an On Hold deposit
+            // Non-null when an open deal (open/won) or a Reserved deposit
             // pins this property to the project — the FE hides its remove button.
             'locked_reason' => $this->lockedReason(),
             // The full property card (not just the code): what it is, where it

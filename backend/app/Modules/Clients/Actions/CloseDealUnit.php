@@ -27,7 +27,7 @@ use Illuminate\Support\Facades\DB;
  *  - lost → the hold releases, the unit and its boxes return to available
  *           inventory, and a box THIS deal linked to the apartment is unlinked.
  *
- * When the last reserved apartment resolves, the deal itself closes:
+ * When the last open apartment resolves, the deal itself closes:
  *  - at least one won → deal won (total = the agreed prices), project won;
  *  - all lost → deal lost, resolved like before: `reopen` steps the project
  *    back to negotiating (a fresh deal can start) or `archive` closes it.
@@ -126,24 +126,24 @@ class CloseDealUnit
         // concurrent close has just sold it (belt-and-braces against a double-sale).
         abort_if($unit->sale_status === SaleStatus::Sold, 422, 'This unit has just been sold.');
 
-        // On Hold locks the sale to its holder: only that project may buy it.
+        // Reserved locks the sale to its holder: only that project may buy it.
         abort_if(
-            $unit->sale_status === SaleStatus::OnHold
-                && (int) $unit->onhold_project_id !== (int) $item->deal->client_project_id,
+            $unit->sale_status === SaleStatus::Reserved
+                && (int) $unit->reserved_project_id !== (int) $item->deal->client_project_id,
             422,
-            'This unit is on hold for another client.',
+            'This unit is reserved for another client.',
         );
 
         $this->activeHold($item)?->update(['hold_status' => HoldStatus::Converted->value]);
 
-        // The sale ends every backup — other projects that reserved this unit
+        // The sale ends every backup — other projects interested in this unit
         // lose it (their deals re-resolve; the all-users "sold" bell tells them).
         $this->releaseBackups($item);
 
         $unit->update([
             'sale_status' => SaleStatus::Sold->value,
-            'onhold_expires_at' => null,
-            'onhold_project_id' => null,
+            'reserved_expires_at' => null,
+            'reserved_project_id' => null,
         ]);
         $this->shortlistItemFor($item)?->update(['state' => ShortlistState::Won->value]);
 
@@ -232,7 +232,7 @@ class CloseDealUnit
         foreach ($item->boxItems as $boxItem) {
             $box = $boxItem->box;
             $box->update([
-                'sale_status' => $box->sale_status === SaleStatus::Reserved
+                'sale_status' => $box->sale_status === SaleStatus::Interested
                     ? SaleStatus::Available->value
                     : $box->sale_status,
                 // A link created by this deal is reverted with it.
@@ -243,19 +243,19 @@ class CloseDealUnit
 
         $item->update(['state' => DealState::Lost->value, 'closed_at' => now()]);
 
-        // Back to the market: reserved if other projects still hold it, else
+        // Back to the market: interested if other projects still hold it, else
         // available. But a backup losing must NOT lift a lock held by a DIFFERENT
-        // project — leave that unit On Hold for its holder.
+        // project — leave that unit Reserved for its holder.
         $unit = $item->unit;
-        $heldByAnother = $unit->sale_status === SaleStatus::OnHold
-            && (int) $unit->onhold_project_id !== (int) $item->deal->client_project_id;
+        $heldByAnother = $unit->sale_status === SaleStatus::Reserved
+            && (int) $unit->reserved_project_id !== (int) $item->deal->client_project_id;
         if (! $heldByAnother) {
             $unit->revertToMarket();
         }
     }
 
     /**
-     * Every OTHER open deal that reserved this same unit loses it when it sells —
+     * Every OTHER open deal carrying this same unit loses it when it sells —
      * release each backup project's hold, free the boxes it linked, close its
      * apartment item lost and let that deal re-resolve (steps its project back
      * into the pipeline). Leaves the unit's own status to win() (→ sold).
@@ -264,7 +264,7 @@ class CloseDealUnit
     {
         $backups = DealItem::query()->active()
             ->where('unit_id', $wonItem->unit_id)
-            ->where('state', DealState::Reserved->value)
+            ->where('state', DealState::Open->value)
             ->where('deal_id', '!=', $wonItem->deal_id)
             ->with(['deal', 'boxItems' => fn ($q) => $q->active(), 'boxItems.box'])
             ->get();
@@ -276,7 +276,7 @@ class CloseDealUnit
             foreach ($backup->boxItems as $boxItem) {
                 $box = $boxItem->box;
                 $box->update([
-                    'sale_status' => $box->sale_status === SaleStatus::Reserved
+                    'sale_status' => $box->sale_status === SaleStatus::Interested
                         ? SaleStatus::Available->value
                         : $box->sale_status,
                     'unit_id' => $boxItem->box_linked ? null : $box->unit_id,
@@ -294,7 +294,7 @@ class CloseDealUnit
     private function finalizeWhenResolved(Deal $deal, string $resolution, ?string $note): void
     {
         $stillOpen = $deal->unitItems()->active()
-            ->where('state', DealState::Reserved->value)
+            ->where('state', DealState::Open->value)
             ->exists();
 
         if ($stillOpen) {
@@ -331,7 +331,7 @@ class CloseDealUnit
         // (Also shields an API-sent `archive` from aborting the whole close.)
         $otherEngaged = $project->deals()->active()
             ->whereKeyNot($deal->id)
-            ->whereIn('state', [DealState::Reserved->value, DealState::Won->value])
+            ->whereIn('state', [DealState::Open->value, DealState::Won->value])
             ->exists();
         if ($otherEngaged) {
             return;
@@ -349,7 +349,7 @@ class CloseDealUnit
 
         // reopen: step the project back so a fresh deal cycle can start (the
         // lost deal is kept as history) — the log workflow unfreezes here.
-        if ($project->isActive() && $project->stage === ClientProjectStage::Reserved) {
+        if ($project->isActive() && $project->stage === ClientProjectStage::Deal) {
             $project->update(['stage' => ClientProjectStage::Negotiating->value]);
         }
     }

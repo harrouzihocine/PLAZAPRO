@@ -10,8 +10,8 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Add apartment(s) to visit on a project, standalone (not inside a completion).
- * Conducting agents on a project they can see may plan field visits — a field
- * agent dispatched here, the client's sales agent, or any conductor. The route
+ * Needs visits.propose (its own grant, split from visits.conduct so the button
+ * can be handed out person-by-person) on a project the user can see. The route
  * carries no permission middleware, so this authorize() is the whole gate.
  */
 class ProposeInSiteVisitRequest extends FormRequest
@@ -20,7 +20,7 @@ class ProposeInSiteVisitRequest extends FormRequest
     {
         $user = $this->user();
 
-        if ($user === null || ! $user->can('visits.conduct')) {
+        if ($user === null || ! $user->can('visits.propose')) {
             return false;
         }
 

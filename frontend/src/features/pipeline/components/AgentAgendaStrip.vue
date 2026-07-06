@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import { pipelineApi } from '@/features/pipeline/api'
+import { todayInput } from '@/utils/format'
 
 // The "when are you free?" picker on the next-action form: the signed-in agent's
 // own workload for the coming week, one cell per day with a capacity meter, so she
@@ -11,10 +12,11 @@ import { pipelineApi } from '@/features/pipeline/api'
 // question "is this a good day?" is answered inline (works on touch, not hover).
 // Collapsible via the corner −/+ (once the day is picked, it can fold away).
 //
-// Dates are UTC throughout — the backend buckets by UTC day (the same reference
-// the date <input> stores under and the dispatch board uses), so a clicked cell
-// maps to exactly the value a plan is saved with. Times come pre-formatted (UTC)
-// from the server, so a date-only plan reads as "All day", never a stray "00:00".
+// Dates are Algerian wall-clock throughout — the backend (app timezone
+// Africa/Algiers) buckets by local day, the same reference the date <input>
+// stores under and the dispatch board uses, so a clicked cell maps to exactly
+// the value a plan is saved with. Times come pre-formatted from the server,
+// so a date-only plan reads as "All day", never a stray "00:00".
 const props = defineProps({
   // The currently chosen due date ('YYYY-MM-DD'), highlighted in the picker.
   modelValue: { type: String, default: '' },
@@ -38,8 +40,11 @@ const expanded = ref(true)
 // always schedulable — no dead past days to grey out.
 const weekOffset = ref(0)
 
-const todayUtc = () => new Date().toISOString().slice(0, 10)
-const addUtcDays = (iso, n) => {
+// The backend buckets the agenda by Algerian (app-timezone) days, so "today"
+// is the browser's local date (toISOString would give the UTC date, a day
+// back before 01:00). addDays is timezone-neutral Y-m-d string arithmetic.
+const localToday = () => todayInput()
+const addDays = (iso, n) => {
   const d = new Date(iso + 'T00:00:00Z')
   d.setUTCDate(d.getUTCDate() + n)
   return d.toISOString().slice(0, 10)
@@ -47,7 +52,7 @@ const addUtcDays = (iso, n) => {
 
 // The first day of the shown window, derived from the offset (deterministic —
 // the label never waits on the fetch to settle).
-const weekStart = computed(() => addUtcDays(todayUtc(), weekOffset.value * props.days))
+const weekStart = computed(() => addDays(localToday(), weekOffset.value * props.days))
 
 const KIND = {
   call: { icon: 'pi pi-phone', label: 'Call' },
@@ -59,7 +64,7 @@ const kindOf = (k) => KIND[k] ?? { icon: 'pi pi-circle', label: k }
 
 // One cell of derived display state per returned day.
 const columns = computed(() => {
-  const today = todayUtc()
+  const today = localToday()
   return buckets.value.map((b) => {
     const d = new Date(b.date + 'T00:00:00Z')
     const count = b.items.length
@@ -86,7 +91,7 @@ const weekLabel = computed(() => {
   if (weekOffset.value === 0) return 'This week'
   if (weekOffset.value === 1) return 'Next week'
   const start = new Date(weekStart.value + 'T00:00:00Z')
-  const end = new Date(addUtcDays(weekStart.value, props.days - 1) + 'T00:00:00Z')
+  const end = new Date(addDays(weekStart.value, props.days - 1) + 'T00:00:00Z')
   const sameMonth = start.getUTCMonth() === end.getUTCMonth()
   const fmt = (d, month) =>
     d.toLocaleDateString(undefined, {

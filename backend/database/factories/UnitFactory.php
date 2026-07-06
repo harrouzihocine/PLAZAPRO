@@ -32,9 +32,9 @@ class UnitFactory extends Factory
         ];
     }
 
-    public function reserved(): static
+    public function interested(): static
     {
-        return $this->state(fn () => ['sale_status' => SaleStatus::Reserved->value]);
+        return $this->state(fn () => ['sale_status' => SaleStatus::Interested->value]);
     }
 
     public function sold(): static

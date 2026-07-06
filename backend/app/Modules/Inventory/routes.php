@@ -75,9 +75,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/media/{media}', [MediaController::class, 'destroy']);
     });
 
-    // Reservation lifecycle (the 48h hold). Requires units.reserve.
-    Route::middleware('can:units.reserve')->group(function () {
-        Route::post('/units/{unit}/reserve', [ReservationController::class, 'reserve']);
+    // Interest-hold lifecycle (the 48h hold). Requires units.interest.
+    Route::middleware('can:units.interest')->group(function () {
+        Route::post('/units/{unit}/interest', [ReservationController::class, 'reserve']);
         Route::post('/reservations/{reservation}/release', [ReservationController::class, 'release']);
         Route::post('/reservations/{reservation}/convert', [ReservationController::class, 'convert']);
     });

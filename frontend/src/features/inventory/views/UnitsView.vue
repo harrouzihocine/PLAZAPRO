@@ -91,8 +91,8 @@ function onPage(e) {
 }
 const statusOptions = [
   { value: 'available', label: 'Available' },
+  { value: 'interested', label: 'Interested' },
   { value: 'reserved', label: 'Reserved' },
-  { value: 'onhold', label: 'On hold' },
   { value: 'sold', label: 'Sold' },
 ]
 // GTM priority filter options (shared source of truth).
@@ -207,7 +207,7 @@ async function removeUnit(u) {
   if (
     await confirmAction({
       title: `Cancel unit "${u.reference}"?`,
-      text: 'The record is kept but marked cancelled. Only available units (not reserved, on hold, or sold) can be cancelled.',
+      text: 'The record is kept but marked cancelled. Only available units (not interested, reserved, or sold) can be cancelled.',
       confirmText: 'Cancel unit',
       danger: true,
     })
@@ -366,7 +366,7 @@ async function removeUnit(u) {
         </Column>
         <Column header="Status">
           <template #body="{ data }">
-            <SaleStatusBadge :status="data.sale_status" :reserved-count="data.reserved_count" />
+            <SaleStatusBadge :status="data.sale_status" :interested-count="data.interested_count" />
           </template>
         </Column>
         <Column header="Priority">
@@ -470,7 +470,7 @@ async function removeUnit(u) {
             :clearable="false"
             :options="[
               { value: 'available', label: 'Available' },
-              { value: 'reserved', label: 'Reserved' },
+              { value: 'interested', label: 'Interested' },
               { value: 'sold', label: 'Sold' },
             ]"
           />

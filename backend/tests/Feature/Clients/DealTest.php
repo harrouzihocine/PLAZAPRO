@@ -94,28 +94,28 @@ class DealTest extends TestCase
             'units' => [['unit_id' => $unit->id, 'box_ids' => $picked->pluck('id')->all()]],
         ])
             ->assertCreated()
-            ->assertJsonPath('data.state', 'reserved')
-            ->assertJsonPath('data.units.0.state', 'reserved')
+            ->assertJsonPath('data.state', 'open')
+            ->assertJsonPath('data.units.0.state', 'open')
             ->assertJsonPath('data.units.0.reference', $unit->reference)
             ->assertJsonCount(2, 'data.boxes');
 
-        // The unit is reserved on this project with a NO-EXPIRY hold — only
+        // The unit is held for this project with a NO-EXPIRY hold — only
         // closing the deal releases or converts it.
-        $this->assertSame('reserved', $unit->fresh()->sale_status->value);
+        $this->assertSame('interested', $unit->fresh()->sale_status->value);
         $this->assertDatabaseHas('reservations', [
             'unit_id' => $unit->id, 'client_project_id' => $project->id,
             'hold_status' => 'active', 'expires_at' => null,
         ]);
 
-        // The two picked boxes are reserved AND linked to the apartment.
+        // The two picked boxes are marked interested AND linked to the apartment.
         foreach ($picked as $box) {
-            $this->assertSame('reserved', $box->fresh()->sale_status->value);
+            $this->assertSame('interested', $box->fresh()->sale_status->value);
             $this->assertSame($unit->id, $box->fresh()->unit_id);
         }
-        $this->assertSame(2, Box::query()->where('sale_status', 'reserved')->count());
+        $this->assertSame(2, Box::query()->where('sale_status', 'interested')->count());
 
-        // The project sits at the reserved step.
-        $this->assertSame('reserved', $project->fresh()->stage->value);
+        // The project sits at the deal step.
+        $this->assertSame('deal', $project->fresh()->stage->value);
     }
 
     public function test_opening_a_deal_requires_visibility_of_the_project(): void
@@ -132,7 +132,7 @@ class DealTest extends TestCase
             'units' => [['unit_id' => $unit->id]],
         ])->assertForbidden();
 
-        // Nothing was reserved — the unit is untouched.
+        // Nothing was held — the unit is untouched.
         $this->assertSame('available', $unit->fresh()->sale_status->value);
         $this->assertSame(0, $project->deals()->count());
     }
@@ -233,7 +233,7 @@ class DealTest extends TestCase
 
         $deal = $project->deals()->latest('id')->firstOrFail();
         $this->assertNotNull($deal->call_id);
-        $this->assertSame('reserved', $deal->state->value);
+        $this->assertSame('open', $deal->state->value);
 
         // The log workflow stays OPEN while the deal is open — the client may
         // keep hunting more apartments (one deal per committed apartment).
@@ -252,7 +252,7 @@ class DealTest extends TestCase
         $payload = ['visit_id' => $visit->id, 'units' => [['unit_id' => $unit->id]]];
         $this->postJson("/api/v1/projects/{$project->id}/deals", $payload)->assertCreated();
 
-        // The same unit cannot be reserved twice — the hold refuses it.
+        // The same unit cannot be held twice by one project — the hold refuses it.
         $this->postJson("/api/v1/projects/{$project->id}/deals", $payload)->assertStatus(422);
 
         // But ANOTHER apartment opens its own deal alongside the first one —
@@ -265,7 +265,7 @@ class DealTest extends TestCase
             'units' => [['unit_id' => $other->id]],
         ])->assertCreated();
 
-        $this->assertSame(2, $project->deals()->active()->where('state', 'reserved')->count());
+        $this->assertSame(2, $project->deals()->active()->where('state', 'open')->count());
     }
 
     public function test_a_direct_deal_requires_the_permission(): void
@@ -370,11 +370,11 @@ class DealTest extends TestCase
             'outcome' => 'won', 'agreed_price' => '510000.00',
         ])
             ->assertOk()
-            ->assertJsonPath('data.state', 'reserved')
+            ->assertJsonPath('data.state', 'open')
             ->assertJsonPath('data.units.0.state', 'won');
 
         $this->assertSame('sold', $unit->fresh()->sale_status->value);
-        $this->assertSame('reserved', $second->fresh()->sale_status->value);
+        $this->assertSame('interested', $second->fresh()->sale_status->value);
 
         // Losing the second resolves the whole deal as WON (one apartment sold).
         $this->postJson("/api/v1/deals/{$deal['id']}/items/{$secondItem}/close", ['outcome' => 'lost'])
@@ -430,7 +430,7 @@ class DealTest extends TestCase
             ->assertJsonPath('data.state', 'lost');
 
         $this->assertSame('available', $unit->fresh()->sale_status->value);
-        $this->assertSame(0, Box::query()->where('sale_status', 'reserved')->count());
+        $this->assertSame(0, Box::query()->where('sale_status', 'interested')->count());
         $this->assertDatabaseHas('reservations', ['unit_id' => $unit->id, 'hold_status' => 'released']);
         // The project steps back into play.
         $this->assertSame('negotiating', $project->fresh()->stage->value);
@@ -557,7 +557,7 @@ class DealTest extends TestCase
             'units' => [['unit_id' => $unit->id]],
         ])->assertCreated()->json('data');
 
-        // Still reserved — the release endpoint is for WON apartments only.
+        // Still open — the release endpoint is for WON apartments only.
         $this->postJson("/api/v1/deals/{$deal['id']}/items/{$deal['units'][0]['item_id']}/release")
             ->assertStatus(422);
     }
@@ -593,7 +593,7 @@ class DealTest extends TestCase
         $this->assertSame($unit->id, $box->fresh()->unit_id);
         $this->assertSame('525000.00', (string) $project->fresh()->total_price);
 
-        // A reserved (not won) apartment refuses this path - use the boxes editor.
+        // An open (not won) apartment refuses this path - use the boxes editor.
         $this->assertSame('won', $project->fresh()->stage->value);
     }
 
@@ -621,7 +621,7 @@ class DealTest extends TestCase
         // The dropped box is released and unlinked; the new one linked.
         $this->assertSame('available', $first->fresh()->sale_status->value);
         $this->assertNull($first->fresh()->unit_id);
-        $this->assertSame('reserved', $otherBox->fresh()->sale_status->value);
+        $this->assertSame('interested', $otherBox->fresh()->sale_status->value);
         $this->assertSame($unit->id, $otherBox->fresh()->unit_id);
     }
 
