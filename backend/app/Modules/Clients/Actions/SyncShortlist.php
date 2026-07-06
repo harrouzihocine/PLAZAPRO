@@ -70,7 +70,7 @@ class SyncShortlist
 
             $toDrop->each->cancel('Removed from shortlist');
 
-            return $project->shortlistItems()->active()->with('shortlistable')->get();
+            return $project->shortlistItems()->active()->withProperty()->get();
         });
     }
 }

@@ -22,8 +22,10 @@ use App\Modules\Payments\Support\DomPdfRenderer;
 use App\Modules\Pipeline\Models\Call;
 use App\Modules\Pipeline\Models\Visit;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -39,6 +41,16 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // N+1 tripwire: a lazy-loaded relation throws in dev/CI so it never
+        // ships; production stays lenient (a stray lazy load must not 500).
+        Model::preventLazyLoading(! $this->app->isProduction());
+
+        // Real password policy where it matters; dev/test keep the loose
+        // default so factories and seeders stay simple.
+        Password::defaults(fn () => $this->app->isProduction()
+            ? Password::min(10)->letters()->mixedCase()->numbers()
+            : Password::min(8));
+
         // Models live in feature modules (App\Modules\...), but their factories
         // all live flat in Database\Factories. Map any model to its factory by
         // class basename so HasFactory resolves across the modular structure.

@@ -41,6 +41,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // Sanctum SPA (cookie) auth for the first-party frontend.
         $middleware->statefulApi();
 
+        // The app always sits behind a proxy (dev: nginx/Vite; prod: cloudflared → nginx).
+        // Without this, X-Forwarded-Proto is ignored — HTTPS detection, secure cookies and
+        // signed URLs break, and the rate limiter keys every external user by the proxy IP
+        // (one shared 120 req/min bucket). nginx rewrites the client IP from
+        // CF-Connecting-IP (docker/nginx/prod.conf), so trusting all proxies is safe here.
+        $middleware->trustProxies(at: '*');
+
         // Security-baseline headers on every response.
         $middleware->append(SecurityHeaders::class);
 

@@ -24,8 +24,8 @@ class UnitSold implements ShouldBroadcast
     use SerializesModels;
 
     /**
-     * @param  list<string>  $saleAgents   who did the marketing
-     * @param  list<string>  $insiteAgents who ran the site visits
+     * @param  list<string>  $saleAgents  who did the marketing
+     * @param  list<string>  $insiteAgents  who ran the site visits
      * @param  list<string>  $otherAgents  anyone else credited
      * @param  array{type?: ?string, room_number?: ?string, floor?: ?string, area_sqm?: ?string}  $details
      */

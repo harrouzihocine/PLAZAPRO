@@ -24,9 +24,12 @@ class SendDispatchRequestNotification implements ShouldQueue
 
         [, $subjectType, $subjectId] = NotificationLink::forSubject($subject);
 
+        // role.permissions eager-loaded: can() → hasPermission() then reads the
+        // loaded collection instead of one query per user (N+1).
         $dispatchers = User::query()
             ->active()
             ->where('is_active', true)
+            ->with('role.permissions')
             ->get()
             ->filter(fn (User $u) => $u->can('visits.dispatch'));
 

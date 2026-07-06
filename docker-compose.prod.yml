@@ -1,0 +1,161 @@
+# docker-compose.prod.yml — PLAZA PRO production stack.
+#
+# Standalone file (NOT an override of docker-compose.yml). Run it from a
+# dedicated production checkout whose .env sets COMPOSE_FILE=docker-compose.prod.yml
+# (scripts/generate-prod-env.sh writes that), so every `docker compose` command
+# there picks this file automatically. See docs/production-runbook.md.
+#
+# Differences from dev, on purpose:
+#   - no Vite dev server, no Mailpit
+#   - NOTHING published to the network except nginx (and the outbound-only tunnel);
+#     MySQL/Redis/Reverb are unreachable from outside docker
+#   - mysql + redis live on an internal-only network (no internet egress — even a
+#     compromised DB container cannot phone data home)
+#   - php-fpm pool + opcache tuned (docker/php/www.prod.conf, production.ini)
+#   - queue on Redis, 2 workers, hourly self-recycle
+#   - every service: restart policy, log rotation, no-new-privileges
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+x-php-base: &php-base
+  build:
+    context: ./docker/php
+    args:
+      UID: ${UID:-1000}
+      GID: ${GID:-1000}
+  volumes:
+    - ./backend:/var/www/html
+    - ./docker/php/production.ini:/usr/local/etc/php/conf.d/zz-production.ini:ro
+    - ./docker/php/www.prod.conf:/usr/local/etc/php-fpm.d/zz-www.prod.conf:ro
+  restart: unless-stopped
+  init: true
+  security_opt: ["no-new-privileges:true"]
+  logging: *logging
+  networks: [internal, edge]
+
+services:
+  nginx:
+    image: nginx:alpine
+    # The ONLY published port. Office LAN access + local smoke tests; internet
+    # traffic arrives through the cloudflared tunnel on the docker network.
+    ports: ["${APP_PORT:-80}:80"]
+    volumes:
+      - ./backend:/var/www/html:ro
+      - ./frontend/dist:/var/www/spa:ro
+      - ./docker/nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on: [app]
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+    networks: [internal, edge]
+    healthcheck:
+      # Exercises the full chain: nginx → php-fpm → Laravel /up.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/up"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  cloudflared: # outbound-only HTTPS tunnel — the public entry point
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      # Required when the "tunnel" profile is active (see docs/production-runbook.md).
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on: [nginx]
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+    networks: [edge]           # needs internet egress; nothing internal
+    profiles: ["tunnel"]       # enable with: docker compose --profile tunnel up -d
+
+  app: # Laravel + PHP-FPM
+    <<: *php-base
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "pgrep", "php-fpm"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  queue: # async workers ×2 — --max-time recycles each worker hourly (memory hygiene)
+    <<: *php-base
+    command: php artisan queue:work --tries=3 --timeout=120 --max-time=3600 --sleep=1
+    user: "${UID:-1000}:${GID:-1000}"
+    deploy:
+      replicas: 2
+    depends_on:
+      app: { condition: service_started }
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  scheduler: # cron schedule (routes/console.php)
+    <<: *php-base
+    command: php artisan schedule:work
+    user: "${UID:-1000}:${GID:-1000}"
+    depends_on:
+      app: { condition: service_started }
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  reverb: # websocket server — reached only via nginx's /app proxy, never published
+    <<: *php-base
+    command: php artisan reverb:start --host=0.0.0.0 --port=8081
+    user: "${UID:-1000}:${GID:-1000}"
+    depends_on:
+      app: { condition: service_started }
+      redis: { condition: service_healthy }
+
+  mysql:
+    image: mysql:8
+    # No ports: — unreachable from the host network entirely.
+    command:
+      - --innodb-buffer-pool-size=2G
+      - --slow-query-log=ON
+      - --slow-query-log-file=/var/lib/mysql/slow.log
+      - --long-query-time=1
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-plaza}
+      MYSQL_USER: ${MYSQL_USER:-plaza}                # least-privilege app user (single schema)
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+    volumes: ["db-data:/var/lib/mysql"]
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p\"$$MYSQL_ROOT_PASSWORD\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:alpine
+    # AOF (everysec): queued jobs survive a container restart, not just snapshots.
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+    volumes: ["redis-data:/data"]
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db-data:
+  redis-data:
+
+networks:
+  edge: # nginx ↔ cloudflared; has internet egress
+  internal: # app ↔ mysql/redis/reverb; no route to the outside world
+    internal: true

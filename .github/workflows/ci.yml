@@ -40,7 +40,7 @@ jobs:
           php artisan migrate --force
           php artisan test
       - name: Dependency audit
-        run: composer audit || true
+        run: composer audit
 
   frontend:
     runs-on: ubuntu-latest
@@ -61,4 +61,4 @@ jobs:
       - name: Unit tests
         run: npm run test
       - name: Dependency audit
-        run: npm audit --audit-level=high || true
+        run: npm audit --audit-level=high

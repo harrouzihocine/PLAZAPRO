@@ -21,6 +21,7 @@ use App\Modules\Clients\Http\Resources\DealResource;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Clients\Models\Deal;
 use App\Modules\Clients\Models\DealItem;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
@@ -54,7 +55,7 @@ class DealController extends Controller
     }
 
     /** Who worked this project — the pool for the "who deserves credit" pickers. */
-    public function participants(Request $request, ClientProject $project, BuildProjectParticipants $action): \Illuminate\Http\JsonResponse
+    public function participants(Request $request, ClientProject $project, BuildProjectParticipants $action): JsonResponse
     {
         abort_unless($project->isVisibleTo($request->user()), 404);
 

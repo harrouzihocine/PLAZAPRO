@@ -11,6 +11,7 @@ use App\Modules\Inventory\Models\Box;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Pipeline\Models\Call;
 use App\Modules\Pipeline\Models\Visit;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -57,6 +58,34 @@ class ShortlistItem extends BaseModel
     public function shortlistable(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * Everything ShortlistItemResource's property card touches, per morph type.
+     * Eager-load through withProperty()/loadPropertyCard() — a bare
+     * with('shortlistable') leaves these to lazy-load once per item (N+1).
+     *
+     * @var array<class-string, list<string>>
+     */
+    private const PROPERTY_CARD = [
+        Unit::class => ['roomNumber', 'floor', 'location'],
+        Box::class => ['type', 'location'],
+    ];
+
+    /** Query-side eager load of the full property card. */
+    public function scopeWithProperty(Builder $query): Builder
+    {
+        return $query->with([
+            'shortlistable' => fn (MorphTo $morphTo) => $morphTo->morphWith(self::PROPERTY_CARD),
+        ]);
+    }
+
+    /** Instance-side equivalent, for single items about to hit the resource. */
+    public function loadPropertyCard(): static
+    {
+        return $this->load([
+            'shortlistable' => fn (MorphTo $morphTo) => $morphTo->morphWith(self::PROPERTY_CARD),
+        ]);
     }
 
     /** Guard a morph target actually exists (morph FKs are not DB-enforced). */

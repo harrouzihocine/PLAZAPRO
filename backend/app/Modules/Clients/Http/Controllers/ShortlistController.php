@@ -11,9 +11,6 @@ use App\Modules\Clients\Http\Requests\SyncShortlistRequest;
 use App\Modules\Clients\Http\Resources\ShortlistItemResource;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Clients\Models\ShortlistItem;
-use App\Modules\Inventory\Models\Box;
-use App\Modules\Inventory\Models\Unit;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
@@ -31,12 +28,7 @@ class ShortlistController extends Controller
         abort_unless($project->isVisibleTo($request->user()), 404);
 
         // Eager-load the full property card per morph type (type/floor/location).
-        $items = $project->shortlistItems()->active()
-            ->with(['shortlistable' => fn (MorphTo $morphTo) => $morphTo->morphWith([
-                Unit::class => ['roomNumber', 'floor', 'location'],
-                Box::class => ['type', 'location'],
-            ])])
-            ->get();
+        $items = $project->shortlistItems()->active()->withProperty()->get();
 
         return ShortlistItemResource::collection($items);
     }
@@ -59,7 +51,7 @@ class ShortlistController extends Controller
             $item,
             $request->validated('outcome'),
             $request->validated('total_price'),
-        )->load('shortlistable');
+        )->loadPropertyCard();
 
         return new ShortlistItemResource($updated);
     }

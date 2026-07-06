@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Settings\Http\Requests;
 
+use App\Modules\Settings\Actions\ProcessAvatar;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Upload a profile photo for the authenticated user. The image is re-encoded
- * and shrunk server-side (see {@see \App\Modules\Settings\Actions\ProcessAvatar}),
+ * and shrunk server-side (see {@see ProcessAvatar}),
  * so the ceiling here only guards against wildly oversized originals — anything
  * within it comes out a few KB.
  */

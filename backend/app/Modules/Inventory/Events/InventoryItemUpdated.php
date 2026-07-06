@@ -22,9 +22,9 @@ class InventoryItemUpdated implements ShouldBroadcast
     use InteractsWithSockets;
 
     /**
-     * @param  'unit'|'box'  $type     which inventory item was edited
-     * @param  string        $context  room / floor / location (unit) or type / location (box)
-     * @param  string        $changed  human list of the fields that moved
+     * @param  'unit'|'box'  $type  which inventory item was edited
+     * @param  string  $context  room / floor / location (unit) or type / location (box)
+     * @param  string  $changed  human list of the fields that moved
      */
     public function __construct(
         public string $type,
