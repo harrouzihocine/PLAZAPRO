@@ -31,7 +31,10 @@ fi
 echo "==> Building images and frontend"
 docker compose build app
 # Build the SPA with a throwaway node container (prod stack has no node service).
-docker run --rm -u "$(id -u):$(id -g)" -v "$ROOT/frontend":/app -w /app \
+# npm_config_cache: a UID-mapped user has no writable $HOME in the stock image,
+# and npm dies on its cache dir without it.
+docker run --rm -u "$(id -u):$(id -g)" -e npm_config_cache=/tmp/npm-cache \
+    -v "$ROOT/frontend":/app -w /app \
     node:20-alpine sh -c "npm ci --no-audit --no-fund && npm run build"
 
 echo "==> Starting datastores"
