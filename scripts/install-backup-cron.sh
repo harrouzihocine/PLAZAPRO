@@ -28,9 +28,9 @@ $MARK_BEGIN
 #   sudo timedatectl set-timezone Africa/Algiers
 TZ=Africa/Algiers
 CRON_TZ=Africa/Algiers
-*/30 7-18 * * * $ROOT/scripts/backup-db.sh >> $LOG 2>&1
-0 19-23,0-6 * * * $ROOT/scripts/backup-db.sh >> $LOG 2>&1
-30 21 * * * $ROOT/scripts/backup-media.sh >> $LOG 2>&1
+*/30 7-18 * * * PLAZA_BACKUP_DIR=$BACKUP_ROOT $ROOT/scripts/backup-db.sh >> $LOG 2>&1
+0 19-23,0-6 * * * PLAZA_BACKUP_DIR=$BACKUP_ROOT $ROOT/scripts/backup-db.sh >> $LOG 2>&1
+30 21 * * * PLAZA_BACKUP_DIR=$BACKUP_ROOT $ROOT/scripts/backup-media.sh >> $LOG 2>&1
 $MARK_END
 CRON
 )
