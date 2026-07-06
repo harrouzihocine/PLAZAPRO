@@ -8,13 +8,13 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Close an interested shortlisted property: won (with the agreed total price) or
- * lost. Deal management is back-office (clients.manage).
+ * lost. Deal management is the closure desk (deals.manage).
  */
 class ShortlistOutcomeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->can('clients.manage');
+        return (bool) $this->user()?->can('deals.manage');
     }
 
     /**

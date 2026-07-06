@@ -1,5 +1,25 @@
 import { useApi } from '@/composables/useApi'
 
+// The supervised duplicate-client queue (clients.duplicates.resolve).
+export const duplicateRequestsApi = {
+  async list() {
+    const { data } = await useApi().get('/clients/duplicate-requests')
+    return data.data
+  },
+  async resolve(id, payload) {
+    const { data } = await useApi().post(`/clients/duplicate-requests/${id}/resolve`, payload)
+    return data.data
+  },
+  // Inspect one of the existing client's projects (activity, stage, the brief)
+  // before deciding — deny / share / start a separate project.
+  async previewProject(id, projectId) {
+    const { data } = await useApi().get(
+      `/clients/duplicate-requests/${id}/projects/${projectId}`,
+    )
+    return data.data
+  },
+}
+
 // Network calls for the Clients feature. State lives in clientsStore.js; these
 // functions are the only place the feature talks to the API (via shared useApi).
 export const clientsApi = {
@@ -52,6 +72,15 @@ export const followUpAgentsApi = {
 export const staffApi = {
   async list() {
     const { data } = await useApi().get('/staff')
+    return data.data
+  },
+}
+
+// Project handlers (role can open a client project — projects.create). Feeds the
+// archive reactivation hand-off picker (who a project may be given to).
+export const projectHandlersApi = {
+  async list() {
+    const { data } = await useApi().get('/project-handlers')
     return data.data
   },
 }
@@ -147,8 +176,26 @@ export const projectsApi = {
     return useApi().post(`/projects/${projectId}/archive`, payload)
   },
 
-  reactivate(projectId) {
-    return useApi().post(`/projects/${projectId}/reactivate`)
+  // Deliberate close-down to new activity (payments still flow) — and back.
+  freeze(projectId) {
+    return useApi().post(`/projects/${projectId}/freeze`)
+  },
+
+  unfreeze(projectId) {
+    return useApi().post(`/projects/${projectId}/unfreeze`)
+  },
+
+  // Reactivate an archived project. With no payload it is a plain reactivate;
+  // with { handler_ids, mode, primary_id } it hands the project to a chosen team
+  // (as-is or a separate new project — see ReactivateProjectWithHandoff).
+  reactivate(projectId, payload = {}) {
+    return useApi().post(`/projects/${projectId}/reactivate`, payload)
+  },
+
+  // Who to show before reactivating: opener + current contributors + in-site agents.
+  async handoffPreview(projectId) {
+    const { data } = await useApi().get(`/projects/${projectId}/handoff-preview`)
+    return data.data
   },
 
   // Client changed their mind: archive the deal + put them back on the desire list.
@@ -168,14 +215,30 @@ export const desireMatchesApi = {
     const { data } = await useApi().get('/desires/matches')
     return data.data
   },
+
+  // Delegate a waiting client to the sales agent who will reconnect (manager
+  // action). Sets the client's assigned agent + notifies them; the lead then
+  // shows on that agent's board. Returns the refreshed client.
+  async assign(clientId, agentId) {
+    const { data } = await useApi().post(`/clients/${clientId}/assign-agent`, { agent_id: agentId })
+    return data.data
+  },
 }
 
-// Deals on a project: opened from a visit log with the properties the client is
-// interested in (auto-reserved), then closed won (agreed price) or lost. Boxes
-// reserved alongside the apartment can be re-set while the deal is open.
+// Deals on a project: opened from an interaction log (visit or call) with the
+// properties the client is interested in (auto-reserved). Each APARTMENT closes
+// won (its own agreed price) or lost on its own; the whole-deal close is the
+// bulk face of the same flow. Boxes are edited per apartment while it's open.
 export const dealsApi = {
   async list(projectId) {
     const { data } = await useApi().get(`/projects/${projectId}/deals`)
+    return data.data
+  },
+
+  // Who worked the project (pool + defaults for the "who deserves credit" pickers
+  // on a sale): { participants: [{id,name}], insite_agent_ids, sale_agent_ids }.
+  async participants(projectId) {
+    const { data } = await useApi().get(`/projects/${projectId}/participants`)
     return data.data
   },
 
@@ -184,13 +247,35 @@ export const dealsApi = {
     return data.data
   },
 
+  // Bulk: { outcome: 'won', items: [{item_id, agreed_price}] } or
+  //       { outcome: 'lost', resolution, note }.
   async close(dealId, payload) {
     const { data } = await useApi().post(`/deals/${dealId}/close`, payload)
     return data.data
   },
 
-  async syncBoxes(dealId, boxIds) {
-    const { data } = await useApi().put(`/deals/${dealId}/boxes`, { box_ids: boxIds })
+  // One apartment: { outcome, agreed_price?, resolution?, note? }.
+  async closeItem(dealId, itemId, payload) {
+    const { data } = await useApi().post(`/deals/${dealId}/items/${itemId}/close`, payload)
+    return data.data
+  },
+
+  // Release a WON apartment (the sale fell through): { resolution?, note? }.
+  async releaseItem(dealId, itemId, payload) {
+    const { data } = await useApi().post(`/deals/${dealId}/items/${itemId}/release`, payload)
+    return data.data
+  },
+
+  // Sell extra boxes onto a WON apartment: { box_ids, added_price? }.
+  async addBoxes(dealId, itemId, payload) {
+    const { data } = await useApi().post(`/deals/${dealId}/items/${itemId}/boxes/add`, payload)
+    return data.data
+  },
+
+  async syncUnitBoxes(dealId, itemId, boxIds) {
+    const { data } = await useApi().put(`/deals/${dealId}/items/${itemId}/boxes`, {
+      box_ids: boxIds,
+    })
     return data.data
   },
 }

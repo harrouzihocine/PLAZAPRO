@@ -4,15 +4,29 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Modules\Collaboration\Actions\GrantFieldAgentChatAccess;
 use App\Modules\Collaboration\Events\MessageSent;
+use App\Modules\Collaboration\Listeners\AnnounceBoxEdited;
+use App\Modules\Collaboration\Listeners\AnnounceNewBox;
+use App\Modules\Collaboration\Listeners\AnnounceNewUnit;
+use App\Modules\Collaboration\Listeners\AnnounceUnitEdited;
+use App\Modules\Collaboration\Listeners\AnnounceUnitSold;
+use App\Modules\Collaboration\Listeners\AnnounceUnitStatusChange;
 use App\Modules\Collaboration\Listeners\NotifyAgentsOfMatchingUnit;
+use App\Modules\Collaboration\Listeners\NotifyHolderOfLapsedHold;
 use App\Modules\Collaboration\Listeners\NotifyParticipantsOfMessage;
 use App\Modules\Collaboration\Listeners\SendDispatchRequestNotification;
 use App\Modules\Collaboration\Listeners\SendDueReminderNotification;
 use App\Modules\Collaboration\Listeners\SendPaymentNotification;
 use App\Modules\Collaboration\Listeners\SendVisitAssignedNotification;
+use App\Modules\Inventory\Events\BoxEdited;
+use App\Modules\Inventory\Events\BoxPublished;
+use App\Modules\Inventory\Events\OnHoldLapsed;
+use App\Modules\Inventory\Events\UnitEdited;
 use App\Modules\Inventory\Events\UnitPublished;
 use App\Modules\Inventory\Events\UnitRepriced;
+use App\Modules\Inventory\Events\UnitSold;
+use App\Modules\Inventory\Events\UnitStatusChanged;
 use App\Modules\Payments\Events\VersementRecorded;
 use App\Modules\Pipeline\Events\InSiteDispatchRequested;
 use App\Modules\Pipeline\Events\ReminderDue;
@@ -34,12 +48,18 @@ class CollaborationServiceProvider extends ServiceProvider
      */
     private array $listen = [
         ReminderDue::class => [SendDueReminderNotification::class],
-        VisitAssigned::class => [SendVisitAssignedNotification::class],
+        VisitAssigned::class => [SendVisitAssignedNotification::class, GrantFieldAgentChatAccess::class],
         InSiteDispatchRequested::class => [SendDispatchRequestNotification::class],
         MessageSent::class => [NotifyParticipantsOfMessage::class],
         VersementRecorded::class => [SendPaymentNotification::class],
-        UnitPublished::class => [NotifyAgentsOfMatchingUnit::class],
+        UnitPublished::class => [NotifyAgentsOfMatchingUnit::class, AnnounceNewUnit::class],
+        UnitEdited::class => [AnnounceUnitEdited::class],
         UnitRepriced::class => [NotifyAgentsOfMatchingUnit::class],
+        BoxPublished::class => [AnnounceNewBox::class],
+        BoxEdited::class => [AnnounceBoxEdited::class],
+        UnitSold::class => [AnnounceUnitSold::class],
+        UnitStatusChanged::class => [AnnounceUnitStatusChange::class],
+        OnHoldLapsed::class => [NotifyHolderOfLapsedHold::class],
     ];
 
     public function boot(): void

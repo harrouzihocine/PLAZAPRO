@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Http\Controllers;
 
+use App\Modules\Inventory\Actions\BuildUnitInsights;
+use App\Modules\Inventory\Actions\BuildUnitProjectLogs;
 use App\Modules\Inventory\Actions\CancelUnit;
 use App\Modules\Inventory\Actions\CorrectUnit;
 use App\Modules\Inventory\Actions\CreateUnit;
@@ -28,19 +30,19 @@ class UnitController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        // type_id / floor_id / wilaya_id / sale_status accept either a single value
-        // or a list (multi-select filters) — cast to an array and use whereIn.
+        // room_number_id / floor_id / wilaya_id / sale_status accept either a single
+        // value or a list (multi-select filters) — cast to an array and use whereIn.
         $asList = fn (string $key) => array_values(array_filter(
             (array) $request->query($key),
             fn ($v) => $v !== '' && $v !== null,
         ));
 
         $units = Unit::query()
-            ->with(['type', 'floor', 'location.wilaya', 'location.commune', 'location.contractType'])
+            ->with(['roomNumber', 'floor', 'location.wilaya', 'location.commune', 'location.type', 'location.contractType', 'activeReservations:id,unit_id,client_project_id'])
             ->when($request->query('status') !== 'all', fn ($q) => $q->active())
             ->when($request->filled('search'), fn ($q) => $q->where('reference', 'like', '%'.trim((string) $request->query('search')).'%'))
             ->when($request->filled('location_id'), fn ($q) => $q->where('location_id', $request->query('location_id')))
-            ->when($asList('type_id'), fn ($q, $ids) => $q->whereIn('type_id', $ids))
+            ->when($asList('room_number_id'), fn ($q, $ids) => $q->whereIn('room_number_id', $ids))
             ->when($asList('floor_id'), fn ($q, $ids) => $q->whereIn('floor_id', $ids))
             // Geographic location lives on the unit's project (location), not the unit.
             ->when($asList('wilaya_id'), fn ($q, $ids) => $q->whereHas('location', fn ($l) => $l->whereIn('wilaya_id', $ids)))
@@ -61,22 +63,39 @@ class UnitController extends Controller
 
     public function show(Unit $unit): UnitResource
     {
-        return new UnitResource($unit->load(['type', 'floor', 'location.wilaya', 'location.commune', 'location.contractType']));
+        return new UnitResource($unit->load(['roomNumber', 'floor', 'location.wilaya', 'location.commune', 'location.type', 'location.contractType']));
+    }
+
+    /** Read-only stats + payments summary for the unit detail page. */
+    public function insights(Request $request, Unit $unit, BuildUnitInsights $action): JsonResponse
+    {
+        $canSeeMoney = (bool) $request->user()?->can('versements.view');
+
+        return response()->json(['data' => $action->handle($unit, $canSeeMoney)]);
+    }
+
+    /**
+     * The interaction logs (calls + visits) of every visible client project that
+     * has touched this unit, grouped per project — for the unit page's log tab.
+     */
+    public function projectLogs(Request $request, Unit $unit, BuildUnitProjectLogs $action): JsonResponse
+    {
+        return response()->json(['data' => $action->handle($unit, $request->user())]);
     }
 
     public function store(StoreUnitRequest $request, Location $location, CreateUnit $action): UnitResource
     {
-        return new UnitResource($action->handle($location, $request->validated())->load(['type', 'floor']));
+        return new UnitResource($action->handle($location, $request->validated())->load(['roomNumber', 'floor']));
     }
 
     public function update(UpdateUnitRequest $request, Unit $unit, UpdateUnit $action): UnitResource
     {
-        return new UnitResource($action->handle($unit, $request->validated())->load(['type', 'floor']));
+        return new UnitResource($action->handle($unit, $request->validated())->load(['roomNumber', 'floor']));
     }
 
     public function correct(CorrectUnitRequest $request, Unit $unit, CorrectUnit $action): JsonResponse
     {
-        $corrected = $action->handle($unit, $request->validated())->load(['type', 'floor']);
+        $corrected = $action->handle($unit, $request->validated())->load(['roomNumber', 'floor']);
 
         // The superseded replacement is a freshly-inserted row; a JsonResource
         // would otherwise auto-send 201. A correction is a 200 from the client's view.

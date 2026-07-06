@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
@@ -12,15 +12,52 @@ import { initials } from '@/utils/format'
 import NotificationBell from '@/features/collaboration/components/NotificationBell.vue'
 import DraftsIndicator from '@/components/shell/DraftsIndicator.vue'
 import GlobalSearch from '@/components/shell/GlobalSearch.vue'
+import BrandLogo from '@/components/BrandLogo.vue'
+import UnitSoldCelebration from '@/features/inventory/components/UnitSoldCelebration.vue'
+import ProfileModal from '@/features/settings/components/ProfileModal.vue'
+import { useAnnouncementsStore } from '@/features/inventory/announcementsStore'
+import { oversightApi } from '@/features/oversight/api'
 
 const { isNight, toggle } = useTheme()
 const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 
+// Oversight sidebar badge counts (only fetched for users who can see any monitor).
+const badges = ref({})
+const OVERSIGHT_PERMS = [
+  'oversight.clients',
+  'oversight.pipeline',
+  'oversight.deals',
+  'oversight.drafts',
+  'oversight.archive',
+  'clients.duplicates.resolve',
+  'clients.view',
+]
+// Live announcements reach EVERY logged-in user (sold celebration, status moves,
+// new units) over the public channel — subscribe once for the whole session.
+const announcements = useAnnouncementsStore()
+
+onMounted(async () => {
+  announcements.subscribe()
+
+  if (!OVERSIGHT_PERMS.some((p) => auth.can(p))) return
+  try {
+    badges.value = await oversightApi.summary()
+  } catch {
+    /* badges are best-effort */
+  }
+})
+
 const search = ref(null)
 const userPanel = ref(null)
 const mobileNav = ref(false)
+const showProfile = ref(false)
+
+function openProfile() {
+  userPanel.value?.hide()
+  showProfile.value = true
+}
 
 // Collapsed icon-rail preference survives reloads.
 const collapsed = ref(localStorage.getItem('plaza-nav-collapsed') === '1')
@@ -39,7 +76,6 @@ const SECTIONS = [
     label: 'Sales',
     items: [
       { to: '/clients', label: 'Clients', icon: 'pi pi-users', permission: 'clients.view' },
-      { to: '/desires/matches', label: 'Matches', icon: 'pi pi-heart', permission: 'clients.view' },
       { to: '/tasks', label: 'Tasks', icon: 'pi pi-check-square', permission: 'tasks.manage' },
       { to: '/dispatch', label: 'Dispatch', icon: 'pi pi-send', permission: 'visits.dispatch' },
       { to: '/chat', label: 'Chat', icon: 'pi pi-comments', permission: 'chat.use' },
@@ -67,7 +103,62 @@ const SECTIONS = [
     label: 'Insights',
     items: [
       { to: '/analytics', label: 'Reports', icon: 'pi pi-chart-line', permission: 'reports.view' },
+      { to: '/team-logs', label: 'Team logs', icon: 'pi pi-list-check', permission: 'logs.view_all' },
       { to: '/audit', label: 'Audit', icon: 'pi pi-shield', permission: 'audit.view' },
+    ],
+  },
+  {
+    label: 'Oversight',
+    items: [
+      {
+        to: '/oversight/clients',
+        label: 'Client quality',
+        icon: 'pi pi-user-minus',
+        permission: 'oversight.clients',
+        badgeKey: 'clients',
+      },
+      {
+        to: '/oversight/pipeline',
+        label: 'Pipeline',
+        icon: 'pi pi-hourglass',
+        permission: 'oversight.pipeline',
+        badgeKey: 'pipeline',
+      },
+      {
+        to: '/oversight/deals',
+        label: 'Lost + paid',
+        icon: 'pi pi-wallet',
+        permission: 'oversight.deals',
+        badgeKey: 'deals',
+      },
+      {
+        to: '/oversight/drafts',
+        label: 'Drafts',
+        icon: 'pi pi-pencil',
+        permission: 'oversight.drafts',
+        badgeKey: 'drafts',
+      },
+      {
+        to: '/oversight/duplicates',
+        label: 'Duplicates',
+        icon: 'pi pi-clone',
+        permission: 'clients.duplicates.resolve',
+        badgeKey: 'duplicates',
+      },
+      {
+        to: '/desires/matches',
+        label: 'Matches',
+        icon: 'pi pi-heart',
+        permission: 'clients.view',
+        badgeKey: 'matches',
+      },
+      {
+        to: '/oversight/archive',
+        label: 'Archive',
+        icon: 'pi pi-inbox',
+        permission: 'oversight.archive',
+        badgeKey: 'archive',
+      },
     ],
   },
   {
@@ -89,6 +180,54 @@ function isActive(to) {
   if (to === '/') return route.path === '/'
   return route.path === to || route.path.startsWith(to + '/')
 }
+
+// ── Collapsible sections ──────────────────────────────────────────────
+// Only the group you're working in stays open, so the rail never scrolls.
+// Manual open/close survives reloads; the active section always auto-opens.
+const NAV_OPEN_KEY = 'plaza-nav-open'
+const openSections = ref({})
+
+function activeSectionLabel() {
+  return SECTIONS.find((s) => s.items.some((i) => isActive(i.to)))?.label
+}
+
+;(() => {
+  let saved = null
+  try {
+    saved = JSON.parse(localStorage.getItem(NAV_OPEN_KEY) || 'null')
+  } catch {
+    /* corrupt value — fall back to defaults */
+  }
+  if (saved && typeof saved === 'object') {
+    openSections.value = saved
+  } else {
+    // First visit: open the section for the current page (Overview as a fallback).
+    openSections.value[activeSectionLabel() || 'Overview'] = true
+  }
+})()
+
+const isOpen = (section) => !!openSections.value[section.label]
+
+function toggleSection(label) {
+  openSections.value[label] = !openSections.value[label]
+  localStorage.setItem(NAV_OPEN_KEY, JSON.stringify(openSections.value))
+}
+
+// Sum of pending badges in a section — surfaced on a collapsed header.
+function sectionBadge(section) {
+  return (
+    section.items.reduce((n, i) => n + (i.badgeKey ? badges.value[i.badgeKey] || 0 : 0), 0) || null
+  )
+}
+
+// Keep the section for the current route open as the user navigates.
+watch(
+  () => route.path,
+  () => {
+    const label = activeSectionLabel()
+    if (label) openSections.value[label] = true
+  },
+)
 
 // Mobile bottom bar: the four most-used destinations + "More".
 const bottomNav = computed(() => {
@@ -114,32 +253,49 @@ async function logout() {
       <!-- Brand -->
       <RouterLink
         to="/"
-        class="flex h-16 shrink-0 items-center gap-3 border-b border-line px-4"
+        class="flex h-16 shrink-0 items-center border-b border-line px-4"
         :class="collapsed && 'justify-center px-0'"
       >
-        <span
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-lg font-bold text-primary-contrast"
-        >
-          P
-        </span>
-        <span v-if="!collapsed" class="truncate">
-          <span class="block text-[15px] font-bold leading-5 tracking-wide text-ink">
-            PLAZA<span class="text-primary-600 dark:text-primary-400"> PRO</span>
-          </span>
-          <span class="block text-[11px] leading-4 text-mute">Real-estate CRM</span>
-        </span>
+        <BrandLogo
+          :variant="collapsed ? 'mark' : 'full'"
+          :subtitle="collapsed ? '' : 'Real-estate CRM'"
+        />
       </RouterLink>
 
       <!-- Nav -->
       <nav class="flex-1 overflow-y-auto px-3 py-4">
-        <div v-for="section in sections" :key="section.label" class="mb-5">
-          <p
+        <div
+          v-for="section in sections"
+          :key="section.label"
+          :class="collapsed ? 'mb-4 last:mb-0' : 'mb-0.5'"
+        >
+          <!-- Section header — click to expand / collapse the group -->
+          <button
             v-if="!collapsed"
-            class="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-mute"
+            type="button"
+            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800"
+            :aria-expanded="isOpen(section)"
+            @click="toggleSection(section.label)"
           >
-            {{ section.label }}
-          </p>
-          <div class="space-y-0.5">
+            <span class="truncate">{{ section.label }}</span>
+            <span
+              v-if="!isOpen(section) && sectionBadge(section)"
+              class="num rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-contrast"
+            >
+              {{ sectionBadge(section) }}
+            </span>
+            <i
+              class="pi pi-chevron-down ml-auto text-[10px] transition-transform duration-200"
+              :class="isOpen(section) ? '' : '-rotate-90'"
+              aria-hidden="true"
+            />
+          </button>
+
+          <div
+            v-show="collapsed || isOpen(section)"
+            class="space-y-0.5"
+            :class="!collapsed && 'mb-2 mt-0.5'"
+          >
             <RouterLink
               v-for="item in section.items"
               :key="item.to"
@@ -166,6 +322,13 @@ async function logout() {
                 aria-hidden="true"
               />
               <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
+              <span
+                v-if="item.badgeKey && badges[item.badgeKey]"
+                class="num ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-contrast"
+                :class="collapsed ? 'absolute right-1 top-1 min-w-0 !px-1' : ''"
+              >
+                {{ badges[item.badgeKey] }}
+              </span>
             </RouterLink>
           </div>
         </div>
@@ -205,12 +368,8 @@ async function logout() {
           @click="mobileNav = true"
         />
 
-        <RouterLink to="/" class="flex items-center gap-2 lg:hidden">
-          <span
-            class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary font-bold text-primary-contrast"
-          >
-            P
-          </span>
+        <RouterLink to="/" class="flex items-center lg:hidden" aria-label="PLAZA PRO — home">
+          <BrandLogo variant="mark" icon-class="h-8 w-auto" />
         </RouterLink>
 
         <!-- Search trigger -->
@@ -249,7 +408,8 @@ async function logout() {
             @click="userPanel.toggle($event)"
           >
             <Avatar
-              :label="initials(auth.user?.name)"
+              :image="auth.user?.avatar_url || undefined"
+              :label="auth.user?.avatar_url ? undefined : initials(auth.user?.name)"
               shape="circle"
               class="!bg-primary !text-primary-contrast"
             />
@@ -264,7 +424,16 @@ async function logout() {
                 severity="secondary"
                 class="mt-2"
               />
-              <div class="mt-3 border-t border-line pt-2">
+              <div class="mt-3 space-y-1 border-t border-line pt-2">
+                <Button
+                  label="Edit profile"
+                  icon="pi pi-user-edit"
+                  severity="secondary"
+                  text
+                  size="small"
+                  class="w-full !justify-start"
+                  @click="openProfile"
+                />
                 <Button
                   label="Log out"
                   icon="pi pi-sign-out"
@@ -293,14 +462,7 @@ async function logout() {
     <!-- ══ Mobile drawer (full nav) ══ -->
     <Drawer v-model:visible="mobileNav" class="!w-72">
       <template #header>
-        <span class="flex items-center gap-2">
-          <span
-            class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary font-bold text-primary-contrast"
-          >
-            P
-          </span>
-          <span class="font-bold text-ink">PLAZA<span class="text-primary-600"> PRO</span></span>
-        </span>
+        <BrandLogo icon-class="h-8 w-auto" />
       </template>
       <nav>
         <div v-for="section in sections" :key="section.label" class="mb-4">
@@ -317,6 +479,12 @@ async function logout() {
           >
             <i :class="item.icon" class="w-5 text-center" aria-hidden="true" />
             {{ item.label }}
+            <span
+              v-if="item.badgeKey && badges[item.badgeKey]"
+              class="num ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-contrast"
+            >
+              {{ badges[item.badgeKey] }}
+            </span>
           </RouterLink>
         </div>
       </nav>
@@ -349,5 +517,11 @@ async function logout() {
     </nav>
 
     <GlobalSearch ref="search" />
+
+    <!-- Full-screen "unit sold" celebration for all users (teleports to body). -->
+    <UnitSoldCelebration />
+
+    <!-- Self-service profile editor (opened from the account menu). -->
+    <ProfileModal v-if="showProfile" @close="showProfile = false" />
   </div>
 </template>

@@ -12,14 +12,14 @@ const auth = useAuthStore()
 const router = useRouter()
 const { isNight, toggle } = useTheme()
 
-const email = ref('')
+const login = ref('')
 const password = ref('')
 const loading = ref(false)
 
 async function submit() {
   loading.value = true
   try {
-    await auth.login(email.value, password.value)
+    await auth.login(login.value.trim(), password.value)
     router.push({ name: 'dashboard' })
   } catch (e) {
     toastError(e.response?.data?.message ?? 'Login failed. Check your credentials.')
@@ -44,15 +44,14 @@ async function submit() {
         aria-hidden="true"
       />
 
-      <div class="relative flex items-center gap-3">
-        <span
-          class="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-xl font-bold text-primary-contrast"
-        >
-          P
-        </span>
-        <span class="text-lg font-bold tracking-wide text-white">
-          PLAZA<span class="text-primary-400"> PRO</span>
-        </span>
+      <div class="relative">
+        <!-- Full lockup on the always-dark panel, flipped to white. -->
+        <img
+          src="/logo-full.png"
+          alt="PLAZA PRO"
+          class="brand-mark-invert h-16 w-auto select-none"
+          draggable="false"
+        />
       </div>
 
       <div class="relative max-w-md">
@@ -83,15 +82,14 @@ async function submit() {
       />
 
       <div class="w-full max-w-sm">
-        <div class="mb-8 flex items-center gap-3 lg:hidden">
-          <span
-            class="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-xl font-bold text-primary-contrast"
-          >
-            P
-          </span>
-          <span class="text-lg font-bold tracking-wide text-ink">
-            PLAZA<span class="text-primary-600 dark:text-primary-400"> PRO</span>
-          </span>
+        <div class="mb-8 lg:hidden">
+          <!-- Full lockup: navy on light, flipped to white in dark mode. -->
+          <img
+            src="/logo-full.png"
+            alt="PLAZA PRO"
+            class="brand-mark-auto h-12 w-auto select-none"
+            draggable="false"
+          />
         </div>
 
         <h1 class="text-2xl font-semibold tracking-tight text-ink">Welcome back</h1>
@@ -99,20 +97,24 @@ async function submit() {
 
         <form class="mt-8 flex flex-col gap-5" @submit.prevent="submit">
           <div class="flex flex-col gap-1.5">
-            <label for="login-email" class="text-sm font-medium text-ink">Email</label>
+            <label for="login-id" class="text-sm font-medium text-ink"
+              >Username or email<span class="text-danger" aria-hidden="true"> *</span></label
+            >
             <InputText
-              id="login-email"
-              v-model="email"
-              type="email"
+              id="login-id"
+              v-model="login"
+              type="text"
               autocomplete="username"
-              placeholder="you@company.com"
+              placeholder="username or you@company.com"
               required
               fluid
             />
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label for="login-password" class="text-sm font-medium text-ink">Password</label>
+            <label for="login-password" class="text-sm font-medium text-ink"
+              >Password<span class="text-danger" aria-hidden="true"> *</span></label
+            >
             <Password
               id="login-password"
               v-model="password"

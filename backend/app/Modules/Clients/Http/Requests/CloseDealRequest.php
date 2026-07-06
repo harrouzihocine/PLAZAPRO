@@ -7,14 +7,20 @@ namespace App\Modules\Clients\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Close the deal won (with the agreed total price — prefilled client-side from
- * the reserved property prices) or lost. Back-office (clients.manage).
+ * Close the WHOLE deal in one move (each apartment still resolves on its own
+ * underneath — see CloseDealItemRequest for the one-apartment close):
+ *  - won  → an agreed price per remaining apartment (covers its boxes);
+ *  - lost → everything remaining is released; the resolution (reopen /
+ *           archive, note required when archiving) only matters when nothing
+ *           else carries the project — with another deal still open or won it
+ *           is moot, so it is optional (defaults to reopen server-side).
+ * The closure desk (deals.manage).
  */
 class CloseDealRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->can('clients.manage');
+        return (bool) $this->user()?->can('deals.manage');
     }
 
     /**
@@ -24,7 +30,11 @@ class CloseDealRequest extends FormRequest
     {
         return [
             'outcome' => ['required', 'in:won,lost'],
-            'total_price' => ['required_if:outcome,won', 'nullable', 'numeric', 'min:0', 'max:9999999999.99'],
+            'items' => ['required_if:outcome,won', 'array'],
+            'items.*.item_id' => ['required', 'integer', 'exists:deal_items,id'],
+            'items.*.agreed_price' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
+            'resolution' => ['nullable', 'in:reopen,archive'],
+            'note' => ['required_if:resolution,archive', 'nullable', 'string', 'max:2000'],
         ];
     }
 }

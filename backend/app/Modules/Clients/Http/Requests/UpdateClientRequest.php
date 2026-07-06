@@ -34,17 +34,17 @@ class UpdateClientRequest extends FormRequest
             'rating_id' => ['sometimes', 'nullable', 'integer', 'exists:dynamic_list_items,id'],
             'referrer_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'referrer_phone' => ['sometimes', 'nullable', 'string', 'max:50'],
-            'assigned_agent_id' => ['sometimes', 'nullable', 'integer', new CanFollowUpClient],
+            'assigned_agent_id' => ['sometimes', 'nullable', 'integer', new CanFollowUpClient($this->route('client')?->assigned_agent_id)],
             'notes' => ['sometimes', 'nullable', 'string', 'max:5000'],
-            'interests' => ['sometimes', 'nullable', 'array'],
-            'interests.*' => ['integer', 'distinct', 'exists:dynamic_list_items,id'],
             'id_documents' => ['sometimes', 'nullable', 'array'],
             'id_documents.*.type' => ['nullable', new Enum(IdDocumentType::class)],
             'id_documents.*.number' => ['nullable', 'string', 'max:100'],
             'id_documents.*.issued_at' => ['nullable', 'date'],
             'id_documents.*.issued_place' => ['nullable', 'string', 'max:255'],
             'id_number' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'birth_date' => ['sometimes', 'nullable', 'date', 'before:today'],
+            // A birth date must not be in the future; today itself is valid (a
+            // newborn). `before:today` wrongly rejected today — use before_or_equal.
+            'birth_date' => ['sometimes', 'nullable', 'date', 'before_or_equal:today'],
             'birth_place' => ['sometimes', 'nullable', 'string', 'max:255'],
             'address' => ['sometimes', 'nullable', 'string', 'max:500'],
         ];

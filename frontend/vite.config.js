@@ -14,6 +14,13 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  // Pre-bundle heavy libraries that only appear inside lazily-imported route
+  // chunks (Leaflet on the location page, Chart.js on analytics). Without this
+  // Vite first discovers them when you navigate there, re-optimises, and forces
+  // a full page reload — the multi-second stall on first open of those pages.
+  optimizeDeps: {
+    include: ['leaflet', 'chart.js'],
+  },
   server: {
     host: true, // listen on 0.0.0.0 inside the container
     port: 5173,

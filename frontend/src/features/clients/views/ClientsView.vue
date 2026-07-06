@@ -6,7 +6,6 @@ import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import InputText from 'primevue/inputtext'
-import Tag from 'primevue/tag'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
@@ -126,7 +125,7 @@ function openFile(event) {
           placeholder="All sources"
           aria-label="Filter by source"
           class="w-full sm:w-44"
-          :options="sources.map((s) => ({ value: s.id, label: s.label }))"
+          :options="sources.map((s) => ({ value: s.id, label: s.label, icon: s.meta?.icon }))"
         />
         <BaseSelect
           v-if="canSeeDetails"
@@ -190,14 +189,14 @@ function openFile(event) {
 
         <Column v-if="canSeeDetails" header="Source">
           <template #body="{ data }">
-            <Tag v-if="data.source" :value="data.source.label" severity="secondary" />
+            <Tag v-if="data.source" :icon="data.source.icon || undefined" :value="data.source.label" severity="secondary" />
             <span v-else class="text-mute">—</span>
           </template>
         </Column>
 
         <Column v-if="canSeeDetails" header="Rating">
           <template #body="{ data }">
-            <Tag v-if="data.rating" :value="data.rating.label" severity="info" />
+            <span v-if="data.rating" class="text-ink">{{ data.rating.label }}</span>
             <span v-else class="text-mute">—</span>
           </template>
         </Column>

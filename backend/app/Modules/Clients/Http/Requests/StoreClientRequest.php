@@ -47,9 +47,6 @@ class StoreClientRequest extends FormRequest
             'referrer_phone' => ['nullable', 'string', 'max:50'],
             'assigned_agent_id' => ['nullable', 'integer', new CanFollowUpClient],
             'notes' => ['nullable', 'string', 'max:5000'],
-            // What the client is shopping for (property_interests items). Multi-select.
-            'interests' => ['nullable', 'array'],
-            'interests.*' => ['integer', 'distinct', 'exists:dynamic_list_items,id'],
             // Identity / contract details, needed by the time a deal closes.
             // A client may present several ID documents; each carries its type,
             // number and issue date/place (تاريخ الإصدار و مكان الإصدار).
@@ -60,7 +57,8 @@ class StoreClientRequest extends FormRequest
             'id_documents.*.issued_place' => ['nullable', 'string', 'max:255'],
             // Algerian national identification number (NIN) — not the ID-card number.
             'id_number' => ['nullable', 'string', 'max:100'],
-            'birth_date' => ['nullable', 'date', 'before:today'],
+            // Not in the future; today itself is valid (a newborn).
+            'birth_date' => ['nullable', 'date', 'before_or_equal:today'],
             'birth_place' => ['nullable', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:500'],
         ];

@@ -68,8 +68,13 @@ class ConversationResource extends JsonResource
             return false;
         }
 
-        if ($this->relationLoaded('participants') && $this->participants->contains('id', $me->id)) {
-            return true;
+        if ($this->relationLoaded('participants')) {
+            $mine = $this->participants->firstWhere('id', $me->id);
+            // A downgraded field-agent observer (un-assigned by the dispatcher)
+            // keeps a participant row for read-only history — they cannot post.
+            if ($mine !== null) {
+                return $mine->pivot->role !== Conversation::ROLE_FIELD_AGENT_OBSERVER;
+            }
         }
 
         return $this->isWritableBy($me);

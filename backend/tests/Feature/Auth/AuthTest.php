@@ -22,15 +22,16 @@ class AuthTest extends TestCase
         $this->withHeader('Origin', 'http://localhost:5173');
     }
 
-    public function test_a_user_can_log_in_with_valid_credentials(): void
+    public function test_a_user_can_log_in_with_their_email(): void
     {
         $user = User::factory()->create([
             'email' => 'agent@plaza.local',
+            'username' => 'agent',
             'password' => Hash::make('secret-pass'),
         ]);
 
         $response = $this->postJson('/api/v1/auth/login', [
-            'email' => 'agent@plaza.local',
+            'login' => 'agent@plaza.local',
             'password' => 'secret-pass',
         ]);
 
@@ -40,15 +41,31 @@ class AuthTest extends TestCase
         $this->assertDatabaseHas('activity_log', ['action' => 'login', 'subject_id' => $user->id]);
     }
 
-    public function test_login_fails_with_wrong_password(): void
+    public function test_a_user_can_log_in_with_their_username(): void
     {
-        User::factory()->create([
+        $user = User::factory()->create([
             'email' => 'agent@plaza.local',
+            'username' => 'agent',
             'password' => Hash::make('secret-pass'),
         ]);
 
         $this->postJson('/api/v1/auth/login', [
-            'email' => 'agent@plaza.local',
+            'login' => 'agent',
+            'password' => 'secret-pass',
+        ])->assertOk()->assertJsonPath('data.username', 'agent');
+
+        $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_login_fails_with_wrong_password(): void
+    {
+        User::factory()->create([
+            'username' => 'agent',
+            'password' => Hash::make('secret-pass'),
+        ]);
+
+        $this->postJson('/api/v1/auth/login', [
+            'login' => 'agent',
             'password' => 'wrong',
         ])->assertStatus(422);
 
@@ -58,13 +75,13 @@ class AuthTest extends TestCase
     public function test_inactive_user_cannot_log_in(): void
     {
         User::factory()->create([
-            'email' => 'off@plaza.local',
+            'username' => 'off',
             'password' => Hash::make('secret-pass'),
             'is_active' => false,
         ]);
 
         $this->postJson('/api/v1/auth/login', [
-            'email' => 'off@plaza.local',
+            'login' => 'off',
             'password' => 'secret-pass',
         ])->assertStatus(422);
 
@@ -80,6 +97,6 @@ class AuthTest extends TestCase
     {
         $this->postJson('/api/v1/auth/login', [])
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['email', 'password']);
+            ->assertJsonValidationErrors(['login', 'password']);
     }
 }

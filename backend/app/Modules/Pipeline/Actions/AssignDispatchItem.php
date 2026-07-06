@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Pipeline\Actions;
 
+use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Collaboration\Actions\RevokeFieldAgentChatAccess;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
 use Illuminate\Support\Carbon;
@@ -25,6 +27,7 @@ class AssignDispatchItem
     public function __construct(
         private SyncVisitFromNextAction $syncVisitFromNextAction,
         private AssignVisit $assignVisit,
+        private RevokeFieldAgentChatAccess $revokeChatAccess,
     ) {}
 
     /**
@@ -56,6 +59,10 @@ class AssignDispatchItem
 
         abort_unless($action->type->value === 'in_site_visit', 422, 'Only in-site plans are dispatched from the board.');
 
+        // The agent this plan is leaving — its chat grant is revoked below once
+        // the reassignment / return-to-pool has removed his open visits.
+        $previousAgentId = $action->assigned_to;
+
         $updates = [];
         if (array_key_exists('agent_id', $change)) {
             $updates['assigned_to'] = $change['agent_id'];
@@ -72,6 +79,10 @@ class AssignDispatchItem
             $action->visits()->active()->whereNull('completed_at')->get()
                 ->each->cancel('Returned to the dispatch pool');
 
+            if ($previousAgentId !== null && $action->subject instanceof ClientProject) {
+                $this->revokeChatAccess->handle($action->subject, (int) $previousAgentId);
+            }
+
             return;
         }
 
@@ -79,6 +90,7 @@ class AssignDispatchItem
         // re-assignment must move them too (GenerateInSiteVisits would skip
         // them as "already open" and leave them on the previous agent).
         $openVisits = $action->visits()->active()->whereNull('completed_at')->get();
+        $previousVisitAgentIds = $openVisits->pluck('agent_id')->filter()->unique();
 
         foreach ($openVisits as $visit) {
             $visit->update(['scheduled_at' => $action->due_at]);
@@ -89,6 +101,14 @@ class AssignDispatchItem
 
         // First assignment (or new shortlisted units): materialize the rest.
         $this->syncVisitFromNextAction->handle($action);
+
+        // A previous field agent who no longer holds an open in-site visit here
+        // loses their chat grant (read-only from now on).
+        if ($action->subject instanceof ClientProject) {
+            foreach ($previousVisitAgentIds->reject(fn ($id) => (int) $id === (int) $action->assigned_to) as $id) {
+                $this->revokeChatAccess->handle($action->subject, (int) $id);
+            }
+        }
     }
 
     private function moveVisit(array $change, ?Carbon $dueDate): void
@@ -96,6 +116,11 @@ class AssignDispatchItem
         $visit = Visit::query()->active()->whereNull('completed_at')->findOrFail($change['id']);
 
         abort_unless($visit->type->value === 'in_site', 422, 'Only in-site visits are dispatched from the board.');
+
+        // The agent currently on this visit — its chat grant is revoked below
+        // once he no longer holds an open in-site visit on the project.
+        $previousAgentId = $visit->agent_id;
+        $project = $visit->clientProject;
 
         // Back to the pool: the plan loses its agent, its open visits retire.
         if (empty($change['agent_id'])) {
@@ -109,6 +134,10 @@ class AssignDispatchItem
                 ->each->cancel('Returned to the dispatch pool');
             $this->syncVisitFromNextAction->handle($action->fresh());
 
+            if ($previousAgentId !== null && $project !== null) {
+                $this->revokeChatAccess->handle($project, (int) $previousAgentId);
+            }
+
             return;
         }
 
@@ -121,6 +150,12 @@ class AssignDispatchItem
 
         if ((int) $change['agent_id'] !== (int) $visit->agent_id) {
             $this->assignVisit->handle($visit->fresh(), (int) $change['agent_id']);
+
+            // The visit moved to another agent — the previous one may have lost
+            // his last open in-site visit here.
+            if ($previousAgentId !== null && $project !== null) {
+                $this->revokeChatAccess->handle($project, (int) $previousAgentId);
+            }
         }
     }
 }

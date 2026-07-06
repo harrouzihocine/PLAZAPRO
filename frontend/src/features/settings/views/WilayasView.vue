@@ -1,10 +1,12 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Button from 'primevue/button'
 import BaseInput from '@/components/base/BaseInput.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import WilayaFormModal from '@/features/settings/components/WilayaFormModal.vue'
+import CommuneFormModal from '@/features/settings/components/CommuneFormModal.vue'
 import { geographyApi } from '@/features/settings/api'
 import { invalidateWilayas, invalidateCommunes } from '@/composables/useGeography'
 import { confirmAction, toastError } from '@/composables/useConfirm'
@@ -16,8 +18,11 @@ const search = ref('')
 const loading = ref(false)
 const saving = ref(false)
 
-const newWilaya = reactive({ code: '', name: '' })
-const newCommune = reactive({ name: '', daira_name: '' })
+// Modal state for each level (null item = creating).
+const wilayaModalOpen = ref(false)
+const wilayaModalItem = ref(null)
+const communeModalOpen = ref(false)
+const communeModalItem = ref(null)
 
 const selected = computed(() => wilayas.value.find((w) => w.id === selectedId.value) ?? null)
 const filtered = computed(() => {
@@ -58,35 +63,28 @@ async function mutate(fn) {
   }
 }
 
-async function addWilaya() {
-  if (!newWilaya.code.trim() || !newWilaya.name.trim()) return
+/* --- Wilaya --- */
+function openCreateWilaya() {
+  wilayaModalItem.value = null
+  wilayaModalOpen.value = true
+}
+function openEditWilaya() {
+  wilayaModalItem.value = selected.value
+  wilayaModalOpen.value = true
+}
+async function saveWilaya(payload) {
   try {
     await mutate(() =>
-      geographyApi.createWilaya({ code: newWilaya.code.trim(), name: newWilaya.name.trim() }),
-    )
-    newWilaya.code = ''
-    newWilaya.name = ''
-    await loadWilayas()
-  } catch {
-    /* surfaced via error */
-  }
-}
-
-async function renameWilaya() {
-  if (!selected.value) return
-  try {
-    await mutate(() =>
-      geographyApi.updateWilaya(selected.value.id, {
-        code: selected.value.code,
-        name: selected.value.name,
-      }),
+      wilayaModalItem.value
+        ? geographyApi.updateWilaya(wilayaModalItem.value.id, payload)
+        : geographyApi.createWilaya(payload),
     )
     await loadWilayas()
+    wilayaModalOpen.value = false
   } catch {
-    /* surfaced via error */
+    /* surfaced via toast */
   }
 }
-
 async function removeWilaya(wilaya) {
   if (
     !(await confirmAction({
@@ -105,41 +103,33 @@ async function removeWilaya(wilaya) {
     }
     await loadWilayas()
   } catch {
-    /* surfaced via error */
+    /* surfaced via toast */
   }
 }
 
-async function addCommune() {
-  if (!selected.value || !newCommune.name.trim()) return
+/* --- Commune --- */
+function openCreateCommune() {
+  communeModalItem.value = null
+  communeModalOpen.value = true
+}
+function openEditCommune(commune) {
+  communeModalItem.value = commune
+  communeModalOpen.value = true
+}
+async function saveCommune(payload) {
   try {
     await mutate(() =>
-      geographyApi.createCommune(selected.value.id, {
-        name: newCommune.name.trim(),
-        daira_name: newCommune.daira_name.trim() || null,
-      }),
+      communeModalItem.value
+        ? geographyApi.updateCommune(communeModalItem.value.id, payload)
+        : geographyApi.createCommune(selected.value.id, payload),
     )
-    newCommune.name = ''
-    newCommune.daira_name = ''
     communes.value = await geographyApi.communes(selected.value.id)
     await loadWilayas() // refresh communes_count
+    communeModalOpen.value = false
   } catch {
-    /* surfaced via error */
+    /* surfaced via toast */
   }
 }
-
-async function saveCommune(commune) {
-  try {
-    await mutate(() =>
-      geographyApi.updateCommune(commune.id, {
-        name: commune.name,
-        daira_name: commune.daira_name,
-      }),
-    )
-  } catch {
-    /* surfaced via error */
-  }
-}
-
 async function removeCommune(commune) {
   if (
     !(await confirmAction({
@@ -155,7 +145,7 @@ async function removeCommune(commune) {
     communes.value = await geographyApi.communes(selected.value.id)
     await loadWilayas()
   } catch {
-    /* surfaced via error */
+    /* surfaced via toast */
   }
 }
 </script>
@@ -165,12 +155,16 @@ async function removeCommune(commune) {
     <PageHeader
       title="Wilayas & Communes"
       subtitle="Manage Algeria's wilayas and the communes that belong to each one."
-    />
+    >
+      <template #actions>
+        <Button label="Add wilaya" icon="pi pi-plus" @click="openCreateWilaya" />
+      </template>
+    </PageHeader>
 
-    <div class="grid grid-cols-1 gap-5 md:grid-cols-[20rem_1fr]">
+    <div class="grid grid-cols-1 gap-5 lg:grid-cols-[20rem_minmax(0,1fr)]">
       <!-- Wilaya picker -->
       <SectionCard :title="`Wilayas (${wilayas.length})`" icon="pi pi-map" class="self-start">
-        <BaseInput v-model="search" label="Search" class="mb-3" />
+        <BaseInput v-model="search" placeholder="Search wilayas…" class="mb-3" />
         <p v-if="loading" class="py-2 text-center text-sm text-mute">Loading…</p>
         <nav v-else class="-mx-1 flex max-h-[26rem] flex-col gap-0.5 overflow-y-auto px-1">
           <button
@@ -190,86 +184,76 @@ async function removeCommune(commune) {
             </span>
             <span class="num text-xs text-mute">{{ w.communes_count }}</span>
           </button>
+          <p v-if="!filtered.length" class="py-3 text-center text-sm text-mute">No wilayas found.</p>
         </nav>
-
-        <!-- Add wilaya -->
-        <form
-          class="mt-3 flex flex-col gap-2 border-t border-line pt-3"
-          @submit.prevent="addWilaya"
-        >
-          <div class="flex gap-2">
-            <BaseInput v-model="newWilaya.code" label="Code" class="w-20" />
-            <BaseInput v-model="newWilaya.name" label="Name" class="flex-1" />
-          </div>
-          <Button type="submit" label="Add wilaya" icon="pi pi-plus" :loading="saving" />
-        </form>
       </SectionCard>
 
       <!-- Commune manager -->
       <SectionCard v-if="selected">
-        <header class="mb-4 flex flex-wrap items-end justify-between gap-2">
-          <form class="flex items-end gap-2" @submit.prevent="renameWilaya">
-            <BaseInput v-model="selected.code" label="Code" class="w-20" />
-            <BaseInput v-model="selected.name" label="Wilaya" class="w-56" />
-            <Button
-              type="submit"
-              label="Save"
-              icon="pi pi-check"
-              severity="secondary"
-              outlined
-              :disabled="saving"
-            />
-          </form>
+        <template #header>
+          <div class="min-w-0">
+            <h2 class="text-sm font-semibold text-ink">
+              <span class="num text-mute">{{ selected.code }}</span> · {{ selected.name }}
+            </h2>
+            <p class="mt-0.5 text-xs text-mute">{{ communes.length }} communes</p>
+          </div>
+        </template>
+        <template #actions>
           <Button
-            label="Remove wilaya"
+            icon="pi pi-pencil"
+            label="Edit"
+            size="small"
+            severity="secondary"
+            outlined
+            @click="openEditWilaya"
+          />
+          <Button
             icon="pi pi-ban"
+            label="Remove"
+            size="small"
             severity="danger"
             outlined
             @click="removeWilaya(selected)"
           />
-        </header>
+          <Button label="Add commune" icon="pi pi-plus" size="small" @click="openCreateCommune" />
+        </template>
 
         <div class="space-y-2">
           <div
             v-for="c in communes"
             :key="c.id"
-            class="flex flex-col gap-2 rounded-xl border border-line p-2.5 sm:flex-row sm:items-end"
+            class="flex items-center gap-3 rounded-xl border border-line px-3 py-2.5"
           >
-            <BaseInput v-model="c.name" label="Commune" class="flex-1" />
-            <BaseInput v-model="c.daira_name" label="Daïra" class="flex-1" />
-            <div class="flex gap-1">
-              <Button
-                label="Save"
-                icon="pi pi-check"
-                size="small"
-                severity="secondary"
-                outlined
-                :disabled="saving"
-                @click="saveCommune(c)"
-              />
-              <Button
-                icon="pi pi-ban"
-                text
-                rounded
-                size="small"
-                severity="danger"
-                aria-label="Remove commune"
-                @click="removeCommune(c)"
-              />
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-sm font-medium text-ink">{{ c.name }}</p>
+              <p v-if="c.daira_name" class="truncate text-xs text-mute">Daïra: {{ c.daira_name }}</p>
             </div>
+            <Button
+              icon="pi pi-pencil"
+              text
+              rounded
+              size="small"
+              severity="secondary"
+              aria-label="Edit commune"
+              @click="openEditCommune(c)"
+            />
+            <Button
+              icon="pi pi-ban"
+              text
+              rounded
+              size="small"
+              severity="danger"
+              aria-label="Remove commune"
+              @click="removeCommune(c)"
+            />
           </div>
-          <p v-if="!communes.length" class="py-4 text-center text-sm text-mute">No communes yet.</p>
+          <EmptyState
+            v-if="!communes.length"
+            icon="pi pi-map-marker"
+            title="No communes yet"
+            body="Add the first commune for this wilaya."
+          />
         </div>
-
-        <!-- Add commune -->
-        <form
-          class="mt-4 flex flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:items-end"
-          @submit.prevent="addCommune"
-        >
-          <BaseInput v-model="newCommune.name" label="New commune" class="flex-1" />
-          <BaseInput v-model="newCommune.daira_name" label="Daïra (optional)" class="flex-1" />
-          <Button type="submit" label="Add commune" icon="pi pi-plus" :loading="saving" />
-        </form>
       </SectionCard>
 
       <SectionCard v-else>
@@ -280,5 +264,21 @@ async function removeCommune(commune) {
         />
       </SectionCard>
     </div>
+
+    <WilayaFormModal
+      v-if="wilayaModalOpen"
+      :wilaya="wilayaModalItem"
+      :saving="saving"
+      @save="saveWilaya"
+      @close="wilayaModalOpen = false"
+    />
+    <CommuneFormModal
+      v-if="communeModalOpen"
+      :commune="communeModalItem"
+      :wilaya-name="selected?.name"
+      :saving="saving"
+      @save="saveCommune"
+      @close="communeModalOpen = false"
+    />
   </div>
 </template>

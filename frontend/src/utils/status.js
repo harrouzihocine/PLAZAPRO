@@ -7,6 +7,8 @@ const META = {
   // unit / box sale status
   available: { severity: 'success', icon: 'pi pi-check-circle' },
   reserved: { severity: 'warn', icon: 'pi pi-lock' },
+  // On Hold — a deposit-backed, off-market lock; stronger than reserved.
+  onhold: { severity: 'contrast', icon: 'pi pi-pause-circle', label: 'On hold' },
   sold: { severity: 'info', icon: 'pi pi-flag-fill' },
   blocked: { severity: 'danger', icon: 'pi pi-ban' },
 

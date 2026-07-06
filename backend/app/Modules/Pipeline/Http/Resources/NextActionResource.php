@@ -25,6 +25,7 @@ class NextActionResource extends JsonResource
             'state' => $this->state?->value,
             'due_at' => $this->due_at,
             'completed_at' => $this->completed_at,
+            'created_at' => $this->created_at,
             'is_overdue' => $this->state?->value === 'pending' && $this->due_at?->isPast(),
             'status' => $this->status?->value,
             'edited' => $this->supersedes_id !== null,

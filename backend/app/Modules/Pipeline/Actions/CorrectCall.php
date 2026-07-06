@@ -14,7 +14,7 @@ use App\Modules\Pipeline\Models\Call;
 class CorrectCall
 {
     /**
-     * @param  array<string, mixed>  $data  changed fillable fields (direction, outcome_id, notes, topics, called_at)
+     * @param  array<string, mixed>  $data  changed fillable fields (direction, outcome_id, notes, topics, objections, called_at)
      */
     public function handle(Call $call, array $data, string $reason): Call
     {

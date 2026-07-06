@@ -36,6 +36,19 @@ body,
   font-variant-numeric: tabular-nums;
 }
 
+/* The PLAZA PRO mark ships as a single navy asset; on dark surfaces we flip it
+   to white — brightness(0) blacks out every opaque pixel, invert(1) turns it
+   white, alpha preserved. `-auto` only inverts in dark mode; `-invert` always
+   does (for permanently-dark panels like the login hero).
+   Authored as plain CSS: Tailwind's arbitrary `[filter:…]` value is mangled by
+   the minifier in this toolchain. */
+.brand-mark-invert {
+  filter: brightness(0) invert(1);
+}
+[data-theme='dark'] .brand-mark-auto {
+  filter: brightness(0) invert(1);
+}
+
 /* Thin, theme-aware scrollbars everywhere. */
 * {
   scrollbar-width: thin;

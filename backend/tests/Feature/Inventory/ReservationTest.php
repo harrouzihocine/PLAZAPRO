@@ -52,9 +52,21 @@ class ReservationTest extends TestCase
         $this->assertSame(48, (int) round($reservation->held_at->diffInHours($reservation->expires_at)));
     }
 
-    public function test_reserving_an_unavailable_unit_is_rejected(): void
+    public function test_reserving_a_reserved_unit_adds_a_backup(): void
     {
+        // Reservations are multi-project now: a reserved unit can be held again
+        // as a backup ("2nd place"). It stays reserved and the count grows.
         $unit = Unit::factory()->reserved()->create();
+        Sanctum::actingAs($this->agent());
+
+        $this->postJson("/api/v1/units/{$unit->id}/reserve")->assertCreated();
+        $this->assertSame('reserved', $unit->fresh()->sale_status->value);
+        $this->assertSame(1, Reservation::count());
+    }
+
+    public function test_reserving_a_sold_unit_is_rejected(): void
+    {
+        $unit = Unit::factory()->create(['sale_status' => 'sold']);
         Sanctum::actingAs($this->agent());
 
         $this->postJson("/api/v1/units/{$unit->id}/reserve")->assertStatus(422);

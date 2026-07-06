@@ -20,7 +20,8 @@ use Illuminate\Routing\Controller;
 
 /**
  * The property shortlist on a deal, built at the office visit. Reading needs
- * clients.view; setting it needs visits.conduct (the visiting agent curates it).
+ * clients.view; curating it from the standalone panel needs shortlist.manage
+ * (agents add properties via "Add unit to visit" instead).
  */
 class ShortlistController extends Controller
 {
@@ -32,7 +33,7 @@ class ShortlistController extends Controller
         // Eager-load the full property card per morph type (type/floor/location).
         $items = $project->shortlistItems()->active()
             ->with(['shortlistable' => fn (MorphTo $morphTo) => $morphTo->morphWith([
-                Unit::class => ['type', 'floor', 'location'],
+                Unit::class => ['roomNumber', 'floor', 'location'],
                 Box::class => ['type', 'location'],
             ])])
             ->get();

@@ -31,6 +31,8 @@ class CorrectCallRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:5000'],
             'topics' => ['nullable', 'array'],
             'topics.*' => ['integer', 'distinct', 'exists:dynamic_list_items,id'],
+            'objections' => ['nullable', 'array'],
+            'objections.*' => ['integer', 'distinct', 'exists:dynamic_list_items,id'],
             'called_at' => ['nullable', 'date'],
         ];
     }

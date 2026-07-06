@@ -19,6 +19,7 @@ class PaymentScheduleResource extends JsonResource
         return [
             'id' => $this->id,
             'client_project_id' => $this->client_project_id,
+            'unit_id' => $this->unit_id,
             'installment_no' => $this->installment_no,
             'due_date' => optional($this->due_date)->toDateString(),
             'amount' => (string) $this->amount,

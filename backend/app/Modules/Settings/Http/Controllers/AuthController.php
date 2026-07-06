@@ -32,16 +32,19 @@ class AuthController extends Controller
     {
         $credentials = $request->validated();
 
-        if (! Auth::attempt(['email' => $credentials['email'], 'password' => $credentials['password']], true)) {
+        // Accept either an email or a username as the login identifier.
+        $field = filter_var($credentials['login'], FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+
+        if (! Auth::attempt([$field => $credentials['login'], 'password' => $credentials['password']], true)) {
             throw ValidationException::withMessages([
-                'email' => [__('auth.failed')],
+                'login' => [__('auth.failed')],
             ]);
         }
 
         if (! Auth::user()->is_active) {
             Auth::logout();
             throw ValidationException::withMessages([
-                'email' => [__('This account is inactive.')],
+                'login' => [__('This account is inactive.')],
             ]);
         }
 

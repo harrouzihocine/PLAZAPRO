@@ -2,6 +2,7 @@
 import { onMounted, watch } from 'vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseMultiSelect from '@/components/base/BaseMultiSelect.vue'
+import MoneyInput from '@/components/base/MoneyInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import { useDynamicList } from '@/composables/useDynamicList'
@@ -12,14 +13,17 @@ import { useLocationsStore } from '@/features/inventory/locationsStore'
 // call-log form and the shift-to-desire modal. Max detail, mirroring the unit
 // form: type + floor selectors, area and budget ranges, preferred sites.
 // Notes are REQUIRED — the story behind the numbers. Emits a merged object so
-// the parent owns the value: { wilaya_id, commune_id, type_id, floor_id,
-// area_min, area_max, rooms_min, budget_min, budget_max, location_ids, notes }.
+// the parent owns the value: { wilaya_id, commune_id, type_id, room_number_id,
+// contract_type_id, floor_id, area_min, area_max, rooms_min, budget_min,
+// budget_max, location_ids, notes }.
 const props = defineProps({ modelValue: { type: Object, required: true } })
 const emit = defineEmits(['update:modelValue'])
 
 const { wilayas } = useWilayas()
 const { communes, load: loadCommunes } = useCommunes()
-const { items: unitTypes } = useDynamicList('unit_types')
+const { items: projectTypes } = useDynamicList('project_types')
+const { items: roomNumbers } = useDynamicList('room_numbers')
+const { items: contractTypes } = useDynamicList('contract_types')
 const { items: floors } = useDynamicList('floors')
 const locations = useLocationsStore()
 
@@ -71,11 +75,25 @@ watch(
       @update:model-value="(v) => update('location_ids', v)"
     />
     <BaseSelect
-      label="Type"
+      label="Project type"
       placeholder="Any"
       :model-value="modelValue.type_id"
-      :options="unitTypes.map((t) => ({ value: t.id, label: t.label }))"
+      :options="projectTypes.map((t) => ({ value: t.id, label: t.label }))"
       @change="(v) => update('type_id', v)"
+    />
+    <BaseSelect
+      label="Room number"
+      placeholder="Any"
+      :model-value="modelValue.room_number_id"
+      :options="roomNumbers.map((r) => ({ value: r.id, label: r.label }))"
+      @change="(v) => update('room_number_id', v)"
+    />
+    <BaseSelect
+      label="Contract type"
+      placeholder="Any"
+      :model-value="modelValue.contract_type_id"
+      :options="contractTypes.map((c) => ({ value: c.id, label: c.label }))"
+      @change="(v) => update('contract_type_id', v)"
     />
     <BaseSelect
       label="Floor"
@@ -102,21 +120,20 @@ watch(
       type="number"
       @update:model-value="(v) => update('rooms_min', v)"
     />
-    <BaseInput
+    <MoneyInput
       :model-value="modelValue.budget_min"
       label="Budget min"
-      type="number"
       @update:model-value="(v) => update('budget_min', v)"
     />
-    <BaseInput
+    <MoneyInput
       :model-value="modelValue.budget_max"
       label="Budget max"
-      type="number"
       @update:model-value="(v) => update('budget_max', v)"
     />
     <BaseTextarea
       class="sm:col-span-2"
-      label="Notes (required — what exactly are they after?)"
+      label="Notes — what exactly are they after?"
+      required
       :rows="2"
       :model-value="modelValue.notes"
       @update:model-value="(v) => update('notes', v)"

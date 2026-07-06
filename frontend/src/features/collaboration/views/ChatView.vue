@@ -131,7 +131,7 @@ function resetModal() {
       </template>
 
       <template v-if="groupMode">
-        <BaseInput v-model="groupTitle" label="Group name" />
+        <BaseInput v-model="groupTitle" label="Group name" required />
         <div class="my-4 max-h-60 space-y-0.5 overflow-y-auto">
           <label
             v-for="u in store.contacts"

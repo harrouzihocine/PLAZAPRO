@@ -10,6 +10,8 @@ use App\Modules\Clients\Models\ShortlistItem;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
+use App\Modules\Settings\Models\DynamicList;
+use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
@@ -39,6 +41,19 @@ class ReviewRegressionTest extends TestCase
         return User::factory()->create(['role_id' => $role->id]);
     }
 
+    /** A next_action_change_reasons list item id — the reason a plan was corrected. */
+    private function changeReasonId(string $label = 'Changed the type of next step'): int
+    {
+        $list = DynamicList::firstOrCreate(
+            ['key' => 'next_action_change_reasons'],
+            ['name' => 'Change Reasons', 'is_system' => true],
+        );
+
+        return DynamicListItem::create([
+            'dynamic_list_id' => $list->id, 'label' => $label, 'value' => 'changed_type', 'is_active' => true,
+        ])->id;
+    }
+
     public function test_logging_a_call_without_a_follow_up_closes_the_fulfilled_plan(): void
     {
         $actor = $this->userWith(['clients.view', 'clients.view_all', 'calls.log']);
@@ -50,8 +65,11 @@ class ReviewRegressionTest extends TestCase
         ]);
 
         Sanctum::actingAs($actor);
-        $this->postJson("/api/v1/clients/{$client->id}/calls", ['direction' => 'outbound'])
-            ->assertCreated();
+        // Concluding onto the desire list (no next step) still fulfils the plan.
+        $this->postJson("/api/v1/clients/{$client->id}/calls", [
+            'direction' => 'outbound',
+            'closure' => ['type' => 'desire', 'desire' => ['notes' => 'Waiting on inventory.']],
+        ])->assertCreated();
 
         // The plan was fulfilled by this very call — it must not stay pending.
         $this->assertSame('done', $plan->fresh()->state->value);
@@ -211,7 +229,7 @@ class ReviewRegressionTest extends TestCase
 
         Sanctum::actingAs($actor);
         $this->postJson("/api/v1/next-actions/{$plan->id}/correct", [
-            'reason' => 'client wants to see it on site',
+            'reason_id' => $this->changeReasonId(), 'note' => 'client wants to see it on site',
             'type' => 'in_site_visit',
             'due_date' => now()->addDays(2)->toDateString(),
         ])->assertCreated();

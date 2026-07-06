@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Clients\Http\Controllers;
 
+use App\Modules\Clients\Actions\AssignClientAgent;
 use App\Modules\Clients\Actions\CancelClient;
 use App\Modules\Clients\Actions\CreateClient;
+use App\Modules\Clients\Actions\RequestDuplicateResolution;
 use App\Modules\Clients\Actions\UpdateClient;
+use App\Modules\Clients\Http\Requests\AssignClientAgentRequest;
 use App\Modules\Clients\Http\Requests\StoreClientRequest;
 use App\Modules\Clients\Http\Requests\UpdateClientRequest;
 use App\Modules\Clients\Http\Resources\ClientResource;
 use App\Modules\Clients\Models\Client;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
@@ -71,11 +75,42 @@ class ClientController extends Controller
         );
     }
 
-    public function store(StoreClientRequest $request, CreateClient $action): ClientResource
-    {
-        return new ClientResource(
-            $action->handle($request->validated())->load(['source', 'rating', 'assignedAgent', 'creator']),
-        );
+    public function store(
+        StoreClientRequest $request,
+        CreateClient $action,
+        RequestDuplicateResolution $duplicate,
+    ): JsonResponse {
+        $user = $request->user();
+
+        // Duplicate-phone guard: a phone identifies a client, so two clients with
+        // the same number cannot coexist. If one already exists, block creation —
+        // and, when the finder can't see it, open a supervised share request so
+        // nobody silently takes another user's client.
+        $existing = Client::query()->active()->matchingPhone($request->validated('phone'))->first();
+
+        if ($existing !== null) {
+            if (Client::query()->visibleTo($user)->whereKey($existing->id)->exists()) {
+                return response()->json([
+                    'duplicate' => true,
+                    'client_id' => $existing->id,
+                    'message' => 'A client with this phone already exists in your list.',
+                ], 409);
+            }
+
+            $created = $duplicate->handle($existing, $request->validated(), $user);
+
+            return response()->json([
+                'duplicate' => true,
+                'request_id' => $created->id,
+                'message' => 'This phone already belongs to another user’s client. '
+                    .'A request was sent to a supervisor.',
+            ], 409);
+        }
+
+        $client = $action->handle($request->validated())
+            ->load(['source', 'rating', 'assignedAgent', 'creator']);
+
+        return (new ClientResource($client))->response()->setStatusCode(201);
     }
 
     public function update(UpdateClientRequest $request, Client $client, UpdateClient $action): ClientResource
@@ -90,5 +125,18 @@ class ClientController extends Controller
         $reason = (string) $request->input('reason', 'Removed by admin');
 
         return new ClientResource($action->handle($client, $reason));
+    }
+
+    /**
+     * Delegate a waiting client (a desire match) to a sales agent, who then runs
+     * the reconnect. Focused endpoint (not a full client edit) so it can carry
+     * its own side effect — notifying the assignee — and read as one intent in
+     * the audit trail. Manager action (clients.manage, in the request).
+     */
+    public function assignAgent(AssignClientAgentRequest $request, Client $client, AssignClientAgent $action): ClientResource
+    {
+        return new ClientResource(
+            $action->handle($client, $request->integer('agent_id'))->load('assignedAgent'),
+        );
     }
 }

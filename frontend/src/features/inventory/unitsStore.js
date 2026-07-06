@@ -18,7 +18,7 @@ export const useUnitsStore = defineStore('units', {
       location_id: '',
       wilaya_id: [], // multi-select — geographic wilaya (from the unit's project)
       commune_id: [], // multi-select — commune, cascades from the selected wilaya(s)
-      type_id: [], // multi-select
+      room_number_id: [], // multi-select — number of rooms (F2 / F3 / …)
       floor_id: [], // multi-select
       sale_status: [], // multi-select
       priority: [], // multi-select — GTM (sales) priority

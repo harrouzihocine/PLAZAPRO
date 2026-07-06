@@ -63,8 +63,8 @@ class DispatchController extends Controller
                 'client' => $a->subject?->client?->full_name,
                 'client_id' => $a->subject?->client_id,
                 'project_id' => $a->subject_type === 'client_project' ? $a->subject_id : null,
-                'units' => $this->shortlistUnits($a->subject),
-                'sites' => $this->shortlistSites($a->subject),
+                'units' => $this->shortlistUnits($a->subject, $a->target_unit_ids),
+                'sites' => $this->shortlistSites($a->subject, $a->target_unit_ids),
                 'link' => $a->subject_type === 'client_project' && $a->subject
                     ? '/clients/'.$a->subject->client_id.'/projects/'.$a->subject_id
                     : null,
@@ -144,13 +144,15 @@ class DispatchController extends Controller
     }
 
     /**
-     * The shortlisted properties an in-site plan will send the agent to visit.
+     * The shortlisted properties an in-site plan will send the agent to visit —
+     * narrowed to the plan's targeted apartment(s) when it has any.
      *
+     * @param  list<int>|null  $targetUnitIds
      * @return list<array{reference: ?string, site: ?string}>
      */
-    private function shortlistUnits(?ClientProject $project): array
+    private function shortlistUnits(?ClientProject $project, ?array $targetUnitIds = null): array
     {
-        return $this->shortlistItems($project)
+        return $this->shortlistItems($project, $targetUnitIds)
             ->map(fn ($item) => [
                 'reference' => $item->shortlistable?->reference,
                 'site' => $item->shortlistable?->location?->name,
@@ -164,11 +166,12 @@ class DispatchController extends Controller
      * The distinct sites (locations) those properties sit on, each with a Google
      * Maps link when the location has coordinates.
      *
+     * @param  list<int>|null  $targetUnitIds
      * @return list<array{name: string, maps_url: ?string}>
      */
-    private function shortlistSites(?ClientProject $project): array
+    private function shortlistSites(?ClientProject $project, ?array $targetUnitIds = null): array
     {
-        return $this->shortlistItems($project)
+        return $this->shortlistItems($project, $targetUnitIds)
             ->map(fn ($item) => $item->shortlistable?->location)
             ->filter()
             ->unique('id')
@@ -180,11 +183,20 @@ class DispatchController extends Controller
             ->all();
     }
 
-    /** The active unit shortlist items eager-loaded on the pending action's project. */
-    private function shortlistItems(?ClientProject $project): Collection
+    /**
+     * The active unit shortlist items eager-loaded on the pending action's project,
+     * optionally narrowed to a targeted-apartment set.
+     *
+     * @param  list<int>|null  $targetUnitIds
+     */
+    private function shortlistItems(?ClientProject $project, ?array $targetUnitIds = null): Collection
     {
-        return $project instanceof ClientProject
-            ? $project->shortlistItems
-            : new Collection;
+        if (! $project instanceof ClientProject) {
+            return new Collection;
+        }
+
+        return $targetUnitIds
+            ? $project->shortlistItems->whereIn('shortlistable_id', $targetUnitIds)->values()
+            : $project->shortlistItems;
     }
 }

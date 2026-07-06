@@ -19,6 +19,7 @@ class CreateUser
         $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
+            'username' => $data['username'],
             'password' => $data['password'],
             'role_id' => $data['role_id'],
             'department_id' => $data['department_id'] ?? null,

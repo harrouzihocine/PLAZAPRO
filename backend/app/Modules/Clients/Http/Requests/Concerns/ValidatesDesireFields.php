@@ -30,6 +30,8 @@ trait ValidatesDesireFields
             $p.'wilaya_id' => ['nullable', 'integer', 'exists:wilayas,id'],
             $p.'commune_id' => ['nullable', 'integer', 'exists:communes,id'],
             $p.'type_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
+            $p.'room_number_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
+            $p.'contract_type_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
             $p.'floor_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
             $p.'floor_pref' => ['nullable', 'string', 'max:255'],
             $p.'area_min' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],

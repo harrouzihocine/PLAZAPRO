@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Pipeline\Actions;
 
+use App\Modules\Clients\Actions\AddShortlistItems;
+use App\Modules\Clients\Enums\ShortlistState;
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Clients\Models\ShortlistItem;
 use App\Modules\Pipeline\Enums\NextActionType;
 use App\Modules\Pipeline\Events\InSiteDispatchRequested;
 use App\Modules\Pipeline\Events\VisitAssigned;
@@ -32,7 +35,10 @@ use Illuminate\Support\Collection;
  */
 class SyncVisitFromNextAction
 {
-    public function __construct(private GenerateInSiteVisits $generateInSiteVisits) {}
+    public function __construct(
+        private GenerateInSiteVisits $generateInSiteVisits,
+        private AddShortlistItems $addShortlistItems,
+    ) {}
 
     /** @return Collection<int, Visit> the visits created (or re-planned) */
     public function handle(NextAction $action): Collection
@@ -91,14 +97,24 @@ class SyncVisitFromNextAction
         $message = 'Shortlist at least one unit before planning an in-site visit.';
         abort_unless($subject instanceof ClientProject, 422, $message);
 
+        // A targeted plan ("same / another apartment") first makes sure its
+        // apartment(s) are on the shortlist and re-armed to visit — so the pool
+        // shows them and the generator materialises exactly them.
+        $targetUnitIds = $action->target_unit_ids ?: null;
+        if ($targetUnitIds !== null) {
+            $this->ensureTargetsToVisit($subject, $targetUnitIds);
+        }
+
         $eligible = $subject->shortlistItems()->active()
             ->where('shortlistable_type', 'unit')
             ->whereIn('state', ['shortlisted', 'not_visited'])
+            ->when($targetUnitIds !== null, fn ($q) => $q->whereIn('shortlistable_id', $targetUnitIds))
             ->exists();
         $alreadyOpen = Visit::query()->active()
             ->where('client_project_id', $subject->id)
             ->where('type', 'in_site')
             ->whereNull('completed_at')
+            ->when($targetUnitIds !== null, fn ($q) => $q->whereIn('unit_id', $targetUnitIds))
             ->exists();
         abort_unless($eligible || $alreadyOpen, 422, $message);
 
@@ -111,7 +127,7 @@ class SyncVisitFromNextAction
         }
 
         $created = $this->generateInSiteVisits->handle(
-            $subject, (int) $action->assigned_to, $action->due_at, $action->id,
+            $subject, (int) $action->assigned_to, $action->due_at, $action->id, $targetUnitIds,
         );
 
         foreach ($created as $visit) {
@@ -119,6 +135,32 @@ class SyncVisitFromNextAction
         }
 
         return $created;
+    }
+
+    /**
+     * Make sure each targeted apartment is on the deal's shortlist and in a
+     * visitable state: a brand-new "another apartment" is added (shortlisted);
+     * an already-visited one chosen for a second look ("same apartment") is
+     * re-armed to `not_visited` so the generator regenerates its visit.
+     *
+     * @param  list<int>  $unitIds
+     */
+    private function ensureTargetsToVisit(ClientProject $project, array $unitIds): void
+    {
+        $this->addShortlistItems->handle(
+            $project,
+            array_map(fn ($id) => ['shortlistable_type' => 'unit', 'shortlistable_id' => $id], $unitIds),
+        );
+
+        ShortlistItem::query()->active()
+            ->where('client_project_id', $project->id)
+            ->where('shortlistable_type', 'unit')
+            ->whereIn('shortlistable_id', $unitIds)
+            ->whereIn('state', [
+                ShortlistState::VisitedInterested->value,
+                ShortlistState::VisitedNotInterested->value,
+            ])
+            ->update(['state' => ShortlistState::NotVisited->value]);
     }
 
     /** @return array{0: int, 1: int|null} [client_id, client_project_id] */

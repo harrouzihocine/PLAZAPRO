@@ -29,8 +29,10 @@ class AssignVisit
 
         $fresh = $visit->fresh();
 
-        // Notify the newly assigned agent (Collaboration listens; Phase 5).
-        VisitAssigned::dispatch($fresh);
+        // Notify the newly assigned agent (Collaboration listens; Phase 5). A
+        // reassignment is not a new visit — it must not re-alert overseers /
+        // contributors that a fresh office visit needs organising.
+        VisitAssigned::dispatch($fresh, isNew: false);
 
         return $fresh;
     }

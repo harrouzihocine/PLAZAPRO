@@ -23,7 +23,9 @@ class StoreDynamicListItemRequest extends FormRequest
 
         return [
             'label' => ['required', 'string', 'max:255'],
-            'value' => ['required', 'string', 'max:255', Rule::unique('dynamic_list_items', 'value')->where('dynamic_list_id', $listId)],
+            // Optional: when omitted, the action derives a unique machine value
+            // from the label. When supplied it must still be unique in the list.
+            'value' => ['sometimes', 'nullable', 'string', 'max:255', Rule::unique('dynamic_list_items', 'value')->where('dynamic_list_id', $listId)],
             'parent_id' => ['nullable', 'integer', Rule::exists('dynamic_list_items', 'id')->where('dynamic_list_id', $listId)],
             'is_active' => ['sometimes', 'boolean'],
             'sort_order' => ['sometimes', 'integer', 'min:0'],

@@ -8,15 +8,16 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Set a deal's property shortlist at the office visit. At least one property is
- * required; each is a unit (apartment / local) or a box. Existence of the morph
- * target is re-checked in SyncShortlist.
+ * Set a project's property shortlist from the standalone shortlist panel. At
+ * least one property is required; each is a unit (apartment / local) or a box.
+ * Existence of the morph target is re-checked in SyncShortlist. Reserved for
+ * shortlist.manage — agents add properties via "Add unit to visit" instead.
  */
 class SyncShortlistRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->can('visits.conduct');
+        return (bool) $this->user()?->can('shortlist.manage');
     }
 
     /**

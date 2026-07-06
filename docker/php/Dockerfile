@@ -20,6 +20,10 @@ RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+# Raise the file-upload limits above PHP's 2M/8M defaults so media uploads
+# (presentations, plans) aren't rejected with a 413 before reaching Laravel.
+COPY uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+
 WORKDIR /var/www/html
 
 # Match the host user so bind-mounted files are writable without root-owned artefacts

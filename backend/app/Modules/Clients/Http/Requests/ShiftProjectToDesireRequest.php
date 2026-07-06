@@ -12,7 +12,7 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * Shift a deal back to the Desire list (client changed their mind). Carries the
  * desire criteria (ValidatesDesireFields, incl. required notes) to re-capture
- * what the client wants. Deal lifecycle is back-office (clients.manage).
+ * what the client wants. Project lifecycle is back-office (projects.manage).
  */
 class ShiftProjectToDesireRequest extends FormRequest
 {
@@ -21,7 +21,7 @@ class ShiftProjectToDesireRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return (bool) $this->user()?->can('clients.manage');
+        return (bool) $this->user()?->can('projects.manage');
     }
 
     /**

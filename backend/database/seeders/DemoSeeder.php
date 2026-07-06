@@ -73,7 +73,10 @@ class DemoSeeder extends Seeder
 
         $this->command->info('Seeding demo data…');
 
-        $agentRole = Role::where('slug', 'site-agent')->firstOrFail();
+        // Sales agents: they log calls and follow clients up (calls.log), so they
+        // are valid client "assigned agents". A site-agent (visits only, no
+        // calls.log) would violate the CanFollowUpClient invariant on every client.
+        $agentRole = Role::where('slug', 'sales-agent')->firstOrFail();
         $sales = Department::firstOrCreate(['slug' => 'ventes'], ['name' => 'Ventes']);
 
         // --- Agents (also the chat participants) ------------------------------
@@ -94,15 +97,30 @@ class DemoSeeder extends Seeder
         $createLocation = app(CreateLocation::class);
         $elFeth = $createLocation->handle([
             'name' => 'Résidence El Feth', 'code' => 'REF', 'wilaya_id' => $this->wilaya('Alger'),
+            'type_id' => $this->item('project_types', 'akam_mftoh'),
+            // Financing options this project offers buyers (project_payment_methods).
+            'payment_method_ids' => [
+                $this->item('project_payment_methods', 'alkrd_albnky_mtofr'),
+                $this->item('project_payment_methods', 'amkany_altksyt'),
+                $this->item('project_payment_methods', 'aldfaa_kash'),
+            ],
             'address' => '12 Rue des Frères Boughedou, Alger', 'description' => 'Standing residence, 5 floors.',
         ]);
         $oran = $createLocation->handle([
             'name' => "Les Jardins d'Oran", 'code' => 'LJO', 'wilaya_id' => $this->wilaya('Oran'),
+            'type_id' => $this->item('project_types', 'akam_mghlk'),
+            'payment_method_ids' => [
+                $this->item('project_payment_methods', 'alkrd_albnky_ghyr_mtofr'),
+                $this->item('project_payment_methods', 'aldfaa_kash'),
+            ],
             'address' => 'Route de Sénia, Oran', 'description' => 'Family project near the coast.',
         ]);
 
+        // $type here is the room layout (F2 / F3 / …), stored on the unit; project
+        // type lives on the location above.
         $u = fn (Location $loc, string $ref, string $type, string $floor, float $sqm, string $price, string $block, int $sf, int $pos): Unit => app(CreateUnit::class)->handle($loc, [
-            'reference' => $ref, 'type_id' => $this->item('unit_types', $type), 'floor_id' => $this->item('floors', $floor),
+            'reference' => $ref, 'room_number_id' => $this->item('room_numbers', $type === 'duplex' ? 'dublex' : $type),
+            'floor_id' => $this->item('floors', $floor),
             'area_sqm' => $sqm, 'price' => $price, 'block' => $block, 'stack_floor' => $sf, 'position' => $pos,
         ]);
 
@@ -134,9 +152,9 @@ class DemoSeeder extends Seeder
 
         // --- Desires (what a few clients are looking for) ---------------------
         $desire = app(UpsertDesire::class);
-        $desire->handle($c1, ['wilaya_id' => $this->wilaya('Alger'), 'type_id' => $this->item('unit_types', 'f4'), 'floor_pref' => 'floor_3', 'budget_min' => '7000000.00', 'budget_max' => '9000000.00', 'notes' => 'Étage élevé de préférence.']);
-        $desire->handle($c2, ['wilaya_id' => $this->wilaya('Alger'), 'type_id' => $this->item('unit_types', 'f3'), 'budget_min' => '6000000.00', 'budget_max' => '7500000.00']);
-        $desire->handle($c4, ['wilaya_id' => $this->wilaya('Oran'), 'type_id' => $this->item('unit_types', 'f2'), 'budget_min' => '3800000.00', 'budget_max' => '5000000.00']);
+        $desire->handle($c1, ['wilaya_id' => $this->wilaya('Alger'), 'type_id' => $this->item('project_types', 'akam_mftoh'), 'room_number_id' => $this->item('room_numbers', 'f4'), 'floor_pref' => 'floor_3', 'budget_min' => '7000000.00', 'budget_max' => '9000000.00', 'notes' => 'Étage élevé de préférence.']);
+        $desire->handle($c2, ['wilaya_id' => $this->wilaya('Alger'), 'type_id' => $this->item('project_types', 'akam_mftoh'), 'room_number_id' => $this->item('room_numbers', 'f3'), 'budget_min' => '6000000.00', 'budget_max' => '7500000.00']);
+        $desire->handle($c4, ['wilaya_id' => $this->wilaya('Oran'), 'type_id' => $this->item('project_types', 'akam_mghlk'), 'room_number_id' => $this->item('room_numbers', 'f2'), 'budget_min' => '3800000.00', 'budget_max' => '5000000.00']);
 
         // --- Deals (one per stage) -------------------------------------------
         $mkDeal = app(CreateClientProject::class);
@@ -158,8 +176,8 @@ class DemoSeeder extends Seeder
 
         // --- Calls (each leaves the enforced next action; one overdue) --------
         $logCall = app(LogCall::class);
-        $logCall->handle($c1, ['client_project_id' => $d1->id, 'agent_id' => $sarah->id, 'direction' => CallDirection::Outbound->value, 'outcome_id' => $this->item('call_outcomes', 'interested'), 'notes' => 'Prêt à signer.', 'called_at' => now()->subDays(3), 'next_action' => ['type' => NextActionType::Call->value, 'due_at' => now()->addDay(), 'assigned_to' => $sarah->id]], $sarah);
-        $logCall->handle($c2, ['client_project_id' => $d2->id, 'agent_id' => $karim->id, 'direction' => CallDirection::Outbound->value, 'outcome_id' => $this->item('call_outcomes', 'callback_requested'), 'notes' => 'Rappeler demain matin.', 'called_at' => now()->subDay(), 'next_action' => ['type' => NextActionType::Call->value, 'due_at' => now()->addDay(), 'assigned_to' => $karim->id]], $karim);
+        $logCall->handle($c1, ['client_project_id' => $d1->id, 'agent_id' => $sarah->id, 'direction' => CallDirection::Outbound->value, 'outcome_id' => $this->item('call_outcomes', 'interested'), 'notes' => 'Prêt à signer, mais trouve le prix un peu élevé.', 'objections' => [$this->item('objection_reasons', 'price_too_high')], 'called_at' => now()->subDays(3), 'next_action' => ['type' => NextActionType::Call->value, 'due_at' => now()->addDay(), 'assigned_to' => $sarah->id]], $sarah);
+        $logCall->handle($c2, ['client_project_id' => $d2->id, 'agent_id' => $karim->id, 'direction' => CallDirection::Outbound->value, 'outcome_id' => $this->item('call_outcomes', 'callback_requested'), 'notes' => 'Rappeler demain matin. Voudrait un échéancier plus long.', 'objections' => [$this->item('objection_reasons', 'payment_plan_too_short'), $this->item('objection_reasons', 'price_too_high')], 'called_at' => now()->subDay(), 'next_action' => ['type' => NextActionType::Call->value, 'due_at' => now()->addDay(), 'assigned_to' => $karim->id]], $karim);
         $logCall->handle($c3, ['client_project_id' => $d3->id, 'agent_id' => $sarah->id, 'direction' => CallDirection::Inbound->value, 'outcome_id' => $this->item('call_outcomes', 'interested'), 'notes' => 'Souhaite visiter le A-21.', 'called_at' => now()->subDays(2), 'properties' => [['shortlistable_type' => 'unit', 'shortlistable_id' => $unitA21->id]], 'next_action' => ['type' => NextActionType::InSiteVisit->value, 'due_at' => now()->addDays(2), 'assigned_to' => $sarah->id]], $sarah);
         $logCall->handle($c5, ['client_project_id' => $d4->id, 'agent_id' => $karim->id, 'direction' => CallDirection::Outbound->value, 'outcome_id' => $this->item('call_outcomes', 'no_answer'), 'notes' => 'Pas de réponse.', 'called_at' => now()->subDays(4), 'next_action' => ['type' => NextActionType::Call->value, 'due_at' => now()->subDay(), 'assigned_to' => $karim->id]], $karim); // overdue
 
@@ -179,15 +197,16 @@ class DemoSeeder extends Seeder
         $task->handle(['title' => 'Préparer le rapport hebdomadaire', 'assigned_to' => $karim->id, 'due_at' => now()->addDays(2), 'priority' => TaskPriority::Normal->value], $admin);
 
         // --- Payments on the won deal (plan reconciles to 8.4M; part-paid) ----
-        $schedule = app(SaveSchedule::class)->handle($d1, ['installments' => [
+        // Per-apartment tracking: the plan and every payment carry the sold unit.
+        $schedule = app(SaveSchedule::class)->handle($d1, ['unit_id' => $unitA31->id, 'installments' => [
             ['due_date' => now()->subDays(30)->toDateString(), 'amount' => '2800000.00'],
             ['due_date' => now()->subDays(5)->toDateString(), 'amount' => '2800000.00'],
             ['due_date' => now()->addDays(60)->toDateString(), 'amount' => '2800000.00'],
         ]])->values();
 
         $recordVersement = app(RecordVersement::class);
-        $recordVersement->handle($d1, ['amount' => '2800000.00', 'paid_on' => now()->subDays(28)->toDateString(), 'method_id' => $this->item('payment_methods', 'bank_transfer'), 'reference' => 'VIR-2026-0012', 'schedule_item_id' => $schedule[0]->id], $admin); // -> paid
-        $recordVersement->handle($d1, ['amount' => '1000000.00', 'paid_on' => now()->subDays(2)->toDateString(), 'method_id' => $this->item('payment_methods', 'cheque'), 'reference' => 'CHQ-0098', 'schedule_item_id' => $schedule[1]->id], $admin); // -> overdue (partial, past due)
+        $recordVersement->handle($d1, ['unit_id' => $unitA31->id, 'amount' => '2800000.00', 'paid_on' => now()->subDays(28)->toDateString(), 'method_id' => $this->item('payment_methods', 'bank_transfer'), 'reference' => 'VIR-2026-0012', 'schedule_item_id' => $schedule[0]->id], $admin); // -> paid
+        $recordVersement->handle($d1, ['unit_id' => $unitA31->id, 'amount' => '1000000.00', 'paid_on' => now()->subDays(2)->toDateString(), 'method_id' => $this->item('payment_methods', 'cheque'), 'reference' => 'CHQ-0098', 'schedule_item_id' => $schedule[1]->id], $admin); // -> overdue (partial, past due)
 
         // --- Chat -------------------------------------------------------------
         $newConversation = app(CreateConversation::class);

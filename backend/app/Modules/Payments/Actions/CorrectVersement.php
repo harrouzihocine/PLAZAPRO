@@ -26,6 +26,7 @@ class CorrectVersement
     public function handle(Versement $versement, array $data): Versement
     {
         abort_unless($versement->isActive(), 422, 'Only an active versement can be corrected.');
+        abort_if($versement->isRefunded(), 422, 'This versement was refunded — it can no longer be corrected.');
 
         $replacement = DB::transaction(function () use ($versement, $data) {
             $originalAmount = (string) $versement->amount;

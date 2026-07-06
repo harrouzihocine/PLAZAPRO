@@ -28,6 +28,9 @@ class BoxController extends Controller
             ->when($request->query('status') !== 'all', fn ($q) => $q->active())
             ->when($request->filled('location_id'), fn ($q) => $q->where('location_id', $request->query('location_id')))
             ->when($request->filled('unit_id'), fn ($q) => $q->where('unit_id', $request->query('unit_id')))
+            // unlinked=1 → only boxes not attached to any apartment (the pool a
+            // deal can link to an apartment that has none).
+            ->when($request->boolean('unlinked'), fn ($q) => $q->whereNull('unit_id'))
             ->when($request->filled('sale_status'), fn ($q) => $q->where('sale_status', $request->query('sale_status')))
             ->orderBy('reference')
             ->get();

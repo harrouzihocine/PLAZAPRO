@@ -11,6 +11,8 @@ use App\Modules\Inventory\Models\Unit;
 use App\Modules\Pipeline\Models\Call;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
+use App\Modules\Settings\Models\DynamicList;
+use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
@@ -42,6 +44,19 @@ class VisitMaterializationTest extends TestCase
     private function agent(): User
     {
         return User::factory()->agent()->create();
+    }
+
+    /** A next_action_change_reasons list item id — the reason a plan was corrected. */
+    private function changeReasonId(string $label = 'Changed the type of next step'): int
+    {
+        $list = DynamicList::firstOrCreate(
+            ['key' => 'next_action_change_reasons'],
+            ['name' => 'Change Reasons', 'is_system' => true],
+        );
+
+        return DynamicListItem::create([
+            'dynamic_list_id' => $list->id, 'label' => $label, 'value' => 'changed_type', 'is_active' => true,
+        ])->id;
     }
 
     /** A field agent (is_agent role) who can also conduct visits. */
@@ -150,7 +165,7 @@ class VisitMaterializationTest extends TestCase
         $this->assertSame(0, Visit::count());
 
         $this->postJson("/api/v1/next-actions/{$na->id}/correct", [
-            'reason' => 'Client wants to come in', 'type' => 'office_visit',
+            'reason_id' => $this->changeReasonId(), 'note' => 'Client wants to come in', 'type' => 'office_visit',
             'due_date' => now()->addDays(2)->toDateString(),
         ])->assertSuccessful();
 
@@ -174,7 +189,7 @@ class VisitMaterializationTest extends TestCase
         $visit = Visit::query()->active()->sole();
 
         $this->postJson("/api/v1/next-actions/{$na->id}/correct", [
-            'reason' => 'Prefers a phone follow-up', 'type' => 'call',
+            'reason_id' => $this->changeReasonId('Prefers a phone follow-up'), 'type' => 'call',
             'due_date' => now()->addDays(2)->toDateString(),
         ])->assertSuccessful();
 

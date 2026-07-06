@@ -62,18 +62,35 @@ class InteractionTest extends TestCase
             ->where('subject_type', 'client')->where('subject_id', $client->id)->count());
     }
 
-    public function test_logging_a_call_without_a_next_action_is_allowed(): void
+    public function test_a_call_must_have_a_next_action_or_a_closure(): void
     {
-        // Optional plan: some calls genuinely end a thread — the call is logged
-        // and simply leaves no pending action (one can be planned later).
+        // The self-closing rule: a concluded call never leaves the engagement
+        // dangling — it either plans a next step or carries an explicit closure.
         $client = Client::factory()->create();
         Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
 
         $this->postJson("/api/v1/clients/{$client->id}/calls", ['direction' => 'outbound'])
-            ->assertCreated();
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('closure');
+
+        $this->assertSame(0, NextAction::count());
+    }
+
+    public function test_logging_a_call_can_conclude_with_a_closure_instead_of_a_next_action(): void
+    {
+        // No next step: the client is put on the desire list (an explicit outcome,
+        // not a dangling thread). No pending action is left.
+        $client = Client::factory()->create();
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+
+        $this->postJson("/api/v1/clients/{$client->id}/calls", [
+            'direction' => 'outbound',
+            'closure' => ['type' => 'desire', 'desire' => ['notes' => 'Wants a 3-room near the centre.']],
+        ])->assertCreated();
 
         $this->assertDatabaseHas('calls', ['client_id' => $client->id, 'direction' => 'outbound']);
         $this->assertSame(0, NextAction::count());
+        $this->assertDatabaseHas('desires', ['client_id' => $client->id]);
     }
 
     public function test_a_next_action_can_be_planned_after_the_fact(): void
@@ -84,8 +101,11 @@ class InteractionTest extends TestCase
         // (ReviewRegressionTest covers the visibility rule).
         Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.view_all', 'calls.log']));
 
-        // A call closed its thread; the plan arrives later, standalone.
-        $this->postJson("/api/v1/clients/{$client->id}/calls", ['direction' => 'outbound'])->assertCreated();
+        // A call concluded onto the desire list; a standalone plan arrives later.
+        $this->postJson("/api/v1/clients/{$client->id}/calls", [
+            'direction' => 'outbound',
+            'closure' => ['type' => 'desire', 'desire' => ['notes' => 'Follow up when inventory arrives.']],
+        ])->assertCreated();
 
         $this->postJson("/api/v1/clients/{$client->id}/next-actions", [
             'type' => 'call',
@@ -95,6 +115,49 @@ class InteractionTest extends TestCase
 
         $this->assertSame(1, NextAction::query()->pending()
             ->where('subject_type', 'client')->where('subject_id', $client->id)->count());
+    }
+
+    public function test_an_archive_closure_archives_the_project_with_a_reason_and_note(): void
+    {
+        $client = Client::factory()->create();
+        $project = ClientProject::factory()->create(['client_id' => $client->id]);
+        $list = DynamicList::create(['key' => 'cancellation_reasons', 'name' => 'Reasons', 'is_system' => true]);
+        $reason = DynamicListItem::create([
+            'dynamic_list_id' => $list->id, 'label' => 'Changed mind', 'value' => 'changed_mind', 'is_active' => true,
+        ]);
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+
+        $this->postJson("/api/v1/clients/{$client->id}/calls", [
+            'direction' => 'outbound',
+            'client_project_id' => $project->id,
+            'closure' => ['type' => 'archive', 'reason_id' => $reason->id, 'note' => 'Bought elsewhere.'],
+        ])->assertCreated();
+
+        $this->assertSame('archived', $project->fresh()->status->value);
+        $this->assertStringContainsString('Changed mind', (string) $project->fresh()->cancellation_reason);
+        $this->assertStringContainsString('Bought elsewhere', (string) $project->fresh()->cancellation_reason);
+    }
+
+    public function test_a_won_project_still_takes_new_calls_but_a_frozen_one_does_not(): void
+    {
+        // Won no longer freezes by itself — the client may buy another
+        // apartment on the same project. Only an EXPLICIT freeze (frozen_at,
+        // a projects.freeze act) closes it to new activity.
+        $client = Client::factory()->create();
+        $project = ClientProject::factory()->create(['client_id' => $client->id, 'stage' => 'won']);
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+
+        $payload = [
+            'direction' => 'outbound',
+            'client_project_id' => $project->id,
+            'next_action' => $this->nextActionPayload($this->agent()),
+        ];
+
+        $this->postJson("/api/v1/clients/{$client->id}/calls", $payload)->assertCreated();
+
+        $project->update(['frozen_at' => now()]);
+
+        $this->postJson("/api/v1/clients/{$client->id}/calls", $payload)->assertStatus(422);
     }
 
     public function test_retired_next_action_types_are_rejected(): void
@@ -227,13 +290,43 @@ class InteractionTest extends TestCase
 
         // Change the plan: a follow-up call becomes an in-site visit for a field agent.
         $this->postJson("/api/v1/next-actions/{$na->id}/correct", [
-            'reason' => 'Client asked to visit', 'type' => 'in_site_visit',
+            'reason_id' => $this->changeReasonId(), 'note' => 'Client asked to visit', 'type' => 'in_site_visit',
             'due_date' => now()->addDays(3)->toDateString(), 'assigned_to' => $fieldAgent->id,
         ])->assertSuccessful()->assertJsonPath('data.type', 'in_site_visit');
 
         $this->assertDatabaseHas('next_actions', ['id' => $na->id, 'status' => 'cancelled']);
         $this->assertSame(1, NextAction::query()->active()->pending()
             ->where('subject_type', 'client_project')->where('subject_id', $project->id)->count());
+    }
+
+    public function test_correcting_a_call_into_an_in_site_visit_without_an_assignee_pools_it(): void
+    {
+        // The reported case: a non-dispatcher edits a sales-owned call plan into
+        // an in-site visit. They can't pick a field agent (the picker is theirs
+        // only with visits.dispatch), so no assignee is sent. The inherited
+        // sales owner is NOT a field agent — so the plan must land in the
+        // dispatch pool, never be rejected as "must be an active agent".
+        $nonAgentSales = $this->userWithPermissions(['clients.view']); // role not is_agent
+        $client = Client::factory()->create(['assigned_agent_id' => $nonAgentSales->id]);
+        $unit = Unit::factory()->create();
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+
+        $this->postJson("/api/v1/clients/{$client->id}/calls", [
+            'direction' => 'outbound',
+            'properties' => [['shortlistable_type' => 'unit', 'shortlistable_id' => $unit->id]],
+            'next_action' => ['type' => 'call', 'due_date' => now()->addDay()->toDateString()],
+        ])->assertCreated();
+        $na = NextAction::query()->active()->pending()->firstOrFail();
+        $this->assertSame($nonAgentSales->id, $na->assigned_to); // inherited the sales owner
+
+        // No assigned_to in the payload (the picker was hidden) — must succeed.
+        $this->postJson("/api/v1/next-actions/{$na->id}/correct", [
+            'reason_id' => $this->changeReasonId(), 'note' => 'Client asked to visit', 'type' => 'in_site_visit',
+            'due_date' => now()->addDays(3)->toDateString(),
+        ])->assertSuccessful()->assertJsonPath('data.type', 'in_site_visit');
+
+        // The corrected plan is pooled (no assignee), held for a dispatcher.
+        $this->assertNull(NextAction::query()->active()->pending()->firstOrFail()->assigned_to);
     }
 
     public function test_completing_an_office_visit_with_in_site_next_generates_field_visits(): void
@@ -348,6 +441,155 @@ class InteractionTest extends TestCase
         $this->assertSame('visited_interested', $item->fresh()->state->value);
     }
 
+    /** A next_action_change_reasons list item id — the reason a plan was corrected. */
+    private function changeReasonId(string $label = 'Changed the type of next step'): int
+    {
+        $list = DynamicList::firstOrCreate(
+            ['key' => 'next_action_change_reasons'],
+            ['name' => 'Change Reasons', 'is_system' => true],
+        );
+
+        return DynamicListItem::create([
+            'dynamic_list_id' => $list->id, 'label' => $label, 'value' => 'changed_type', 'is_active' => true,
+        ])->id;
+    }
+
+    /** An in-site outcome list item (insite_outcomes) with the given value. */
+    private function insiteOutcome(string $value): DynamicListItem
+    {
+        $list = DynamicList::firstOrCreate(
+            ['key' => 'insite_outcomes'],
+            ['name' => 'In-site', 'is_system' => false],
+        );
+
+        return DynamicListItem::create([
+            'dynamic_list_id' => $list->id, 'label' => ucfirst($value), 'value' => $value, 'is_active' => true,
+        ]);
+    }
+
+    public function test_an_interim_in_site_visit_records_its_result_without_a_conclusion(): void
+    {
+        $client = Client::factory()->create();
+        $project = ClientProject::factory()->create(['client_id' => $client->id]);
+        [$unitA, $unitB] = [Unit::factory()->create(), Unit::factory()->create()];
+        foreach ([$unitA, $unitB] as $u) {
+            ShortlistItem::factory()->create([
+                'client_project_id' => $project->id, 'shortlistable_type' => 'unit', 'shortlistable_id' => $u->id,
+            ]);
+        }
+        $notVisited = $this->insiteOutcome('not_visited');
+        $actor = $this->userWithPermissions(['clients.view', 'visits.conduct']);
+        $visitA = Visit::factory()->inSite()->create([
+            'client_id' => $client->id, 'client_project_id' => $project->id, 'unit_id' => $unitA->id, 'agent_id' => $actor->id,
+        ]);
+        $visitB = Visit::factory()->inSite()->create([
+            'client_id' => $client->id, 'client_project_id' => $project->id, 'unit_id' => $unitB->id, 'agent_id' => $actor->id,
+        ]);
+        Sanctum::actingAs($actor);
+
+        // Sibling B is still open, so completing A needs NO conclusion.
+        $this->postJson("/api/v1/visits/{$visitA->id}/complete", [
+            'outcome_id' => $notVisited->id, 'notes' => 'Nobody home',
+        ])->assertOk();
+
+        $this->assertNotNull($visitA->fresh()->completed_at);
+        $this->assertNull($visitB->fresh()->completed_at); // the sibling stays open
+        // No conclusion applied, no plan opened, the project is untouched.
+        $this->assertSame(0, NextAction::query()->where('subject_id', $project->id)->count());
+        $this->assertSame('active', $project->fresh()->status->value);
+    }
+
+    public function test_the_last_in_site_visit_applies_the_conclusion(): void
+    {
+        $client = Client::factory()->create();
+        $project = ClientProject::factory()->create(['client_id' => $client->id]);
+        $unit = Unit::factory()->create();
+        ShortlistItem::factory()->create([
+            'client_project_id' => $project->id, 'shortlistable_type' => 'unit', 'shortlistable_id' => $unit->id,
+        ]);
+        $reason = DynamicListItem::create([
+            'dynamic_list_id' => DynamicList::create(['key' => 'cancellation_reasons', 'name' => 'Reasons', 'is_system' => false])->id,
+            'label' => 'Not interested', 'value' => 'not_interested', 'is_active' => true,
+        ]);
+        $actor = $this->userWithPermissions(['clients.view', 'visits.conduct']);
+        $visit = Visit::factory()->inSite()->create([
+            'client_id' => $client->id, 'client_project_id' => $project->id, 'unit_id' => $unit->id, 'agent_id' => $actor->id,
+        ]);
+        Sanctum::actingAs($actor);
+
+        // The only open in-site visit → its archive closure is applied.
+        $this->postJson("/api/v1/visits/{$visit->id}/complete", [
+            'closure' => ['type' => 'archive', 'reason_id' => $reason->id, 'note' => 'Client walked away'],
+        ])->assertOk();
+
+        $this->assertSame('archived', $project->fresh()->status->value);
+    }
+
+    public function test_in_site_next_action_targeting_another_apartment_shortlists_and_visits_only_it(): void
+    {
+        $fieldAgent = $this->agent();
+        $client = Client::factory()->create();
+        $project = ClientProject::factory()->create(['client_id' => $client->id]);
+        $current = Unit::factory()->create();
+        $another = Unit::factory()->create();
+        ShortlistItem::factory()->create([
+            'client_project_id' => $project->id, 'shortlistable_type' => 'unit', 'shortlistable_id' => $current->id,
+        ]);
+        $actor = $this->userWithPermissions(['clients.view', 'visits.conduct']);
+        $visit = Visit::factory()->inSite()->create([
+            'client_id' => $client->id, 'client_project_id' => $project->id, 'unit_id' => $current->id, 'agent_id' => $actor->id,
+        ]);
+        Sanctum::actingAs($actor);
+
+        $this->postJson("/api/v1/visits/{$visit->id}/complete", [
+            'next_action' => [
+                'type' => 'in_site_visit', 'due_date' => now()->addDay()->toDateString(),
+                'assigned_to' => $fieldAgent->id, 'unit_ids' => [$another->id],
+            ],
+        ])->assertOk();
+
+        // The picked apartment joins the shortlist and gets its own field visit…
+        $this->assertDatabaseHas('shortlist_items', [
+            'client_project_id' => $project->id, 'shortlistable_type' => 'unit',
+            'shortlistable_id' => $another->id, 'status' => 'active',
+        ]);
+        $this->assertSame(1, Visit::query()->where('type', 'in_site')->where('unit_id', $another->id)
+            ->whereNull('completed_at')->where('agent_id', $fieldAgent->id)->count());
+        // …and NO fresh visit is generated for the just-completed apartment.
+        $this->assertSame(0, Visit::query()->where('type', 'in_site')->where('unit_id', $current->id)
+            ->whereNull('completed_at')->count());
+    }
+
+    public function test_in_site_next_action_targeting_the_same_apartment_rearms_and_revisits_it(): void
+    {
+        $fieldAgent = $this->agent();
+        $client = Client::factory()->create();
+        $project = ClientProject::factory()->create(['client_id' => $client->id]);
+        $unit = Unit::factory()->create();
+        $item = ShortlistItem::factory()->create([
+            'client_project_id' => $project->id, 'shortlistable_type' => 'unit', 'shortlistable_id' => $unit->id,
+        ]);
+        $interested = $this->insiteOutcome('visited_interested');
+        $actor = $this->userWithPermissions(['clients.view', 'visits.conduct']);
+        $visit = Visit::factory()->inSite()->create([
+            'client_id' => $client->id, 'client_project_id' => $project->id, 'unit_id' => $unit->id, 'agent_id' => $actor->id,
+        ]);
+        Sanctum::actingAs($actor);
+
+        $this->postJson("/api/v1/visits/{$visit->id}/complete", [
+            'outcome_id' => $interested->id,
+            'next_action' => [
+                'type' => 'in_site_visit', 'due_date' => now()->addDay()->toDateString(),
+                'assigned_to' => $fieldAgent->id, 'unit_ids' => [$unit->id],
+            ],
+        ])->assertOk();
+
+        // The visited apartment is re-armed and gets a fresh second-look visit.
+        $this->assertSame('not_visited', $item->fresh()->state->value);
+        $this->assertSame(1, Visit::query()->where('type', 'in_site')->where('unit_id', $unit->id)
+            ->whereNull('completed_at')->where('agent_id', $fieldAgent->id)->count());
+    }
+
     public function test_a_visit_can_only_be_assigned_to_an_agent(): void
     {
         $client = Client::factory()->create();
@@ -395,14 +637,16 @@ class InteractionTest extends TestCase
             ->assertStatus(422);
     }
 
-    public function test_completing_a_visit_without_a_next_action_is_allowed(): void
+    public function test_completing_a_visit_can_conclude_with_a_closure_instead_of_a_next_action(): void
     {
-        // Optional plan: a visit can close its thread — completed, no pending
-        // action left (one can be planned later, standalone).
+        // A visit that plans no next step must resolve into an explicit outcome
+        // (here, the desire list) — no dangling thread, no pending action left.
         $visit = Visit::factory()->create();
         Sanctum::actingAs($this->userWithPermissions(['clients.view', 'visits.conduct']));
 
-        $this->postJson("/api/v1/visits/{$visit->id}/complete", [])
+        $this->postJson("/api/v1/visits/{$visit->id}/complete", [
+            'closure' => ['type' => 'desire', 'desire' => ['notes' => 'Prefers a higher floor.']],
+        ])
             ->assertOk()
             ->assertJsonPath('data.is_completed', true);
 

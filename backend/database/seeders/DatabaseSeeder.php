@@ -15,6 +15,9 @@ class DatabaseSeeder extends Seeder
             DepartmentSeeder::class,
             DynamicListSeeder::class,
             WilayaCommuneSeeder::class,
+            LocationSeeder::class,
+            ClientSeeder::class,
+            UnitSeeder::class,
         ]);
     }
 }

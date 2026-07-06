@@ -1,15 +1,18 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import BaseInput from '@/components/base/BaseInput.vue'
+import BaseModal from '@/components/base/BaseModal.vue'
 import BaseMultiSelect from '@/components/base/BaseMultiSelect.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import MoneyInput from '@/components/base/MoneyInput.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import { confirmAction } from '@/composables/useConfirm'
 import { useAutoFilter } from '@/composables/useAutoFilter'
 import { useDynamicList } from '@/composables/useDynamicList'
 import { useWilayas, useCommunes } from '@/composables/useGeography'
@@ -18,21 +21,27 @@ import GtmPriorityBadge from '@/features/inventory/components/GtmPriorityBadge.v
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
 import { useLocationsStore } from '@/features/inventory/locationsStore'
 import { useUnitsStore } from '@/features/inventory/unitsStore'
+import { useAuthStore } from '@/features/settings/store'
 import { formatMoney } from '@/features/payments/money'
 
 const units = useUnitsStore()
 const locations = useLocationsStore()
+const auth = useAuthStore()
 const router = useRouter()
-const { items: unitTypes } = useDynamicList('unit_types')
+const { items: roomNumbers } = useDynamicList('room_numbers')
 const { items: floors } = useDynamicList('floors')
 const { wilayas } = useWilayas()
 const { load: loadCommunes } = useCommunes()
+
+const canManage = auth.can('units.manage')
 
 // Map location id -> name so the table shows the project, not a raw FK.
 const locationName = computed(() => Object.fromEntries(locations.items.map((l) => [l.id, l.name])))
 
 // { value, label } option lists for the multi-select filters.
-const typeOptions = computed(() => unitTypes.value.map((t) => ({ value: t.id, label: t.label })))
+const roomNumberOptions = computed(() =>
+  roomNumbers.value.map((r) => ({ value: r.id, label: r.label })),
+)
 const floorOptions = computed(() => floors.value.map((f) => ({ value: f.id, label: f.label })))
 const wilayaOptions = computed(() =>
   wilayas.value.map((w) => ({ value: w.id, label: `${w.code} · ${w.name}` })),
@@ -70,10 +79,14 @@ watch(
 )
 
 // Filters apply themselves as they change — no "Filter" button.
-useAutoFilter(() => units.filters, () => units.fetch())
+useAutoFilter(
+  () => units.filters,
+  () => units.fetch(),
+)
 const statusOptions = [
   { value: 'available', label: 'Available' },
   { value: 'reserved', label: 'Reserved' },
+  { value: 'onhold', label: 'On hold' },
   { value: 'sold', label: 'Sold' },
 ]
 // GTM priority filter options (shared source of truth).
@@ -81,9 +94,11 @@ const priorityOptions = GTM_PRIORITIES
 
 const showAdvanced = ref(false)
 
-onMounted(async () => {
-  if (!locations.items.length) await locations.fetch()
-  await units.fetch()
+onMounted(() => {
+  // Projects (for the name lookup + filter) and units are independent reads —
+  // load them in parallel rather than blocking the table on the project list.
+  if (!locations.items.length) locations.fetch()
+  units.fetch()
 })
 
 function reset() {
@@ -92,7 +107,7 @@ function reset() {
     location_id: '',
     wilaya_id: [],
     commune_id: [],
-    type_id: [],
+    room_number_id: [],
     floor_id: [],
     sale_status: [],
     priority: [],
@@ -105,6 +120,94 @@ function reset() {
 
 function openUnit(event) {
   router.push({ name: 'inventory.unit', params: { id: event.data.id } })
+}
+
+// Edit specs / correct price+status / cancel — same actions as the per-project
+// Units tab (LocationDetailView), reused here so managers don't have to leave
+// the cross-project table to fix a unit.
+const form = reactive({
+  reference: '',
+  room_number_id: '',
+  floor_id: '',
+  area_sqm: '',
+  block: '',
+  stack_floor: '',
+  position: '',
+  gtm_priority: 'medium',
+})
+const mode = ref(null) // 'edit' | 'correct' | null
+const editingId = ref(null)
+const correction = reactive({ price: '', sale_status: '', reason: '' })
+
+function openEdit(u) {
+  Object.assign(form, {
+    reference: u.reference,
+    room_number_id: u.room_number_id ?? '',
+    floor_id: u.floor_id ?? '',
+    area_sqm: u.area_sqm ?? '',
+    block: u.block ?? '',
+    stack_floor: u.stack_floor ?? '',
+    position: u.position ?? '',
+    gtm_priority: u.gtm_priority ?? 'medium',
+  })
+  editingId.value = u.id
+  mode.value = 'edit'
+}
+
+function openCorrect(u) {
+  correction.price = u.price
+  correction.sale_status = u.sale_status
+  correction.reason = ''
+  editingId.value = u.id
+  mode.value = 'correct'
+}
+
+function num(v) {
+  return v === '' || v === null ? null : Number(v)
+}
+
+async function submitEdit() {
+  try {
+    await units.update(editingId.value, {
+      reference: form.reference.trim(),
+      room_number_id: form.room_number_id || null,
+      floor_id: form.floor_id || null,
+      area_sqm: num(form.area_sqm),
+      block: form.block.trim() || null,
+      stack_floor: num(form.stack_floor),
+      position: num(form.position),
+      gtm_priority: form.gtm_priority,
+    })
+    mode.value = null
+  } catch {
+    /* surfaced via units.error */
+  }
+}
+
+async function submitCorrection() {
+  try {
+    await units.correct(editingId.value, {
+      price: num(correction.price),
+      sale_status: correction.sale_status,
+      reason: correction.reason.trim(),
+    })
+    mode.value = null
+  } catch {
+    /* surfaced via units.error */
+  }
+}
+
+async function removeUnit(u) {
+  if (
+    await confirmAction({
+      title: `Cancel unit "${u.reference}"?`,
+      text: 'The record is kept but marked cancelled. Only available units (not reserved, on hold, or sold) can be cancelled.',
+      confirmText: 'Cancel unit',
+      danger: true,
+    })
+  ) {
+    units.cancel(u.id)
+  }
 }
 </script>
 
@@ -122,10 +225,10 @@ function openUnit(event) {
           :options="projectOptions"
         />
         <BaseMultiSelect
-          v-model="units.filters.type_id"
-          placeholder="Type"
-          class="w-full sm:w-40"
-          :options="typeOptions"
+          v-model="units.filters.room_number_id"
+          placeholder="Rooms"
+          class="w-full sm:w-36"
+          :options="roomNumberOptions"
         />
         <BaseMultiSelect
           v-model="units.filters.floor_id"
@@ -181,8 +284,8 @@ function openUnit(event) {
         />
         <BaseInput v-model="units.filters.min_area" label="Min area (m²)" type="number" />
         <BaseInput v-model="units.filters.max_area" label="Max area (m²)" type="number" />
-        <BaseInput v-model="units.filters.min_price" label="Min price" type="number" />
-        <BaseInput v-model="units.filters.max_price" label="Max price" type="number" />
+        <MoneyInput v-model="units.filters.min_price" label="Min price" />
+        <MoneyInput v-model="units.filters.max_price" label="Max price" />
       </div>
     </SectionCard>
 
@@ -232,8 +335,11 @@ function openUnit(event) {
             </span>
           </template>
         </Column>
-        <Column header="Type">
-          <template #body="{ data }">{{ data.type || '—' }}</template>
+        <Column header="Project type">
+          <template #body="{ data }">{{ data.location?.type || '—' }}</template>
+        </Column>
+        <Column header="Rooms">
+          <template #body="{ data }">{{ data.room_number || '—' }}</template>
         </Column>
         <Column header="Floor">
           <template #body="{ data }">{{ data.floor || '—' }}</template>
@@ -249,7 +355,9 @@ function openUnit(event) {
           </template>
         </Column>
         <Column header="Status">
-          <template #body="{ data }"><SaleStatusBadge :status="data.sale_status" /></template>
+          <template #body="{ data }">
+            <SaleStatusBadge :status="data.sale_status" :reserved-count="data.reserved_count" />
+          </template>
         </Column>
         <Column header="Priority">
           <template #body="{ data }">
@@ -257,7 +365,120 @@ function openUnit(event) {
             <span v-else class="text-mute">—</span>
           </template>
         </Column>
+        <Column v-if="canManage" header="" class="w-28">
+          <template #body="{ data }">
+            <span class="flex justify-end gap-1" @click.stop>
+              <Button
+                icon="pi pi-pencil"
+                text
+                rounded
+                size="small"
+                severity="secondary"
+                aria-label="Edit unit"
+                @click="openEdit(data)"
+              />
+              <Button
+                icon="pi pi-history"
+                text
+                rounded
+                size="small"
+                severity="secondary"
+                aria-label="Correct price / status"
+                @click="openCorrect(data)"
+              />
+              <Button
+                icon="pi pi-ban"
+                text
+                rounded
+                size="small"
+                severity="danger"
+                aria-label="Cancel unit"
+                @click="removeUnit(data)"
+              />
+            </span>
+          </template>
+        </Column>
       </DataTable>
     </SectionCard>
+
+    <!-- Edit unit specs -->
+    <BaseModal
+      v-if="mode === 'edit' && canManage"
+      title="Edit unit"
+      size="max-w-3xl"
+      @close="mode = null"
+    >
+      <form class="space-y-4" @submit.prevent="submitEdit">
+        <div class="grid gap-3 sm:grid-cols-3">
+          <BaseInput v-model="form.reference" label="Reference" required />
+          <BaseSelect
+            v-model="form.room_number_id"
+            label="Room number"
+            placeholder="— none —"
+            :options="roomNumbers.map((r) => ({ value: r.id, label: r.label }))"
+          />
+          <BaseSelect
+            v-model="form.floor_id"
+            label="Floor"
+            placeholder="— none —"
+            :options="floors.map((f) => ({ value: f.id, label: f.label }))"
+          />
+          <BaseInput v-model="form.area_sqm" label="Area (m²)" type="number" />
+          <BaseInput v-model="form.block" label="Block" />
+          <BaseInput v-model="form.stack_floor" label="Stack floor" type="number" />
+          <BaseInput v-model="form.position" label="Position" type="number" />
+          <BaseSelect
+            v-model="form.gtm_priority"
+            label="GTM priority"
+            :clearable="false"
+            :options="GTM_PRIORITIES"
+          />
+        </div>
+        <p class="text-xs text-mute">
+          To change price or sale status, use “Correct” (keeps the old version).
+        </p>
+        <div class="flex gap-2">
+          <Button type="submit" label="Save" icon="pi pi-check" :loading="units.saving" />
+          <Button type="button" label="Cancel" severity="secondary" outlined @click="mode = null" />
+        </div>
+      </form>
+    </BaseModal>
+
+    <!-- Correction (price / sale status) via versioning -->
+    <BaseModal
+      v-if="mode === 'correct' && canManage"
+      title="Correct price / status"
+      size="max-w-2xl"
+      @close="mode = null"
+    >
+      <form class="space-y-4" @submit.prevent="submitCorrection">
+        <div class="grid gap-3 sm:grid-cols-3">
+          <MoneyInput v-model="correction.price" label="Price" />
+          <BaseSelect
+            v-model="correction.sale_status"
+            label="Sale status"
+            :clearable="false"
+            :options="[
+              { value: 'available', label: 'Available' },
+              { value: 'reserved', label: 'Reserved' },
+              { value: 'sold', label: 'Sold' },
+            ]"
+          />
+          <BaseInput v-model="correction.reason" label="Reason" required />
+        </div>
+        <p class="text-xs text-mute">
+          This cancels the current row and creates a linked new version — the old value is kept.
+        </p>
+        <div class="flex gap-2">
+          <Button
+            type="submit"
+            label="Apply correction"
+            icon="pi pi-check"
+            :loading="units.saving"
+          />
+          <Button type="button" label="Cancel" severity="secondary" outlined @click="mode = null" />
+        </div>
+      </form>
+    </BaseModal>
   </div>
 </template>

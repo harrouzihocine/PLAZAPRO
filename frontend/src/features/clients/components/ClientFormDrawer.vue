@@ -6,6 +6,7 @@ import BaseInput from '@/components/base/BaseInput.vue'
 import BasePhoneInput from '@/components/base/BasePhoneInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
+import DuplicateNoticeModal from '@/features/clients/components/DuplicateNoticeModal.vue'
 import { useDynamicList } from '@/composables/useDynamicList'
 import { useClientsStore } from '@/features/clients/clientsStore'
 import { useAuthStore } from '@/features/settings/store'
@@ -54,6 +55,13 @@ const emptyForm = () => ({
 const form = reactive(emptyForm())
 const showIdentity = ref(false)
 
+// Server-side (422) validation errors, keyed by field name — surfaced under the
+// matching input so the user sees exactly what to fix (e.g. a future birth date)
+// instead of a vague "couldn't save" toast.
+const errors = reactive({})
+const clearErrors = () => Object.keys(errors).forEach((k) => delete errors[k])
+const fieldError = (name) => errors[name]?.[0] ?? ''
+
 const emptyDocument = () => ({ type: '', number: '', issued_at: '', issued_place: '' })
 
 function addDocument() {
@@ -68,6 +76,7 @@ watch(
   () => [props.visible, props.client],
   () => {
     if (!props.visible) return
+    clearErrors()
     const c = props.client
     Object.assign(form, emptyForm(), {
       first_name: c?.first_name ?? '',
@@ -112,6 +121,7 @@ const isReferral = computed(
 
 async function save() {
   if (!form.phone.trim()) return
+  clearErrors()
   const payload = {
     first_name: form.first_name.trim() || null,
     last_name: form.last_name.trim() || null,
@@ -143,10 +153,27 @@ async function save() {
       : await store.create(payload)
     emit('update:visible', false)
     emit('saved', saved)
-  } catch {
-    /* error surfaced via store.error */
+  } catch (e) {
+    // A duplicate phone keeps the drawer open (so the phone can be corrected)
+    // and shows the resolution notice instead of a generic error.
+    if (e?.duplicate) duplicateNotice.value = e.duplicate
+    // Field-level 422 errors: show each message under its input. If the failing
+    // field lives in the collapsed identity section, open it so it is visible.
+    const serverErrors = e?.response?.data?.errors
+    if (serverErrors) {
+      Object.assign(errors, serverErrors)
+      if (
+        ['id_number', 'birth_date', 'birth_place', 'address'].some((k) => errors[k]) ||
+        Object.keys(errors).some((k) => k.startsWith('id_documents'))
+      ) {
+        showIdentity.value = true
+      }
+    }
+    /* the summary message is also surfaced via store.error toast */
   }
 }
+
+const duplicateNotice = ref(null)
 </script>
 
 <template>
@@ -159,17 +186,17 @@ async function save() {
   >
     <form class="space-y-4" @submit.prevent="save">
       <div class="grid grid-cols-2 gap-3">
-        <BaseInput v-model="form.last_name" label="Last name (optional)" capitalize />
-        <BaseInput v-model="form.first_name" label="First name (optional)" capitalize />
+        <BaseInput v-model="form.last_name" label="Last name" capitalize :error="fieldError('last_name')" />
+        <BaseInput v-model="form.first_name" label="First name" capitalize :error="fieldError('first_name')" />
       </div>
-      <BasePhoneInput v-model="form.phone" label="Phone" />
-      <BaseInput v-model="form.email" label="Email" type="email" />
+      <BasePhoneInput v-model="form.phone" label="Phone" required :error="fieldError('phone')" />
+      <BaseInput v-model="form.email" label="Email" type="email" :error="fieldError('email')" />
 
       <BaseSelect
         v-model="form.source_id"
         label="Source"
         placeholder="None"
-        :options="sources.map((s) => ({ value: s.id, label: s.label }))"
+        :options="sources.map((s) => ({ value: s.id, label: s.label, icon: s.meta?.icon }))"
       />
 
       <!-- Who told the client about the project — shown for referral leads. -->
@@ -181,8 +208,8 @@ async function save() {
           <i class="pi pi-share-alt text-[10px]" aria-hidden="true" />
           Referred by
         </p>
-        <BaseInput v-model="form.referrer_name" label="Referrer name" capitalize />
-        <BasePhoneInput v-model="form.referrer_phone" label="Referrer phone" />
+        <BaseInput v-model="form.referrer_name" label="Referrer name" capitalize :error="fieldError('referrer_name')" />
+        <BasePhoneInput v-model="form.referrer_phone" label="Referrer phone" :error="fieldError('referrer_phone')" />
       </div>
 
       <BaseSelect
@@ -200,7 +227,7 @@ async function save() {
         :options="store.followUpAgents.map((a) => ({ value: a.id, label: a.name }))"
       />
 
-      <BaseTextarea v-model="form.notes" label="Notes" :rows="3" />
+      <BaseTextarea v-model="form.notes" label="Notes" :rows="3" :error="fieldError('notes')" />
 
       <!-- Identity / contract details — needed by the time a deal closes. -->
       <div class="rounded-xl border border-line">
@@ -246,11 +273,11 @@ async function save() {
                   placeholder="None"
                   :options="ID_DOCUMENT_TYPES"
                 />
-                <BaseInput v-model="doc.number" label="Document number" />
+                <BaseInput v-model="doc.number" label="Document number" :error="fieldError(`id_documents.${i}.number`)" />
               </div>
               <div class="grid grid-cols-2 gap-3">
-                <BaseInput v-model="doc.issued_at" label="Issue date" type="date" />
-                <BaseInput v-model="doc.issued_place" label="Issue place" capitalize />
+                <BaseInput v-model="doc.issued_at" label="Issue date" type="date" :error="fieldError(`id_documents.${i}.issued_at`)" />
+                <BaseInput v-model="doc.issued_place" label="Issue place" capitalize :error="fieldError(`id_documents.${i}.issued_place`)" />
               </div>
             </div>
             <Button
@@ -266,12 +293,13 @@ async function save() {
             v-model="form.id_number"
             label="ID number (NIN)"
             placeholder="National identification number"
+            :error="fieldError('id_number')"
           />
           <div class="grid grid-cols-2 gap-3">
-            <BaseInput v-model="form.birth_date" label="Birth date" type="date" />
-            <BaseInput v-model="form.birth_place" label="Birth place" capitalize />
+            <BaseInput v-model="form.birth_date" label="Birth date" type="date" :error="fieldError('birth_date')" />
+            <BaseInput v-model="form.birth_place" label="Birth place" capitalize :error="fieldError('birth_place')" />
           </div>
-          <BaseInput v-model="form.address" label="Address" />
+          <BaseInput v-model="form.address" label="Address" :error="fieldError('address')" />
         </div>
       </div>
 
@@ -287,4 +315,10 @@ async function save() {
       </div>
     </form>
   </Drawer>
+
+  <DuplicateNoticeModal
+    v-if="duplicateNotice"
+    :notice="duplicateNotice"
+    @close="duplicateNotice = null"
+  />
 </template>

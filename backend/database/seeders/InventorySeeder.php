@@ -61,7 +61,9 @@ class InventorySeeder extends Seeder
         ];
 
         $blocks = ['A', 'B', 'C', 'D'];
-        $unitTypes = ['studio', 'f2', 'f3', 'f4', 'duplex'];
+        // Room layouts (per-apartment size); project type is a location attribute.
+        $roomLayouts = ['studio', 'f2', 'f3', 'f4', 'duplex'];
+        $projectTypes = ['akam_mftoh', 'akam_mghlk', 'akam_shbh_mghlk'];
         $floors = ['ground', 'floor_1', 'floor_2', 'floor_3', 'floor_4', 'floor_5'];
         $areaByType = ['studio' => 38.0, 'f2' => 55.0, 'f3' => 78.0, 'f4' => 96.0, 'duplex' => 120.0];
         $priceByType = ['studio' => '3200000.00', 'f2' => '4600000.00', 'f3' => '6800000.00', 'f4' => '8400000.00', 'duplex' => '11500000.00'];
@@ -73,6 +75,7 @@ class InventorySeeder extends Seeder
                 'name' => $project['name'],
                 'code' => $project['code'],
                 'wilaya_id' => $this->wilaya($project['wilaya']),
+                'type_id' => $this->item('project_types', $projectTypes[$stackFloor % count($projectTypes)]),
                 'address' => $project['address'],
                 'description' => $project['description'],
                 'gtm_priority' => $project['priority']->value,
@@ -81,12 +84,12 @@ class InventorySeeder extends Seeder
             $block = $blocks[$stackFloor % count($blocks)];
 
             for ($i = 1; $i <= 6; $i++) {
-                $type = $unitTypes[($i - 1) % count($unitTypes)];
+                $type = $roomLayouts[($i - 1) % count($roomLayouts)];
                 $floor = $floors[($i - 1) % count($floors)];
 
                 $createUnit->handle($location, [
                     'reference' => sprintf('%s-%02d', $block, $i),
-                    'type_id' => $this->item('unit_types', $type),
+                    'room_number_id' => $this->item('room_numbers', $type === 'duplex' ? 'dublex' : $type),
                     'floor_id' => $this->item('floors', $floor),
                     'area_sqm' => $areaByType[$type],
                     'price' => $priceByType[$type],

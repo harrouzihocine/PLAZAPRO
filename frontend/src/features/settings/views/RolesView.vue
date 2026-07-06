@@ -1,63 +1,61 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Button from 'primevue/button'
-import Checkbox from 'primevue/checkbox'
 import Tag from 'primevue/tag'
-import BaseInput from '@/components/base/BaseInput.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import RoleFormModal from '@/features/settings/components/RoleFormModal.vue'
 import { useRolesStore } from '@/features/settings/rolesStore'
 import { confirmAction } from '@/composables/useConfirm'
 
 const store = useRolesStore()
 
-const selectedId = ref(null) // null = editing a new-role draft
-const form = reactive({ name: '', description: '', is_agent: false, permissions: [] })
+const selectedId = ref(null)
+const modalOpen = ref(false)
+const modalRole = ref(null) // null = creating
 
-onMounted(() => store.fetch())
-
-// Group the permission catalogue by its `group` for the matrix.
-const groupedPermissions = computed(() => {
-  const groups = {}
-  for (const p of store.permissions) {
-    ;(groups[p.group || 'Other'] ??= []).push(p)
-  }
-  return groups
+onMounted(async () => {
+  await store.fetch()
+  if (!selectedId.value && store.roles.length) selectedId.value = store.roles[0].id
 })
 
-function selectRole(role) {
-  selectedId.value = role.id
-  form.name = role.name
-  form.description = role.description ?? ''
-  form.is_agent = role.is_agent
-  form.permissions = [...(role.permissions ?? [])]
-}
+const selectedRole = computed(() => store.roles.find((r) => r.id === selectedId.value) ?? null)
 
-function startNew() {
-  selectedId.value = null
-  form.name = ''
-  form.description = ''
-  form.is_agent = false
-  form.permissions = []
-}
-
-async function save() {
-  if (!form.name.trim()) return
-  const payload = {
-    name: form.name.trim(),
-    description: form.description.trim() || null,
-    is_agent: form.is_agent,
-    permissions: form.permissions,
+// Plain-language capability summary: the role's granted permissions, resolved to
+// their catalogue entries and grouped by area — so an admin can read exactly
+// what the role can do without decoding a checkbox matrix.
+const capabilities = computed(() => {
+  const role = selectedRole.value
+  if (!role) return []
+  const ids = new Set(role.permissions ?? [])
+  const map = {}
+  for (const p of store.permissions) {
+    if (ids.has(p.id)) (map[p.group || 'Other'] ??= []).push(p)
   }
+  return Object.entries(map).map(([label, items]) => ({ label, items }))
+})
+
+function openCreate() {
+  modalRole.value = null
+  modalOpen.value = true
+}
+function openEdit() {
+  modalRole.value = selectedRole.value
+  modalOpen.value = true
+}
+
+async function onSave(payload) {
   try {
-    if (selectedId.value) {
-      await store.update(selectedId.value, payload)
+    if (modalRole.value) {
+      await store.update(modalRole.value.id, payload)
     } else {
       const created = await store.create(payload)
-      selectedId.value = created?.id ?? null
+      if (created?.id) selectedId.value = created.id
     }
+    modalOpen.value = false
   } catch {
-    /* error surfaced via store.error */
+    /* error surfaced via store.error toast */
   }
 }
 
@@ -72,7 +70,7 @@ async function cancelRole(role) {
     })
   ) {
     await store.cancel(role.id)
-    if (selectedId.value === role.id) startNew()
+    if (selectedId.value === role.id) selectedId.value = store.roles[0]?.id ?? null
   }
 }
 </script>
@@ -80,16 +78,17 @@ async function cancelRole(role) {
 <template>
   <div>
     <PageHeader
-      title="Roles & permissions"
-      subtitle="One role per user; the agent flag controls visit-assignment eligibility."
-    />
+      title="Roles &amp; permissions"
+      subtitle="One role per user. Each permission below explains exactly what it unlocks."
+    >
+      <template #actions>
+        <Button label="New role" icon="pi pi-plus" @click="openCreate" />
+      </template>
+    </PageHeader>
 
-    <div class="grid grid-cols-1 gap-5 md:grid-cols-[17rem_1fr]">
+    <div class="grid grid-cols-1 gap-5 lg:grid-cols-[17rem_minmax(0,1fr)]">
       <!-- Role list -->
       <SectionCard title="Roles" icon="pi pi-shield" flush class="self-start">
-        <template #actions>
-          <Button label="New" icon="pi pi-plus" text size="small" @click="startNew" />
-        </template>
         <nav class="flex flex-col gap-0.5 p-2">
           <button
             v-for="role in store.roles"
@@ -101,7 +100,7 @@ async function cancelRole(role) {
                 ? 'bg-highlight font-semibold text-ink'
                 : 'text-mute hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800'
             "
-            @click="selectRole(role)"
+            @click="selectedId = role.id"
           >
             <span class="truncate">{{ role.name }}</span>
             <span class="flex shrink-0 items-center gap-1.5 text-xs">
@@ -112,57 +111,86 @@ async function cancelRole(role) {
         </nav>
       </SectionCard>
 
-      <!-- Editor -->
-      <SectionCard :title="selectedId ? 'Edit role' : 'New role'" icon="pi pi-pencil">
-        <div class="space-y-4">
-          <div class="grid gap-3 sm:grid-cols-2">
-            <BaseInput v-model="form.name" label="Name" />
-            <BaseInput v-model="form.description" label="Description" />
+      <!-- Role overview -->
+      <SectionCard v-if="selectedRole">
+        <template #header>
+          <div class="min-w-0">
+            <h2 class="flex items-center gap-2 text-sm font-semibold text-ink">
+              {{ selectedRole.name }}
+              <Tag v-if="selectedRole.is_agent" value="agent" severity="info" />
+            </h2>
+            <p class="mt-0.5 text-xs text-mute">{{ selectedRole.users_count ?? 0 }} users</p>
           </div>
-          <label class="flex cursor-pointer items-center gap-2 text-sm text-ink">
-            <Checkbox v-model="form.is_agent" binary />
-            Agent role (eligible for visit assignment)
-          </label>
+        </template>
+        <template #actions>
+          <Button
+            icon="pi pi-pencil"
+            label="Edit"
+            size="small"
+            severity="secondary"
+            outlined
+            @click="openEdit"
+          />
+          <Button
+            icon="pi pi-ban"
+            label="Cancel role"
+            size="small"
+            severity="danger"
+            outlined
+            @click="cancelRole(selectedRole)"
+          />
+        </template>
 
-          <div>
-            <h3 class="mb-2 text-sm font-semibold text-ink">Permissions</h3>
-            <div class="space-y-4">
-              <fieldset v-for="(perms, group) in groupedPermissions" :key="group">
-                <legend class="mb-1 text-xs font-semibold uppercase tracking-wide text-mute">
-                  {{ group }}
-                </legend>
-                <div class="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                  <label
-                    v-for="p in perms"
-                    :key="p.id"
-                    class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-sm text-ink hover:bg-surface-50 dark:hover:bg-surface-800"
-                  >
-                    <Checkbox v-model="form.permissions" :value="p.id" />
-                    <span :title="p.slug">{{ p.name }}</span>
-                  </label>
-                </div>
-              </fieldset>
+        <p v-if="selectedRole.description" class="text-sm text-ink">
+          {{ selectedRole.description }}
+        </p>
+        <p v-else class="text-sm italic text-mute">No description yet.</p>
+
+        <div class="mt-5">
+          <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-mute">
+            What this role can do
+          </h3>
+
+          <EmptyState
+            v-if="!capabilities.length"
+            icon="pi pi-lock"
+            title="No permissions granted"
+            body="This role can sign in but can't do anything yet. Use Edit to grant permissions."
+          />
+
+          <div v-else class="space-y-4">
+            <div v-for="group in capabilities" :key="group.label">
+              <p class="mb-1.5 text-xs font-semibold text-ink">{{ group.label }}</p>
+              <ul class="space-y-1.5">
+                <li v-for="p in group.items" :key="p.id" class="flex items-start gap-2 text-sm">
+                  <i class="pi pi-check-circle mt-0.5 text-success" aria-hidden="true" />
+                  <span class="min-w-0">
+                    <span class="text-ink">{{ p.name }}</span>
+                    <span v-if="p.description" class="text-mute"> — {{ p.description }}</span>
+                  </span>
+                </li>
+              </ul>
             </div>
-          </div>
-
-          <div class="flex items-center gap-2 border-t border-line pt-4">
-            <Button
-              :label="selectedId ? 'Save changes' : 'Create role'"
-              icon="pi pi-check"
-              :disabled="store.saving || !form.name.trim()"
-              @click="save"
-            />
-            <Button
-              v-if="selectedId"
-              label="Cancel role"
-              icon="pi pi-ban"
-              severity="danger"
-              outlined
-              @click="cancelRole(store.roles.find((r) => r.id === selectedId))"
-            />
           </div>
         </div>
       </SectionCard>
+
+      <SectionCard v-else>
+        <EmptyState
+          icon="pi pi-shield"
+          title="Select a role"
+          body="Pick one on the left to see what it can do, or create a new role."
+        />
+      </SectionCard>
     </div>
+
+    <RoleFormModal
+      v-if="modalOpen"
+      :role="modalRole"
+      :permissions="store.permissions"
+      :saving="store.saving"
+      @save="onSave"
+      @close="modalOpen = false"
+    />
   </div>
 </template>

@@ -25,7 +25,7 @@ class Visit extends BaseModel
 
     protected $fillable = [
         'client_id', 'client_project_id', 'type', 'unit_id', 'agent_id',
-        'next_action_id', 'scheduled_at', 'completed_at', 'outcome_id', 'notes', 'checklist',
+        'next_action_id', 'scheduled_at', 'completed_at', 'outcome_id', 'notes', 'checklist', 'objections',
     ];
 
     protected function casts(): array
@@ -33,6 +33,7 @@ class Visit extends BaseModel
         return array_merge(parent::casts(), [
             'type' => VisitType::class,
             'checklist' => 'array',
+            'objections' => 'array',
             'scheduled_at' => 'datetime',
             'completed_at' => 'datetime',
         ]);

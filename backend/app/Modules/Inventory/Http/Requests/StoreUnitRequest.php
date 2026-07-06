@@ -32,7 +32,7 @@ class StoreUnitRequest extends FormRequest
                     ->where('location_id', $locationId)
                     ->where('status', 'active'),
             ],
-            'type_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
+            'room_number_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
             'floor_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
             'area_sqm' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
             'price' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],

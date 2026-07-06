@@ -74,20 +74,42 @@ class EnsureProjectConversation
      * — the one membership rule): the owner is admin, the rest members. Newly
      * added contributors join (and can read the whole history); hidden ones
      * leave. Existing rows keep their joined_at; no-op syncs issue no writes.
+     *
+     * Dispatched field-agent rows (ROLE_FIELD_AGENT / _OBSERVER) are NOT
+     * contributor-driven — the dispatch flow grants/revokes them — so they are
+     * left in place here rather than detached. If such a user later becomes a
+     * real contributor, their row is PROMOTED to admin/member.
      */
     private function syncParticipants(Conversation $conversation, ClientProject $project): void
     {
         $ownerId = $this->ownerId($project);
         $contributorIds = $project->contributorIds()->push($ownerId)->unique();
 
-        $current = $conversation->participants()->pluck('users.id');
+        // Keyed by user id → current pivot role, so contributor rows can be told
+        // apart from the dispatch-managed field-agent rows.
+        $current = $conversation->participants()->pluck('conversation_user.role', 'users.id');
+        $fieldAgentIds = $current
+            ->filter(fn ($role) => in_array($role, [
+                Conversation::ROLE_FIELD_AGENT,
+                Conversation::ROLE_FIELD_AGENT_OBSERVER,
+            ], true))
+            ->keys();
 
-        $toDetach = $current->diff($contributorIds);
+        // Detach only real ex-contributors — never the dispatch-managed rows.
+        $toDetach = $current->keys()->diff($contributorIds)->diff($fieldAgentIds);
         if ($toDetach->isNotEmpty()) {
             $conversation->participants()->detach($toDetach->all());
         }
 
-        $toAttach = $contributorIds->diff($current);
+        // A field agent who has since become a real contributor is promoted out
+        // of their field-agent role into the proper contributor role.
+        foreach ($fieldAgentIds->intersect($contributorIds) as $id) {
+            $conversation->participants()->updateExistingPivot($id, [
+                'role' => $id === $ownerId ? 'admin' : 'member',
+            ]);
+        }
+
+        $toAttach = $contributorIds->diff($current->keys());
         if ($toAttach->isNotEmpty()) {
             $now = now();
             $conversation->participants()->attach(

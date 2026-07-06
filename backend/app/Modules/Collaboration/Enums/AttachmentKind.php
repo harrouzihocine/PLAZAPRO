@@ -70,12 +70,13 @@ enum AttachmentKind: string
     {
         return [
             'audio/webm', 'audio/ogg', 'audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/x-wav',
-            // Browser MediaRecorder produces webm/ogg *containers*; content-based
+            // Browser MediaRecorder produces webm/ogg/mp4 *containers*; content-based
             // MIME detection (libmagic) can report an audio-only recording as
-            // video/webm|ogg. Chat has no video kind and the file input excludes
-            // video, so treating these safe containers as voice makes voice notes
-            // reliable without opening a security hole.
-            'video/webm', 'video/ogg',
+            // video/webm|ogg|mp4 (Safari/iOS records into an mp4 container). Chat
+            // has no video kind and the file input excludes video, so treating these
+            // safe containers as voice makes voice notes reliable across browsers
+            // without opening a security hole.
+            'video/webm', 'video/ogg', 'video/mp4',
         ];
     }
 

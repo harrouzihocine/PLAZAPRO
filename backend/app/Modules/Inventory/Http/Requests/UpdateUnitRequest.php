@@ -35,7 +35,7 @@ class UpdateUnitRequest extends FormRequest
                     ->where('status', 'active')
                     ->ignore($unit->id),
             ],
-            'type_id' => ['sometimes', 'nullable', 'integer', 'exists:dynamic_list_items,id'],
+            'room_number_id' => ['sometimes', 'nullable', 'integer', 'exists:dynamic_list_items,id'],
             'floor_id' => ['sometimes', 'nullable', 'integer', 'exists:dynamic_list_items,id'],
             'area_sqm' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:999999.99'],
             'block' => ['sometimes', 'nullable', 'string', 'max:255'],

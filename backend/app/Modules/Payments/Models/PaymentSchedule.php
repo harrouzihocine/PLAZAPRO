@@ -6,6 +6,7 @@ namespace App\Modules\Payments\Models;
 
 use App\Core\Models\BaseModel;
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Inventory\Models\Unit;
 use App\Modules\Payments\Enums\ScheduleState;
 use App\Modules\Payments\Support\Money;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,15 +14,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * One instalment in a deal's payment plan. `state`/`paid_amount` are derived by
- * the AllocateVersement Action and the overdue sweep — never client-set.
+ * One instalment in an apartment's payment plan (unit_id scopes the plan to a
+ * won apartment — each apartment on a deal is tracked alone; null only on
+ * legacy project-level plans). `state`/`paid_amount` are derived by the
+ * AllocateVersement Action and the overdue sweep — never client-set.
  */
 class PaymentSchedule extends BaseModel
 {
     use HasFactory;
 
     protected $fillable = [
-        'client_project_id', 'installment_no', 'due_date', 'amount', 'state', 'paid_amount',
+        'client_project_id', 'unit_id', 'installment_no', 'due_date', 'amount', 'state', 'paid_amount',
     ];
 
     protected function casts(): array
@@ -38,6 +41,12 @@ class PaymentSchedule extends BaseModel
     public function clientProject(): BelongsTo
     {
         return $this->belongsTo(ClientProject::class);
+    }
+
+    /** The won apartment this instalment pays for. */
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(Unit::class);
     }
 
     /** Recorded versements allocated to this instalment (active only via scope). */

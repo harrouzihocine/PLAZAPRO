@@ -3,27 +3,33 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseMultiSelect from '@/components/base/BaseMultiSelect.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import MoneyInput from '@/components/base/MoneyInput.vue'
 import { useDynamicList } from '@/composables/useDynamicList'
 import { boxesApi, locationsApi, unitsApi } from '@/features/inventory/api'
+import { formatMoney } from '@/features/payments/money'
+import UnitBoxPicker from '@/features/inventory/components/UnitBoxPicker.vue'
 
 // The property picker used across the workflow (call log, office-visit shortlist,
 // deal creation): pick a project (location), refine with the same filters as the
 // inventory units screen (type / floor / price / area), then tap available units
-// and boxes to multi-select them. Each candidate shows the FULL property card
-// (reference · type · floor · area · price), not just its code.
+// (and boxes, unless units-only) to multi-select them. Each candidate shows the
+// FULL property card (reference · type · floor · area · price), not just its code.
 //
 // v-model is a list of { shortlistable_type: 'unit'|'box', shortlistable_id,
-// label, location_id, box_count? }. `exclude` hides properties already elsewhere
-// (e.g. on the saved shortlist). With `with-boxes`, every selected unit offers the
-// "include boxes" decision: a checkbox plus how many (1 → max available, not taken).
+// label, location_id, box_ids? }. `exclude` hides properties already elsewhere
+// (e.g. on the saved shortlist). With `with-boxes`, every selected apartment
+// offers ITS boxes: the ones linked to it plus the location's unlinked pool
+// (picking one links it) — never a box belonging to another apartment. Deal
+// contexts pair `with-boxes` with `units-only`, so standalone boxes are not
+// pickable there (a box always rides with an apartment).
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },
   exclude: { type: Array, default: () => [] }, // ['unit:12', 'box:3', …]
   withBoxes: { type: Boolean, default: false },
+  unitsOnly: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue'])
 
-const { items: unitTypes } = useDynamicList('unit_types')
 const { items: floors } = useDynamicList('floors')
 
 const locations = ref([])
@@ -35,16 +41,12 @@ const showFilters = ref(false)
 
 // Inventory-style refinements, applied server-side like UnitsView.
 const filters = reactive({
-  type_id: [],
   floor_id: [],
   min_price: '',
   max_price: '',
   min_area: '',
   max_area: '',
 })
-
-// Available (not taken) boxes per location — drives the box_count ceiling.
-const availableBoxCount = ref({})
 
 onMounted(async () => {
   locations.value = await locationsApi.list()
@@ -54,20 +56,35 @@ async function loadCandidates() {
   if (!locationId.value) return
   loading.value = true
   try {
-    const params = { location_id: locationId.value, sale_status: 'available' }
+    // Reserved / on-hold units can still be shortlisted and reserved as backups
+    // ("2nd place") — only a sold unit is off the table. Boxes stay single-tenant
+    // (available only).
+    const params = {
+      location_id: locationId.value,
+      sale_status: ['available', 'reserved', 'onhold'],
+    }
     for (const [k, v] of Object.entries(filters)) {
-      if (Array.isArray(v) ? v.length : v !== '') params[k] = v
+      if (Array.isArray(v) ? v.length : v !== '' && v != null) params[k] = v
     }
     const [u, b] = await Promise.all([
       unitsApi.list(params),
-      boxesApi.list({ location_id: locationId.value, sale_status: 'available' }),
+      // Standalone boxes are only pickable outside deal contexts (units-only).
+      props.unitsOnly
+        ? Promise.resolve([])
+        : boxesApi.list({ location_id: locationId.value, sale_status: 'available' }),
     ])
     units.value = u
     boxes.value = b
-    availableBoxCount.value = { ...availableBoxCount.value, [locationId.value]: b.length }
   } finally {
     loading.value = false
   }
+}
+
+// The Mil-scaled price fields emit on every keystroke, so debounce their reload.
+let priceTimer = null
+function loadCandidatesDebounced() {
+  clearTimeout(priceTimer)
+  priceTimer = setTimeout(loadCandidates, 400)
 }
 
 watch(locationId, () => {
@@ -84,12 +101,17 @@ const excludedKeys = computed(() => new Set(props.exclude))
 
 // One rich, human-readable card per property — all its info, not only the code.
 function unitLabel(u) {
-  return [u.reference, u.type, u.floor, u.area_sqm ? `${u.area_sqm} m²` : null, u.price]
+  return [
+    u.reference,
+    u.floor,
+    u.area_sqm ? `${u.area_sqm} m²` : null,
+    u.price ? formatMoney(u.price) : null,
+  ]
     .filter(Boolean)
     .join(' · ')
 }
 function boxLabel(b) {
-  return [b.reference, b.type, b.price].filter(Boolean).join(' · ')
+  return [b.reference, b.type, b.price ? formatMoney(b.price) : null].filter(Boolean).join(' · ')
 }
 
 const candidates = computed(() => {
@@ -125,7 +147,7 @@ function toggle(candidate) {
         shortlistable_id: candidate.id,
         label: candidate.label,
         location_id: candidate.locationId,
-        ...(props.withBoxes && candidate.type === 'unit' ? { box_count: 0 } : {}),
+        ...(props.withBoxes && candidate.type === 'unit' ? { box_ids: [] } : {}),
       },
     ])
   }
@@ -139,15 +161,9 @@ function remove(index) {
 
 // --- The box decision on a selected apartment (with-boxes mode) ---
 
-const maxBoxesFor = (p) => availableBoxCount.value[p.location_id] ?? 0
-
-function setBoxCount(index, count) {
-  const next = props.modelValue.map((p, i) => (i === index ? { ...p, box_count: count } : p))
+function setBoxIds(index, boxIds) {
+  const next = props.modelValue.map((p, i) => (i === index ? { ...p, box_ids: boxIds } : p))
   emit('update:modelValue', next)
-}
-
-function toggleBoxes(index, checked) {
-  setBoxCount(index, checked ? 1 : 0)
 }
 </script>
 
@@ -178,30 +194,20 @@ function toggleBoxes(index, checked) {
             <i class="pi pi-times text-[10px]" aria-hidden="true" />
           </button>
         </span>
-        <!-- Include boxes with this apartment (1 → max available, not taken). -->
+        <!-- The apartment's boxes: its linked ones + the unlinked pool to link. -->
         <div
-          v-if="withBoxes && p.shortlistable_type === 'unit' && maxBoxesFor(p) > 0"
-          class="mt-2 flex items-center gap-2 border-t border-primary-200/60 pt-2 dark:border-primary-500/20"
+          v-if="withBoxes && p.shortlistable_type === 'unit'"
+          class="mt-2 border-t border-primary-200/60 pt-2 dark:border-primary-500/20"
         >
-          <label class="inline-flex cursor-pointer items-center gap-1.5 text-ink">
-            <input
-              type="checkbox"
-              class="h-4 w-4 accent-primary"
-              :checked="(p.box_count ?? 0) > 0"
-              @change="toggleBoxes(i, $event.target.checked)"
-            />
-            <span>Include box(es)</span>
-          </label>
-          <template v-if="(p.box_count ?? 0) > 0">
-            <select
-              class="rounded-md border border-line bg-card px-2 py-1 text-xs text-ink outline-none focus:border-primary"
-              :value="p.box_count"
-              @change="setBoxCount(i, Number($event.target.value))"
-            >
-              <option v-for="n in maxBoxesFor(p)" :key="n" :value="n">{{ n }}</option>
-            </select>
-            <span class="text-mute">of {{ maxBoxesFor(p) }} available</span>
-          </template>
+          <p class="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-mute">
+            Boxes with this apartment
+          </p>
+          <UnitBoxPicker
+            :unit-id="p.shortlistable_id"
+            :location-id="p.location_id"
+            :model-value="p.box_ids ?? []"
+            @update:model-value="setBoxIds(i, $event)"
+          />
         </div>
       </div>
     </div>
@@ -231,29 +237,21 @@ function toggleBoxes(index, checked) {
       class="grid gap-3 rounded-xl border border-line p-3 sm:grid-cols-3"
     >
       <BaseMultiSelect
-        v-model="filters.type_id"
-        label="Type"
-        :options="unitTypes.map((t) => ({ value: t.id, label: t.label }))"
-        @update:model-value="loadCandidates()"
-      />
-      <BaseMultiSelect
         v-model="filters.floor_id"
         label="Floor"
         :options="floors.map((f) => ({ value: f.id, label: f.label }))"
         @update:model-value="loadCandidates()"
       />
       <div class="grid grid-cols-2 gap-2">
-        <BaseInput
+        <MoneyInput
           v-model="filters.min_price"
           label="Min price"
-          type="number"
-          @change="loadCandidates()"
+          @update:model-value="loadCandidatesDebounced()"
         />
-        <BaseInput
+        <MoneyInput
           v-model="filters.max_price"
           label="Max price"
-          type="number"
-          @change="loadCandidates()"
+          @update:model-value="loadCandidatesDebounced()"
         />
       </div>
       <div class="grid grid-cols-2 gap-2 sm:col-start-1">

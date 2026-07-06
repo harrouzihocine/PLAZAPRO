@@ -217,4 +217,130 @@ class ClientVisibilityTest extends TestCase
         $this->postJson("/api/v1/projects/{$project->id}/viewers", ['user_id' => $user->id])
             ->assertForbidden();
     }
+
+    // --- Collaborator identity is hidden from name-only lookers ---------------
+
+    /**
+     * A user who can list a project (view_all) but not see the client's details
+     * (no view_details) and is NOT a member of the project must not learn who is
+     * behind it — otherwise they could quietly poach a colleague's client.
+     */
+    public function test_collaborator_identity_is_hidden_from_name_only_lookers(): void
+    {
+        $owner = $this->userWithPermissions(['clients.view']);
+        $client = Client::factory()->create();
+        $project = ClientProject::factory()->create(['client_id' => $client->id, 'created_by' => $owner->id]);
+
+        // Lists every project (projects.view_all) + chat.use, but no view_details,
+        // and not a member: chat.use lets the request reach the guard (not the 403 gate).
+        $looker = $this->userWithPermissions([
+            'clients.view', 'clients.view_all', 'projects.view_all', 'chat.use',
+        ]);
+        Sanctum::actingAs($looker);
+
+        $this->getJson("/api/v1/clients/{$client->id}/projects")
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $project->id)
+            ->assertJsonPath('data.0.can_view_collaborators', false)
+            ->assertJsonMissingPath('data.0.created_by');
+
+        // The "who can see this project" list and the project chat both read as absent.
+        $this->getJson("/api/v1/projects/{$project->id}/viewers")->assertNotFound();
+        $this->getJson("/api/v1/projects/{$project->id}/conversation")->assertNotFound();
+    }
+
+    public function test_a_project_member_without_view_details_still_sees_collaborators(): void
+    {
+        $owner = $this->userWithPermissions(['clients.view']);
+        $client = Client::factory()->create();
+        $project = ClientProject::factory()->create(['client_id' => $client->id, 'created_by' => $owner->id]);
+
+        // The creator holds neither view_all nor view_details but IS a member.
+        Sanctum::actingAs($owner);
+
+        $this->getJson("/api/v1/clients/{$client->id}/projects")
+            ->assertOk()
+            ->assertJsonPath('data.0.can_view_collaborators', true)
+            ->assertJsonPath('data.0.created_by.id', $owner->id);
+
+        $this->getJson("/api/v1/projects/{$project->id}/viewers")
+            ->assertOk()
+            ->assertJsonFragment(['id' => $owner->id, 'is_creator' => true]);
+    }
+
+    public function test_view_details_unlocks_collaborators_without_membership(): void
+    {
+        $owner = $this->userWithPermissions(['clients.view']);
+        $client = Client::factory()->create();
+        $project = ClientProject::factory()->create(['client_id' => $client->id, 'created_by' => $owner->id]);
+
+        // Trusted with the client's details (view_details) though not a member.
+        $trusted = $this->userWithPermissions([
+            'clients.view', 'clients.view_all', 'projects.view_all', 'clients.view_details',
+        ]);
+        Sanctum::actingAs($trusted);
+
+        $this->getJson("/api/v1/clients/{$client->id}/projects")
+            ->assertOk()
+            ->assertJsonPath('data.0.can_view_collaborators', true)
+            ->assertJsonPath('data.0.created_by.id', $owner->id);
+
+        $this->getJson("/api/v1/projects/{$project->id}/viewers")->assertOk();
+    }
+
+    // --- A client's own agent is never locked out of its projects ------------
+
+    /**
+     * The client's assigned agent can list and work every project of that client
+     * even without projects.view_all and even on a project a colleague opened
+     * (they are neither its creator nor a viewer).
+     */
+    public function test_the_clients_assigned_agent_is_never_locked_out_of_its_projects(): void
+    {
+        $agent = $this->userWithPermissions(['clients.view']); // no view_all, not a member
+        $client = Client::factory()->create(['assigned_agent_id' => $agent->id]);
+        $project = ClientProject::factory()->create(['client_id' => $client->id]); // opened by a colleague
+        Sanctum::actingAs($agent);
+
+        $rows = collect($this->getJson("/api/v1/clients/{$client->id}/projects")->assertOk()->json('data'));
+        $ids = $rows->pluck('id');
+        $this->assertTrue($ids->contains($project->id));
+
+        // It is their own client, so they see who opened it and who works it —
+        // the logs' and history's authors — even without clients.view_details.
+        $this->assertTrue($rows->firstWhere('id', $project->id)['can_view_collaborators']);
+        $this->getJson("/api/v1/projects/{$project->id}/viewers")->assertOk();
+
+        // The project-scoped reads load (no 404) — so the workspace is usable.
+        $this->getJson("/api/v1/projects/{$project->id}/shortlist")->assertOk();
+        $this->getJson("/api/v1/projects/{$project->id}/deals")->assertOk();
+    }
+
+    public function test_the_clients_creator_is_never_locked_out_of_its_projects(): void
+    {
+        $creator = $this->userWithPermissions(['clients.view']);
+        $client = Client::factory()->create(['created_by' => $creator->id]);
+        $project = ClientProject::factory()->create(['client_id' => $client->id]);
+        Sanctum::actingAs($creator);
+
+        $ids = collect($this->getJson("/api/v1/clients/{$client->id}/projects")->assertOk()->json('data'))
+            ->pluck('id');
+        $this->assertTrue($ids->contains($project->id));
+        $this->getJson("/api/v1/projects/{$project->id}/shortlist")->assertOk();
+    }
+
+    /** A non-owner, non-member without projects.view_all still cannot reach it. */
+    public function test_a_non_owner_without_view_all_still_cannot_see_the_projects(): void
+    {
+        // Sees every client (view_all) but owns neither this client nor the project.
+        $stranger = $this->userWithPermissions(['clients.view', 'clients.view_all']);
+        $client = Client::factory()->create();
+        $project = ClientProject::factory()->create(['client_id' => $client->id]);
+        Sanctum::actingAs($stranger);
+
+        $ids = collect($this->getJson("/api/v1/clients/{$client->id}/projects")->assertOk()->json('data'))
+            ->pluck('id');
+        $this->assertFalse($ids->contains($project->id));
+        $this->getJson("/api/v1/projects/{$project->id}/shortlist")->assertNotFound();
+    }
 }

@@ -22,6 +22,7 @@ class CallResource extends JsonResource
             'direction' => $this->direction?->value,
             'notes' => $this->notes,
             'topics' => $this->topics ?? [],
+            'objections' => $this->objections ?? [],
             'called_at' => $this->called_at,
             'created_at' => $this->created_at,
             'status' => $this->status?->value,

@@ -11,7 +11,8 @@ use Illuminate\Validation\Rules\Enum;
 
 /**
  * Correct the enforced next action (e.g. change a follow-up "call" into an
- * "in-site visit") with a mandatory reason. Same who/when rules as creating one:
+ * "in-site visit") with a reason picked from the next_action_change_reasons
+ * dynamic list, optionally with a free note. Same who/when rules as creating one:
  * an in-site visit is either handed to a field agent or left for the dispatch
  * board; every other type may leave the assignee blank (defaults to the
  * current one).
@@ -29,7 +30,8 @@ class CorrectNextActionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'reason' => ['required', 'string', 'max:500'],
+            'reason_id' => ['required', 'integer', 'exists:dynamic_list_items,id'],
+            'note' => ['nullable', 'string', 'max:1000'],
             'type' => ['required', new Enum(NextActionType::class)],
             'due_date' => ['required', 'date'],
             'due_time' => ['nullable', 'date_format:H:i'],

@@ -75,6 +75,7 @@ const showViewer = (user) => run(() => projectViewersApi.add(props.projectId, us
         <template v-if="canShare && !v.is_creator">
           <Button
             v-if="!v.hidden"
+            v-tooltip.top="'Hide (kept, not removed)'"
             icon="pi pi-eye-slash"
             text
             rounded
@@ -82,18 +83,17 @@ const showViewer = (user) => run(() => projectViewersApi.add(props.projectId, us
             severity="secondary"
             :disabled="busy"
             aria-label="Hide from this user"
-            v-tooltip.top="'Hide (kept, not removed)'"
             @click="hideViewer(v)"
           />
           <Button
             v-else
+            v-tooltip.top="'Show again'"
             icon="pi pi-eye"
             text
             rounded
             size="small"
             :disabled="busy"
             aria-label="Show to this user again"
-            v-tooltip.top="'Show again'"
             @click="showViewer(v)"
           />
         </template>

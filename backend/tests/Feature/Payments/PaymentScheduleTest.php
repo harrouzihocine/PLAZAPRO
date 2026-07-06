@@ -8,6 +8,7 @@ use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Payments\Actions\MarkSchedulesOverdue;
 use App\Modules\Payments\Enums\ScheduleState;
 use App\Modules\Payments\Models\PaymentSchedule;
+use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
@@ -101,6 +102,50 @@ class PaymentScheduleTest extends TestCase
         $this->assertDatabaseCount('payment_schedules', 3);
         $this->assertEquals(2, $project->paymentSchedules()->active()->count());
         $this->assertEquals(1, PaymentSchedule::where('status', 'cancelled')->count());
+    }
+
+    public function test_replanning_with_recorded_payments_reallocates_what_was_paid(): void
+    {
+        // The client paid, then renegotiates how the remaining balance is
+        // spread: the plan is replaced and the money already collected pours
+        // back onto the new instalments in order.
+        $project = ClientProject::factory()->create(['total_price' => '3000.00']);
+        $cashier = $this->userWithPermissions(['versements.view', 'versements.record']);
+        Sanctum::actingAs($cashier);
+
+        $this->putJson("/api/v1/projects/{$project->id}/schedule", [
+            'installments' => [
+                ['due_date' => '2026-08-01', 'amount' => '1500.00'],
+                ['due_date' => '2026-09-01', 'amount' => '1500.00'],
+            ],
+        ])->assertOk();
+
+        $first = $project->paymentSchedules()->active()->orderBy('installment_no')->firstOrFail();
+        $method = DynamicListItem::factory()->create();
+
+        $this->postJson("/api/v1/projects/{$project->id}/versements", [
+            'amount' => '1200.00', 'paid_on' => now()->toDateString(),
+            'method_id' => $method->id, 'schedule_item_id' => $first->id,
+        ])->assertCreated();
+
+        // Re-plan: three instalments of 1000.00 — allowed even with money in.
+        $this->putJson("/api/v1/projects/{$project->id}/schedule", [
+            'installments' => [
+                ['due_date' => '2026-08-01', 'amount' => '1000.00'],
+                ['due_date' => '2026-09-01', 'amount' => '1000.00'],
+                ['due_date' => '2026-10-01', 'amount' => '1000.00'],
+            ],
+        ])->assertOk();
+
+        $plan = $project->paymentSchedules()->active()->orderBy('installment_no')->get();
+        $this->assertCount(3, $plan);
+
+        // 1200 paid -> first instalment full (paid), 200 on the second (partial).
+        $this->assertSame('1000.00', (string) $plan[0]->paid_amount);
+        $this->assertSame(ScheduleState::Paid, $plan[0]->state);
+        $this->assertSame('200.00', (string) $plan[1]->paid_amount);
+        $this->assertSame(ScheduleState::Partial, $plan[1]->state);
+        $this->assertSame('0.00', (string) $plan[2]->paid_amount);
     }
 
     public function test_the_sweep_marks_past_due_unpaid_instalments_overdue(): void

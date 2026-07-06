@@ -14,7 +14,7 @@ class UpdateClientProjectRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->can('clients.manage');
+        return (bool) $this->user()?->can('projects.manage');
     }
 
     /**

@@ -43,25 +43,12 @@ function openDraft(draft) {
       </div>
       <ul class="max-h-[50vh] divide-y divide-line overflow-y-auto">
         <li v-for="d in drafts.list" :key="d.key">
-          <div class="flex items-center gap-2 px-4 py-2.5">
-            <button
-              type="button"
-              class="min-w-0 flex-1 text-left"
-              @click="openDraft(d)"
-            >
-              <span class="block truncate text-sm font-medium text-ink">{{ d.label }}</span>
-              <span class="block text-xs text-mute">{{ timeAgo(d.savedAt) }}</span>
-            </button>
-            <Button
-              icon="pi pi-trash"
-              text
-              rounded
-              size="small"
-              severity="danger"
-              aria-label="Discard draft"
-              @click="drafts.discard(d.key)"
-            />
-          </div>
+          <!-- Non-dismissable: a draft stays until it is saved (or an oversight
+               admin clears it) — you can only resume it, not discard it. -->
+          <button type="button" class="block w-full px-4 py-2.5 text-left" @click="openDraft(d)">
+            <span class="block truncate text-sm font-medium text-ink">{{ d.label }}</span>
+            <span class="block text-xs text-mute">{{ timeAgo(d.savedAt) }}</span>
+          </button>
         </li>
       </ul>
     </Popover>

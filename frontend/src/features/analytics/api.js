@@ -22,6 +22,26 @@ export const analyticsApi = {
     const { data } = await useApi().get('/analytics/units', { params })
     return data.data
   },
+
+  // Company-wide Team Logs feed (gated by logs.view_all). Returns the paginated
+  // feed rows, a per-type summary and pagination meta.
+  // params: { user_id, type, from, to, mode (logged|upcoming), page }.
+  async teamLogs(params = {}) {
+    const { data } = await useApi().get('/team-logs', { params })
+    return { items: data.data, summary: data.summary ?? {}, meta: data.meta ?? {} }
+  },
+
+  // Voice-of-Client feedback for a development. params: { from, to } (optional).
+  async locationFeedback(id, params = {}) {
+    const { data } = await useApi().get(`/analytics/locations/${id}/feedback`, { params })
+    return data.data
+  },
+
+  // Voice-of-Client feedback drilled into a single unit. params: { from, to }.
+  async unitFeedback(id, params = {}) {
+    const { data } = await useApi().get(`/analytics/units/${id}/feedback`, { params })
+    return data.data
+  },
 }
 
 export const auditApi = {

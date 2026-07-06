@@ -20,8 +20,17 @@ class ClientProjectViewerController extends Controller
 {
     public function index(ClientProject $project): JsonResponse
     {
-        // A project outside the user's visibility scope reads as absent.
-        abort_unless($project->isVisibleTo(request()->user()), 404);
+        // "Who can see this project" is collaborator identity: revealed only to the
+        // project's own members or to a user trusted with the client's details —
+        // never to a name-only looker, who could otherwise poach the client. A
+        // hidden list reads as absent (matches the project's own visibility rule).
+        //
+        // Also require the project to be VISIBLE: a client detail grant unlocks the
+        // client's contact but must NOT expose the viewer list of a project the
+        // user cannot see — this silos a duplicate-resolution "separate project"
+        // (the finder never sees the original's collaborators, nor the owner theirs).
+        $user = request()->user();
+        abort_unless($project->isVisibleTo($user) && $project->collaboratorsVisibleTo($user), 404);
 
         return $this->list($project);
     }

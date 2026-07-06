@@ -14,12 +14,24 @@ use Illuminate\Contracts\Validation\ValidationRule;
  * (plus managers), as opposed to the field agents who only conduct visits. The
  * single source of truth for the client "assigned agent". Null passes so it can
  * sit beside `nullable`.
+ *
+ * On edit, pass the client's currently-stored agent id as `$current`: re-submitting
+ * an unchanged assignment always passes. Otherwise editing any unrelated field would
+ * 422 whenever the already-assigned agent has since lost calls.log or been
+ * deactivated — a validation error the user cannot act on and did not cause.
  */
 class CanFollowUpClient implements ValidationRule
 {
+    public function __construct(private readonly ?int $current = null) {}
+
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         if ($value === null || $value === '') {
+            return;
+        }
+
+        // An unchanged assignment is never re-validated — only a real CHANGE is.
+        if ($this->current !== null && (int) $value === $this->current) {
             return;
         }
 

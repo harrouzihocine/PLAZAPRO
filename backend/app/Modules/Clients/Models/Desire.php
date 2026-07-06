@@ -26,8 +26,8 @@ class Desire extends BaseModel
 
     protected $fillable = [
         'client_id', 'client_project_id', 'wilaya_id', 'commune_id', 'type_id',
-        'floor_id', 'floor_pref', 'area_min', 'area_max', 'rooms_min',
-        'budget_min', 'budget_max', 'notes',
+        'room_number_id', 'contract_type_id', 'floor_id', 'floor_pref',
+        'area_min', 'area_max', 'rooms_min', 'budget_min', 'budget_max', 'notes',
     ];
 
     protected function casts(): array
@@ -59,6 +59,18 @@ class Desire extends BaseModel
     public function type(): BelongsTo
     {
         return $this->belongsTo(DynamicListItem::class, 'type_id');
+    }
+
+    /** Preferred number of rooms (a `room_numbers` item), e.g. F2 / F3. */
+    public function roomNumber(): BelongsTo
+    {
+        return $this->belongsTo(DynamicListItem::class, 'room_number_id');
+    }
+
+    /** Preferred sale contract (a `contract_types` item), e.g. VEFA / turnkey. */
+    public function contractType(): BelongsTo
+    {
+        return $this->belongsTo(DynamicListItem::class, 'contract_type_id');
     }
 
     public function floor(): BelongsTo

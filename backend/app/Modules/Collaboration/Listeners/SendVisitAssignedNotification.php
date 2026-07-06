@@ -9,11 +9,16 @@ use App\Modules\Collaboration\Support\NotificationLink;
 use App\Modules\Pipeline\Events\VisitAssigned;
 use App\Modules\Settings\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Support\Collection;
 
 /**
- * Notify the agent a visit was assigned to — and, for an in-site visit, the
- * project's contributors too, so everyone following the project knows the
- * field agent is set. Runs on the queue.
+ * Notify the agent a visit was assigned to, plus the right wider audience:
+ *  - in-site visit  → the project's contributors, so everyone following the
+ *                     project knows which field agent is set (on assign/reassign);
+ *  - new office visit → the project's contributors AND the pipeline overseers
+ *                     (oversight.pipeline holders), so an upcoming office visit
+ *                     gets picked up and organised in real time.
+ * Runs on the queue; delivery is DB + broadcast, so recipients see it live.
  */
 class SendVisitAssignedNotification implements ShouldQueue
 {
@@ -41,35 +46,73 @@ class SendVisitAssignedNotification implements ShouldQueue
             $visit->unit ? 'at '.$visit->unit->reference : null,
             $visit->unit?->location?->name,
         ]);
+        $summary = implode(' · ', $details);
 
         $agent->notify(new DomainNotification(
             kind: 'visit_assigned',
             title: 'A visit was assigned to you',
-            body: implode(' · ', $details).'.',
+            body: $summary.'.',
             link: $link,
             subjectType: $subjectType,
             subjectId: $subjectId,
         ));
 
-        // In-site: tell the project's contributors the field agent is set.
         $project = $visit->clientProject;
-        if ($visit->type->value !== 'in_site' || $project === null) {
-            return;
-        }
 
-        $contributors = User::query()
-            ->findMany($project->contributorIds())
-            ->reject(fn ($u) => $u->id === $agent->id);
-
-        foreach ($contributors as $contributor) {
-            $contributor->notify(new DomainNotification(
+        // In-site: tell the project's contributors the field agent is set.
+        if ($visit->type->value === 'in_site' && $project !== null) {
+            $this->fanOut($project->contributorIds(), $agent->id, new DomainNotification(
                 kind: 'visit_agent_assigned',
                 title: 'In-site agent assigned',
-                body: $agent->name.' will handle the '.implode(' · ', $details).'.',
+                body: $agent->name.' will handle the '.$summary.'.',
                 link: $link,
                 subjectType: $subjectType,
                 subjectId: $subjectId,
             ));
+
+            return;
+        }
+
+        // New office visit: alert the project's contributors and the pipeline
+        // overseers so the upcoming visit gets organised. Reassignments (isNew
+        // = false) stay scoped to the agent above.
+        if ($visit->type->value === 'office' && $event->isNew) {
+            $recipientIds = $this->pipelineOverseerIds()
+                ->merge($project?->contributorIds() ?? [])
+                ->unique();
+
+            $this->fanOut($recipientIds, $agent->id, new DomainNotification(
+                kind: 'office_visit_scheduled',
+                title: 'Upcoming office visit',
+                body: $summary.' — with '.$agent->name.'.',
+                link: $link,
+                subjectType: $subjectType,
+                subjectId: $subjectId,
+            ));
+        }
+    }
+
+    /** Active users holding the Pipeline oversight permission. */
+    private function pipelineOverseerIds(): Collection
+    {
+        return User::query()
+            ->where('is_active', true)
+            ->whereHas('role.permissions', fn ($q) => $q->where('slug', 'oversight.pipeline'))
+            ->pluck('id');
+    }
+
+    /**
+     * Send one notification to each recipient id, skipping the assigned agent
+     * (already notified directly) and any blanks.
+     *
+     * @param  Collection<int, int>|iterable<int>  $recipientIds
+     */
+    private function fanOut(iterable $recipientIds, int $agentId, DomainNotification $notification): void
+    {
+        $ids = collect($recipientIds)->filter()->reject(fn ($id) => (int) $id === $agentId)->unique();
+
+        foreach (User::query()->findMany($ids) as $recipient) {
+            $recipient->notify($notification);
         }
     }
 }

@@ -24,6 +24,17 @@ class Conversation extends BaseModel
 {
     use HasFactory;
 
+    /**
+     * A field agent dispatched to one of a project's in-site visits joins that
+     * project's chat with this role — read + write, but NOT a project
+     * contributor (kept off client_project_viewers / contributorIds). When the
+     * dispatcher un-assigns him, the row is downgraded to
+     * ROLE_FIELD_AGENT_OBSERVER: read-only, kept for history.
+     */
+    public const ROLE_FIELD_AGENT = 'field_agent';
+
+    public const ROLE_FIELD_AGENT_OBSERVER = 'field_agent_observer';
+
     protected $fillable = [
         'type', 'title', 'subject_type', 'subject_id', 'created_by', 'last_message_at',
     ];
@@ -78,6 +89,19 @@ class Conversation extends BaseModel
     }
 
     /**
+     * A participant who may WRITE by virtue of their row — every role except a
+     * downgraded field-agent observer (a former dispatched agent whose row is
+     * kept for read-only history after the dispatcher un-assigned him).
+     */
+    public function hasWritableParticipant(User $user): bool
+    {
+        return $this->participants()
+            ->where('users.id', $user->id)
+            ->wherePivot('role', '!=', self::ROLE_FIELD_AGENT_OBSERVER)
+            ->exists();
+    }
+
+    /**
      * Read access: participants always; on client-project chats, holders of the
      * oversight grants may additionally read without being a contributor —
      * chat.view_project_chats (read-only) or chat.participate_project_chats
@@ -97,7 +121,7 @@ class Conversation extends BaseModel
      */
     public function isWritableBy(User $user): bool
     {
-        return $this->hasParticipant($user)
+        return $this->hasWritableParticipant($user)
             || ($this->type === ConversationType::Project && $user->can('chat.participate_project_chats'));
     }
 

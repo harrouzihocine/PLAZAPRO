@@ -34,7 +34,13 @@ class ClientProjectTest extends TestCase
 
     private function manager(): User
     {
-        return $this->userWithPermissions(['clients.view', 'clients.manage', 'units.view', 'units.reserve']);
+        // Mirrors the real Manager role: full visibility + create + manage,
+        // incl. the project-level grants split out of the old clients.manage.
+        return $this->userWithPermissions([
+            'clients.view', 'clients.view_all', 'clients.create', 'clients.manage',
+            'projects.create', 'projects.manage', 'projects.advance',
+            'units.view', 'units.reserve',
+        ]);
     }
 
     public function test_a_deal_opens_at_the_lead_stage(): void
@@ -116,10 +122,73 @@ class ClientProjectTest extends TestCase
         $this->assertDatabaseHas('client_projects', ['id' => $project->id, 'status' => 'cancelled']);
     }
 
-    public function test_writes_require_clients_manage(): void
+    public function test_freezing_a_project_blocks_new_activity_until_unfrozen(): void
     {
         $client = Client::factory()->create();
-        Sanctum::actingAs($this->userWithPermissions(['clients.view']));
+        $project = ClientProject::factory()->create(['client_id' => $client->id]);
+        $freezer = $this->userWithPermissions(['clients.view', 'projects.freeze', 'calls.log']);
+        Sanctum::actingAs($freezer);
+
+        $this->postJson("/api/v1/projects/{$project->id}/freeze")
+            ->assertOk()
+            ->assertJsonPath('data.frozen', true);
+
+        // Frozen: no new calls on it.
+        $this->postJson("/api/v1/clients/{$client->id}/calls", [
+            'direction' => 'outbound',
+            'client_project_id' => $project->id,
+            'next_action' => ['type' => 'call', 'due_date' => now()->addDay()->toDateString()],
+        ])->assertStatus(422);
+
+        // Unfreeze reopens it.
+        $this->postJson("/api/v1/projects/{$project->id}/unfreeze")
+            ->assertOk()
+            ->assertJsonPath('data.frozen', false);
+
+        $this->postJson("/api/v1/clients/{$client->id}/calls", [
+            'direction' => 'outbound',
+            'client_project_id' => $project->id,
+            'next_action' => ['type' => 'call', 'due_date' => now()->addDay()->toDateString()],
+        ])->assertCreated();
+    }
+
+    public function test_freezing_requires_the_projects_freeze_permission(): void
+    {
+        $project = ClientProject::factory()->create();
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.manage']));
+
+        $this->postJson("/api/v1/projects/{$project->id}/freeze")->assertForbidden();
+    }
+
+    public function test_opening_a_project_requires_projects_create_not_manage(): void
+    {
+        $client = Client::factory()->create();
+
+        // projects.manage alone (no create) cannot open a project.
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.view_all', 'projects.manage']));
+        $this->postJson("/api/v1/clients/{$client->id}/projects", [])->assertForbidden();
+    }
+
+    public function test_an_agent_can_open_a_project_on_their_own_client_without_manage(): void
+    {
+        // A lead-capturing agent (projects.create, no manage, no view_all) opens
+        // a project on the client THEY created — the "New project" workflow.
+        $agent = $this->userWithPermissions(['clients.view', 'clients.create', 'projects.create']);
+        $client = Client::factory()->create(['created_by' => $agent->id]);
+        Sanctum::actingAs($agent);
+
+        $this->postJson("/api/v1/clients/{$client->id}/projects", [])
+            ->assertCreated()
+            ->assertJsonPath('data.stage', 'lead');
+    }
+
+    public function test_an_agent_cannot_open_a_project_on_an_out_of_scope_client(): void
+    {
+        // Has projects.create but neither owns the client nor holds view_all:
+        // the client is invisible to them, so opening a project on it is blocked.
+        $agent = $this->userWithPermissions(['clients.view', 'clients.create', 'projects.create']);
+        $client = Client::factory()->create();
+        Sanctum::actingAs($agent);
 
         $this->postJson("/api/v1/clients/{$client->id}/projects", [])->assertForbidden();
     }

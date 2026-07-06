@@ -27,6 +27,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/visits', [VisitController::class, 'index']);
     });
 
+    // The signed-in user's own upcoming workload (the free/busy strip on the
+    // next-action form). Personal data only — no permission beyond being signed in.
+    Route::get('/me/agenda', [NextActionController::class, 'agenda']);
+
     // Logging a call may leave a next action; one can also be planned later on
     // its own (store). Corrections (call + next action) also run under calls.log
     // — every edit is a cancel + new version, captured in history with a reason.
@@ -53,6 +57,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // assigned field agent for their own in-site log — CorrectVisitRequest is
     // the gate, so no permission middleware here.
     Route::post('/visits/{visit}/correct', [VisitController::class, 'correct']);
+
+    // Add apartment(s) to visit on a project, standalone (no need to complete an
+    // open visit first). Conducting agents who can see the project — the request
+    // is the gate, so no permission middleware here.
+    Route::post('/projects/{project}/in-site-visits', [VisitController::class, 'proposeInSite']);
 
     // Completing a visit (conducting it) always leaves a next action.
     Route::middleware('can:visits.conduct')->group(function () {

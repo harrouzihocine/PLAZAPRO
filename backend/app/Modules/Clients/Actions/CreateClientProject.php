@@ -16,19 +16,23 @@ use Illuminate\Support\Facades\Auth;
  * starting stage is given. created_by is stamped from the authenticated user —
  * it drives the projects.view_all visibility rule. Every project opens with its
  * own dedicated chat (participants = the contributors).
+ *
+ * $createdBy overrides the creator: the duplicate-resolution "separate project"
+ * outcome opens a project ON BEHALF of the finder (the creator must be the finder,
+ * not the resolver who is acting), so it passes the finder's id here.
  */
 class CreateClientProject
 {
     public function __construct(private EnsureProjectConversation $ensureConversation) {}
 
-    public function handle(Client $client, array $data): ClientProject
+    public function handle(Client $client, array $data, ?int $createdBy = null): ClientProject
     {
         $attributes = Arr::only($data, ['location_id', 'unit_id', 'stage', 'total_price']);
         $attributes['stage'] ??= ClientProjectStage::Lead->value;
 
         $project = new ClientProject($attributes);
         $project->client()->associate($client);
-        $project->created_by = Auth::id();
+        $project->created_by = $createdBy ?? Auth::id();
         $project->save();
 
         $this->ensureConversation->handle($project);

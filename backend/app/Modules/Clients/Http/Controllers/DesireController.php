@@ -23,7 +23,7 @@ class DesireController extends Controller
 {
     public function show(Client $client): JsonResponse
     {
-        $desire = $client->desire()->with(['wilaya', 'commune', 'type', 'floor', 'locations'])->first();
+        $desire = $client->desire()->with(['wilaya', 'commune', 'type', 'roomNumber', 'contractType', 'floor', 'locations'])->first();
 
         return response()->json([
             'data' => $desire ? (new DesireResource($desire))->resolve() : null,

@@ -24,9 +24,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('can:units.view')->group(function () {
         Route::get('/locations', [LocationController::class, 'index']);
         Route::get('/locations/{location}', [LocationController::class, 'show']);
+        Route::get('/locations/{location}/insights', [LocationController::class, 'insights']);
 
         Route::get('/units', [UnitController::class, 'index']);
         Route::get('/units/{unit}', [UnitController::class, 'show']);
+        Route::get('/units/{unit}/insights', [UnitController::class, 'insights']);
+        Route::get('/units/{unit}/project-logs', [UnitController::class, 'projectLogs']);
 
         Route::get('/locations/{location}/stacking', [StackingController::class, 'show']);
 

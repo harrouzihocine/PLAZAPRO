@@ -181,6 +181,56 @@ class VersementTest extends TestCase
         ])->assertStatus(422);
     }
 
+    public function test_refunding_a_versement_keeps_it_as_history_and_reverses_the_allocation(): void
+    {
+        $project = ClientProject::factory()->create(['total_price' => '2000.00']);
+        $item = PaymentSchedule::factory()->create([
+            'client_project_id' => $project->id, 'amount' => '2000.00',
+            'due_date' => now()->addMonth()->toDateString(),
+        ]);
+        $method = $this->method()->id;
+        Sanctum::actingAs($this->cashier());
+
+        $id = $this->postJson("/api/v1/projects/{$project->id}/versements", [
+            'amount' => '1000.00', 'paid_on' => now()->toDateString(),
+            'method_id' => $method, 'schedule_item_id' => $item->id,
+        ])->assertCreated()->json('data.id');
+
+        $this->postJson("/api/v1/versements/{$id}/refund", ['reason' => 'Deal released — money returned'])
+            ->assertOk()
+            ->assertJsonPath('data.refund_reason', 'Deal released — money returned');
+
+        // The row stays ACTIVE in history — flagged, not cancelled or superseded.
+        $versement = Versement::query()->findOrFail($id);
+        $this->assertSame('active', $versement->status->value);
+        $this->assertTrue($versement->isRefunded());
+
+        // Its contribution to the instalment is reversed…
+        $this->assertSame('0.00', (string) $item->refresh()->paid_amount);
+
+        // …and it no longer counts toward the balance (still listed, though).
+        $index = $this->getJson("/api/v1/projects/{$project->id}/versements")->assertOk()->json();
+        $this->assertSame('0.00', $index['meta']['total_paid']);
+        $this->assertCount(1, $index['data']);
+
+        // Refund is final for the row: no double refund, no correction after it.
+        $this->postJson("/api/v1/versements/{$id}/refund", ['reason' => 'again'])->assertStatus(422);
+        $this->postJson("/api/v1/versements/{$id}/correct", [
+            'amount' => '500.00', 'paid_on' => now()->toDateString(),
+            'method_id' => $method, 'reason' => 'x',
+        ])->assertStatus(422);
+    }
+
+    public function test_refund_requires_the_cancel_permission(): void
+    {
+        $project = ClientProject::factory()->create(['total_price' => '1000.00']);
+        $versement = Versement::factory()->create(['client_project_id' => $project->id]);
+        Sanctum::actingAs($this->userWithPermissions(['versements.view', 'versements.record']));
+
+        $this->postJson("/api/v1/versements/{$versement->id}/refund", ['reason' => 'x'])
+            ->assertForbidden();
+    }
+
     public function test_recording_requires_the_record_permission(): void
     {
         $project = ClientProject::factory()->create(['total_price' => '1000.00']);

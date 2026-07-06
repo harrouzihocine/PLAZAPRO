@@ -16,9 +16,16 @@ class CreateLocation
         // (mirrors the column default; a fresh instance isn't reloaded from DB).
         $data['gtm_priority'] ??= GtmPriority::Medium->value;
 
-        return Location::create(Arr::only($data, [
-            'name', 'code', 'wilaya_id', 'commune_id', 'contract_type_id', 'address',
+        $location = Location::create(Arr::only($data, [
+            'name', 'code', 'wilaya_id', 'commune_id', 'type_id', 'contract_type_id', 'address',
             'description', 'expected_delivery_date', 'gtm_priority', 'latitude', 'longitude',
         ]));
+
+        // The financing / payment options the project offers buyers.
+        if (array_key_exists('payment_method_ids', $data)) {
+            $location->paymentMethods()->sync($data['payment_method_ids'] ?? []);
+        }
+
+        return $location;
     }
 }

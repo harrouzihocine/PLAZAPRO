@@ -35,14 +35,22 @@ class CreateNextAction
         // where a visits.dispatch holder hands it to a field agent (weekly
         // board). Every other type needs an owner (defaulted to the client's
         // sales agent by the caller).
-        if (($data['type'] ?? null) === NextActionType::InSiteVisit->value) {
+        $isInSite = ($data['type'] ?? null) === NextActionType::InSiteVisit->value;
+
+        if ($isInSite) {
             $assignedTo = $data['assigned_to'] ?? null;
         } else {
             $assignedTo = $data['assigned_to'] ?? $defaultAssigneeId;
             abort_if($assignedTo === null, 422, 'A next action must be assigned to someone.');
         }
 
-        return DB::transaction(function () use ($subject, $source, $data, $assignedTo) {
+        // Only in-site plans carry a specific-apartment target (same / another) —
+        // an empty pick is "the whole shortlist", stored as null.
+        $targetUnitIds = $isInSite && ! empty($data['unit_ids'])
+            ? array_values(array_unique(array_map('intval', $data['unit_ids'])))
+            : null;
+
+        return DB::transaction(function () use ($subject, $source, $data, $assignedTo, $targetUnitIds) {
             // Close any prior open plan so exactly one stays pending (fulfilled →
             // done; an undispatched pool plan → cancelled). Shared rule — see
             // ClosePendingNextActions.
@@ -56,6 +64,7 @@ class CreateNextAction
                 'type' => $data['type'],
                 'due_at' => self::resolveDueAt($data),
                 'assigned_to' => $assignedTo,
+                'target_unit_ids' => $targetUnitIds,
                 'state' => NextActionState::Pending->value,
             ]);
         });

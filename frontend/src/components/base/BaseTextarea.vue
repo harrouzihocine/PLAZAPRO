@@ -6,6 +6,8 @@ import Textarea from 'primevue/textarea'
 // textareas, never single-line inputs).
 defineProps({
   label: { type: String, default: '' },
+  // Shows a red "*" after the label. No star = the field is not required.
+  required: { type: Boolean, default: false },
   modelValue: { type: [String, Number], default: '' },
   error: { type: String, default: '' },
   rows: { type: Number, default: 3 },
@@ -16,7 +18,9 @@ const emit = defineEmits(['update:modelValue'])
 
 <template>
   <label class="block">
-    <span v-if="label" class="mb-1.5 block text-sm font-medium text-ink">{{ label }}</span>
+    <span v-if="label" class="mb-1.5 block text-sm font-medium text-ink"
+      >{{ label }}<span v-if="required" class="text-danger" aria-hidden="true"> *</span></span
+    >
     <Textarea
       :model-value="String(modelValue ?? '')"
       :rows="rows"

@@ -89,9 +89,26 @@ export const useClientsStore = defineStore('clients', {
     },
 
     async create(payload) {
-      const result = await this.mutate(() => clientsApi.create(payload))
-      await this.fetch()
-      return result
+      this.saving = true
+      this.error = ''
+      try {
+        const result = await clientsApi.create(payload)
+        await this.fetch()
+        return result
+      } catch (e) {
+        // A duplicate phone is not a toast — the caller shows the resolution
+        // notice (either "already yours" or "a request was sent to a supervisor").
+        if (e.response?.status === 409 && e.response.data?.duplicate) {
+          const dup = new Error('duplicate')
+          dup.duplicate = e.response.data
+          throw dup
+        }
+        this.error = e.response?.data?.message ?? 'Action failed.'
+        toastError(this.error)
+        throw e
+      } finally {
+        this.saving = false
+      }
     },
 
     async update(id, payload) {
@@ -140,6 +157,17 @@ export const useClientsStore = defineStore('clients', {
       return this.loadProjects(clientId)
     },
 
+    // Freeze / unfreeze: a deliberate close-down to new activity.
+    async freezeProject(clientId, projectId) {
+      await this.mutate(() => projectsApi.freeze(projectId))
+      return this.loadProjects(clientId)
+    },
+
+    async unfreezeProject(clientId, projectId) {
+      await this.mutate(() => projectsApi.unfreeze(projectId))
+      return this.loadProjects(clientId)
+    },
+
     async reactivateProject(clientId, projectId) {
       await this.mutate(() => projectsApi.reactivate(projectId))
       await this.loadArchivedProjects(clientId)
@@ -183,7 +211,7 @@ export const useClientsStore = defineStore('clients', {
       return this.loadMatches(clientId)
     },
 
-    // --- Deals on a project (created from visit logs; one active at a time) ---
+    // --- Deals on a project (created from visit logs; several may be open) ---
 
     async loadDeals(projectId) {
       this.deals = { ...this.deals, [projectId]: await dealsApi.list(projectId) }
@@ -202,8 +230,29 @@ export const useClientsStore = defineStore('clients', {
       return this.loadProjects(clientId)
     },
 
-    async syncDealBoxes(projectId, dealId, boxIds) {
-      await this.mutate(() => dealsApi.syncBoxes(dealId, boxIds))
+    // Close ONE apartment on the deal (won with its own price / lost).
+    async closeDealItem(clientId, projectId, dealId, itemId, payload) {
+      await this.mutate(() => dealsApi.closeItem(dealId, itemId, payload))
+      await this.loadDeals(projectId)
+      return this.loadProjects(clientId)
+    },
+
+    // Release a WON apartment — it returns to the market; payments stay as history.
+    async releaseDealItem(clientId, projectId, dealId, itemId, payload) {
+      await this.mutate(() => dealsApi.releaseItem(dealId, itemId, payload))
+      await this.loadDeals(projectId)
+      return this.loadProjects(clientId)
+    },
+
+    // Sell extra boxes onto a WON apartment (agreed price grows).
+    async addDealBoxes(clientId, projectId, dealId, itemId, payload) {
+      await this.mutate(() => dealsApi.addBoxes(dealId, itemId, payload))
+      await this.loadDeals(projectId)
+      return this.loadProjects(clientId)
+    },
+
+    async syncDealUnitBoxes(projectId, dealId, itemId, boxIds) {
+      await this.mutate(() => dealsApi.syncUnitBoxes(dealId, itemId, boxIds))
       return this.loadDeals(projectId)
     },
 
@@ -230,6 +279,14 @@ export const useClientsStore = defineStore('clients', {
 
     async completeVisit(clientId, visitId, payload) {
       await this.mutate(() => pipelineApi.completeVisit(visitId, payload))
+      return this.loadTimeline(clientId)
+    },
+
+    // Add apartment(s) to visit on a project, standalone — no open visit to
+    // complete first. The new pending visit(s) / pooled request show in the
+    // refreshed timeline.
+    async proposeInSiteVisit(clientId, projectId, payload) {
+      await this.mutate(() => pipelineApi.proposeInSiteVisit(projectId, payload))
       return this.loadTimeline(clientId)
     },
 

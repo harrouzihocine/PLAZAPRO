@@ -6,18 +6,20 @@ import Badge from 'primevue/badge'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import Tabs from 'primevue/tabs'
-import BaseInput from '@/components/base/BaseInput.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
-import StatusTag from '@/components/ui/StatusTag.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
+import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import { useClientsStore } from '@/features/clients/clientsStore'
+import AddUnitVisitForm from '@/features/pipeline/components/AddUnitVisitForm.vue'
 import CallLogForm from '@/features/pipeline/components/CallLogForm.vue'
 import CompleteVisitForm from '@/features/pipeline/components/CompleteVisitForm.vue'
+import LogTimeline from '@/features/pipeline/components/LogTimeline.vue'
 import NextActionFields from '@/features/pipeline/components/NextActionFields.vue'
+import { actionEntries, byNewest, callEntries, visitEntries } from '@/features/pipeline/timeline'
 import { useAuthStore } from '@/features/settings/store'
 import { useDynamicList } from '@/composables/useDynamicList'
-import { googleMapsUrl } from '@/features/inventory/googleMaps'
-import { formatDate, formatDateTime, humanize } from '@/utils/format'
+import { toastSuccess } from '@/composables/useConfirm'
+import { formatDate, formatTimeIfSet, humanize } from '@/utils/format'
 
 // The interaction timeline — scoped to ONE project when projectId is set (its
 // logs + the client-level qualifying calls). The pipeline keeps exactly one
@@ -31,11 +33,19 @@ import { formatDate, formatDateTime, humanize } from '@/utils/format'
 const props = defineProps({
   clientId: { type: [String, Number], required: true },
   projectId: { type: [String, Number], default: null },
+  // A frozen (explicitly frozen / archived / cancelled) project is closed to
+  // new activity — hide the log / plan / complete affordances (the server
+  // also rejects them). Won alone does NOT freeze, and neither do open deals:
+  // the client may keep hunting more apartments while one is reserved.
+  frozen: { type: Boolean, default: false },
+  // The project's conclusion already exists (open or won deal) — completing a
+  // visit needs no conclusion of its own (it may still open another deal).
+  dealSettled: { type: Boolean, default: false },
 })
 const emit = defineEmits(['changed'])
 const store = useClientsStore()
 const auth = useAuthStore()
-const { items: officeChecklist } = useDynamicList('office_visit_checklist')
+const { items: changeReasons } = useDynamicList('next_action_change_reasons')
 
 const canLogCall = () => auth.can('calls.log')
 // An in-site log is completed by its assigned agent (or a visit admin); office
@@ -44,13 +54,19 @@ const canComplete = (visit) =>
   auth.can('visits.conduct') &&
   (visit.type !== 'in_site' || visit.agent?.id === auth.user?.id || auth.can('visits.assign'))
 
+// Adding apartment(s) to visit is an in-site (field) action — offered on a
+// project story only, to conducting agents, on an open project.
+const canAddUnitVisit = computed(() => !!props.projectId && auth.can('visits.conduct'))
+
 const showCall = ref(false)
+const showAddUnit = ref(false)
 const completing = ref(null) // the visit being completed (modal)
 
 const emptyNextAction = () => ({ type: 'call', due_date: '', due_time: '', assigned_to: '' })
 
-// Edit-with-reason state (corrections = cancel + new version).
-const editNa = reactive({ open: false, id: null, reason: '', form: emptyNextAction() })
+// Edit-with-reason state (corrections = cancel + new version). The reason is
+// picked from a list for fast logging, with an optional free note.
+const editNa = reactive({ open: false, id: null, reasonId: null, note: '', form: emptyNextAction() })
 
 // Plan-after-the-fact state: a log that didn't need a next action at the time
 // can be re-armed later (next actions are optional on the log forms).
@@ -76,69 +92,32 @@ const openVisits = computed(() =>
   store.timeline.visits.filter((v) => v.status === 'active' && !v.is_completed),
 )
 
-// --- Version chains: a superseded row nests under its replacement ---------
-// Rows arrive flat (active + cancelled). The top level keeps rows nobody
-// replaced; each carries its older versions (walked via supersedes_id).
-function withVersions(list) {
-  const byId = new Map(list.map((x) => [x.id, x]))
-  const replacedIds = new Set(list.map((x) => x.supersedes_id).filter((id) => id != null))
-  return list
-    .filter((x) => !replacedIds.has(x.id))
-    .map((x) => {
-      const versions = []
-      let cur = x
-      while (cur?.supersedes_id != null && byId.has(cur.supersedes_id)) {
-        cur = byId.get(cur.supersedes_id)
-        versions.push(cur)
-      }
-      return { ...x, previous_versions: versions }
-    })
-}
-
-const callEntries = computed(() =>
-  withVersions(store.timeline.calls).map((c) => ({ kind: 'call', at: c.called_at, data: c })),
-)
-const visitEntries = computed(() =>
-  withVersions(store.timeline.visits).map((v) => ({ kind: 'visit', at: v.scheduled_at, data: v })),
-)
-const actionEntries = computed(() =>
-  withVersions(store.timeline.next_action_history ?? []).map((a) => ({
-    kind: 'action',
-    at: a.due_at,
-    data: a,
-  })),
-)
-
-const byNewest = (a, b) => new Date(b.at) - new Date(a.at)
+// Whether the visit being completed is the last open in-site visit of its
+// project — only then does the completion form ask how the thread concludes.
+const completingIsLastInSite = computed(() => {
+  const v = completing.value
+  if (!v || v.type !== 'in_site') return true
+  const openInSite = openVisits.value.filter(
+    (o) => o.type === 'in_site' && o.client_project_id === v.client_project_id,
+  )
+  return openInSite.length <= 1
+})
 
 // One list per tab — "all" merges the interaction logs (calls + visits);
-// planned next actions have their own tab (they are plans, not logs).
+// planned next actions have their own tab (they are plans, not logs). The
+// per-entry rendering (version nesting, expand, detail) lives in LogTimeline.
 const tab = ref('all')
+const calls = computed(() => callEntries(store.timeline.calls))
+const visits = computed(() => visitEntries(store.timeline.visits))
+const actions = computed(() => actionEntries(store.timeline.next_action_history ?? []))
 const TABS = computed(() => [
-  { value: 'all', label: 'All', icon: 'pi pi-history', entries: [...callEntries.value, ...visitEntries.value].sort(byNewest) },
-  { value: 'calls', label: 'Calls', icon: 'pi pi-phone', entries: [...callEntries.value].sort(byNewest) },
-  { value: 'office', label: 'Office visits', icon: 'pi pi-building', entries: visitEntries.value.filter((e) => e.data.type === 'office').sort(byNewest) },
-  { value: 'in_site', label: 'In-site visits', icon: 'pi pi-map-marker', entries: visitEntries.value.filter((e) => e.data.type === 'in_site').sort(byNewest) },
-  { value: 'actions', label: 'Next actions', icon: 'pi pi-flag', entries: [...actionEntries.value].sort(byNewest) },
+  { value: 'all', label: 'All', icon: 'pi pi-history', entries: [...calls.value, ...visits.value].sort(byNewest) },
+  { value: 'calls', label: 'Calls', icon: 'pi pi-phone', entries: [...calls.value].sort(byNewest) },
+  { value: 'office', label: 'Office visits', icon: 'pi pi-building', entries: visits.value.filter((e) => e.data.type === 'office').sort(byNewest) },
+  { value: 'in_site', label: 'In-site visits', icon: 'pi pi-map-marker', entries: visits.value.filter((e) => e.data.type === 'in_site').sort(byNewest) },
+  { value: 'actions', label: 'Next actions', icon: 'pi pi-flag', entries: [...actions.value].sort(byNewest) },
 ])
 const entries = computed(() => TABS.value.find((t) => t.value === tab.value)?.entries ?? [])
-
-// --- Expandable detail rows ------------------------------------------------
-const expanded = ref(new Set())
-const keyOf = (e) => `${e.kind}-${e.data.id}`
-function toggle(e) {
-  const k = keyOf(e)
-  const next = new Set(expanded.value)
-  next.has(k) ? next.delete(k) : next.add(k)
-  expanded.value = next
-}
-const isExpanded = (e) => expanded.value.has(keyOf(e))
-const isCancelled = (row) => row.status === 'cancelled'
-
-const checklistLabels = (ids) =>
-  (ids ?? []).map((id) => officeChecklist.value.find((c) => c.id === id)?.label ?? `#${id}`)
-
-const mapsUrl = (visit) => googleMapsUrl(visit.unit?.location ?? {})
 
 // Draft identities for the two modal forms; ?resume=<key> (from the drafts
 // indicator) reopens the right modal with its draft restored.
@@ -167,20 +146,35 @@ async function submitCall(payload) {
   if (props.projectId) payload.client_project_id = props.projectId
   await store.logCall(props.clientId, payload)
   showCall.value = false
+  // A call can conclude into THE deal — surface it in the deal panel right away.
+  if (payload.closure?.type === 'deal' && props.projectId) {
+    await store.loadDeals(props.projectId)
+  }
   emit('changed')
 }
 
-// Completing may also carry the deal step ("client decided") — the visit is
-// completed first, then THE deal opens on the visit's project with provenance.
+// The visit self-closes in one call: its conclusion (next action, or a
+// desire/archive/deal closure) rides inside the completion payload — a deal
+// closure opens THE deal on the visit's project with provenance, server-side.
 async function submitComplete(payload) {
-  const { deal, ...completion } = payload
   const visit = completing.value
-  await store.completeVisit(props.clientId, visit.id, completion)
+  await store.completeVisit(props.clientId, visit.id, payload)
   completing.value = null
-  if (deal && visit.client_project_id) {
-    await store.createDeal(props.clientId, visit.client_project_id, deal)
+  if (payload.closure?.type === 'deal' && visit.client_project_id) {
     await store.loadDeals(visit.client_project_id)
   }
+  emit('changed')
+}
+
+// Add apartment(s) to visit, standalone — no open visit to complete first.
+async function submitAddUnit(payload) {
+  await store.proposeInSiteVisit(props.clientId, props.projectId, payload)
+  showAddUnit.value = false
+  toastSuccess(
+    payload.assigned_to
+      ? 'Added to the field agent’s visits.'
+      : 'Added to the dispatch pool — the dispatcher was notified.',
+  )
   emit('changed')
 }
 
@@ -189,7 +183,8 @@ function openEditNa(na) {
   const d = na.due_at ? new Date(na.due_at) : null
   editNa.open = true
   editNa.id = na.id
-  editNa.reason = ''
+  editNa.reasonId = null
+  editNa.note = ''
   Object.assign(editNa.form, {
     type: na.type,
     due_date: d ? d.toISOString().slice(0, 10) : '',
@@ -199,9 +194,10 @@ function openEditNa(na) {
 }
 
 async function submitEditNa() {
-  if (!editNa.reason.trim() || !nextActionReady(editNa.form)) return
+  if (!editNa.reasonId || !nextActionReady(editNa.form)) return
   await store.correctNextAction(props.clientId, editNa.id, {
-    reason: editNa.reason.trim(),
+    reason_id: editNa.reasonId,
+    note: editNa.note.trim() || null,
     ...editNa.form,
   })
   editNa.open = false
@@ -220,7 +216,7 @@ async function submitEditNa() {
            action IS a call (or nothing is planned yet). -->
       <span class="flex items-center gap-2">
         <Button
-          v-if="canLogCall() && !pending"
+          v-if="canLogCall() && !pending && !frozen"
           label="Plan next action"
           icon="pi pi-flag"
           size="small"
@@ -228,8 +224,19 @@ async function submitEditNa() {
           outlined
           @click="planNa.open = !planNa.open"
         />
+        <!-- Add apartment(s) to visit anytime — no need to complete an open
+             in-site visit first (the field agent finds more units on site). -->
         <Button
-          v-if="canLogCall() && pendingIsCall"
+          v-if="canAddUnitVisit && !frozen"
+          label="Add unit to visit"
+          icon="pi pi-map-marker"
+          size="small"
+          severity="secondary"
+          outlined
+          @click="showAddUnit = true"
+        />
+        <Button
+          v-if="canLogCall() && pendingIsCall && !frozen"
           label="Log call"
           icon="pi pi-phone"
           size="small"
@@ -289,7 +296,8 @@ async function submitEditNa() {
               Next:
               <span class="font-semibold">{{ humanize(na.type) }}</span>
               <span :class="na.is_overdue ? 'font-medium text-danger' : 'text-mute'">
-                · due {{ formatDate(na.due_at) }}
+                · due {{ formatDate(na.due_at)
+                }}<template v-if="formatTimeIfSet(na.due_at)">, {{ formatTimeIfSet(na.due_at) }}</template>
               </span>
             </span>
           </span>
@@ -317,13 +325,20 @@ async function submitEditNa() {
           @submit.prevent="submitEditNa"
         >
           <NextActionFields v-model="editNa.form" :field-agents="store.agents" />
-          <BaseInput v-model="editNa.reason" label="Reason for the change" />
+          <BaseSelect
+            v-model="editNa.reasonId"
+            label="Reason for the change"
+            required
+            placeholder="Pick a reason"
+            :options="changeReasons.map((r) => ({ value: r.id, label: r.label }))"
+          />
+          <BaseTextarea v-model="editNa.note" label="Note" :rows="2" />
           <div class="flex gap-2">
             <Button
               type="submit"
               label="Save change"
               size="small"
-              :disabled="store.saving || !editNa.reason.trim()"
+              :disabled="store.saving || !editNa.reasonId"
             />
             <Button
               type="button"
@@ -356,264 +371,48 @@ async function submitEditNa() {
       </TabList>
     </Tabs>
 
-    <!-- Timeline entries (newest first, expandable, cancelled versions kept) -->
-    <EmptyState
-      v-if="!entries.length"
-      icon="pi pi-phone"
-      :title="tab === 'all' ? 'No calls or visits yet' : 'Nothing here yet'"
-      body="The story starts with the first logged call."
-    />
-    <ol v-else class="mt-3 space-y-0">
-      <li
-        v-for="(e, i) in entries"
-        :key="keyOf(e)"
-        class="relative flex gap-3 pb-5 last:pb-0"
-      >
-        <span
-          v-if="i < entries.length - 1"
-          class="absolute left-4 top-9 h-[calc(100%-2rem)] w-px -translate-x-1/2 bg-line"
-          aria-hidden="true"
+    <!-- Timeline entries (newest first, expandable, cancelled versions kept).
+         LogTimeline owns the per-entry design; the visit "Complete" affordance
+         is injected through its #actions slot. -->
+    <LogTimeline
+      :entries="entries"
+      :empty-title="tab === 'all' ? 'No calls or visits yet' : 'Nothing here yet'"
+      empty-body="The story starts with the first logged call."
+    >
+      <template #actions="{ entry: e }">
+        <Button
+          v-if="e.kind === 'visit' && e.data.status !== 'cancelled' && canComplete(e.data) && !e.data.is_completed && !frozen"
+          label="Complete"
+          icon="pi pi-check"
+          size="small"
+          outlined
+          @click="completing = e.data"
         />
-        <span
-          class="z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs"
-          :class="
-            isCancelled(e.data)
-              ? 'bg-surface-100 text-mute dark:bg-surface-800'
-              : e.kind === 'call'
-                ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300'
-                : e.kind === 'action'
-                  ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300'
-                  : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
-          "
-        >
-          <i
-            :class="
-              e.kind === 'call'
-                ? 'pi pi-phone'
-                : e.kind === 'action'
-                  ? 'pi pi-flag'
-                  : e.data.type === 'in_site'
-                    ? 'pi pi-map-marker'
-                    : 'pi pi-building'
-            "
-            aria-hidden="true"
-          />
-        </span>
-
-        <div class="min-w-0 flex-1 pt-0.5">
-          <!-- Summary line -->
-          <div class="flex flex-wrap items-start justify-between gap-2">
-            <div class="min-w-0" :class="{ 'opacity-70': isCancelled(e.data) }">
-              <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                <span
-                  class="font-semibold text-ink"
-                  :class="{ 'line-through': isCancelled(e.data) }"
-                >
-                  <template v-if="e.kind === 'call'">
-                    Call
-                    <i
-                      :class="
-                        e.data.direction === 'in' ? 'pi pi-arrow-down-left' : 'pi pi-arrow-up-right'
-                      "
-                      class="text-[10px] text-mute"
-                      :title="e.data.direction === 'in' ? 'Incoming' : 'Outgoing'"
-                      aria-hidden="true"
-                    />
-                  </template>
-                  <template v-else-if="e.kind === 'action'">
-                    Planned {{ humanize(e.data.type) }}
-                  </template>
-                  <template v-else>{{ humanize(e.data.type) }} visit</template>
-                </span>
-                <StatusTag v-if="isCancelled(e.data)" value="cancelled" />
-                <StatusTag
-                  v-else-if="e.kind === 'visit'"
-                  :value="e.data.is_completed ? 'completed' : 'scheduled'"
-                />
-                <StatusTag v-else-if="e.kind === 'action'" :value="e.data.state" />
-                <span v-if="e.data.edited" class="text-xs italic text-mute" :title="e.data.edit_reason">
-                  edited
-                </span>
-              </p>
-              <p class="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-mute">
-                <span>{{ formatDateTime(e.at) }}</span>
-                <span v-if="e.kind === 'visit' && e.data.unit">
-                  · {{ e.data.unit.reference }}
-                  <template v-if="e.data.unit.property_type">({{ e.data.unit.property_type }})</template>
-                </span>
-                <span v-if="e.data.agent">· {{ e.data.agent.name }}</span>
-                <span v-if="e.data.assigned_to">· {{ e.data.assigned_to.name }}</span>
-                <span v-if="e.data.outcome">· {{ e.data.outcome.label }}</span>
-              </p>
-            </div>
-            <span class="flex shrink-0 items-center gap-1">
-              <Button
-                v-if="e.kind === 'visit' && !isCancelled(e.data) && canComplete(e.data) && !e.data.is_completed"
-                label="Complete"
-                icon="pi pi-check"
-                size="small"
-                outlined
-                @click="completing = e.data"
-              />
-              <Button
-                :icon="isExpanded(e) ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
-                text
-                rounded
-                size="small"
-                severity="secondary"
-                :aria-label="isExpanded(e) ? 'Collapse details' : 'Expand details'"
-                @click="toggle(e)"
-              />
-            </span>
-          </div>
-
-          <p
-            v-if="e.data.notes && !isExpanded(e)"
-            class="mt-1 line-clamp-2 whitespace-pre-line text-sm text-mute"
-          >
-            {{ e.data.notes }}
-          </p>
-
-          <!-- Expanded: the full detail of the log -->
-          <div
-            v-if="isExpanded(e)"
-            class="mt-2 space-y-3 rounded-xl border border-line bg-surface-50 p-3 text-sm dark:bg-surface-800/50"
-          >
-            <dl class="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
-              <template v-if="e.kind === 'call'">
-                <div class="flex justify-between gap-2">
-                  <dt class="text-mute">Direction</dt>
-                  <dd class="text-ink">{{ e.data.direction === 'in' ? 'Incoming' : 'Outgoing' }}</dd>
-                </div>
-                <div class="flex justify-between gap-2">
-                  <dt class="text-mute">Called at</dt>
-                  <dd class="text-ink">{{ formatDateTime(e.data.called_at) }}</dd>
-                </div>
-                <div v-if="e.data.topics?.length" class="flex justify-between gap-2 sm:col-span-2">
-                  <dt class="text-mute">Topics</dt>
-                  <dd class="text-right text-ink">{{ e.data.topics.join(', ') }}</dd>
-                </div>
-              </template>
-
-              <template v-else-if="e.kind === 'visit'">
-                <div class="flex justify-between gap-2">
-                  <dt class="text-mute">Scheduled</dt>
-                  <dd class="text-ink">{{ formatDateTime(e.data.scheduled_at) }}</dd>
-                </div>
-                <div class="flex justify-between gap-2">
-                  <dt class="text-mute">Completed</dt>
-                  <dd class="text-ink">{{ e.data.completed_at ? formatDateTime(e.data.completed_at) : '—' }}</dd>
-                </div>
-                <div v-if="e.data.unit" class="flex justify-between gap-2 sm:col-span-2">
-                  <dt class="text-mute">Property</dt>
-                  <dd class="text-right text-ink">
-                    {{
-                      [
-                        e.data.unit.reference,
-                        e.data.unit.property_type,
-                        e.data.unit.floor,
-                        e.data.unit.area_sqm ? `${e.data.unit.area_sqm} m²` : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')
-                    }}
-                    <template v-if="e.data.unit.location?.name"> — {{ e.data.unit.location.name }}</template>
-                  </dd>
-                </div>
-                <div v-if="e.data.checklist?.length" class="flex justify-between gap-2 sm:col-span-2">
-                  <dt class="text-mute">Checklist</dt>
-                  <dd class="text-right text-ink">{{ checklistLabels(e.data.checklist).join(', ') }}</dd>
-                </div>
-                <div v-if="e.data.type === 'in_site' && mapsUrl(e.data)" class="sm:col-span-2">
-                  <a
-                    :href="mapsUrl(e.data)"
-                    target="_blank"
-                    rel="noopener"
-                    class="inline-flex items-center gap-1.5 text-primary-600 hover:underline dark:text-primary-400"
-                  >
-                    <i class="pi pi-map" aria-hidden="true" /> Open the site in Google Maps
-                  </a>
-                </div>
-              </template>
-
-              <template v-else>
-                <div class="flex justify-between gap-2">
-                  <dt class="text-mute">Due</dt>
-                  <dd class="text-ink">{{ formatDateTime(e.data.due_at) }}</dd>
-                </div>
-                <div class="flex justify-between gap-2">
-                  <dt class="text-mute">Completed</dt>
-                  <dd class="text-ink">{{ e.data.completed_at ? formatDateTime(e.data.completed_at) : '—' }}</dd>
-                </div>
-              </template>
-
-              <div v-if="e.data.agent || e.data.assigned_to" class="flex justify-between gap-2">
-                <dt class="text-mute">{{ e.kind === 'action' ? 'Assigned to' : 'Agent' }}</dt>
-                <dd class="text-ink">{{ e.data.agent?.name ?? e.data.assigned_to?.name }}</dd>
-              </div>
-              <div v-if="e.data.outcome" class="flex justify-between gap-2">
-                <dt class="text-mute">Outcome</dt>
-                <dd class="text-ink">{{ e.data.outcome.label }}</dd>
-              </div>
-              <div v-if="e.data.created_at" class="flex justify-between gap-2">
-                <dt class="text-mute">Logged</dt>
-                <dd class="text-ink">{{ formatDateTime(e.data.created_at) }}</dd>
-              </div>
-              <div v-if="isCancelled(e.data) && e.data.cancellation_reason" class="flex justify-between gap-2 sm:col-span-2">
-                <dt class="text-mute">Cancelled because</dt>
-                <dd class="text-right font-medium text-danger">{{ e.data.cancellation_reason }}</dd>
-              </div>
-            </dl>
-
-            <p v-if="e.data.notes" class="whitespace-pre-line border-t border-line pt-2 text-ink">
-              {{ e.data.notes }}
-            </p>
-
-            <!-- Previous versions: the cancelled originals this log replaced. -->
-            <div v-if="e.data.previous_versions?.length" class="border-t border-line pt-2">
-              <p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-mute">
-                Previous versions
-              </p>
-              <ol class="space-y-1.5">
-                <li
-                  v-for="v in e.data.previous_versions"
-                  :key="v.id"
-                  class="rounded-lg border border-dashed border-line px-2.5 py-2 opacity-75"
-                >
-                  <p class="flex flex-wrap items-center gap-x-2 text-xs">
-                    <StatusTag value="cancelled" />
-                    <span class="text-mute line-through">
-                      {{ formatDateTime(e.kind === 'call' ? v.called_at : e.kind === 'action' ? v.due_at : v.scheduled_at) }}
-                      <template v-if="v.agent?.name || v.assigned_to?.name">
-                        · {{ v.agent?.name ?? v.assigned_to?.name }}</template
-                      >
-                      <template v-if="v.outcome"> · {{ v.outcome.label }}</template>
-                    </span>
-                    <span v-if="v.cancellation_reason" class="text-mute">
-                      — {{ v.cancellation_reason }}
-                    </span>
-                  </p>
-                  <p v-if="v.notes" class="mt-1 whitespace-pre-line text-xs text-mute">
-                    {{ v.notes }}
-                  </p>
-                </li>
-              </ol>
-            </div>
-          </div>
-        </div>
-      </li>
-    </ol>
+      </template>
+    </LogTimeline>
 
     <!-- Log call — the fast-entry qualification form (properties / desire). -->
     <BaseModal v-if="showCall" title="Log a call" @close="showCall = false">
       <CallLogForm
         :client="store.current"
+        :project-id="projectId"
         :field-agents="store.agents"
         :saving="store.saving"
         :desire="store.desire"
         :draft-key="callDraftKey"
         @submit="submitCall"
         @cancel="showCall = false"
+      />
+    </BaseModal>
+
+    <!-- Add apartment(s) to visit, standalone — picks + date go out as in-site
+         visit(s) (assigned by a dispatcher, else pooled for the board). -->
+    <BaseModal v-if="showAddUnit" title="Add unit to visit" @close="showAddUnit = false">
+      <AddUnitVisitForm
+        :field-agents="store.agents"
+        :saving="store.saving"
+        @submit="submitAddUnit"
+        @cancel="showAddUnit = false"
       />
     </BaseModal>
 
@@ -628,6 +427,9 @@ async function submitEditNa() {
         :field-agents="store.agents"
         :saving="store.saving"
         :can-deal="auth.can('visits.conduct')"
+        :can-manage-shortlist="auth.can('shortlist.manage')"
+        :is-last-in-site="completingIsLastInSite"
+        :deal-settled="dealSettled"
         :draft-key="completeDraftKey(completing)"
         @submit="submitComplete"
         @cancel="completing = null"

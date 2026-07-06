@@ -29,7 +29,12 @@ class StoreLocationRequest extends FormRequest
             'code' => ['required', 'string', 'max:255', 'unique:locations,code'],
             'wilaya_id' => ['nullable', 'integer', 'exists:wilayas,id'],
             'commune_id' => ['nullable', 'integer', 'exists:communes,id'],
+            'type_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
             'contract_type_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
+            // Financing / payment options the project offers buyers
+            // (`project_payment_methods` items) — a project may offer several.
+            'payment_method_ids' => ['nullable', 'array'],
+            'payment_method_ids.*' => ['integer', 'exists:dynamic_list_items,id'],
             'address' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'expected_delivery_date' => ['nullable', 'date'],

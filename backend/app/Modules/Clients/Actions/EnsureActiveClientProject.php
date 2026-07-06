@@ -26,6 +26,20 @@ class EnsureActiveClientProject
 
     public function handle(Client $client): ClientProject
     {
+        $project = $this->resolveProject($client);
+
+        // The client is back in an active pipeline, so they are no longer
+        // "waiting" — close out the desire-board entry (Desire Matches / the
+        // client's own matches tab) so a reconnected client doesn't keep
+        // resurfacing there. UpsertDesire revives a cancelled row if the client
+        // is later shifted back to the desire list.
+        $client->desire()->active()->first()?->cancel('Reconnected — back in an active project');
+
+        return $project;
+    }
+
+    private function resolveProject(Client $client): ClientProject
+    {
         $open = $client->projects()->active()
             ->whereNotIn('stage', [ClientProjectStage::Won->value, ClientProjectStage::Lost->value])
             ->orderBy('id')

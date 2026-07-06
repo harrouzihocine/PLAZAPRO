@@ -54,10 +54,21 @@ class SyncShortlist
                 }
             }
 
-            ShortlistItem::query()->active()
+            $toDrop = ShortlistItem::query()->active()
                 ->where('client_project_id', $project->id)
                 ->whereNotIn('id', $keep)
-                ->get()->each->cancel('Removed from shortlist');
+                ->get();
+
+            foreach ($toDrop as $item) {
+                $reason = $item->lockedReason();
+                abort_if(
+                    $reason !== null,
+                    422,
+                    "This property is {$reason} on an open deal and can't be removed from the shortlist until it's released.",
+                );
+            }
+
+            $toDrop->each->cancel('Removed from shortlist');
 
             return $project->shortlistItems()->active()->with('shortlistable')->get();
         });

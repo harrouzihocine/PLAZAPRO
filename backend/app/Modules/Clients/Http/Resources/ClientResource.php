@@ -16,8 +16,10 @@ class ClientResource extends JsonResource
     public function toArray(Request $request): array
     {
         // clients.view_details: without it a user sees only who the client IS
-        // (name + status) — no phone, email, notes or profile fields.
-        $canSeeDetails = (bool) $request->user()?->can('clients.view_details');
+        // (name + status) — no phone, email, notes or profile fields. A per-client
+        // detail grant (from a supervised duplicate-share) also unlocks details.
+        $user = $request->user();
+        $canSeeDetails = $user !== null && $this->resource->isDetailVisibleTo($user);
 
         // Client ownership (who it's assigned to, and who created it, when) is
         // back-office-only — gated by clients.manage, held by super-admin / admin
@@ -33,9 +35,6 @@ class ClientResource extends JsonResource
             'phone' => $this->when($canSeeDetails, $this->phone),
             'email' => $this->when($canSeeDetails, $this->email),
             'notes' => $this->when($canSeeDetails, $this->notes),
-            // Ids of property_interests items — the FE maps them to labels via the
-            // property_interests dynamic list it already loads.
-            'interests' => $this->when($canSeeDetails, fn () => $this->interests ?? []),
             // Who told the client about the project (source = referral).
             'referrer_name' => $this->when($canSeeDetails, $this->referrer_name),
             'referrer_phone' => $this->when($canSeeDetails, $this->referrer_phone),
@@ -53,6 +52,7 @@ class ClientResource extends JsonResource
                 'id' => $this->source->id,
                 'label' => $this->source->label,
                 'value' => $this->source->value,
+                'icon' => $this->source->meta['icon'] ?? null,
             ] : null)),
             'rating' => $this->when($canSeeDetails, fn () => $this->whenLoaded('rating', fn () => $this->rating ? [
                 'id' => $this->rating->id,

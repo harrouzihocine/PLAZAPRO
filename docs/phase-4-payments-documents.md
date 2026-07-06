@@ -45,7 +45,7 @@ This phase handles money, so the traceability foundations matter most here. Buil
 ### 5. Archive‑only‑without‑payments — the key rule
 - **Rule:** a `client_project` (or unit) may be archived only if it has **no active versements**; the
   archive Action checks and refuses otherwise. (One of the guide's named test rules.)
-- **Permissions:** `clients.manage`.
+- **Permissions:** `projects.manage` (project archive/reactivate; split out of `clients.manage`).
 
 ---
 

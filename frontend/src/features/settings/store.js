@@ -32,8 +32,25 @@ export const useAuthStore = defineStore('auth', {
       useDraftsStore().reset()
     },
 
-    async login(email, password) {
-      this.setUser(await authApi.login(email, password))
+    async login(login, password) {
+      this.setUser(await authApi.login(login, password))
+      return this.user
+    },
+
+    // Self-service profile edits. Each returns the refreshed user (with role +
+    // permissions) so the header, avatar and any `can()` checks stay in sync.
+    async updateProfile(payload) {
+      this.setUser(await authApi.updateProfile(payload))
+      return this.user
+    },
+
+    async uploadAvatar(file) {
+      this.setUser(await authApi.uploadAvatar(file))
+      return this.user
+    },
+
+    async removeAvatar() {
+      this.setUser(await authApi.removeAvatar())
       return this.user
     },
 

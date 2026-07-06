@@ -19,7 +19,6 @@ import { formatPhone } from '@/data/countryCodes'
 import { formatDate, formatDateTime, humanize, initials } from '@/utils/format'
 import { formatMoney } from '@/features/payments/money'
 import ShareToChat from '@/features/collaboration/components/ShareToChat.vue'
-import TimelinePanel from '@/features/pipeline/components/TimelinePanel.vue'
 
 // The client file, project-centric: the profile on one side and the PROJECTS the
 // client is engaging with on the other. Each project card is a DOOR — it opens
@@ -35,6 +34,9 @@ const router = useRouter()
 // gated by clients.manage (super-admin / admin / manager).
 const canSeeOwnership = () => auth.can('clients.manage')
 const canManage = () => auth.can('clients.manage')
+// Opening a NEW project is part of the agent's lead workflow — its own grant,
+// held by agents alongside clients.create.
+const canCreateProject = () => auth.can('projects.create')
 // Without clients.view_details only the client's name is shown (no phone/profile).
 const canSeeDetails = () => auth.can('clients.view_details')
 
@@ -46,7 +48,9 @@ const activeProjects = computed(() => store.projects)
 const closedProjects = computed(() => store.archivedProjects)
 
 const unitLine = (u) =>
-  [u.reference, u.type, u.floor, u.area_sqm ? `${u.area_sqm} m²` : null].filter(Boolean).join(' · ')
+  [u.reference, u.type, u.room_number, u.floor, u.area_sqm ? `${u.area_sqm} m²` : null]
+    .filter(Boolean)
+    .join(' · ')
 
 // Opens WhatsApp (app or web) with the client's number — digits only, E.164.
 const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, '')}`
@@ -180,7 +184,15 @@ async function submitNewProject(callPayload) {
             <dl v-if="canSeeDetails()" class="space-y-2.5 text-sm">
               <div class="flex justify-between gap-2">
                 <dt class="text-mute">Source</dt>
-                <dd class="text-ink">{{ store.current.source?.label ?? '—' }}</dd>
+                <dd class="flex items-center gap-1.5 text-ink">
+                  <i
+                    v-if="store.current.source?.icon"
+                    :class="store.current.source.icon"
+                    class="text-xs text-mute"
+                    aria-hidden="true"
+                  />
+                  {{ store.current.source?.label ?? '—' }}
+                </dd>
               </div>
               <div v-if="store.current.referrer_name || store.current.referrer_phone" class="flex justify-between gap-2">
                 <dt class="text-mute">Referred by</dt>
@@ -288,7 +300,7 @@ async function submitNewProject(callPayload) {
           <SectionCard title="Projects" icon="pi pi-folder">
             <template #actions>
               <Button
-                v-if="canManage()"
+                v-if="canCreateProject()"
                 label="New project"
                 icon="pi pi-plus"
                 size="small"
@@ -320,6 +332,16 @@ async function submitNewProject(callPayload) {
                       <template v-else>Project #{{ p.id }}</template>
                     </span>
                     <StatusTag :value="p.step" />
+                    <!-- Oversight-only: this is a duplicate-resolution "separate
+                         project", a continuation of an earlier engagement rather
+                         than a fresh first-contact. Only view_all sees the link. -->
+                    <span
+                      v-if="p.continued_from"
+                      v-tooltip.top="`Continues project #${p.continued_from.id} — a separate engagement started for another agent on this client`"
+                      class="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-[11px] text-mute"
+                    >
+                      <i class="pi pi-link text-[10px]" aria-hidden="true" /> Continuation
+                    </span>
                   </span>
                   <span class="mt-0.5 block truncate text-xs text-mute">
                     <template v-if="p.location?.name && p.unit"
@@ -403,11 +425,6 @@ async function submitNewProject(callPayload) {
                 </p>
               </div>
             </div>
-          </SectionCard>
-
-          <!-- The client-level story (qualifying calls before any project). -->
-          <SectionCard v-if="!activeProjects.length">
-            <TimelinePanel :client-id="store.current.id" @changed="refresh" />
           </SectionCard>
         </div>
       </div>

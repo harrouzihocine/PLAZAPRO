@@ -2,7 +2,6 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
-import OverlayBadge from 'primevue/overlaybadge'
 import Popover from 'primevue/popover'
 import { useAuthStore } from '@/features/settings/store'
 import { useNotificationsStore } from '@/features/collaboration/notificationsStore'
@@ -27,34 +26,35 @@ async function activate(n) {
   panel.value?.hide()
   if (n.link) router.push(n.link)
 }
+
+// Lazy-load older pages as the panel scrolls near the bottom. loadMore() no-ops
+// if already loading or there's no next page, so no guard is needed here.
+function onScroll(e) {
+  const el = e.target
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 64) {
+    store.loadMore()
+  }
+}
 </script>
 
 <template>
   <div>
-    <OverlayBadge
-      v-if="store.unreadCount > 0"
-      :value="store.unreadCount > 99 ? '99+' : String(store.unreadCount)"
-      severity="danger"
-      size="small"
-    >
+    <span class="relative inline-block">
       <Button
         icon="pi pi-bell"
         text
         rounded
         severity="secondary"
-        :aria-label="`Notifications (${store.unreadCount} unread)`"
+        :aria-label="`Notifications${store.unreadCount > 0 ? ` (${store.unreadCount} unread)` : ''}`"
         @click="panel.toggle($event)"
       />
-    </OverlayBadge>
-    <Button
-      v-else
-      icon="pi pi-bell"
-      text
-      rounded
-      severity="secondary"
-      aria-label="Notifications"
-      @click="panel.toggle($event)"
-    />
+      <span
+        v-if="store.unreadCount > 0"
+        class="pointer-events-none absolute -top-1 -right-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-white"
+      >
+        {{ store.unreadCount > 99 ? '99+' : store.unreadCount }}
+      </span>
+    </span>
 
     <Popover ref="panel" class="w-96 max-w-[92vw]" :pt="{ content: { class: '!p-0' } }">
       <div class="flex items-center justify-between border-b border-line px-4 py-3">
@@ -68,7 +68,7 @@ async function activate(n) {
         />
       </div>
 
-      <div class="max-h-[60vh] overflow-y-auto">
+      <div class="max-h-[60vh] overflow-y-auto" @scroll="onScroll">
         <p v-if="store.loading" class="px-4 py-8 text-center text-sm text-mute">Loading…</p>
         <EmptyState
           v-else-if="store.items.length === 0"
@@ -77,10 +77,10 @@ async function activate(n) {
         />
 
         <ul v-else class="divide-y divide-line">
-          <li v-for="n in store.items" :key="n.id">
+          <li v-for="n in store.items" :key="n.id" class="relative">
             <button
               type="button"
-              class="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-50 dark:hover:bg-surface-800"
+              class="flex w-full items-start gap-3 py-3 pl-4 pr-10 text-left transition-colors hover:bg-surface-50 dark:hover:bg-surface-800"
               @click="activate(n)"
             >
               <span
@@ -99,8 +99,31 @@ async function activate(n) {
                 <span class="mt-0.5 block text-[11px] text-mute">{{ timeAgo(n.created_at) }}</span>
               </span>
             </button>
+
+            <button
+              v-if="!n.read_at"
+              v-tooltip.left="'Mark as read'"
+              type="button"
+              class="absolute right-2 top-3 flex h-6 w-6 items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-700"
+              :aria-label="`Mark '${n.title}' as read`"
+              @click.stop="store.markRead(n.id)"
+            >
+              <i class="pi pi-check text-xs" aria-hidden="true" />
+            </button>
+            <button
+              v-else
+              v-tooltip.left="'Mark as unread'"
+              type="button"
+              class="absolute right-2 top-3 flex h-6 w-6 items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-700"
+              :aria-label="`Mark '${n.title}' as unread`"
+              @click.stop="store.markUnread(n.id)"
+            >
+              <i class="pi pi-undo text-xs" aria-hidden="true" />
+            </button>
           </li>
         </ul>
+
+        <p v-if="store.loadingMore" class="px-4 py-3 text-center text-xs text-mute">Loading more…</p>
       </div>
     </Popover>
   </div>

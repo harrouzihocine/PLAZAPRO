@@ -29,18 +29,16 @@ class Client extends BaseModel
     protected $fillable = [
         'first_name', 'last_name', 'phone', 'email',
         'source_id', 'rating_id', 'referrer_name', 'referrer_phone',
-        'assigned_agent_id', 'notes', 'interests',
+        'assigned_agent_id', 'notes',
         'id_documents', 'id_number', 'birth_date', 'birth_place', 'address',
     ];
 
     /** Shown wherever a client has no captured name yet. */
     public const NO_NAME = 'No name';
 
-    /** @var list<string> Ids of the `property_interests` items the client wants. */
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'interests' => 'array',
             'id_documents' => 'array',
             'birth_date' => 'date:Y-m-d',
         ]);
@@ -118,6 +116,42 @@ class Client extends BaseModel
                     ->whereNull('client_project_viewers.hidden_at'))));
     }
 
+    /**
+     * Match a phone the format-agnostic way: compare the national significant
+     * number (the last 9 digits, after stripping non-digits and any trunk/country
+     * prefix) so "+213555…", "0555…" and "555…" all collide. Used for the
+     * duplicate-client guard. A too-short number never matches (returns nothing).
+     */
+    public function scopeMatchingPhone(Builder $query, ?string $phone): Builder
+    {
+        $digits = preg_replace('/\D/', '', (string) $phone);
+        $nsn = substr((string) $digits, -9);
+
+        if (strlen($nsn) < 8) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereRaw("RIGHT(REGEXP_REPLACE(phone, '[^0-9]', ''), 9) = ?", [$nsn]);
+    }
+
+    /**
+     * Whether a user may see this client's identity/contact fields: the global
+     * clients.view_details permission, OR a per-client detail grant (given when a
+     * supervisor shares a duplicate's details). Short-circuits on the permission,
+     * so users who hold it never hit the grant query.
+     */
+    public function isDetailVisibleTo(User $user): bool
+    {
+        return $user->can('clients.view_details')
+            || $this->detailGrants()->where('user_id', $user->id)->exists();
+    }
+
+    /** Per-user unlocks of THIS client's details (duplicate-share). */
+    public function detailGrants(): HasMany
+    {
+        return $this->hasMany(ClientDetailGrant::class);
+    }
+
     public function source(): BelongsTo
     {
         return $this->belongsTo(DynamicListItem::class, 'source_id');
@@ -162,5 +196,23 @@ class Client extends BaseModel
     public function desire(): HasOne
     {
         return $this->hasOne(Desire::class)->whereNull('client_project_id');
+    }
+
+    /**
+     * True when nothing was ever captured beyond the phone: no project, no call,
+     * no desire. An empty client is a lead someone opened and then abandoned —
+     * the oversight monitor and the "empty client" reminder flag exactly these.
+     */
+    public function isEmpty(): bool
+    {
+        return ! $this->projects()->exists()
+            && ! $this->calls()->exists()
+            && ! $this->desire()->exists();
+    }
+
+    /** No identity captured at all (only a phone) — shows as "No name" everywhere. */
+    public function hasNoName(): bool
+    {
+        return trim((string) $this->last_name.$this->first_name) === '';
     }
 }

@@ -10,18 +10,42 @@ export const useNotificationsStore = defineStore('notifications', {
     items: [],
     unreadCount: 0,
     loading: false,
+    loadingMore: false,
+    page: 1,
+    lastPage: 1,
     subscribed: false,
   }),
+
+  getters: {
+    hasMore: (state) => state.page < state.lastPage,
+  },
 
   actions: {
     async fetch() {
       this.loading = true
       try {
-        const res = await notificationsApi.list()
+        const res = await notificationsApi.list({ page: 1 })
         this.items = res.data
         this.unreadCount = res.unread_count ?? 0
+        this.page = res.meta?.current_page ?? 1
+        this.lastPage = res.meta?.last_page ?? 1
       } finally {
         this.loading = false
+      }
+    },
+
+    // Fetches the next page and appends. Guarded so a scroll handler can call
+    // this freely without tracking pagination state itself.
+    async loadMore() {
+      if (this.loadingMore || !this.hasMore) return
+      this.loadingMore = true
+      try {
+        const res = await notificationsApi.list({ page: this.page + 1 })
+        this.items.push(...res.data)
+        this.page = res.meta?.current_page ?? this.page + 1
+        this.lastPage = res.meta?.last_page ?? this.lastPage
+      } finally {
+        this.loadingMore = false
       }
     },
 
@@ -30,6 +54,15 @@ export const useNotificationsStore = defineStore('notifications', {
       if (item && !item.read_at) {
         const { unread_count } = await notificationsApi.markRead(id)
         item.read_at = new Date().toISOString()
+        this.unreadCount = unread_count
+      }
+    },
+
+    async markUnread(id) {
+      const item = this.items.find((n) => n.id === id)
+      if (item && item.read_at) {
+        const { unread_count } = await notificationsApi.markUnread(id)
+        item.read_at = null
         this.unreadCount = unread_count
       }
     },

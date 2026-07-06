@@ -15,16 +15,24 @@ use Illuminate\Support\Collection;
  * are ancillary), assigned to the chosen field agent. The site agent then fills each
  * one — or adds/removes visits — from there. Idempotent: skips a unit that already
  * has an open in-site visit, so re-completing the office visit won't duplicate them.
+ *
+ * $onlyUnitIds narrows the fan-out to specific apartment(s) — the "same / another
+ * apartment" choice a field agent makes when concluding one visit into the next.
+ * Null visits every shortlisted unit (the office-visit / call-plan default).
  */
 class GenerateInSiteVisits
 {
-    public function handle(ClientProject $project, int $agentId, mixed $scheduledAt, ?int $nextActionId = null): Collection
+    /**
+     * @param  list<int>|null  $onlyUnitIds
+     */
+    public function handle(ClientProject $project, int $agentId, mixed $scheduledAt, ?int $nextActionId = null, ?array $onlyUnitIds = null): Collection
     {
         $created = collect();
 
         $units = $project->shortlistItems()->active()
             ->where('shortlistable_type', 'unit')
             ->whereIn('state', ['shortlisted', 'not_visited'])
+            ->when($onlyUnitIds !== null, fn ($q) => $q->whereIn('shortlistable_id', $onlyUnitIds))
             ->get();
 
         foreach ($units as $item) {

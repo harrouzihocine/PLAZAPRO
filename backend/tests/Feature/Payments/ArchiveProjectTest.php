@@ -43,7 +43,7 @@ class ArchiveProjectTest extends TestCase
 
     private function manager(): User
     {
-        return $this->userWithPermissions(['clients.view', 'clients.manage', 'projects.view_all']);
+        return $this->userWithPermissions(['clients.view', 'projects.manage', 'projects.view_all']);
     }
 
     /** An archive_reasons item id — required to archive a deal. */

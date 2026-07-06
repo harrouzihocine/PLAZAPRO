@@ -42,12 +42,14 @@ class UserTest extends TestCase
         $this->postJson('/api/v1/users', [
             'name' => 'Sam Seller',
             'email' => 'sam@plaza.local',
+            'username' => 'sam',
             'password' => 'Str0ng-Passw0rd!',
             'role_id' => $role->id,
             'department_id' => $dept->id,
         ])
             ->assertCreated()
             ->assertJsonPath('data.email', 'sam@plaza.local')
+            ->assertJsonPath('data.username', 'sam')
             ->assertJsonPath('data.role.id', $role->id)
             ->assertJsonPath('data.department.id', $dept->id);
 

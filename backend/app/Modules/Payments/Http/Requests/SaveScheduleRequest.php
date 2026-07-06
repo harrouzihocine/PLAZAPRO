@@ -23,6 +23,9 @@ class SaveScheduleRequest extends FormRequest
     public function rules(): array
     {
         return [
+            // The won apartment the plan pays for (null only on legacy plans) —
+            // its agreed price is what SaveSchedule reconciles against.
+            'unit_id' => ['nullable', 'integer', 'exists:units,id'],
             'installments' => ['required', 'array', 'min:1'],
             'installments.*.due_date' => ['required', 'date'],
             'installments.*.amount' => ['required', 'numeric', 'gt:0', 'decimal:0,2'],

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Models;
 
 use App\Core\Models\BaseModel;
+use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Inventory\Enums\GtmPriority;
 use App\Modules\Inventory\Enums\HoldStatus;
 use App\Modules\Inventory\Enums\SaleStatus;
+use App\Modules\Inventory\Events\UnitStatusChanged;
 use App\Modules\Settings\Models\DynamicListItem;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -26,8 +28,9 @@ class Unit extends BaseModel
     use HasFactory;
 
     protected $fillable = [
-        'location_id', 'reference', 'type_id', 'floor_id', 'area_sqm',
-        'price', 'sale_status', 'block', 'stack_floor', 'position', 'gtm_priority',
+        'location_id', 'reference', 'room_number_id', 'floor_id', 'area_sqm',
+        'price', 'sale_status', 'onhold_expires_at', 'onhold_project_id',
+        'block', 'stack_floor', 'position', 'gtm_priority',
     ];
 
     protected function casts(): array
@@ -36,8 +39,23 @@ class Unit extends BaseModel
             'price' => 'decimal:2',
             'area_sqm' => 'decimal:2',
             'sale_status' => SaleStatus::class,
+            'onhold_expires_at' => 'datetime',
             'gtm_priority' => GtmPriority::class,
         ]);
+    }
+
+    /**
+     * Mirror every sale_status transition to the public "announcements" channel
+     * so open unit views repaint live for all users (Actions still own the
+     * business rules — this hook carries NO logic, only the broadcast).
+     */
+    protected static function booted(): void
+    {
+        static::updated(function (Unit $unit): void {
+            if ($unit->wasChanged('sale_status') || $unit->wasChanged('onhold_expires_at')) {
+                UnitStatusChanged::dispatch($unit, $unit->wasChanged('sale_status'));
+            }
+        });
     }
 
     public function location(): BelongsTo
@@ -45,9 +63,10 @@ class Unit extends BaseModel
         return $this->belongsTo(Location::class);
     }
 
-    public function type(): BelongsTo
+    /** Number of rooms (a `room_numbers` dynamic-list item), e.g. F2 / F3. */
+    public function roomNumber(): BelongsTo
     {
-        return $this->belongsTo(DynamicListItem::class, 'type_id');
+        return $this->belongsTo(DynamicListItem::class, 'room_number_id');
     }
 
     public function floor(): BelongsTo
@@ -65,12 +84,63 @@ class Unit extends BaseModel
         return $this->hasMany(Reservation::class);
     }
 
-    /** The current active hold, if any (at most one per unit at a time). */
+    /** The client project that has this unit On Hold (paid a deposit), if any. */
+    public function onholdProject(): BelongsTo
+    {
+        return $this->belongsTo(ClientProject::class, 'onhold_project_id');
+    }
+
+    /** The most-recent active hold (the On Hold holder's, or the latest backup). */
     public function activeReservation(): HasOne
     {
         return $this->hasOne(Reservation::class)
             ->where('hold_status', HoldStatus::Active->value)
             ->latest('id');
+    }
+
+    /** All live holds — several projects can reserve the same unit as backups. */
+    public function activeReservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class)
+            ->where('hold_status', HoldStatus::Active->value);
+    }
+
+    /** Any live hold at all (drives whether a unit is still off "available"). */
+    public function hasActiveHold(): bool
+    {
+        return $this->reservations()
+            ->where('hold_status', HoldStatus::Active->value)
+            ->exists();
+    }
+
+    /** Distinct client projects holding this unit — the "Reserved N" counter. */
+    public function reservedCount(): int
+    {
+        return (int) $this->reservations()
+            ->where('hold_status', HoldStatus::Active->value)
+            ->whereNotNull('client_project_id')
+            ->distinct()
+            ->count('client_project_id');
+    }
+
+    /**
+     * Return a unit to the market after a hold ends (deal lost / On Hold lapsed):
+     * clear the On Hold lock and fall back to reserved if backups remain, else
+     * available. Never touches a sold unit (that reversal is ReleaseWonDealUnit).
+     */
+    public function revertToMarket(): void
+    {
+        if ($this->sale_status === SaleStatus::Sold) {
+            return;
+        }
+
+        $this->update([
+            'onhold_expires_at' => null,
+            'onhold_project_id' => null,
+            'sale_status' => $this->hasActiveHold()
+                ? SaleStatus::Reserved->value
+                : SaleStatus::Available->value,
+        ]);
     }
 
     /** Units currently offered for sale. */

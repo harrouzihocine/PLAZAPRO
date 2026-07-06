@@ -20,6 +20,9 @@ class RecordVersementRequest extends FormRequest
     public function rules(): array
     {
         return [
+            // The won apartment the payment tracks (derived from the instalment
+            // when omitted; RecordVersement refuses a mismatch between the two).
+            'unit_id' => ['nullable', 'integer', 'exists:units,id'],
             'amount' => ['required', 'numeric', 'gt:0', 'decimal:0,2'],
             'paid_on' => ['required', 'date'],
             'method_id' => ['required', 'integer', 'exists:dynamic_list_items,id'],

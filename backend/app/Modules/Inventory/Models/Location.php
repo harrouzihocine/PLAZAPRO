@@ -11,6 +11,7 @@ use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\Wilaya;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
@@ -23,8 +24,9 @@ class Location extends BaseModel
     use HasFactory;
 
     protected $fillable = [
-        'name', 'code', 'wilaya_id', 'commune_id', 'contract_type_id', 'address',
+        'name', 'code', 'wilaya_id', 'commune_id', 'type_id', 'contract_type_id', 'address',
         'description', 'expected_delivery_date', 'gtm_priority', 'latitude', 'longitude',
+        'cover_media_id', 'cover_focus_x', 'cover_focus_y',
     ];
 
     protected function casts(): array
@@ -61,10 +63,31 @@ class Location extends BaseModel
         return $this->belongsTo(Commune::class);
     }
 
+    /** The project type (a `project_types` dynamic-list item: open / closed / semi-closed residence). */
+    public function type(): BelongsTo
+    {
+        return $this->belongsTo(DynamicListItem::class, 'type_id');
+    }
+
     /** The sale contract type (a `contract_types` dynamic-list item). */
     public function contractType(): BelongsTo
     {
         return $this->belongsTo(DynamicListItem::class, 'contract_type_id');
+    }
+
+    /**
+     * The financing / payment options this project offers buyers — a set of
+     * `project_payment_methods` dynamic-list items (bank loan, instalments,
+     * cash…). Distinct from how a payment is settled (`payment_methods`).
+     */
+    public function paymentMethods(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            DynamicListItem::class,
+            'location_payment_methods',
+            'location_id',
+            'dynamic_list_item_id',
+        )->withTimestamps();
     }
 
     public function units(): HasMany
@@ -80,5 +103,11 @@ class Location extends BaseModel
     public function media(): MorphMany
     {
         return $this->morphMany(Media::class, 'mediable');
+    }
+
+    /** The chosen cover picture (a row in `media`), shown on the card and hero. */
+    public function coverMedia(): BelongsTo
+    {
+        return $this->belongsTo(Media::class, 'cover_media_id');
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Clients\Models;
 
 use App\Core\Models\BaseModel;
+use App\Modules\Clients\Enums\DealState;
 use App\Modules\Clients\Enums\ShortlistState;
 use App\Modules\Inventory\Models\Box;
 use App\Modules\Inventory\Models\Unit;
@@ -66,5 +67,36 @@ class ShortlistItem extends BaseModel
             'box' => Box::query()->whereKey($id)->exists(),
             default => false,
         };
+    }
+
+    /**
+     * Whether this property is locked to the project by an open deal (reserved
+     * or won) or a deposit-backed On Hold — those can't be dropped from the
+     * shortlist until released. Returns 'reserved' | 'sold' | 'onhold' | null.
+     */
+    public function lockedReason(): ?string
+    {
+        $dealItem = DealItem::query()
+            ->active()
+            ->whereIn('state', [DealState::Reserved->value, DealState::Won->value])
+            ->where($this->shortlistable_type === 'unit' ? 'unit_id' : 'box_id', $this->shortlistable_id)
+            ->whereHas('deal', fn ($q) => $q->active()->where('client_project_id', $this->client_project_id))
+            ->first();
+
+        if ($dealItem) {
+            return $dealItem->state === DealState::Won ? 'sold' : 'reserved';
+        }
+
+        if ($this->shortlistable_type === 'unit') {
+            $onholdProjectId = $this->relationLoaded('shortlistable')
+                ? $this->shortlistable?->onhold_project_id
+                : Unit::query()->whereKey($this->shortlistable_id)->value('onhold_project_id');
+
+            if ($onholdProjectId !== null && (int) $onholdProjectId === $this->client_project_id) {
+                return 'onhold';
+            }
+        }
+
+        return null;
     }
 }

@@ -108,6 +108,36 @@ class ClientTest extends TestCase
             ->assertJsonValidationErrorFor('assigned_agent_id');
     }
 
+    public function test_editing_a_client_keeps_an_already_assigned_invalid_agent(): void
+    {
+        // A client already carries a follow-up agent who is NOT (or is no longer) a
+        // valid one — e.g. a field/site agent assigned before the rule, or an agent
+        // who since lost calls.log. Re-submitting that unchanged id while editing an
+        // unrelated field must pass: the user cannot act on the error and did not
+        // cause it. Only a genuine CHANGE to an invalid agent is rejected.
+        $fieldAgent = $this->userWithPermissions(['clients.view', 'visits.conduct']);
+        $client = Client::factory()->create(['assigned_agent_id' => $fieldAgent->id]);
+        Sanctum::actingAs($this->manager());
+
+        // Editing the rating while echoing back the pre-existing (invalid) agent.
+        $this->putJson("/api/v1/clients/{$client->id}", [
+            'phone' => $client->phone,
+            'assigned_agent_id' => $fieldAgent->id,
+            'notes' => 'Follow up next week.',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.assigned_agent.id', $fieldAgent->id);
+
+        // But switching to a DIFFERENT invalid agent is still rejected.
+        $otherField = $this->userWithPermissions(['clients.view', 'visits.conduct']);
+        $this->putJson("/api/v1/clients/{$client->id}", [
+            'phone' => $client->phone,
+            'assigned_agent_id' => $otherField->id,
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('assigned_agent_id');
+    }
+
     public function test_index_filters_by_agent_and_search(): void
     {
         $agent = $this->agentUser();

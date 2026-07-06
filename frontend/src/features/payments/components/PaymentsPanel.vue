@@ -1,8 +1,10 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import Swal from 'sweetalert2'
 import Button from 'primevue/button'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import MoneyInput from '@/components/base/MoneyInput.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { useDynamicList } from '@/composables/useDynamicList'
@@ -10,11 +12,17 @@ import { documentsApi, scheduleApi, versementsApi } from '@/features/payments/ap
 import { formatMoney } from '@/features/payments/money'
 import { useAuthStore } from '@/features/settings/store'
 import { toastError } from '@/composables/useConfirm'
-import { formatDate } from '@/utils/format'
+import { formatDate, todayInput } from '@/utils/format'
 
+// Payments for ONE apartment on the project (unitId scopes the schedule, the
+// versements and the balance to it — each apartment is tracked alone; null
+// only on legacy project-level plans). `unitLabel` names the apartment in the
+// header when a won deal has several.
 const props = defineProps({
   projectId: { type: [String, Number], required: true },
   totalPrice: { type: [String, Number, null], default: null },
+  unitId: { type: [String, Number], default: null },
+  unitLabel: { type: String, default: null },
 })
 
 const auth = useAuthStore()
@@ -33,8 +41,8 @@ async function load() {
   loading.value = true
   try {
     const [sched, vers] = await Promise.all([
-      scheduleApi.get(props.projectId),
-      versementsApi.list(props.projectId),
+      scheduleApi.get(props.projectId, props.unitId),
+      versementsApi.list(props.projectId, props.unitId),
     ])
     schedule.value = sched
     versements.value = vers.items
@@ -68,7 +76,7 @@ function openBuilder() {
 }
 async function saveSchedule() {
   try {
-    await scheduleApi.save(props.projectId, builder.rows)
+    await scheduleApi.save(props.projectId, builder.rows, props.unitId)
     builder.open = false
     await load()
   } catch (e) {
@@ -98,6 +106,7 @@ function resetRecord() {
 async function recordPayment() {
   try {
     const payload = {
+      unit_id: props.unitId || null,
       amount: recordForm.amount,
       paid_on: recordForm.paid_on,
       method_id: recordForm.method_id,
@@ -147,6 +156,27 @@ async function submitCorrect() {
   }
 }
 
+/* ---- Refund a done payment (money went back; the row stays as history) ---- */
+async function refund(v) {
+  const { value, isConfirmed } = await Swal.fire({
+    title: `Refund ${formatMoney(v.amount)}?`,
+    text: 'The money went back to the client. The payment stays in history flagged refunded and no longer counts toward the balance.',
+    input: 'text',
+    inputPlaceholder: 'Reason *',
+    showCancelButton: true,
+    confirmButtonText: 'Refund',
+    inputValidator: (val) => (!val?.trim() ? 'A reason is required.' : undefined),
+    customClass: { confirmButton: 'plaza-swal-confirm', cancelButton: 'plaza-swal-cancel' },
+  })
+  if (!isConfirmed) return
+  try {
+    await versementsApi.refund(v.id, { reason: value.trim() })
+    await load()
+  } catch (e) {
+    toastError(e.response?.data?.message ?? 'Could not refund the payment.')
+  }
+}
+
 /* ---- Receipt ------------------------------------------------------------- */
 async function receipt(v) {
   try {
@@ -168,7 +198,7 @@ async function receipt(v) {
 </script>
 
 <template>
-  <SectionCard title="Payments" icon="pi pi-wallet">
+  <SectionCard :title="unitLabel ? `Payments — ${unitLabel}` : 'Payments'" icon="pi pi-wallet">
     <template #actions>
       <span
         v-if="meta.balance !== null && meta.balance !== undefined"
@@ -223,8 +253,8 @@ async function receipt(v) {
         <!-- Schedule builder -->
         <div v-if="builder.open" class="mt-3 space-y-3 rounded-xl border border-line p-3">
           <div v-for="(row, i) in builder.rows" :key="i" class="flex items-end gap-2">
-            <BaseInput v-model="row.due_date" type="date" label="Due" class="flex-1" />
-            <BaseInput v-model="row.amount" type="number" label="Amount" class="w-36" />
+            <BaseInput v-model="row.due_date" type="date" label="Due" required :min="todayInput()" class="flex-1" />
+            <MoneyInput v-model="row.amount" label="Amount" required class="w-40" />
             <Button
               icon="pi pi-times"
               text
@@ -277,17 +307,18 @@ async function receipt(v) {
           v-if="recordForm.open"
           class="mb-3 grid gap-3 rounded-xl border border-line p-3 sm:grid-cols-2"
         >
-          <BaseInput v-model="recordForm.amount" type="number" label="Amount" />
-          <BaseInput v-model="recordForm.paid_on" type="date" label="Paid on" />
+          <MoneyInput v-model="recordForm.amount" label="Amount" required />
+          <BaseInput v-model="recordForm.paid_on" type="date" label="Paid on" required />
           <BaseSelect
             v-model="recordForm.method_id"
             label="Method"
+            required
             placeholder="Select…"
             :options="methods.map((m) => ({ value: m.id, label: m.label }))"
           />
           <BaseSelect
             v-model="recordForm.schedule_item_id"
-            label="Instalment (optional)"
+            label="Instalment"
             placeholder="Unallocated"
             :options="
               schedule.map((s) => ({
@@ -316,11 +347,17 @@ async function receipt(v) {
             class="rounded-lg border border-line p-3 text-sm"
           >
             <div class="flex flex-wrap items-center gap-2">
-              <span class="num font-semibold text-ink">{{ formatMoney(v.amount) }}</span>
+              <span
+                class="num font-semibold"
+                :class="v.refunded_at ? 'text-mute line-through' : 'text-ink'"
+              >
+                {{ formatMoney(v.amount) }}
+              </span>
               <span class="text-mute">{{ formatDate(v.paid_on) }}</span>
               <span v-if="v.method" class="text-mute">· {{ v.method.label }}</span>
               <span v-if="v.reference" class="text-mute">· {{ v.reference }}</span>
               <StatusTag v-if="v.supersedes_id" value="corrected" label="corrected" />
+              <StatusTag v-if="v.refunded_at" value="cancelled" label="refunded" />
               <div class="ml-auto flex gap-1">
                 <Button
                   :label="v.document_id ? 'Receipt' : 'Generate receipt'"
@@ -330,7 +367,7 @@ async function receipt(v) {
                   @click="receipt(v)"
                 />
                 <Button
-                  v-if="canCorrect"
+                  v-if="canCorrect && !v.refunded_at"
                   label="Correct"
                   icon="pi pi-history"
                   size="small"
@@ -338,24 +375,40 @@ async function receipt(v) {
                   severity="secondary"
                   @click="startCorrect(v)"
                 />
+                <Button
+                  v-if="canCorrect && !v.refunded_at"
+                  label="Refund"
+                  icon="pi pi-replay"
+                  size="small"
+                  text
+                  severity="danger"
+                  @click="refund(v)"
+                />
               </div>
             </div>
+
+            <p v-if="v.refunded_at" class="mt-1 text-xs text-mute">
+              Refunded {{ formatDate(v.refunded_at) }}<template v-if="v.refunded_by?.name">
+                by {{ v.refunded_by.name }}</template
+              ><template v-if="v.refund_reason"> — {{ v.refund_reason }}</template>
+            </p>
 
             <!-- Correction form -->
             <div
               v-if="correctForm.id === v.id"
               class="mt-3 grid gap-3 border-t border-line pt-3 sm:grid-cols-2"
             >
-              <BaseInput v-model="correctForm.amount" type="number" label="Corrected amount" />
-              <BaseInput v-model="correctForm.paid_on" type="date" label="Paid on" />
+              <MoneyInput v-model="correctForm.amount" label="Corrected amount" required />
+              <BaseInput v-model="correctForm.paid_on" type="date" label="Paid on" required />
               <BaseSelect
                 v-model="correctForm.method_id"
                 label="Method"
+                required
                 :clearable="false"
                 :options="methods.map((m) => ({ value: m.id, label: m.label }))"
               />
               <BaseInput v-model="correctForm.reference" label="Reference" />
-              <BaseInput v-model="correctForm.reason" label="Reason" class="sm:col-span-2" />
+              <BaseInput v-model="correctForm.reason" label="Reason" required class="sm:col-span-2" />
               <div class="flex gap-2 sm:col-span-2">
                 <Button
                   label="Save correction"

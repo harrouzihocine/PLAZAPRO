@@ -25,6 +25,12 @@ export const locationsApi = {
     return data.data
   },
 
+  // Read-only inventory funnel, pipeline and (permission-gated) revenue.
+  async insights(id) {
+    const { data } = await useApi().get(`/locations/${id}/insights`)
+    return data.data
+  },
+
   async create(payload) {
     const { data } = await useApi().post('/locations', payload)
     return data.data
@@ -58,6 +64,19 @@ export const unitsApi = {
 
   async get(id) {
     const { data } = await useApi().get(`/units/${id}`)
+    return data.data
+  },
+
+  // Read-only stats + payments summary for the unit detail page.
+  async insights(id) {
+    const { data } = await useApi().get(`/units/${id}/insights`)
+    return data.data
+  },
+
+  // The interaction logs (calls + visits) of every visible client project that
+  // has touched this unit, grouped per project — the unit page's "Project logs" tab.
+  async projectLogs(id) {
+    const { data } = await useApi().get(`/units/${id}/project-logs`)
     return data.data
   },
 
@@ -148,6 +167,12 @@ export const MEDIA_COLLECTIONS = [
   { key: 'documents', label: 'Documents' },
   { key: 'others', label: 'Others' },
 ]
+
+// Largest file the media library accepts, mirroring the UploadMediaRequest
+// 'max' rule (200 MB) and the PHP upload_max_filesize in docker/php/uploads.ini.
+// Enforced client-side so oversized files fail instantly with a clear message
+// instead of a long upload that PHP rejects with a 413 PostTooLargeException.
+export const MEDIA_MAX_BYTES = 200 * 1024 * 1024
 
 export const mediaApi = {
   async list(mediableType, mediableId, params = {}) {

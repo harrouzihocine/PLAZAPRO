@@ -130,6 +130,11 @@ $permissions = collect([
     'users.manage','roles.manage','settings.manage','audit.view','audit.export',
     'units.view','units.reserve','units.manage','media.manage',
     'clients.view','clients.create','clients.manage',
+    // Client projects & their details are separate groups from the client
+    // record: create/manage the project, plus advance the stage and manage
+    // deals inside it. See phase-3 §2.
+    'projects.create','projects.manage','projects.view_all','projects.contributors','projects.freeze',
+    'projects.advance','deals.direct','deals.manage',
     'calls.log','visits.assign','visits.conduct','tasks.manage',
     'versements.view','versements.record','versements.cancel','documents.generate',
     'chat.use','notifications.view','dashboard.view',
@@ -140,7 +145,7 @@ $admin->permissions()->sync($permissions->pluck('id'));
 
 $agent = Role::firstOrCreate(['slug' => 'agent'], ['name' => 'Agent', 'is_agent' => true]);
 $agent->permissions()->sync(
-    Permission::whereIn('slug', ['units.view','clients.view','clients.create','calls.log',
+    Permission::whereIn('slug', ['units.view','clients.view','clients.create','projects.create','calls.log',
         'visits.conduct','tasks.manage','chat.use','notifications.view','dashboard.view'])->pluck('id')
 );
 

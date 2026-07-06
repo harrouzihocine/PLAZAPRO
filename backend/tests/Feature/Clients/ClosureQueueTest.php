@@ -69,7 +69,7 @@ class ClosureQueueTest extends TestCase
         $client = Client::factory()->create();
         $project = ClientProject::factory()->create(['client_id' => $client->id]);
         $interested = $this->itemInState($project, 'visited_interested');
-        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.manage', 'projects.view_all']));
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'deals.manage', 'projects.view_all']));
 
         $this->postJson("/api/v1/shortlist-items/{$interested->id}/outcome", ['outcome' => 'lost'])
             ->assertSuccessful();

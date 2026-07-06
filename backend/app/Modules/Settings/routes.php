@@ -9,14 +9,17 @@ declare(strict_types=1);
 | Required by routes/api.php inside the /api/v1 prefix group.
 */
 
+use App\Modules\Settings\Http\Controllers\AppSettingController;
 use App\Modules\Settings\Http\Controllers\AuthController;
 use App\Modules\Settings\Http\Controllers\CommuneController;
 use App\Modules\Settings\Http\Controllers\DepartmentController;
 use App\Modules\Settings\Http\Controllers\DynamicListController;
 use App\Modules\Settings\Http\Controllers\DynamicListItemController;
 use App\Modules\Settings\Http\Controllers\PermissionController;
+use App\Modules\Settings\Http\Controllers\ProfileController;
 use App\Modules\Settings\Http\Controllers\RoleController;
 use App\Modules\Settings\Http\Controllers\UserController;
+use App\Modules\Settings\Http\Controllers\UserDraftController;
 use App\Modules\Settings\Http\Controllers\WilayaController;
 use Illuminate\Support\Facades\Route;
 
@@ -31,6 +34,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::delete('/auth/token', [AuthController::class, 'revokeToken']); // mobile logout
+
+    // Self-service profile: the authenticated user editing their own account
+    // (name/email/phone/password) and profile photo. Never touches username,
+    // role or active-state — those are admin-only (see users.manage below).
+    Route::put('/me/profile', [ProfileController::class, 'update']);
+    Route::post('/me/avatar', [ProfileController::class, 'uploadAvatar']);
+    Route::delete('/me/avatar', [ProfileController::class, 'deleteAvatar']);
+
+    // Stream a user's avatar (shown app-wide). Any authed user; the file itself
+    // stays on the private disk and is only reachable through this endpoint.
+    Route::get('/users/{user}/avatar', [UserController::class, 'avatar']);
+
+    // The user's own unsaved-draft metadata (mirror of localStorage; own rows only).
+    Route::get('/me/drafts', [UserDraftController::class, 'index']);
+    Route::post('/me/drafts', [UserDraftController::class, 'upsert']);
+    Route::delete('/me/drafts/{key}', [UserDraftController::class, 'destroy'])->where('key', '.*');
 
     /*
     | Dynamic lists — the reusable dropdown backbone.
@@ -53,9 +72,17 @@ Route::middleware('auth:sanctum')->group(function () {
     // feeds the client "assigned agent" picker. Reference data, any authed user.
     Route::get('/follow-up-agents', [UserController::class, 'followUpAgents']);
 
+    // Project handlers — active users who can open a client project (projects.create);
+    // feeds the archive reactivation hand-off picker. Reference data, any authed user.
+    Route::get('/project-handlers', [UserController::class, 'projectHandlers']);
+
     // Staff directory (id + name of active users) — feeds the "share a project
     // with a colleague" picker. Reference data, any authed user.
     Route::get('/staff', [UserController::class, 'staff']);
+
+    // Scalar app settings (e.g. the reservation hold duration). Read is open —
+    // the UI surfaces the values; writes require settings.manage below.
+    Route::get('/app-settings', [AppSettingController::class, 'index']);
 
     // Wilayas & communes — the geographic hierarchy. Reads feed the location /
     // desire dropdowns, so they are open to any authenticated user; writes below.
@@ -83,6 +110,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/dynamic-lists/{list}/items/reorder', [DynamicListItemController::class, 'reorder']);
         Route::put('/dynamic-lists/{list}/items/{item}', [DynamicListItemController::class, 'update']);
         Route::delete('/dynamic-lists/{list}/items/{item}', [DynamicListItemController::class, 'destroy']);
+
+        Route::put('/app-settings', [AppSettingController::class, 'update']);
 
         Route::post('/departments', [DepartmentController::class, 'store']);
         Route::put('/departments/{department}', [DepartmentController::class, 'update']);

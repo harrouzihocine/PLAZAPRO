@@ -1,40 +1,40 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import BaseButton from '@/components/base/BaseButton.vue'
-import BaseInput from '@/components/base/BaseInput.vue'
+import Button from 'primevue/button'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import DynamicListItemRow from '@/features/settings/components/DynamicListItemRow.vue'
+import ListItemFormModal from '@/features/settings/components/ListItemFormModal.vue'
 import { useDynamicListsStore } from '@/features/settings/dynamicListsStore'
 
 const store = useDynamicListsStore()
 
-const newLabel = ref('')
-const newValue = ref('')
-
 const selected = computed(() => store.selected)
+
+// Modal state: closed, or open on a specific item (null item = creating).
+const modalOpen = ref(false)
+const modalItem = ref(null)
 
 onMounted(() => store.fetchLists())
 
-// Suggest a stable machine value from the label if the user hasn't typed one.
-function suggestValue() {
-  if (!newValue.value) {
-    newValue.value = newLabel.value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '')
-  }
+function openCreate() {
+  modalItem.value = null
+  modalOpen.value = true
 }
 
-async function addItem() {
-  if (!newLabel.value.trim() || !newValue.value.trim()) return
+function openEdit(item) {
+  modalItem.value = item
+  modalOpen.value = true
+}
+
+async function onSave(payload) {
   try {
-    await store.addItem({ label: newLabel.value.trim(), value: newValue.value.trim() })
-    newLabel.value = ''
-    newValue.value = ''
+    if (modalItem.value) await store.updateItem(modalItem.value.id, payload)
+    else await store.addItem(payload) // value omitted → generated server-side
+    modalOpen.value = false
   } catch {
-    /* error is surfaced via store.error */
+    /* error surfaced via store.error toast */
   }
 }
 
@@ -57,7 +57,7 @@ function move(index, dir) {
   <div>
     <PageHeader title="Lists" subtitle="Manage the dropdown options used across the app." />
 
-    <div class="grid grid-cols-1 gap-5 md:grid-cols-[17rem_1fr]">
+    <div class="grid grid-cols-1 gap-5 lg:grid-cols-[15rem_minmax(0,1fr)]">
       <!-- List picker -->
       <SectionCard title="Lists" icon="pi pi-list" flush class="self-start">
         <nav class="flex flex-col gap-0.5 p-2">
@@ -87,16 +87,16 @@ function move(index, dir) {
       <!-- Item manager -->
       <SectionCard v-if="selected">
         <template #header>
-          <div>
+          <div class="min-w-0">
             <h2 class="text-sm font-semibold text-ink">{{ selected.name }}</h2>
-            <p class="mt-0.5 text-xs text-mute">
-              key:
-              <code class="rounded bg-surface-100 px-1 dark:bg-surface-800">{{
-                selected.key
-              }}</code>
+            <p class="mt-0.5 truncate text-xs text-mute">
+              <code class="rounded bg-surface-100 px-1 dark:bg-surface-800">{{ selected.key }}</code>
               <span v-if="selected.description"> — {{ selected.description }}</span>
             </p>
           </div>
+        </template>
+        <template #actions>
+          <Button label="Add item" icon="pi pi-plus" size="small" @click="openCreate" />
         </template>
 
         <div class="space-y-2">
@@ -106,25 +106,26 @@ function move(index, dir) {
             :item="item"
             :is-first="index === 0"
             :is-last="index === store.items.length - 1"
-            @save="(payload) => store.updateItem(item.id, payload)"
+            @edit="openEdit(item)"
             @toggle="toggle(item)"
             @move="(dir) => move(index, dir)"
           />
-          <p v-if="!store.items.length" class="py-4 text-center text-sm text-mute">No items yet.</p>
+          <EmptyState
+            v-if="!store.items.length"
+            icon="pi pi-list"
+            title="No items yet"
+            body="Add the first option for this list."
+          />
         </div>
-
-        <!-- Add item -->
-        <form
-          class="mt-4 flex flex-col gap-2 border-t border-line pt-4 sm:flex-row"
-          @submit.prevent="addItem"
-        >
-          <BaseInput v-model="newLabel" label="Label" class="flex-1" @blur="suggestValue" />
-          <BaseInput v-model="newValue" label="Value" class="flex-1" />
-          <div class="flex items-end">
-            <BaseButton type="submit" :disabled="store.saving">Add item</BaseButton>
-          </div>
-        </form>
       </SectionCard>
     </div>
+
+    <ListItemFormModal
+      v-if="modalOpen"
+      :item="modalItem"
+      :saving="store.saving"
+      @save="onSave"
+      @close="modalOpen = false"
+    />
   </div>
 </template>

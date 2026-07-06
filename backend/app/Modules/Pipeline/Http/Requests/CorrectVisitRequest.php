@@ -52,6 +52,8 @@ class CorrectVisitRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:5000'],
             'checklist' => ['nullable', 'array'],
             'checklist.*' => ['integer', 'distinct', 'exists:dynamic_list_items,id'],
+            'objections' => ['nullable', 'array'],
+            'objections.*' => ['integer', 'distinct', 'exists:dynamic_list_items,id'],
             'outcome_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
         ];
     }

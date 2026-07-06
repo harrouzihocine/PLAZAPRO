@@ -105,17 +105,18 @@ class DesireTest extends TestCase
     {
         $type = DynamicListItem::factory()->create();
         $floor = DynamicListItem::factory()->create();
-        $site = Location::factory()->create();
-        $otherSite = Location::factory()->create();
+        // Project type is a location attribute the units inherit.
+        $site = Location::factory()->create(['type_id' => $type->id]);
+        $otherSite = Location::factory()->create(['type_id' => $type->id]);
 
         $match = Unit::factory()->for($site)->create([
             'reference' => 'OK', 'sale_status' => 'available',
-            'type_id' => $type->id, 'floor_id' => $floor->id, 'area_sqm' => 100, 'price' => 5000000,
+            'floor_id' => $floor->id, 'area_sqm' => 100, 'price' => 5000000,
         ]);
         // Wrong floor / too small / wrong site — all excluded.
-        Unit::factory()->for($site)->create(['reference' => 'X-floor', 'sale_status' => 'available', 'type_id' => $type->id, 'area_sqm' => 100, 'price' => 5000000]);
-        Unit::factory()->for($site)->create(['reference' => 'X-small', 'sale_status' => 'available', 'type_id' => $type->id, 'floor_id' => $floor->id, 'area_sqm' => 50, 'price' => 5000000]);
-        Unit::factory()->for($otherSite)->create(['reference' => 'X-site', 'sale_status' => 'available', 'type_id' => $type->id, 'floor_id' => $floor->id, 'area_sqm' => 100, 'price' => 5000000]);
+        Unit::factory()->for($site)->create(['reference' => 'X-floor', 'sale_status' => 'available', 'area_sqm' => 100, 'price' => 5000000]);
+        Unit::factory()->for($site)->create(['reference' => 'X-small', 'sale_status' => 'available', 'floor_id' => $floor->id, 'area_sqm' => 50, 'price' => 5000000]);
+        Unit::factory()->for($otherSite)->create(['reference' => 'X-site', 'sale_status' => 'available', 'floor_id' => $floor->id, 'area_sqm' => 100, 'price' => 5000000]);
 
         $client = Client::factory()->create();
         $desire = Desire::factory()->create([
@@ -138,19 +139,21 @@ class DesireTest extends TestCase
         $type = DynamicListItem::factory()->create();
         $otherType = DynamicListItem::factory()->create();
 
-        $location = Location::factory()->create(['wilaya_id' => $wilaya->id]);
-        $otherLocation = Location::factory()->create(['wilaya_id' => null]);
+        // Project type is a location attribute — a wrong-type unit lives in a
+        // wrong-type project.
+        $location = Location::factory()->create(['wilaya_id' => $wilaya->id, 'type_id' => $type->id]);
+        $otherLocation = Location::factory()->create(['wilaya_id' => null, 'type_id' => $type->id]);
+        $otherTypeLocation = Location::factory()->create(['wilaya_id' => $wilaya->id, 'type_id' => $otherType->id]);
 
         // The one true match.
         $match = Unit::factory()->for($location)->create([
-            'reference' => 'M-1', 'sale_status' => 'available',
-            'type_id' => $type->id, 'price' => 5000000,
+            'reference' => 'M-1', 'sale_status' => 'available', 'price' => 5000000,
         ]);
         // Excluded for various reasons.
-        Unit::factory()->for($location)->create(['reference' => 'X-sold', 'sale_status' => 'sold', 'type_id' => $type->id, 'price' => 5000000]);
-        Unit::factory()->for($location)->create(['reference' => 'X-pricey', 'sale_status' => 'available', 'type_id' => $type->id, 'price' => 99000000]);
-        Unit::factory()->for($location)->create(['reference' => 'X-type', 'sale_status' => 'available', 'type_id' => $otherType->id, 'price' => 5000000]);
-        Unit::factory()->for($otherLocation)->create(['reference' => 'X-wilaya', 'sale_status' => 'available', 'type_id' => $type->id, 'price' => 5000000]);
+        Unit::factory()->for($location)->create(['reference' => 'X-sold', 'sale_status' => 'sold', 'price' => 5000000]);
+        Unit::factory()->for($location)->create(['reference' => 'X-pricey', 'sale_status' => 'available', 'price' => 99000000]);
+        Unit::factory()->for($otherTypeLocation)->create(['reference' => 'X-type', 'sale_status' => 'available', 'price' => 5000000]);
+        Unit::factory()->for($otherLocation)->create(['reference' => 'X-wilaya', 'sale_status' => 'available', 'price' => 5000000]);
 
         $client = Client::factory()->create();
         Desire::factory()->create([
@@ -170,11 +173,11 @@ class DesireTest extends TestCase
     public function test_matches_are_ranked_by_closeness_to_budget(): void
     {
         $type = DynamicListItem::factory()->create();
-        $location = Location::factory()->create();
+        $location = Location::factory()->create(['type_id' => $type->id]);
 
         // Budget 2M–6M → midpoint 4M. The unit nearest 4M should rank first.
-        $near = Unit::factory()->for($location)->create(['reference' => 'N', 'sale_status' => 'available', 'type_id' => $type->id, 'price' => 4100000]);
-        Unit::factory()->for($location)->create(['reference' => 'F', 'sale_status' => 'available', 'type_id' => $type->id, 'price' => 5900000]);
+        $near = Unit::factory()->for($location)->create(['reference' => 'N', 'sale_status' => 'available', 'price' => 4100000]);
+        Unit::factory()->for($location)->create(['reference' => 'F', 'sale_status' => 'available', 'price' => 5900000]);
 
         $client = Client::factory()->create();
         Desire::factory()->create([

@@ -13,6 +13,8 @@ import {
 
 const props = defineProps({
   label: { type: String, default: '' },
+  // Shows a red "*" after the label. No star = the field is not required.
+  required: { type: Boolean, default: false },
   // Full stored value, e.g. "+213 550112233".
   modelValue: { type: String, default: '' },
   error: { type: String, default: '' },
@@ -80,7 +82,9 @@ function normalizeField() {
 
 <template>
   <label class="block">
-    <span v-if="label" class="mb-1.5 block text-sm font-medium text-ink">{{ label }}</span>
+    <span v-if="label" class="mb-1.5 block text-sm font-medium text-ink"
+      >{{ label }}<span v-if="required" class="text-danger" aria-hidden="true"> *</span></span
+    >
     <div class="flex gap-2">
       <Select
         v-model="dial"

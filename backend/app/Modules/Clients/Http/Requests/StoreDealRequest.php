@@ -31,8 +31,10 @@ class StoreDealRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:5000'],
             'units' => ['required', 'array', 'min:1'],
             'units.*.unit_id' => ['required', 'integer', 'exists:units,id'],
-            // Boxes ride along per apartment: how many to include (0 = none).
-            'units.*.box_count' => ['nullable', 'integer', 'min:0', 'max:100'],
+            // Boxes ride along per apartment: the SPECIFIC boxes to take (each
+            // is linked to the apartment — CreateDeal enforces the link rules).
+            'units.*.box_ids' => ['nullable', 'array'],
+            'units.*.box_ids.*' => ['integer', 'distinct', 'exists:boxes,id'],
         ];
     }
 }

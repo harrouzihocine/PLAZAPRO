@@ -25,7 +25,7 @@ class NextAction extends BaseModel
 
     protected $fillable = [
         'subject_type', 'subject_id', 'source_type', 'source_id',
-        'type', 'due_at', 'assigned_to', 'state', 'completed_at',
+        'type', 'due_at', 'assigned_to', 'target_unit_ids', 'state', 'completed_at',
     ];
 
     protected function casts(): array
@@ -35,6 +35,8 @@ class NextAction extends BaseModel
             'state' => NextActionState::class,
             'due_at' => 'datetime',
             'completed_at' => 'datetime',
+            // The specific apartment(s) an in-site plan targets (else the whole shortlist).
+            'target_unit_ids' => 'array',
         ]);
     }
 

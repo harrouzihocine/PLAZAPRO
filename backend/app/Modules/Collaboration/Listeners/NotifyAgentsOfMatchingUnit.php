@@ -21,7 +21,7 @@ class NotifyAgentsOfMatchingUnit implements ShouldQueue
 
     public function handle(object $event): void
     {
-        $unit = $event->unit;
+        $unit = $event->unit->loadMissing(['floor', 'roomNumber']);
         $isNew = $event instanceof UnitPublished;
 
         $matches = $this->matcher->handle($unit);
@@ -43,10 +43,14 @@ class NotifyAgentsOfMatchingUnit implements ShouldQueue
                 ->unique()
                 ->implode(', ');
 
+            $unitDetails = collect([$unit->roomNumber?->label, $unit->floor?->label])
+                ->filter()
+                ->implode(' · ');
+
             $agent->notify(new DomainNotification(
                 kind: 'unit_match',
                 title: $isNew ? 'New unit matches a client' : 'A matching unit was repriced',
-                body: 'Unit '.$unit->reference.' fits: '.$clients.'.',
+                body: 'Unit '.$unit->reference.($unitDetails !== '' ? ' ('.$unitDetails.')' : '').' fits: '.$clients.'.',
                 link: '/inventory/units/'.$unit->id,
                 subjectType: 'unit',
                 subjectId: $unit->id,

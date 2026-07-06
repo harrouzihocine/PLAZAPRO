@@ -9,6 +9,7 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import { pipelineApi } from '@/features/pipeline/api'
 import { toastError, toastSuccess } from '@/composables/useConfirm'
+import { copyToClipboard } from '@/composables/useClipboard'
 import { formatDateTime, humanize } from '@/utils/format'
 
 // The dispatch board: unassigned in-site plans in the PENDING strip, and one
@@ -371,16 +372,29 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
 
         <!-- Per-site Google Maps links for a pending plan (may span sites). -->
         <div v-if="detailsItem.sites?.length" class="flex flex-wrap gap-x-3 gap-y-1">
-          <a
+          <div
             v-for="(s, i) in detailsItem.sites.filter((x) => x.maps_url)"
             :key="i"
-            :href="s.maps_url"
-            target="_blank"
-            rel="noopener"
-            class="inline-flex items-center gap-1.5 text-xs text-primary-600 hover:underline dark:text-primary-400"
+            class="inline-flex items-center gap-1"
           >
-            <i class="pi pi-map" aria-hidden="true" /> {{ s.name }}
-          </a>
+            <a
+              :href="s.maps_url"
+              target="_blank"
+              rel="noopener"
+              class="inline-flex items-center gap-1.5 text-xs text-primary-600 hover:underline dark:text-primary-400"
+            >
+              <i class="pi pi-map" aria-hidden="true" /> {{ s.name }}
+            </a>
+            <button
+              type="button"
+              title="Copy Maps link"
+              aria-label="Copy Maps link"
+              class="inline-flex items-center text-xs text-primary-600 hover:underline dark:text-primary-400"
+              @click="copyToClipboard(s.maps_url, 'Maps link copied')"
+            >
+              <i class="pi pi-copy" aria-hidden="true" />
+            </button>
+          </div>
         </div>
         <div class="flex items-center gap-3 border-t border-line pt-2">
           <RouterLink
@@ -399,6 +413,16 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
           >
             <i class="pi pi-map" aria-hidden="true" /> Google Maps
           </a>
+          <button
+            v-if="detailsItem.maps_url"
+            type="button"
+            title="Copy Maps link"
+            aria-label="Copy Maps link"
+            class="inline-flex items-center text-primary-600 hover:underline dark:text-primary-400"
+            @click="copyToClipboard(detailsItem.maps_url, 'Maps link copied')"
+          >
+            <i class="pi pi-copy" aria-hidden="true" />
+          </button>
         </div>
       </div>
     </Popover>

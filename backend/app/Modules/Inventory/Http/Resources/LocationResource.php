@@ -30,14 +30,32 @@ class LocationResource extends JsonResource
                 'id' => $this->commune->id,
                 'name' => $this->commune->name,
             ] : null),
+            'type_id' => $this->type_id,
+            'type' => $this->whenLoaded('type', fn () => $this->type?->label),
             'contract_type_id' => $this->contract_type_id,
             'contract_type' => $this->whenLoaded('contractType', fn () => $this->contractType?->label),
+            // Offered payment / financing options (project_payment_methods).
+            // `_ids` drives the multi-select on the edit form; the objects render
+            // the labels on read views.
+            'payment_method_ids' => $this->whenLoaded(
+                'paymentMethods',
+                fn () => $this->paymentMethods->pluck('id')->all(),
+            ),
+            'payment_methods' => $this->whenLoaded(
+                'paymentMethods',
+                fn () => $this->paymentMethods->map(fn ($m) => ['id' => $m->id, 'label' => $m->label])->all(),
+            ),
             'address' => $this->address,
             'description' => $this->description,
             'expected_delivery_date' => $this->expected_delivery_date?->toDateString(),
             'gtm_priority' => $this->gtm_priority?->value,
             'latitude' => $this->latitude,
             'longitude' => $this->longitude,
+            // The cover picture id; the SPA streams it via /api/v1/media/{id}/file.
+            'cover_media_id' => $this->cover_media_id,
+            // Focal point (%), applied as CSS object-position on the card/hero.
+            'cover_focus_x' => (int) $this->cover_focus_x,
+            'cover_focus_y' => (int) $this->cover_focus_y,
             'status' => $this->status?->value,
             'units_count' => $this->whenCounted('units'),
             'created_at' => $this->created_at,

@@ -1,66 +1,212 @@
 <script setup>
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import Swal from 'sweetalert2'
+import Button from 'primevue/button'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
+import StatCard from '@/components/ui/StatCard.vue'
+import StatusTag from '@/components/ui/StatusTag.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import { toastError } from '@/composables/useConfirm'
+import { paymentsOverviewApi } from '@/features/payments/api'
+import { dealsApi } from '@/features/clients/api'
+import { dzdToMil, formatMoney, milToDzd, MIL_LABEL } from '@/features/payments/money'
+import { useAuthStore } from '@/features/settings/store'
+import { formatDate } from '@/utils/format'
 
-// Payments live on each deal (inside the project workspace); this page is the
-// signpost that explains the flow and links there.
-const STEPS = [
-  {
-    icon: 'pi pi-calendar-plus',
-    title: 'Plan',
-    body: "Set an instalment plan that reconciles to the deal's agreed price.",
-  },
-  {
-    icon: 'pi pi-wallet',
-    title: 'Record',
-    body: 'Record payments against instalments; balances are computed server-side.',
-  },
-  {
-    icon: 'pi pi-history',
-    title: 'Correct',
-    body: 'Corrections keep full history (cancel-and-duplicate) — records are never edited.',
-  },
-  {
-    icon: 'pi pi-file-pdf',
-    title: 'Receipt',
-    body: 'Generate a branded receipt PDF for any payment.',
-  },
-]
+// The payment / holding / reservation follow-up hub. Three lists in one place:
+// units On Hold (deposit paid, with a live expiry countdown), units reserved
+// (the "Reserved N" pool), and the instalments to chase across the projects the
+// user may see. A holding can be turned into a sale from here (same win path as
+// the deal panel).
+const auth = useAuthStore()
+const canDeclare = computed(() => auth.can('deals.manage'))
+
+const data = ref({ holdings: [], reservations: [], due: [], totals: {} })
+const loading = ref(false)
+
+async function load() {
+  loading.value = true
+  try {
+    data.value = await paymentsOverviewApi.get()
+  } catch (e) {
+    toastError(e.response?.data?.message ?? 'Could not load the payments overview.')
+  } finally {
+    loading.value = false
+  }
+}
+onMounted(load)
+
+// Live On-hold countdown (all rows share one ticking clock).
+const now = ref(Date.now())
+let ticker
+onMounted(() => (ticker = setInterval(() => (now.value = Date.now()), 1000)))
+onUnmounted(() => clearInterval(ticker))
+function remaining(iso) {
+  if (!iso) return null
+  const ms = new Date(iso).getTime() - now.value
+  if (ms <= 0) return 'expiring…'
+  const h = Math.floor(ms / 3.6e6)
+  const m = Math.floor((ms % 3.6e6) / 6e4)
+  return `${h}h ${String(m).padStart(2, '0')}m`
+}
+
+async function declareSold(h) {
+  if (!h.deal_id || !h.item_id) {
+    toastError('No open deal on this unit to close — open the project to sell it.')
+    return
+  }
+  const { value, isConfirmed } = await Swal.fire({
+    title: `${h.reference} — declare sold 🎉`,
+    text: `Agreed price in ${MIL_LABEL} DZD (its boxes included).`,
+    input: 'number',
+    inputValue: h.price ? dzdToMil(h.price) : undefined,
+    inputAttributes: { min: '0', step: '0.01' },
+    showCancelButton: true,
+    confirmButtonText: 'Mark sold',
+    inputValidator: (v) => (!v || Number(v) < 0 ? 'Enter a valid price.' : undefined),
+    customClass: { confirmButton: 'plaza-swal-confirm', cancelButton: 'plaza-swal-cancel' },
+  })
+  if (!isConfirmed) return
+  try {
+    await dealsApi.closeItem(h.deal_id, h.item_id, {
+      outcome: 'won',
+      agreed_price: milToDzd(value),
+    })
+    await load()
+  } catch (e) {
+    toastError(e.response?.data?.message ?? 'Could not declare the sale.')
+  }
+}
+
+const t = computed(() => data.value.totals ?? {})
 </script>
 
 <template>
   <div>
     <PageHeader
       title="Payments"
-      subtitle="Instalment plans, versements and branded receipts are managed on each won deal, inside its project workspace."
+      subtitle="Follow up holdings, reservations and the instalments to chase — across every project."
     />
 
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <SectionCard v-for="s in STEPS" :key="s.title">
-        <span
-          class="flex h-10 w-10 items-center justify-center rounded-lg bg-highlight text-primary-700 dark:text-primary-300"
-        >
-          <i :class="s.icon" aria-hidden="true" />
-        </span>
-        <h2 class="mt-3 text-sm font-semibold text-ink">{{ s.title }}</h2>
-        <p class="mt-1 text-sm text-mute">{{ s.body }}</p>
-      </SectionCard>
+    <div class="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <StatCard label="On hold" :value="t.on_hold ?? 0" icon="pi pi-pause-circle" tone="warning" />
+      <StatCard label="Reserved" :value="t.reserved ?? 0" icon="pi pi-lock" />
+      <StatCard label="Overdue instalments" :value="t.overdue ?? 0" icon="pi pi-exclamation-circle" tone="danger" />
+      <StatCard label="Overdue amount" :value="formatMoney(t.overdue_amount ?? 0)" icon="pi pi-money-bill" tone="danger" />
     </div>
 
-    <SectionCard class="mt-5">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <p class="text-sm text-mute">
-          Open a client, enter the won project, and the payments panel is right there.
-        </p>
-        <RouterLink
-          :to="{ name: 'clients' }"
-          class="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:underline dark:text-primary-400"
-        >
-          Go to clients
-          <i class="pi pi-arrow-right text-xs" aria-hidden="true" />
-        </RouterLink>
-      </div>
+    <!-- Holdings: units off the market on a deposit -->
+    <SectionCard title="On hold (holding deposits)" icon="pi pi-pause-circle" class="mb-5" flush>
+      <DataTable :value="data.holdings" :loading="loading" data-key="id" class="text-sm">
+        <template #empty>
+          <EmptyState icon="pi pi-pause-circle" title="Nothing on hold" body="No unit is currently held on a deposit." />
+        </template>
+        <Column header="Unit">
+          <template #body="{ data: h }">
+            <RouterLink
+              :to="{ name: 'inventory.unit', params: { id: h.id } }"
+              class="font-medium text-ink hover:underline"
+            >
+              {{ h.reference }}
+            </RouterLink>
+            <span v-if="h.location" class="block text-xs text-mute">{{ h.location }}</span>
+          </template>
+        </Column>
+        <Column header="Deposit">
+          <template #body="{ data: h }"><span class="num">{{ formatMoney(h.deposit) }}</span></template>
+        </Column>
+        <Column header="Price">
+          <template #body="{ data: h }"><span class="num text-mute">{{ formatMoney(h.price) }}</span></template>
+        </Column>
+        <Column header="Expires in">
+          <template #body="{ data: h }">
+            <span class="num font-semibold text-warning">{{ remaining(h.onhold_expires_at) ?? '—' }}</span>
+          </template>
+        </Column>
+        <Column header="">
+          <template #body="{ data: h }">
+            <div class="flex justify-end gap-1.5">
+              <RouterLink
+                v-if="h.client_id && h.project_id"
+                :to="{ name: 'clients.project', params: { id: h.client_id, projectId: h.project_id } }"
+              >
+                <Button label="Project" icon="pi pi-external-link" size="small" text severity="secondary" />
+              </RouterLink>
+              <Button
+                v-if="canDeclare && h.deal_id"
+                label="Declare sold"
+                icon="pi pi-trophy"
+                size="small"
+                severity="success"
+                @click="declareSold(h)"
+              />
+            </div>
+          </template>
+        </Column>
+      </DataTable>
+    </SectionCard>
+
+    <!-- Reservations: the "Reserved N" pool -->
+    <SectionCard title="Reserved" icon="pi pi-lock" class="mb-5" flush>
+      <DataTable :value="data.reservations" :loading="loading" data-key="id" class="text-sm">
+        <template #empty>
+          <EmptyState icon="pi pi-lock" title="Nothing reserved" body="No unit is currently reserved." />
+        </template>
+        <Column header="Unit">
+          <template #body="{ data: r }">
+            <RouterLink
+              :to="{ name: 'inventory.unit', params: { id: r.id } }"
+              class="font-medium text-ink hover:underline"
+            >
+              {{ r.reference }}
+            </RouterLink>
+            <span v-if="r.location" class="block text-xs text-mute">{{ r.location }}</span>
+          </template>
+        </Column>
+        <Column header="Held by">
+          <template #body="{ data: r }">
+            <StatusTag value="reserved" :label="`${r.reserved_count} project${r.reserved_count === 1 ? '' : 's'}`" />
+          </template>
+        </Column>
+        <Column header="Price">
+          <template #body="{ data: r }"><span class="num text-mute">{{ formatMoney(r.price) }}</span></template>
+        </Column>
+      </DataTable>
+    </SectionCard>
+
+    <!-- Instalments to chase -->
+    <SectionCard title="Instalments to chase" icon="pi pi-calendar-times" flush>
+      <DataTable :value="data.due" :loading="loading" data-key="id" paginator :rows="15" class="text-sm">
+        <template #empty>
+          <EmptyState icon="pi pi-check-circle" title="Nothing due" body="No overdue or upcoming instalments on your projects." />
+        </template>
+        <Column header="Due">
+          <template #body="{ data: s }">{{ formatDate(s.due_date) }}</template>
+        </Column>
+        <Column header="Unit">
+          <template #body="{ data: s }">{{ s.unit || '—' }}</template>
+        </Column>
+        <Column header="Amount">
+          <template #body="{ data: s }"><span class="num">{{ formatMoney(s.amount) }}</span></template>
+        </Column>
+        <Column header="Balance">
+          <template #body="{ data: s }"><span class="num font-semibold text-ink">{{ formatMoney(s.balance) }}</span></template>
+        </Column>
+        <Column header="State">
+          <template #body="{ data: s }"><StatusTag :value="s.state" /></template>
+        </Column>
+        <Column header="">
+          <template #body="{ data: s }">
+            <RouterLink v-if="s.link" :to="s.link">
+              <Button label="Open" icon="pi pi-external-link" size="small" text severity="secondary" />
+            </RouterLink>
+          </template>
+        </Column>
+      </DataTable>
     </SectionCard>
   </div>
 </template>

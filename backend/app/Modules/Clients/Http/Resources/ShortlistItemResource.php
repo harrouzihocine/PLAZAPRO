@@ -24,6 +24,9 @@ class ShortlistItemResource extends JsonResource
             'note' => $this->note,
             'shortlistable_type' => $this->shortlistable_type,
             'shortlistable_id' => $this->shortlistable_id,
+            // Non-null when an open deal (reserved/won) or an On Hold deposit
+            // pins this property to the project — the FE hides its remove button.
+            'locked_reason' => $this->lockedReason(),
             // The full property card (not just the code): what it is, where it
             // sits, how big, at what price.
             'property' => $this->whenLoaded('shortlistable', fn () => $this->shortlistable ? [
@@ -34,7 +37,9 @@ class ShortlistItemResource extends JsonResource
                 'sale_status' => $this->shortlistable->sale_status?->value,
                 'location_id' => $this->shortlistable->location_id,
                 'location' => $this->shortlistable->location?->name,
-                'property_type' => $this->shortlistable->type?->label,
+                'property_type' => $this->shortlistable_type === 'unit'
+                    ? $this->shortlistable->roomNumber?->label
+                    : $this->shortlistable->type?->label,
                 'floor' => $this->shortlistable_type === 'unit' ? $this->shortlistable->floor?->label : null,
                 'area_sqm' => $this->shortlistable_type === 'unit' ? $this->shortlistable->area_sqm : null,
             ] : null),

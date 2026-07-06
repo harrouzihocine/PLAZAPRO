@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Modules\Pipeline\Http\Controllers;
 
 use App\Modules\Clients\Models\Client;
+use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Pipeline\Actions\CorrectCall;
 use App\Modules\Pipeline\Actions\LogCall;
 use App\Modules\Pipeline\Http\Requests\CorrectCallRequest;
 use App\Modules\Pipeline\Http\Requests\LogCallRequest;
 use App\Modules\Pipeline\Http\Resources\CallResource;
 use App\Modules\Pipeline\Models\Call;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
 
@@ -20,10 +22,28 @@ use Illuminate\Routing\Controller;
  */
 class CallController extends Controller
 {
-    public function index(Client $client): AnonymousResourceCollection
+    public function index(Request $request, Client $client): AnonymousResourceCollection
     {
+        $user = $request->user();
+
+        // A client outside the caller's scope reads as absent (mirrors the client
+        // show / timeline endpoints).
+        abort_unless(
+            Client::query()->visibleTo($user)->whereKey($client->id)->exists(),
+            404,
+        );
+
+        // Only calls on a project the caller can see, plus client-level (no-project)
+        // qualifying calls — so a duplicate-resolution "separate project" stays
+        // siloed: the other agent's calls on the same client never surface here.
+        $projectIds = ClientProject::query()
+            ->where('client_id', $client->id)
+            ->visibleTo($user)
+            ->pluck('id');
+
         $calls = Call::query()
             ->where('client_id', $client->id)
+            ->where(fn ($q) => $q->whereIn('client_project_id', $projectIds)->orWhereNull('client_project_id'))
             ->active()
             ->with(['agent', 'outcome'])
             ->latest('called_at')

@@ -14,11 +14,24 @@ This is the sales heart of the CRM. Build as vertical slices.
 - **Rules:** `assigned_agent_id` must be an **agent** (`is_agent`); `source_id`/`rating_id` from dynamic
   lists; cancel, never delete.
 - **UI:** clients table (searchable by phone/name), client file (profile, desire, timeline, payments).
-- **Permissions:** `clients.view`, `clients.create`, `clients.manage`.
+- **Permissions (the client record only):** `clients.view`, `clients.create`, `clients.manage`
+  (edit/reassign/archive the client). Project and deal work has its own grants — see §2.
 
 ### 2. Client projects (deals)
-- **API:** `/api/v1/clients/{id}/projects` — create/advance stage (`lead→…→won/lost`).
-- **UI:** deal panel on the client file. **Permissions:** `clients.manage`.
+- **API:** `/api/v1/clients/{id}/projects` — open a project; `/projects/{id}` edit/archive/reactivate/
+  shift/remove; `/projects/{id}/advance` moves the stage (`lead→…→won/lost`); deal closure under
+  `/deals/*` and `/shortlist-items/{id}/outcome`.
+- **UI:** deal panel on the client file.
+- **Permissions — split into three groups so client editing can be handed out without project closing:**
+  - *Client projects (the project record & lifecycle):* `projects.create` (open a project),
+    `projects.manage` (edit/archive/reactivate/shift/remove), plus the existing `projects.view_all`,
+    `projects.contributors`, `projects.freeze`.
+  - *Client project details (work inside one project's file):* `projects.advance` (move the stage),
+    `deals.direct` (open a deal without a visit log), `deals.manage` (close a deal/apartment won/lost,
+    release a won apartment, add boxes, record shortlist outcomes).
+  - Legacy note: `projects.create` was split out of `clients.create`; `projects.manage`,
+    `projects.advance` and `deals.manage` were split out of `clients.manage`. The seeder backfills the
+    new grants onto any role that held the legacy one, so nothing loses access on upgrade.
 
 ### 3. Desire + matching
 - **API:** `/api/v1/clients/{id}/desire` (upsert); `GET /api/v1/clients/{id}/matches` →

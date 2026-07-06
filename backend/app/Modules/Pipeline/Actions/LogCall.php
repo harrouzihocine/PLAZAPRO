@@ -38,16 +38,20 @@ class LogCall
         private ReactivateClientProject $reactivateClientProject,
         private AddShortlistItems $addShortlistItems,
         private UpsertDesire $upsertDesire,
+        private ApplyInteractionClosure $applyClosure,
     ) {}
 
     public function handle(Client $client, array $data, User $actor): Call
     {
         return DB::transaction(function () use ($client, $data, $actor) {
             // The call belongs to the deal if one is linked; shortlisting properties
-            // needs a deal to live on, so the open one is found-or-created.
+            // needs a deal to live on, so the open one is found-or-created. A call
+            // that concludes INTO a deal also needs the project up front — the call
+            // is the deal's provenance, so it must ride on the deal's project.
             $project = match (true) {
                 ! empty($data['client_project_id']) => $this->resolveExplicitProject((int) $data['client_project_id']),
-                ! empty($data['properties']) => $this->ensureActiveClientProject->handle($client),
+                ! empty($data['properties']),
+                ($data['closure']['type'] ?? null) === 'deal' => $this->ensureActiveClientProject->handle($client),
                 default => $this->reopenDesireProject($client),
             };
 
@@ -59,6 +63,7 @@ class LogCall
                 'outcome_id' => $data['outcome_id'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'topics' => $data['topics'] ?? null,
+                'objections' => $data['objections'] ?? null,
                 'called_at' => $data['called_at'] ?? now(),
             ]);
 
@@ -84,6 +89,15 @@ class LogCall
                 // No follow-up planned: the call still FULFILS the open plan —
                 // close it, or it lingers pending forever (stuck CTA, reminders).
                 $this->closePendingNextActions->handle($project ?? $client);
+
+                // …and it MUST resolve into an explicit outcome (desire / archive /
+                // deal) — a concluded call never leaves the engagement dangling.
+                // The call itself is the deal's provenance (deals born on the phone).
+                if (! empty($data['closure'])) {
+                    $this->applyClosure->handle(
+                        $project, $client, $data['closure'], $actor, callId: $call->id,
+                    );
+                }
             }
 
             // Return the created instance (not a refetch) so the API responds 201.
@@ -105,6 +119,11 @@ class LogCall
         }
 
         abort_unless($project->isActive(), 422, 'This project is closed — reactivate it before logging on it.');
+
+        // An explicitly frozen project takes no new activity — only payments /
+        // documents continue. (Open deals do NOT freeze the logs: the client may
+        // keep hunting more apartments — one deal per committed apartment.)
+        abort_if($project->isFrozen(), 422, 'This project is frozen — unfreeze it before logging on it.');
 
         return $project;
     }

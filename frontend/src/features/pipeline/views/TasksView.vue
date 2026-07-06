@@ -5,18 +5,23 @@ import Checkbox from 'primevue/checkbox'
 import Tag from 'primevue/tag'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import TimeField from '@/components/base/TimeField.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { useTasksStore } from '@/features/pipeline/tasksStore'
 import { confirmAction } from '@/composables/useConfirm'
+import { todayInput } from '@/utils/format'
 
 const store = useTasksStore()
 
-const inputClass =
-  'w-full rounded-md border border-line bg-card px-3 py-2 min-h-[42px] text-sm text-ink outline-none transition-colors focus:border-primary'
-
-const emptyForm = () => ({ title: '', assigned_to: '', priority: 'normal', due_at: '' })
+const emptyForm = () => ({
+  title: '',
+  assigned_to: '',
+  priority: 'normal',
+  due_date: '',
+  due_time: '',
+})
 const form = reactive(emptyForm())
 
 onMounted(() => store.fetch())
@@ -31,11 +36,14 @@ function isOverdue(task) {
 
 async function quickAdd() {
   if (!form.title.trim()) return
+  // Combine the split date + time back into the datetime the API expects; a bare
+  // date (no time) defaults to the start of that day.
+  const dueAt = form.due_date ? `${form.due_date}T${form.due_time || '00:00'}` : null
   const payload = {
     title: form.title.trim(),
     priority: form.priority,
     assigned_to: form.assigned_to || null,
-    due_at: form.due_at || null,
+    due_at: dueAt,
   }
   try {
     await store.create(payload)
@@ -77,10 +85,11 @@ function formatDue(value) {
 
     <!-- Quick add -->
     <SectionCard title="Quick add" icon="pi pi-plus-circle" class="mb-5">
-      <form class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" @submit.prevent="quickAdd">
+      <form class="grid gap-3 sm:grid-cols-2 lg:grid-cols-6" @submit.prevent="quickAdd">
         <BaseInput
           v-model="form.title"
           label="New task"
+          required
           placeholder="What needs doing?"
           class="lg:col-span-2"
         />
@@ -100,11 +109,19 @@ function formatDue(value) {
             { value: 'high', label: 'High' },
           ]"
         />
-        <label class="block">
-          <span class="mb-1.5 block text-sm font-medium text-ink">Due</span>
-          <input v-model="form.due_at" type="datetime-local" :class="inputClass" aria-label="Due" />
-        </label>
-        <div class="lg:col-span-5">
+        <BaseInput
+          v-model="form.due_date"
+          label="Due date"
+          type="date"
+          :min="todayInput()"
+        />
+        <div class="block">
+          <span class="mb-1.5 block text-sm font-medium text-ink">
+            Time
+          </span>
+          <TimeField v-model="form.due_time" aria-label="Due time" />
+        </div>
+        <div class="lg:col-span-6">
           <Button type="submit" label="Add task" icon="pi pi-plus" :loading="store.saving" />
         </div>
       </form>

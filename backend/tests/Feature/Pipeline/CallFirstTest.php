@@ -61,7 +61,7 @@ class CallFirstTest extends TestCase
         // project row must exist first so the call can attach to it), so project
         // creation itself is NOT gated on a prior call.
         $client = Client::factory()->create();
-        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.manage']));
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.view_all', 'clients.create', 'projects.create']));
 
         $this->postJson("/api/v1/clients/{$client->id}/projects", [])->assertCreated();
     }

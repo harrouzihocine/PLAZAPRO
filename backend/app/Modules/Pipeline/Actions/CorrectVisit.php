@@ -14,7 +14,7 @@ use App\Modules\Pipeline\Models\Visit;
 class CorrectVisit
 {
     /**
-     * @param  array<string, mixed>  $data  changed fillable fields (type, unit_id, scheduled_at, notes, checklist, outcome_id)
+     * @param  array<string, mixed>  $data  changed fillable fields (type, unit_id, scheduled_at, notes, checklist, objections, outcome_id)
      */
     public function handle(Visit $visit, array $data, string $reason): Visit
     {

@@ -7,8 +7,9 @@ namespace App\Modules\Clients\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Re-set the boxes reserved on an open deal (the agent adjusts what the client
- * takes alongside the apartment). Availability is enforced in SyncDealBoxes.
+ * Re-set the boxes riding with ONE apartment on an open deal (the agent adjusts
+ * what the client takes alongside it). Availability and the link-to-apartment
+ * rules are enforced in SyncDealUnitBoxes.
  */
 class SyncDealBoxesRequest extends FormRequest
 {

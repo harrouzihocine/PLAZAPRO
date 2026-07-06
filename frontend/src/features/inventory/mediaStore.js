@@ -1,6 +1,16 @@
 import { defineStore } from 'pinia'
 import { toastError } from '@/composables/useConfirm'
-import { mediaApi } from '@/features/inventory/api'
+import { MEDIA_MAX_BYTES, mediaApi } from '@/features/inventory/api'
+
+// Reject files over the media ceiling before uploading, so the user gets an
+// instant, clear message instead of a stalled upload that PHP kills with a 413.
+const MEDIA_MAX_MB = Math.round(MEDIA_MAX_BYTES / (1024 * 1024))
+function oversized(file) {
+  if (file.size <= MEDIA_MAX_BYTES) return false
+  const mb = (file.size / (1024 * 1024)).toFixed(1)
+  toastError(`"${file.name}" is ${mb} MB — the maximum is ${MEDIA_MAX_MB} MB.`)
+  return true
+}
 
 // State for a mediable's gallery (upload / reorder / replace / remove). Keyed to
 // one mediable at a time (the project or unit currently open).
@@ -53,8 +63,10 @@ export const useMediaStore = defineStore('media', {
     },
 
     async uploadMany(files, collection) {
+      const accepted = files.filter((file) => !oversized(file))
+      if (!accepted.length) return
       await this.run(async () => {
-        for (const file of files) {
+        for (const file of accepted) {
           await mediaApi.upload(this.mediableType, this.mediableId, file, collection)
         }
         this.items = await mediaApi.list(this.mediableType, this.mediableId)
@@ -62,6 +74,7 @@ export const useMediaStore = defineStore('media', {
     },
 
     replace(id, file) {
+      if (oversized(file)) return
       return this.run(async () => {
         await mediaApi.replace(id, file)
         this.items = await mediaApi.list(this.mediableType, this.mediableId)

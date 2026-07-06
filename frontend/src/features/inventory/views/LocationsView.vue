@@ -1,11 +1,11 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
 import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
 import InputText from 'primevue/inputtext'
 import Skeleton from 'primevue/skeleton'
 import BaseInput from '@/components/base/BaseInput.vue'
+import BaseMultiSelect from '@/components/base/BaseMultiSelect.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -15,18 +15,23 @@ import { useAutoFilter } from '@/composables/useAutoFilter'
 import { useDynamicList } from '@/composables/useDynamicList'
 import { useWilayas, useCommunes } from '@/composables/useGeography'
 import { GTM_PRIORITIES } from '@/features/inventory/api'
-import GtmPriorityBadge from '@/features/inventory/components/GtmPriorityBadge.vue'
+import CoverImageUpload from '@/features/inventory/components/CoverImageUpload.vue'
+import LocationCard from '@/features/inventory/components/LocationCard.vue'
 import LocationMap from '@/features/inventory/components/LocationMap.vue'
 import { googleMapsUrl } from '@/features/inventory/googleMaps'
 import { useLocationsStore } from '@/features/inventory/locationsStore'
+import { todayInput } from '@/utils/format'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction } from '@/composables/useConfirm'
-import { formatDate } from '@/utils/format'
+import { copyToClipboard } from '@/composables/useClipboard'
 
 const store = useLocationsStore()
 const auth = useAuthStore()
 const { wilayas } = useWilayas()
+const { items: projectTypes } = useDynamicList('project_types')
 const { items: contractTypes } = useDynamicList('contract_types')
+// Financing / payment options this project offers buyers (multi-select).
+const { items: projectPaymentMethods } = useDynamicList('project_payment_methods')
 // Independent dependent-commune lists for the filter bar and the form.
 const { communes: filterCommunes, load: loadFilterCommunes } = useCommunes()
 const { communes: formCommunes, load: loadFormCommunes } = useCommunes()
@@ -38,13 +43,18 @@ const blank = {
   code: '',
   wilaya_id: '',
   commune_id: '',
+  type_id: '',
   contract_type_id: '',
+  payment_method_ids: [],
   address: '',
   description: '',
   expected_delivery_date: '',
   gtm_priority: 'medium',
   latitude: null,
   longitude: null,
+  cover_media_id: null,
+  cover_focus_x: 50,
+  cover_focus_y: 50,
 }
 const form = reactive({ ...blank })
 const editingId = ref(null)
@@ -89,13 +99,18 @@ function openEdit(loc) {
     code: loc.code,
     wilaya_id: loc.wilaya_id ?? '',
     commune_id: loc.commune_id ?? '',
+    type_id: loc.type_id ?? '',
     contract_type_id: loc.contract_type_id ?? '',
+    payment_method_ids: loc.payment_method_ids ?? [],
     address: loc.address ?? '',
     description: loc.description ?? '',
     expected_delivery_date: loc.expected_delivery_date ?? '',
     gtm_priority: loc.gtm_priority ?? 'medium',
     latitude: loc.latitude ?? null,
     longitude: loc.longitude ?? null,
+    cover_media_id: loc.cover_media_id ?? null,
+    cover_focus_x: loc.cover_focus_x ?? 50,
+    cover_focus_y: loc.cover_focus_y ?? 50,
   })
   loadFormCommunes(loc.wilaya_id)
   editingId.value = loc.id
@@ -109,13 +124,18 @@ async function submit() {
     code: form.code.trim(),
     wilaya_id: form.wilaya_id || null,
     commune_id: form.commune_id || null,
+    type_id: form.type_id || null,
     contract_type_id: form.contract_type_id || null,
+    payment_method_ids: form.payment_method_ids ?? [],
     address: form.address.trim() || null,
     description: form.description.trim() || null,
     expected_delivery_date: form.expected_delivery_date || null,
     gtm_priority: form.gtm_priority,
     latitude: form.latitude ?? null,
     longitude: form.longitude ?? null,
+    cover_media_id: form.cover_media_id ?? null,
+    cover_focus_x: form.cover_focus_x ?? 50,
+    cover_focus_y: form.cover_focus_y ?? 50,
   }
   try {
     if (editingId.value) {
@@ -229,75 +249,15 @@ function toggleArchived() {
     </SectionCard>
 
     <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-      <div
+      <LocationCard
         v-for="loc in store.items"
         :key="loc.id"
-        class="group relative flex flex-col rounded-xl border border-line bg-card p-4 shadow-card transition-all hover:border-primary-300 hover:shadow-pop"
-      >
-        <div class="flex items-start justify-between gap-2">
-          <RouterLink
-            :to="{ name: 'inventory.location', params: { id: loc.id } }"
-            class="min-w-0 after:absolute after:inset-0"
-          >
-            <span class="block truncate font-semibold text-ink group-hover:underline">
-              {{ loc.name }}
-            </span>
-            <span class="num mt-0.5 block text-xs text-mute">{{ loc.code }}</span>
-          </RouterLink>
-          <GtmPriorityBadge v-if="loc.gtm_priority" :priority="loc.gtm_priority" />
-        </div>
-
-        <dl class="mt-3 space-y-1.5 text-sm">
-          <div v-if="loc.wilaya" class="flex items-center gap-2 text-mute">
-            <i class="pi pi-map-marker text-xs" aria-hidden="true" />
-            <span class="truncate">
-              {{ loc.wilaya.name }}<template v-if="loc.commune"> · {{ loc.commune.name }}</template>
-            </span>
-          </div>
-          <div v-if="loc.contract_type" class="flex items-center gap-2 text-mute">
-            <i class="pi pi-file text-xs" aria-hidden="true" />
-            <span class="truncate">{{ loc.contract_type }}</span>
-          </div>
-          <div v-if="loc.expected_delivery_date" class="flex items-center gap-2 text-mute">
-            <i class="pi pi-flag text-xs" aria-hidden="true" />
-            <span>Delivery {{ formatDate(loc.expected_delivery_date) }}</span>
-          </div>
-        </dl>
-
-        <div
-          v-if="canManage"
-          class="relative z-10 mt-auto flex justify-end gap-1 border-t border-line pt-2.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
-        >
-          <Button
-            icon="pi pi-pencil"
-            text
-            rounded
-            size="small"
-            severity="secondary"
-            aria-label="Edit project"
-            @click.prevent="openEdit(loc)"
-          />
-          <Button
-            icon="pi pi-inbox"
-            text
-            rounded
-            size="small"
-            severity="secondary"
-            aria-label="Archive project"
-            @click.prevent="archive(loc)"
-          />
-          <Button
-            icon="pi pi-trash"
-            text
-            rounded
-            size="small"
-            severity="danger"
-            aria-label="Remove project"
-            @click.prevent="remove(loc)"
-          />
-        </div>
-        <div v-else class="mt-1" />
-      </div>
+        :loc="loc"
+        :can-manage="canManage"
+        @edit="openEdit"
+        @archive="archive"
+        @remove="remove"
+      />
     </div>
 
     <!-- Archived projects: hidden by default, reactivatable one by one. -->
@@ -347,8 +307,8 @@ function toggleArchived() {
     >
       <form v-if="canManage" class="space-y-4" @submit.prevent="submit">
         <div class="grid gap-3 sm:grid-cols-2">
-          <BaseInput v-model="form.name" label="Name" />
-          <BaseInput v-model="form.code" label="Code" />
+          <BaseInput v-model="form.name" label="Name" required />
+          <BaseInput v-model="form.code" label="Code" required />
           <BaseSelect
             v-model="form.wilaya_id"
             label="Wilaya"
@@ -363,28 +323,52 @@ function toggleArchived() {
             :options="formCommunes.map((c) => ({ value: c.id, label: c.name }))"
           />
           <BaseSelect
+            v-model="form.type_id"
+            label="Project type"
+            placeholder="— none —"
+            :options="projectTypes.map((t) => ({ value: t.id, label: t.label }))"
+          />
+          <BaseSelect
             v-model="form.contract_type_id"
             label="Contract type"
             placeholder="— none —"
             :options="contractTypes.map((t) => ({ value: t.id, label: t.label }))"
           />
+          <BaseMultiSelect
+            v-model="form.payment_method_ids"
+            label="Payment methods offered"
+            placeholder="— none —"
+            class="sm:col-span-2"
+            :options="projectPaymentMethods.map((m) => ({ value: m.id, label: m.label }))"
+          />
           <div>
             <BaseInput v-model="form.address" label="Address" />
-            <a
-              v-if="mapsUrl"
-              :href="mapsUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="mt-1 inline-flex items-center gap-1 text-sm text-primary-600 hover:underline dark:text-primary-400"
-            >
-              <i class="pi pi-map-marker text-xs" aria-hidden="true" />
-              Open in Google Maps
-            </a>
+            <div v-if="mapsUrl" class="mt-1 flex items-center gap-3">
+              <a
+                :href="mapsUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-1 text-sm text-primary-600 hover:underline dark:text-primary-400"
+              >
+                <i class="pi pi-map-marker text-xs" aria-hidden="true" />
+                Open in Google Maps
+              </a>
+              <button
+                type="button"
+                title="Copy Maps link"
+                aria-label="Copy Maps link"
+                class="inline-flex items-center text-primary-600 hover:underline dark:text-primary-400"
+                @click="copyToClipboard(mapsUrl, 'Maps link copied')"
+              >
+                <i class="pi pi-copy text-xs" aria-hidden="true" />
+              </button>
+            </div>
           </div>
           <BaseInput
             v-model="form.expected_delivery_date"
             label="Expected delivery date"
             type="date"
+            :min="todayInput()"
           />
           <BaseSelect
             v-model="form.gtm_priority"
@@ -393,6 +377,13 @@ function toggleArchived() {
             :options="GTM_PRIORITIES"
           />
         </div>
+        <CoverImageUpload
+          v-if="editingId"
+          v-model="form.cover_media_id"
+          v-model:focus-x="form.cover_focus_x"
+          v-model:focus-y="form.cover_focus_y"
+          :mediable-id="editingId"
+        />
         <div class="space-y-2">
           <Button
             type="button"

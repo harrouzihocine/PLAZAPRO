@@ -31,6 +31,11 @@ trait ValidatesNextAction
             'next_action.due_date' => ['required_with:next_action', 'date'],
             'next_action.due_time' => ['nullable', 'date_format:H:i'],
             'next_action.assigned_to' => $this->assignedToRules(),
+            // An in-site plan may target specific apartment(s) — "same apartment"
+            // (this visit's unit) or "another" (picked from the property picker).
+            // Absent → the plan fans out over every shortlisted unit (legacy).
+            'next_action.unit_ids' => ['nullable', 'array'],
+            'next_action.unit_ids.*' => ['integer', 'distinct', 'exists:units,id'],
         ];
     }
 

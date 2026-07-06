@@ -21,11 +21,14 @@ class BuildStackingPlan
     {
         $units = $location->units()
             ->active()
-            ->with('activeReservation:id,unit_id,expires_at')
+            ->with([
+                'activeReservation:id,unit_id,expires_at',
+                'activeReservations:id,unit_id,client_project_id',
+            ])
             ->orderByDesc('stack_floor')
             ->orderBy('position')
             ->orderBy('reference')
-            ->get(['id', 'reference', 'sale_status', 'price', 'block', 'stack_floor', 'position']);
+            ->get(['id', 'reference', 'sale_status', 'price', 'block', 'stack_floor', 'position', 'onhold_expires_at']);
 
         return $units
             ->groupBy(fn ($unit) => $unit->block ?? 'Unassigned')
@@ -42,7 +45,13 @@ class BuildStackingPlan
                             'price' => $unit->price,
                             'position' => $unit->position,
                             'reservation_id' => $unit->activeReservation?->id,
-                            'expires_at' => $unit->activeReservation?->expires_at,
+                            // Reservation hold countdown, or the On Hold deposit
+                            // countdown when the unit is on hold.
+                            'expires_at' => $unit->sale_status?->value === 'onhold'
+                                ? $unit->onhold_expires_at
+                                : $unit->activeReservation?->expires_at,
+                            'reserved_count' => $unit->activeReservations
+                                ->pluck('client_project_id')->filter()->unique()->count(),
                         ])->values()->all(),
                     ])->values()->all(),
             ])

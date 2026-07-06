@@ -5,6 +5,7 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { toastError } from '@/composables/useConfirm'
 import { shortlistApi } from '@/features/clients/api'
+import { formatMoney } from '@/features/payments/money'
 import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPicker.vue'
 import { useAuthStore } from '@/features/settings/store'
 
@@ -15,7 +16,10 @@ import { useAuthStore } from '@/features/settings/store'
 const props = defineProps({ projectId: { type: [String, Number], required: true } })
 const emit = defineEmits(['changed'])
 const auth = useAuthStore()
-const canEdit = () => auth.can('visits.conduct')
+// Curating the standalone shortlist (add / drop / save) needs shortlist.manage
+// — the same senior grant as the office-visit picker. Everyone else sees it
+// read-only and adds properties via "Add unit to visit".
+const canEdit = () => auth.can('shortlist.manage')
 
 const items = ref([]) // working copy: { shortlistable_type, shortlistable_id, state, property }
 const additions = ref([]) // ProjectUnitsPicker v-model: properties to add on save
@@ -30,7 +34,7 @@ const propertyLine = (it) => {
     p.property_type,
     p.floor,
     p.area_sqm ? `${p.area_sqm} m²` : null,
-    p.price,
+    p.price ? formatMoney(p.price) : null,
     p.location,
   ]
     .filter(Boolean)
@@ -52,6 +56,7 @@ async function load() {
     shortlistable_type: i.shortlistable_type,
     shortlistable_id: i.shortlistable_id,
     state: i.state,
+    locked_reason: i.locked_reason,
     property: i.property,
   }))
   additions.value = []
@@ -103,9 +108,10 @@ async function save() {
           />
           <span class="min-w-0 truncate text-ink">{{ propertyLine(it) }}</span>
           <StatusTag :value="it.state" />
+          <StatusTag v-if="it.locked_reason" :value="it.locked_reason" />
         </span>
         <Button
-          v-if="canEdit() && !['won', 'lost'].includes(it.state)"
+          v-if="canEdit() && !['won', 'lost'].includes(it.state) && !it.locked_reason"
           icon="pi pi-times"
           text
           rounded

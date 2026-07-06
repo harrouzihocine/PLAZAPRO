@@ -117,10 +117,52 @@ const routes = [
         meta: { permission: 'reports.view' },
       },
       {
+        path: 'team-logs',
+        name: 'team-logs',
+        component: () => import('@/features/analytics/views/TeamLogsView.vue'),
+        meta: { permission: 'logs.view_all' },
+      },
+      {
         path: 'audit',
         name: 'audit',
         component: () => import('@/features/analytics/views/AuditView.vue'),
         meta: { permission: 'audit.view' },
+      },
+      {
+        path: 'oversight/duplicates',
+        name: 'oversight.duplicates',
+        component: () => import('@/features/oversight/views/DuplicateRequestsView.vue'),
+        meta: { permission: 'clients.duplicates.resolve' },
+      },
+      {
+        path: 'oversight/clients',
+        name: 'oversight.clients',
+        component: () => import('@/features/oversight/views/OversightClientsView.vue'),
+        meta: { permission: 'oversight.clients' },
+      },
+      {
+        path: 'oversight/pipeline',
+        name: 'oversight.pipeline',
+        component: () => import('@/features/oversight/views/OversightPipelineView.vue'),
+        meta: { permission: 'oversight.pipeline' },
+      },
+      {
+        path: 'oversight/deals',
+        name: 'oversight.deals',
+        component: () => import('@/features/oversight/views/OversightDealsView.vue'),
+        meta: { permission: 'oversight.deals' },
+      },
+      {
+        path: 'oversight/drafts',
+        name: 'oversight.drafts',
+        component: () => import('@/features/oversight/views/OversightDraftsView.vue'),
+        meta: { permission: 'oversight.drafts' },
+      },
+      {
+        path: 'oversight/archive',
+        name: 'oversight.archive',
+        component: () => import('@/features/oversight/views/ArchiveView.vue'),
+        meta: { permission: 'oversight.archive' },
       },
       {
         path: 'settings',
@@ -131,6 +173,12 @@ const routes = [
             path: 'lists',
             name: 'settings.lists',
             component: () => import('@/features/settings/views/ListsView.vue'),
+            meta: { permission: 'settings.manage' },
+          },
+          {
+            path: 'general',
+            name: 'settings.general',
+            component: () => import('@/features/settings/views/GeneralView.vue'),
             meta: { permission: 'settings.manage' },
           },
           {

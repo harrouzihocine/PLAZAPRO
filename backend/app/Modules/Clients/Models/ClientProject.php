@@ -11,7 +11,10 @@ use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Payments\Models\PaymentSchedule;
 use App\Modules\Payments\Models\Versement;
+use App\Modules\Payments\Support\Money;
+use App\Modules\Pipeline\Enums\VisitType;
 use App\Modules\Pipeline\Models\Call;
+use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Settings\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Collection;
 
 /**
@@ -35,13 +39,21 @@ class ClientProject extends BaseModel
     use HasFactory;
 
     protected $fillable = [
-        'client_id', 'location_id', 'unit_id', 'stage', 'total_price', 'closed_to_desire_at',
+        'client_id', 'continued_from_project_id', 'hidden_from_owner',
+        'location_id', 'unit_id', 'stage', 'total_price', 'closed_to_desire_at',
+        'frozen_at', 'frozen_by',
     ];
 
     /**
      * Visibility rule (projects.view_all): without the grant a user sees only
-     * the projects they created plus the ones they were added to as a viewer
-     * (and not since hidden).
+     * the projects they created, the ones they were added to as a viewer (and not
+     * since hidden), plus every project of a client they OWN — its creator or its
+     * assigned agent. A client's own agent is never locked out of that client's
+     * projects, even a project a colleague opened on it.
+     *
+     * Exception: a hidden_from_owner project (a duplicate-resolution "separate
+     * project") is siloed from the client owner — the owner-branch does NOT reach
+     * it. Its own creator still sees it (created_by), and view_all still sees all.
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
@@ -53,7 +65,12 @@ class ClientProject extends BaseModel
             ->where('created_by', $user->id)
             ->orWhereHas('viewers', fn (Builder $v) => $v
                 ->whereKey($user->id)
-                ->whereNull('client_project_viewers.hidden_at')));
+                ->whereNull('client_project_viewers.hidden_at'))
+            ->orWhere(fn (Builder $owner) => $owner
+                ->where('hidden_from_owner', false)
+                ->whereHas('client', fn (Builder $c) => $c
+                    ->where('created_by', $user->id)
+                    ->orWhere('assigned_agent_id', $user->id))));
     }
 
     /**
@@ -75,11 +92,78 @@ class ClientProject extends BaseModel
     public function isVisibleTo(User $user): bool
     {
         return $user->can('projects.view_all')
-            || $this->created_by === $user->id
+            || $this->isContributor($user)
+            || (! $this->hidden_from_owner && $this->isClientOwner($user));
+    }
+
+    /**
+     * The client's own agent: its creator or its assigned agent. Such a user is
+     * never locked out of the client's projects (scopeVisibleTo / isVisibleTo) —
+     * but this is deliberately NOT part of isContributor / contributorIds, so it
+     * does not change who joins the project chat or gets its notifications, nor
+     * does it reveal the collaborator list to a name-only owner.
+     */
+    public function isClientOwner(User $user): bool
+    {
+        return $this->client !== null
+            && ($this->client->created_by === $user->id
+                || $this->client->assigned_agent_id === $user->id);
+    }
+
+    /**
+     * A member OF this project: its creator or a non-hidden viewer. Unlike
+     * isVisibleTo this ignores projects.view_all — an overseer may READ the
+     * project (view-all) without being one of the people actually working it.
+     */
+    public function isContributor(User $user): bool
+    {
+        return $this->created_by === $user->id
             || $this->viewers()
                 ->whereKey($user->id)
                 ->whereNull('client_project_viewers.hidden_at')
                 ->exists();
+    }
+
+    /**
+     * A user tied to this project ONLY by a field-agent dispatch: they hold one
+     * of its (live) in-site visits, but are neither a contributor (creator /
+     * viewer) nor the client's own agent. Their remit is that in-site visit —
+     * they may not log the project's calls or complete its office visits (the
+     * FormRequests enforce it). A contributor, the client owner, or a visit
+     * administrator (visits.assign, layered on by the caller) is never treated
+     * as dispatch-only. Mirrors how the chat grant refuses to downgrade a real
+     * contributor who happens to be the dispatched agent.
+     */
+    public function isDispatchOnlyAgent(User $user): bool
+    {
+        if ($this->isContributor($user) || $this->isClientOwner($user)) {
+            return false;
+        }
+
+        return $this->visits()->active()
+            ->where('type', VisitType::InSite->value)
+            ->where('agent_id', $user->id)
+            ->exists();
+    }
+
+    /**
+     * Whether this project's collaborator identity — who opened it, who can see
+     * it, and its chat — may be revealed to a user. Kept OFF name-only lookers
+     * (no clients.view_details) so a colleague's client cannot be poached: only
+     * the project's own members, the client's own agent, or someone trusted with
+     * the client's details, see who is behind it. Mirrors ClientResource, which
+     * hides the client's contact details and ownership from the very same
+     * population.
+     *
+     * The client OWNER (creator / assigned agent) is included even without
+     * view_details: it is their own client, so seeing who opened each project
+     * and who worked it — the logs' and history's authors — is not poaching.
+     */
+    public function collaboratorsVisibleTo(User $user): bool
+    {
+        return $this->isContributor($user)
+            || $this->isClientOwner($user)
+            || ($this->client?->isDetailVisibleTo($user) ?? false);
     }
 
     protected function casts(): array
@@ -88,12 +172,31 @@ class ClientProject extends BaseModel
             'stage' => ClientProjectStage::class,
             'total_price' => 'decimal:2',
             'closed_to_desire_at' => 'datetime',
+            'frozen_at' => 'datetime',
+            'hidden_from_owner' => 'boolean',
         ]);
+    }
+
+    /** The user who froze this project (projects.freeze). */
+    public function freezer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'frozen_by');
     }
 
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    /**
+     * The earlier project this one continues (duplicate-resolution "separate
+     * project" outcome). Oversight-only: surfaced to projects.view_all holders as
+     * a "continuation of an earlier engagement" marker — never to the finder, who
+     * must not learn the original exists.
+     */
+    public function continuedFrom(): BelongsTo
+    {
+        return $this->belongsTo(ClientProject::class, 'continued_from_project_id');
     }
 
     /** The user who opened this project. */
@@ -141,19 +244,84 @@ class ClientProject extends BaseModel
         return $this->hasMany(ShortlistItem::class);
     }
 
-    /** The deals opened on this project (one active at a time — CreateDeal). */
+    /** The deals opened on this project (several may be open at once). */
     public function deals(): HasMany
     {
         return $this->hasMany(Deal::class);
     }
 
-    /** THE open (reserved) deal, when one exists. */
+    /** The latest open (reserved) deal, when one exists. */
     public function activeDeal(): HasOne
     {
         return $this->hasOne(Deal::class)
             ->where('deals.status', 'active')
             ->where('state', DealState::Reserved->value)
             ->latest('id');
+    }
+
+    /**
+     * The agreed price a payment plan must reconcile to — per apartment. A won
+     * deal item carries the apartment's own agreed price (it covers its boxes);
+     * legacy wins (closed before per-unit tracking) fall back to the project's
+     * stamped unit + total. Null when the unit was never won here.
+     */
+    /**
+     * Re-derive the won stamp from every won apartment across the project's
+     * active deals (a project may carry several). Returns true when at least
+     * one won apartment remains — the project is (still) won and stamped with
+     * the first sold unit + the aggregate agreed total. False leaves the
+     * caller to decide where the project steps back to.
+     */
+    public function restampFromWonDeals(): bool
+    {
+        $won = DealItem::query()->active()
+            ->whereNotNull('unit_id')
+            ->where('state', DealState::Won->value)
+            ->whereHas('deal', fn (Builder $q) => $q
+                ->where('client_project_id', $this->id)
+                ->where('status', 'active'))
+            ->orderBy('id')
+            ->get();
+
+        if ($won->isEmpty()) {
+            return false;
+        }
+
+        $this->update([
+            'stage' => ClientProjectStage::Won->value,
+            'unit_id' => $won->first()->unit_id,
+            'total_price' => $won->reduce(
+                fn (string $sum, DealItem $item) => Money::add($sum, (string) $item->agreed_price),
+                '0.00',
+            ),
+        ]);
+
+        return true;
+    }
+
+    public function agreedPriceForUnit(?int $unitId): ?string
+    {
+        if ($unitId === null) {
+            return $this->total_price !== null ? (string) $this->total_price : null;
+        }
+
+        $item = DealItem::query()->active()
+            ->where('unit_id', $unitId)
+            ->where('state', DealState::Won->value)
+            ->whereNotNull('agreed_price')
+            ->whereHas('deal', fn (Builder $q) => $q
+                ->where('client_project_id', $this->id)
+                ->where('status', 'active'))
+            ->latest('id')
+            ->first();
+
+        if ($item !== null) {
+            return (string) $item->agreed_price;
+        }
+
+        return $this->unit_id !== null && (int) $this->unit_id === $unitId && $this->total_price !== null
+            ? (string) $this->total_price
+            : null;
     }
 
     public function calls(): HasMany
@@ -164,6 +332,12 @@ class ClientProject extends BaseModel
     public function visits(): HasMany
     {
         return $this->hasMany(Visit::class);
+    }
+
+    /** The next-action plans whose subject is this project (for the stuck monitor). */
+    public function nextActions(): MorphMany
+    {
+        return $this->morphMany(NextAction::class, 'subject');
     }
 
     /**
@@ -180,6 +354,20 @@ class ClientProject extends BaseModel
             && ! $this->deals()->exists()
             && ! $this->paymentSchedules()->exists()
             && ! $this->versements()->exists();
+    }
+
+    /**
+     * A frozen project is closed to NEW activity (calls, plans, visits, deals,
+     * chat): it has been archived, cancelled, or EXPLICITLY frozen (frozen_at,
+     * a deliberate projects.freeze act). Payments and documents still flow.
+     * Won no longer freezes by itself — a won project can keep living (the
+     * client may buy another apartment on it); freeze it to close it down.
+     */
+    public function isFrozen(): bool
+    {
+        return $this->isArchived()
+            || $this->isCancelled()
+            || $this->frozen_at !== null;
     }
 
     /**

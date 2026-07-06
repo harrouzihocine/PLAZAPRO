@@ -15,41 +15,51 @@ use App\Modules\Inventory\Actions\ReserveUnit;
 use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Models\Box;
 use App\Modules\Inventory\Models\Unit;
+use App\Modules\Pipeline\Actions\ClosePendingNextActions;
+use App\Modules\Pipeline\Models\Call;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Settings\Models\User;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Open THE deal on a client project from the properties the client is interested
- * in. Workflow rules enforced here:
- *  - one ACTIVE (reserved) deal per project — no deal stacking;
- *  - a deal comes from a visit log (visit_id provenance on this project); creating
- *    one with no visit requires the deals.direct permission;
- *  - only shortlisted properties the client has not rejected can enter the deal
- *    (for a permitted direct deal, the unit is shortlisted on the fly);
- *  - every unit is auto-reserved (48h hold via ReserveUnit) and each requested box
- *    is allocated from the unit's location (available and not taken) and reserved.
+ * Open a deal on a client project from the properties the client is interested
+ * in. A project may carry SEVERAL deals at once — the client can commit to one
+ * apartment per completed in-site visit, each on its own deal (double-reserving
+ * a unit is impossible anyway: ReserveUnit refuses a non-available unit).
+ * Workflow rules enforced here:
+ *  - a deal comes from an interaction log (visit_id / call_id provenance on this
+ *    project); creating one with no log requires the deals.direct permission;
+ *  - a unit the client already rejected cannot enter the deal; a unit not yet
+ *    shortlisted is shortlisted on the fly (added during the log itself);
+ *  - every unit is reserved with a NO-EXPIRY hold (only closing the deal
+ *    releases or converts it) and its boxes ride with it: a box already linked
+ *    to the apartment, or an unlinked one that gets linked here (box_linked,
+ *    reverted if the apartment is lost). A box linked to ANOTHER apartment is
+ *    refused;
+ *  - the deal opening supersedes any pending next-action plan — the project
+ *    falls back to the log-a-call CTA (the logs stay open while the deal lives;
+ *    an in-site visit scheduled for another apartment stays completable on its
+ *    own row).
  */
 class CreateDeal
 {
-    public function __construct(private ReserveUnit $reserveUnit) {}
+    public function __construct(
+        private ReserveUnit $reserveUnit,
+        private ClosePendingNextActions $closePendingNextActions,
+    ) {}
 
     /**
-     * @param  array{visit_id?: int|null, notes?: string|null, units: list<array{unit_id: int, box_count?: int}>}  $data
+     * @param  array{visit_id?: int|null, call_id?: int|null, notes?: string|null, units: list<array{unit_id: int, box_ids?: list<int>}>}  $data
      */
     public function handle(ClientProject $project, array $data, User $actor): Deal
     {
         abort_unless($project->isActive(), 422, 'This project is not active.');
-        abort_if($project->stage === ClientProjectStage::Won, 422, 'This project is already won.');
-        abort_if(
-            $project->deals()->active()->where('state', DealState::Reserved->value)->exists(),
-            422,
-            'This project already has an active deal. Close it (won / lost) first.',
-        );
+        abort_if($project->isFrozen(), 422, 'This project is frozen — unfreeze it before opening a deal.');
 
-        // Provenance: the deal must come from a visit log on this project, unless
-        // the actor holds the direct-deal permission.
+        // Provenance: the deal must come from an interaction log (visit or call)
+        // on this project, unless the actor holds the direct-deal permission.
         $visit = null;
+        $call = null;
         if (! empty($data['visit_id'])) {
             $visit = Visit::query()->whereKey($data['visit_id'])->first();
             abort_unless(
@@ -57,18 +67,26 @@ class CreateDeal
                 422,
                 'The deal must come from a visit log on this project.',
             );
+        } elseif (! empty($data['call_id'])) {
+            $call = Call::query()->whereKey($data['call_id'])->first();
+            abort_unless(
+                $call !== null && (int) $call->client_project_id === (int) $project->id,
+                422,
+                'The deal must come from a call log on this project.',
+            );
         } else {
             abort_unless(
                 $actor->can('deals.direct'),
                 403,
-                'A deal must come from a visit log. You are not allowed to create one directly.',
+                'A deal must come from an interaction log. You are not allowed to create one directly.',
             );
         }
 
-        return DB::transaction(function () use ($project, $data, $actor, $visit) {
+        return DB::transaction(function () use ($project, $data, $actor, $visit, $call) {
             $deal = Deal::create([
                 'client_project_id' => $project->id,
                 'visit_id' => $visit?->id,
+                'call_id' => $call?->id,
                 'state' => DealState::Reserved->value,
                 'notes' => $data['notes'] ?? null,
                 'created_by' => $actor->id,
@@ -77,19 +95,33 @@ class CreateDeal
             foreach ($data['units'] as $entry) {
                 $unit = Unit::query()->findOrFail((int) $entry['unit_id']);
 
-                $this->assertClientWantsUnit($project, $unit, $actor);
+                $this->assertClientWantsUnit($project, $unit);
 
-                // 48h hold: locks the row, refuses a non-available unit, flips it
-                // to reserved and records the hold against this project.
-                $this->reserveUnit->handle($unit, ['client_project_id' => $project->id], $actor);
+                // No-expiry hold: locks the row, refuses a non-available unit,
+                // flips it to reserved and records the hold against this project.
+                $this->reserveUnit->handle(
+                    $unit,
+                    ['client_project_id' => $project->id, 'no_expiry' => true],
+                    $actor,
+                );
 
-                DealItem::create(['deal_id' => $deal->id, 'unit_id' => $unit->id]);
+                $unitItem = DealItem::create(['deal_id' => $deal->id, 'unit_id' => $unit->id]);
 
-                $this->allocateBoxes($deal, $unit, (int) ($entry['box_count'] ?? 0));
+                $this->attachBoxes($unitItem, $unit, array_map(intval(...), $entry['box_ids'] ?? []));
             }
 
-            // The properties are committed — the project sits at the reserved step.
-            if ($project->stage !== ClientProjectStage::Reserved) {
+            // Opening the deal supersedes whatever was planned next: the pending
+            // plan is retired so the project falls back to its default CTA — log a
+            // call (the logs stay open while the deal lives; freezing the project
+            // is what silences the CTA). Any in-site visit still scheduled for
+            // another apartment stays completable on its own (its "Complete"
+            // button rides on the visit row, not on this pending plan), so each
+            // can still conclude into its own deal.
+            $this->closePendingNextActions->handle($project, 'Superseded by the deal');
+
+            // The properties are committed — the project sits at the reserved
+            // step (a project already won by an earlier deal stays won).
+            if (! in_array($project->stage, [ClientProjectStage::Reserved, ClientProjectStage::Won], true)) {
                 $project->update(['stage' => ClientProjectStage::Reserved->value]);
             }
 
@@ -98,11 +130,11 @@ class CreateDeal
     }
 
     /**
-     * A unit enters the deal only when the client shortlisted it and has not
-     * rejected/closed it. A permitted direct deal shortlists the unit on the fly
-     * so the property journey stays consistent.
+     * A unit the client already passed on cannot enter the deal. A unit not on
+     * the shortlist yet is shortlisted on the fly (picked during the log), so
+     * the property journey stays consistent.
      */
-    private function assertClientWantsUnit(ClientProject $project, Unit $unit, User $actor): void
+    private function assertClientWantsUnit(ClientProject $project, Unit $unit): void
     {
         $item = ShortlistItem::query()->active()
             ->where('client_project_id', $project->id)
@@ -111,12 +143,6 @@ class CreateDeal
             ->first();
 
         if ($item === null) {
-            abort_unless(
-                $actor->can('deals.direct'),
-                422,
-                'Only a shortlisted property the client is interested in can enter the deal.',
-            );
-
             ShortlistItem::create([
                 'client_project_id' => $project->id,
                 'shortlistable_type' => 'unit',
@@ -134,30 +160,47 @@ class CreateDeal
         );
     }
 
-    /** Allocate N available boxes from the unit's location and reserve them. */
-    private function allocateBoxes(Deal $deal, Unit $unit, int $count): void
+    /**
+     * Reserve the chosen boxes with the apartment. Only a box already linked to
+     * THIS apartment or not linked to any apartment may ride along; an unlinked
+     * box is linked here (box_linked → reverted if the apartment is lost).
+     *
+     * @param  list<int>  $boxIds
+     */
+    private function attachBoxes(DealItem $unitItem, Unit $unit, array $boxIds): void
     {
-        if ($count < 1) {
-            return;
-        }
+        foreach (array_unique($boxIds) as $boxId) {
+            $box = Box::query()->active()->whereKey($boxId)->lockForUpdate()->first();
 
-        $boxes = Box::query()->active()
-            ->where('location_id', $unit->location_id)
-            ->where('sale_status', SaleStatus::Available->value)
-            ->orderBy('reference')
-            ->lockForUpdate()
-            ->limit($count)
-            ->get();
+            abort_if($box === null, 422, 'A selected box does not exist.');
+            abort_unless(
+                (int) $box->location_id === (int) $unit->location_id,
+                422,
+                "Box {$box->reference} belongs to another location.",
+            );
+            abort_unless(
+                $box->unit_id === null || (int) $box->unit_id === (int) $unit->id,
+                422,
+                "Box {$box->reference} is linked to another apartment.",
+            );
+            abort_unless(
+                $box->sale_status === SaleStatus::Available,
+                422,
+                "Box {$box->reference} is not available.",
+            );
 
-        abort_unless(
-            $boxes->count() === $count,
-            422,
-            "Only {$boxes->count()} box(es) are still available in this project.",
-        );
+            $linkedHere = $box->unit_id === null;
+            $box->update([
+                'sale_status' => SaleStatus::Reserved->value,
+                'unit_id' => $unit->id,
+            ]);
 
-        foreach ($boxes as $box) {
-            $box->update(['sale_status' => SaleStatus::Reserved->value]);
-            DealItem::create(['deal_id' => $deal->id, 'box_id' => $box->id]);
+            DealItem::create([
+                'deal_id' => $unitItem->deal_id,
+                'box_id' => $box->id,
+                'parent_item_id' => $unitItem->id,
+                'box_linked' => $linkedHere,
+            ]);
         }
     }
 }

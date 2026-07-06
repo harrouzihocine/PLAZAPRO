@@ -24,6 +24,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/notifications', [NotificationController::class, 'index']);
         Route::post('/notifications/read-all', [NotificationController::class, 'readAll']);
         Route::post('/notifications/{id}/read', [NotificationController::class, 'read']);
+        Route::post('/notifications/{id}/unread', [NotificationController::class, 'unread']);
     });
 
     // Chat. Route entry is gated chat.use; per-conversation access is guarded by

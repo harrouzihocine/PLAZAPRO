@@ -6,11 +6,16 @@ import { useApi } from '@/composables/useApi'
 export const notificationsApi = {
   async list(params = {}) {
     const { data } = await useApi().get('/notifications', { params })
-    return data // { data: [...], meta: { unread_count }, links }
+    return data // { data: [...], links, meta: { current_page, last_page, ... }, unread_count }
   },
 
   async markRead(id) {
     const { data } = await useApi().post(`/notifications/${id}/read`)
+    return data // { unread_count }
+  },
+
+  async markUnread(id) {
+    const { data } = await useApi().post(`/notifications/${id}/unread`)
     return data // { unread_count }
   },
 

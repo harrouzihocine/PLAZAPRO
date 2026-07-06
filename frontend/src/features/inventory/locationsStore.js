@@ -66,8 +66,11 @@ export const useLocationsStore = defineStore('locations', {
       return this.mutate(() => locationsApi.create(payload))
     },
 
-    update(id, payload) {
-      return this.mutate(() => locationsApi.update(id, payload))
+    async update(id, payload) {
+      const result = await this.mutate(() => locationsApi.update(id, payload))
+      // Keep the open detail record (its cover hero, etc.) in sync.
+      if (this.current?.id === id) this.current = result
+      return result
     },
 
     async loadArchived() {

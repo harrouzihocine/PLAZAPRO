@@ -1,3 +1,12 @@
+/* Keep every SweetAlert2 surface (top-right flash toasts + confirm/alert dialogs)
+   above PrimeVue modals. PrimeVue's Dialog auto-assigns a modal z-index starting
+   at 1100, while SweetAlert2's container defaults to 1060 — so without this, a
+   flash toast (e.g. an error / missed-required-input warning) fires *behind* an
+   open modal and is never seen. 100000 clears any realistic PrimeVue stack. */
+.swal2-container {
+  z-index: 100000 !important;
+}
+
 /* Theme SweetAlert2 dialogs with the app's design tokens (light/dark aware). */
 .swal2-popup {
   background: var(--color-surface);

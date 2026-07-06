@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Actions;
 
 use App\Modules\Inventory\Enums\SaleStatus;
+use App\Modules\Inventory\Events\UnitEdited;
 use App\Modules\Inventory\Events\UnitRepriced;
 use App\Modules\Inventory\Models\Unit;
 use Illuminate\Support\Arr;
@@ -26,9 +27,22 @@ class CorrectUnit
 
         $replacement = $unit->supersedeWith($changes, $reason);
 
+        $priceChanged = (string) $replacement->price !== $originalPrice;
+        $statusChanged = $replacement->sale_status !== $originalStatus;
+
+        // Announce the correction to the whole team (Collaboration drops a "unit
+        // updated" bell for everyone), naming the field(s) that moved.
+        $edited = array_values(array_filter([
+            $priceChanged ? 'price' : null,
+            $statusChanged ? 'sale_status' : null,
+        ]));
+
+        if ($edited !== []) {
+            UnitEdited::dispatch($replacement, $edited);
+        }
+
         // Re-run the reverse desire-match only when the change could create new
         // matches: the price moved, or the unit became available again.
-        $priceChanged = (string) $replacement->price !== $originalPrice;
         $becameAvailable = $replacement->sale_status === SaleStatus::Available
             && $originalStatus !== SaleStatus::Available;
 

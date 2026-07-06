@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Inventory;
 
 use App\Modules\Inventory\Models\Location;
+use App\Modules\Inventory\Models\Media;
 use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
@@ -117,6 +118,21 @@ class LocationTest extends TestCase
 
         $this->assertDatabaseHas('locations', [
             'code' => 'VEFA-1', 'contract_type_id' => $contractType->id,
+        ]);
+    }
+
+    public function test_manager_can_set_a_cover_picture(): void
+    {
+        $location = Location::factory()->create();
+        $media = Media::factory()->create();
+        Sanctum::actingAs($this->manager());
+
+        $this->putJson("/api/v1/locations/{$location->id}", ['cover_media_id' => $media->id])
+            ->assertOk()
+            ->assertJsonPath('data.cover_media_id', $media->id);
+
+        $this->assertDatabaseHas('locations', [
+            'id' => $location->id, 'cover_media_id' => $media->id,
         ]);
     }
 

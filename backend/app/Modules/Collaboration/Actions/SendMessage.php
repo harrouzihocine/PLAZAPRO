@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Collaboration\Actions;
 
+use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Collaboration\Enums\AttachmentKind;
 use App\Modules\Collaboration\Enums\MessageType;
 use App\Modules\Collaboration\Events\MessageSent;
@@ -31,6 +32,15 @@ class SendMessage
         ?int $durationMs = null,
     ): Message {
         abort_if($body === null && $attachment === null, 422, 'A message needs text or an attachment.');
+
+        // A closed project's chat is read-only: won / archived / cancelled projects
+        // accept no new messages (oversight can still read the history).
+        $subject = $conversation->subject;
+        abort_if(
+            $subject instanceof ClientProject && $subject->isFrozen(),
+            422,
+            'This project is closed — its chat is read-only.',
+        );
 
         $type = MessageType::Text;
         if ($attachment !== null) {

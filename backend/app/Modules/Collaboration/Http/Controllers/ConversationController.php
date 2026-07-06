@@ -67,7 +67,23 @@ class ConversationController extends Controller
      */
     public function forProject(Request $request, ClientProject $project, EnsureProjectConversation $ensure): ConversationResource
     {
-        abort_unless($project->isVisibleTo($request->user()), 404);
+        // The chat exposes its participant list, so gate it like the rest of the
+        // project's collaborator identity: members or detail-trusted users, plus
+        // the oversight roles that may read/write any project chat. A name-only
+        // looker never learns who is on the client's project.
+        //
+        // The identity branch also requires the project to be VISIBLE: a client
+        // detail grant unlocks the client's contact, but must NOT expose the chat
+        // of a project the user cannot otherwise see — this is what silos a
+        // duplicate-resolution "separate project" both ways (the finder never sees
+        // the original's chat; the client's own agent never sees the fork's).
+        $user = $request->user();
+        abort_unless(
+            ($project->isVisibleTo($user) && $project->collaboratorsVisibleTo($user))
+                || $user->can('chat.view_project_chats')
+                || $user->can('chat.participate_project_chats'),
+            404,
+        );
 
         $conversation = $ensure->handle($project);
 

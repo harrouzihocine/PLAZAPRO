@@ -3,9 +3,10 @@ import { useApi, getCsrf } from '@/composables/useApi'
 // Network calls for the Settings feature (auth). State lives in store.js; these
 // functions are the only place Settings talks to the API (via the shared useApi).
 export const authApi = {
-  async login(email, password) {
+  // `login` is either the username or the email — the API accepts both.
+  async login(login, password) {
     await getCsrf() // prime the CSRF cookie before the first stateful request
-    const { data } = await useApi().post('/auth/login', { email, password })
+    const { data } = await useApi().post('/auth/login', { login, password })
     return data.data
   },
 
@@ -16,6 +17,38 @@ export const authApi = {
 
   logout() {
     return useApi().post('/auth/logout')
+  },
+
+  // Self-service profile (own account only): details/password, then avatar.
+  async updateProfile(payload) {
+    const { data } = await useApi().put('/me/profile', payload)
+    return data.data
+  },
+
+  async uploadAvatar(file) {
+    const form = new FormData()
+    form.append('avatar', file)
+    const { data } = await useApi().post('/me/avatar', form)
+    return data.data
+  },
+
+  async removeAvatar() {
+    const { data } = await useApi().delete('/me/avatar')
+    return data.data
+  },
+}
+
+// Scalar app-wide settings (e.g. the reservation hold duration in hours).
+// Read is open to any authed user; writes require settings.manage.
+export const appSettingsApi = {
+  async get() {
+    const { data } = await useApi().get('/app-settings')
+    return data.data
+  },
+
+  async save(payload) {
+    const { data } = await useApi().put('/app-settings', payload)
+    return data.data
   },
 }
 

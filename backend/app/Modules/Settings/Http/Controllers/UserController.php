@@ -17,6 +17,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Users admin. Every endpoint requires users.manage (see routes). Users are
@@ -74,6 +76,24 @@ class UserController extends Controller
     }
 
     /**
+     * Active users whose role can open a client project (projects.create) — the
+     * people a project may be handed to (the archive reactivation hand-off, like
+     * the duplicate-resolution finder). Reference data, open to any authed user.
+     */
+    public function projectHandlers(): AnonymousResourceCollection
+    {
+        $handlers = User::query()
+            ->with('role')
+            ->active()
+            ->where('is_active', true)
+            ->whereHas('role.permissions', fn ($q) => $q->where('slug', 'projects.create'))
+            ->orderBy('name')
+            ->get();
+
+        return UserResource::collection($handlers);
+    }
+
+    /**
      * Minimal staff directory (id + name of every active user) — feeds pickers
      * that target any colleague, e.g. sharing a project's visibility list.
      * Reference data, open to any authenticated user like the agent pickers.
@@ -87,6 +107,25 @@ class UserController extends Controller
             ->get(['id', 'name']);
 
         return response()->json(['data' => $users]);
+    }
+
+    /**
+     * Stream a user's avatar. Profile photos are shown across the app (header,
+     * staff pickers, chat), so this is open to any authenticated user — but the
+     * file lives on the private disk and is only reachable through here, never a
+     * public URL. 404 when the user has no photo.
+     */
+    public function avatar(User $user): StreamedResponse
+    {
+        abort_if($user->avatar_path === null, 404);
+
+        $disk = Storage::disk('media');
+        abort_unless($disk->exists($user->avatar_path), 404);
+
+        return $disk->response($user->avatar_path, null, [
+            'Content-Type' => 'image/jpeg',
+            'Cache-Control' => 'private, max-age=86400',
+        ]);
     }
 
     public function store(StoreUserRequest $request, CreateUser $action): UserResource

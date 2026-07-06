@@ -15,6 +15,15 @@ const dateTimeFmt = new Intl.DateTimeFormat('en-GB', {
   minute: '2-digit',
 })
 
+// Local "today" as YYYY-MM-DD for native date inputs. `toISOString()` is UTC,
+// which can roll a late-evening "today" to tomorrow (or vice-versa), so we build
+// the string from local parts. Used as the `min` on scheduling pickers so a plan
+// can never be set in the past.
+export function todayInput(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
 export function formatDate(value) {
   if (!value) return '—'
   const d = value instanceof Date ? value : new Date(value)
@@ -25,6 +34,18 @@ export function formatDateTime(value) {
   if (!value) return '—'
   const d = value instanceof Date ? value : new Date(value)
   return Number.isNaN(d.getTime()) ? '—' : dateTimeFmt.format(d)
+}
+
+const timeFmt = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' })
+
+// The backend stores an untimed next action as midnight (see BuildAgentAgenda's
+// "All day"), so 00:00 means "no time chosen" rather than a real due time.
+// Returns '' in that case so callers can skip showing a stray "00:00".
+export function formatTimeIfSet(value) {
+  if (!value) return ''
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.getHours() === 0 && d.getMinutes() === 0 ? '' : timeFmt.format(d)
 }
 
 const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })

@@ -28,7 +28,7 @@ class DynamicListSeeder extends Seeder
             );
 
             foreach (array_values($config['items']) as $order => $item) {
-                DynamicListItem::firstOrCreate(
+                $row = DynamicListItem::firstOrCreate(
                     ['dynamic_list_id' => $list->id, 'value' => $item['value']],
                     [
                         'label' => $item['label'],
@@ -37,6 +37,16 @@ class DynamicListSeeder extends Seeder
                         'meta' => $item['meta'] ?? null,
                     ],
                 );
+
+                // Backfill the default icon onto items seeded before icons existed,
+                // without clobbering an admin's own choice (only fills empty keys).
+                if (! empty($item['meta'])) {
+                    $meta = $row->meta ?? [];
+                    $merged = $item['meta'] + $meta; // existing values win
+                    if ($merged !== $meta) {
+                        $row->update(['meta' => $merged]);
+                    }
+                }
             }
         }
     }
@@ -47,24 +57,48 @@ class DynamicListSeeder extends Seeder
     private function lists(): array
     {
         return [
+            // Project (location) attribute: the financing / payment options a
+            // project offers its buyers — what a client can use to BUY a unit
+            // here (bank loan available or not, instalments, cash…). A project
+            // may offer several, so it is a multi-select on the location.
+            // Distinct from `payment_methods` below (how a payment is settled).
+            'project_payment_methods' => [
+                'name' => 'Project Payment Methods',
+                'description' => 'Financing / payment options a project offers buyers (bank loan, instalments, cash…).',
+                'items' => [
+                    ['label' => 'القرض البنكي غير متوفر', 'value' => 'alkrd_albnky_ghyr_mtofr'],
+                    ['label' => 'القرض البنكي متوفر', 'value' => 'alkrd_albnky_mtofr'],
+                    ['label' => 'امكانية التقسيط', 'value' => 'amkany_altksyt'],
+                    ['label' => 'الدفع كاش', 'value' => 'aldfaa_kash'],
+                    ['label' => 'التحويل البنكي', 'value' => 'bank_transfer'],
+                    ['label' => 'تحويل', 'value' => 'transfer'],
+                ],
+            ],
+            // Payment-workflow attribute: HOW a versement (a deposit / instalment
+            // payment) is actually settled — the tender used. Consumed by the
+            // versement + holding-deposit forms. Distinct from the project's
+            // offered options in `project_payment_methods` above.
             'payment_methods' => [
                 'name' => 'Payment Methods',
-                'description' => 'How a versement (instalment) is paid.',
+                'description' => 'How a payment (deposit / instalment) is settled — the tender used.',
                 'items' => [
                     ['label' => 'Cash', 'value' => 'cash'],
+                    ['label' => 'Bank transfer', 'value' => 'bank_transfer'],
                     ['label' => 'Cheque', 'value' => 'cheque'],
-                    ['label' => 'Bank Transfer', 'value' => 'bank_transfer'],
                 ],
             ],
             'sources' => [
                 'name' => 'Lead Sources',
                 'description' => 'Where a client came from.',
                 'items' => [
-                    ['label' => 'Walk-in', 'value' => 'walk_in'],
-                    ['label' => 'Referral', 'value' => 'referral'],
-                    ['label' => 'Facebook', 'value' => 'facebook'],
-                    ['label' => 'Instagram', 'value' => 'instagram'],
-                    ['label' => 'Property Portal', 'value' => 'portal'],
+                    ['label' => 'Walk-in', 'value' => 'walk_in', 'meta' => ['icon' => 'pi pi-users']],
+                    ['label' => 'Referral', 'value' => 'referral', 'meta' => ['icon' => 'pi pi-share-alt']],
+                    ['label' => 'Facebook', 'value' => 'facebook', 'meta' => ['icon' => 'pi pi-facebook']],
+                    ['label' => 'Instagram', 'value' => 'instagram', 'meta' => ['icon' => 'pi pi-instagram']],
+                    ['label' => 'Ouedkniss', 'value' => 'ouedkniss', 'meta' => ['icon' => 'pi pi-tag']],
+                    ['label' => 'WhatsApp', 'value' => 'whatsapp', 'meta' => ['icon' => 'pi pi-whatsapp']],
+                    ['label' => 'TikTok', 'value' => 'tiktok', 'meta' => ['icon' => 'pi pi-tiktok']],
+                    ['label' => 'Phone Call', 'value' => 'phone_call', 'meta' => ['icon' => 'pi pi-phone']],
                 ],
             ],
             'client_ratings' => [
@@ -87,16 +121,34 @@ class DynamicListSeeder extends Seeder
                     ['label' => 'Other', 'value' => 'other'],
                 ],
             ],
-            'unit_types' => [
-                'name' => 'Unit Types',
-                'description' => 'Apartment / property layout (incl. commercial "local").',
+            // Project type — a project (location) attribute: the kind of residence
+            // the whole development is (open / closed / semi-closed). Attached to a
+            // location and surfaced on its units and on client desires.
+            'project_types' => [
+                'name' => 'Project Type',
+                'description' => 'The kind of residence a project is (open / closed / semi-closed).',
                 'items' => [
-                    ['label' => 'Studio', 'value' => 'studio'],
+                    ['label' => 'إقامة مفتوحة', 'value' => 'akam_mftoh'],
+                    ['label' => 'إقامة مغلقة', 'value' => 'akam_mghlk'],
+                    ['label' => 'اقامة شبه مغلقة', 'value' => 'akam_shbh_mghlk'],
+                ],
+            ],
+            // Number of rooms (F2 / F3 / …) — a size attribute in its own right,
+            // separate from a unit's type. Captured on units and on desires.
+            'room_numbers' => [
+                'name' => 'Room Numbers',
+                'description' => 'Number of rooms (F2, F3, …) — the apartment size.',
+                'items' => [
+                    ['label' => 'studio', 'value' => 'studio'],
+                    ['label' => 'F1', 'value' => 'f1'],
                     ['label' => 'F2', 'value' => 'f2'],
                     ['label' => 'F3', 'value' => 'f3'],
                     ['label' => 'F4', 'value' => 'f4'],
-                    ['label' => 'Duplex', 'value' => 'duplex'],
-                    ['label' => 'Local / Commercial', 'value' => 'local'],
+                    ['label' => 'F5', 'value' => 'f5'],
+                    ['label' => 'F2 + T', 'value' => 'f2_t'],
+                    ['label' => 'F3 + T', 'value' => 'f3_t'],
+                    ['label' => 'F4 + T', 'value' => 'f4_t'],
+                    ['label' => 'Dublex', 'value' => 'dublex'],
                 ],
             ],
             // Sale contract a project is marketed under. Attached to a location
@@ -105,21 +157,10 @@ class DynamicListSeeder extends Seeder
                 'name' => 'Contract Types',
                 'description' => 'The sale contract a project is sold under (VEFA, turnkey, …).',
                 'items' => [
-                    ['label' => 'VEFA (off-plan)', 'value' => 'vefa'],
-                    ['label' => 'Turnkey (ready)', 'value' => 'turnkey'],
-                    ['label' => 'Rent-to-own', 'value' => 'rent_to_own'],
-                    ['label' => 'Cash sale', 'value' => 'cash_sale'],
-                ],
-            ],
-            // What a client is shopping for — captured at lead creation, drives
-            // qualification & the office-visit shortlist. Multi-select.
-            'property_interests' => [
-                'name' => 'Property Interests',
-                'description' => 'What the client wants to buy (apartment / box / local). Multi-select.',
-                'items' => [
-                    ['label' => 'Apartment', 'value' => 'apartment'],
-                    ['label' => 'Box', 'value' => 'box'],
-                    ['label' => 'Local / Commercial', 'value' => 'local'],
+                    ['label' => 'حصة في الأرض', 'value' => 'hs_fy_alard'],
+                    ['label' => 'دفتر عقاري', 'value' => 'dftr_aakary'],
+                    ['label' => 'وعد بالبيع', 'value' => 'oaad_balbyaa'],
+                    ['label' => 'بيع على التصميم', 'value' => 'byaa_aal_altsmym'],
                 ],
             ],
             // Fast checkbox talking-points logged against a phone call. The former
@@ -135,9 +176,31 @@ class DynamicListSeeder extends Seeder
                     ['label' => 'Not interested (now)', 'value' => 'not_interested'],
                     ['label' => 'Requested a callback', 'value' => 'requested_callback'],
                     ['label' => 'Requested an office visit', 'value' => 'requested_office_visit'],
+                    ['label' => 'Requested an in-site visit', 'value' => 'requested_an_office_visit'],
                     ['label' => 'Price negotiation', 'value' => 'price_negotiation'],
                     ['label' => 'No answer', 'value' => 'no_answer'],
                     ['label' => 'Wrong number', 'value' => 'wrong_number'],
+                ],
+            ],
+            // Concerns / objections a client raised on a call or visit — the
+            // "why not" signals the Voice-of-Client analytics mine to tell the
+            // promoteur what is blocking sales. Distinct from `call_topics`
+            // (what was discussed): these are the reasons a client hesitates.
+            'objection_reasons' => [
+                'name' => 'Objection Reasons',
+                'description' => 'Why a client hesitates or passes (price, location, payment plan…). Mined by the Voice-of-Client analytics.',
+                'items' => [
+                    ['label' => 'Price too high', 'value' => 'price_too_high'],
+                    ['label' => 'Location not preferred', 'value' => 'location_not_preferred'],
+                    ['label' => 'Payment plan too short', 'value' => 'payment_plan_too_short'],
+                    ['label' => 'Delivery date too far', 'value' => 'delivery_too_far'],
+                    ['label' => 'Unit too small', 'value' => 'unit_too_small'],
+                    ['label' => 'Unit too large', 'value' => 'unit_too_large'],
+                    ['label' => 'Floor not preferred', 'value' => 'floor_not_preferred'],
+                    ['label' => 'Financing difficulty', 'value' => 'financing_difficulty'],
+                    ['label' => 'Prefers another project', 'value' => 'prefers_another_project'],
+                    ['label' => 'Just comparing', 'value' => 'just_comparing'],
+                    ['label' => 'Wants more discount', 'value' => 'wants_more_discount'],
                 ],
             ],
             // Fast checkbox checklist logged against an office visit.
@@ -163,6 +226,21 @@ class DynamicListSeeder extends Seeder
                     ['label' => 'Visited – interested', 'value' => 'visited_interested'],
                     ['label' => 'Visited – not interested', 'value' => 'visited_not_interested'],
                     ['label' => 'Needs a second visit', 'value' => 'needs_second_visit'],
+                ],
+            ],
+            // Why the open next action was corrected (change of plan on the
+            // timeline). Picked from this list for fast logging; an optional
+            // free note adds the detail.
+            'next_action_change_reasons' => [
+                'name' => 'Next-Action Change Reasons',
+                'description' => 'Why the pending next action was changed (fast timeline correction).',
+                'items' => [
+                    ['label' => 'Client requested a reschedule', 'value' => 'client_reschedule'],
+                    ['label' => 'Client unavailable', 'value' => 'client_unavailable'],
+                    ['label' => 'Changed the type of next step', 'value' => 'changed_type'],
+                    ['label' => 'Reassigned to another agent', 'value' => 'reassigned'],
+                    ['label' => 'Logged by mistake', 'value' => 'data_entry_error'],
+                    ['label' => 'Other', 'value' => 'other'],
                 ],
             ],
             // Why a deal was archived (required when archiving / losing a deal).
@@ -196,6 +274,10 @@ class DynamicListSeeder extends Seeder
                     ['label' => '3rd Floor', 'value' => 'floor_3'],
                     ['label' => '4th Floor', 'value' => 'floor_4'],
                     ['label' => '5th Floor', 'value' => 'floor_5'],
+                    ['label' => '6th Floor', 'value' => '6th_floor'],
+                    ['label' => '7th Floor', 'value' => '7th_floor'],
+                    ['label' => '8th Floor', 'value' => '8th_floor'],
+                    ['label' => '9th Floor', 'value' => '9th_floor'],
                 ],
             ],
             // Geography (wilayas / communes) lives in its own tables now — see

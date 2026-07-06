@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Collaboration;
 
 use App\Modules\Clients\Models\Client;
+use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Collaboration\Notifications\DomainNotification;
+use App\Modules\Pipeline\Actions\AssignVisit;
 use App\Modules\Pipeline\Actions\DispatchReminders;
 use App\Modules\Pipeline\Actions\ScheduleVisit;
 use App\Modules\Pipeline\Enums\VisitType;
@@ -58,6 +60,32 @@ class NotificationTest extends TestCase
             ->assertJsonPath('unread_count', 1);
     }
 
+    public function test_the_feed_is_paginated_ten_per_page(): void
+    {
+        $me = $this->userWithPermissions(['notifications.view']);
+        for ($i = 0; $i < 15; $i++) {
+            $me->notify(new DomainNotification('test', "N{$i}"));
+        }
+
+        Sanctum::actingAs($me);
+
+        $first = $this->getJson('/api/v1/notifications')
+            ->assertOk()
+            ->assertJsonCount(10, 'data')
+            ->assertJsonPath('meta.current_page', 1)
+            ->assertJsonPath('meta.last_page', 2)
+            ->assertJsonPath('meta.total', 15);
+
+        $second = $this->getJson('/api/v1/notifications?page=2')
+            ->assertOk()
+            ->assertJsonCount(5, 'data')
+            ->assertJsonPath('meta.current_page', 2);
+
+        $ids = collect($first->json('data'))->pluck('id')
+            ->merge(collect($second->json('data'))->pluck('id'));
+        $this->assertCount(15, $ids->unique());
+    }
+
     public function test_marking_a_notification_read_decrements_the_unread_count(): void
     {
         $me = $this->userWithPermissions(['notifications.view']);
@@ -71,6 +99,22 @@ class NotificationTest extends TestCase
             ->assertJsonPath('unread_count', 0);
 
         $this->assertNotNull($me->notifications()->first()->read_at);
+    }
+
+    public function test_marking_a_notification_unread_restores_the_unread_count(): void
+    {
+        $me = $this->userWithPermissions(['notifications.view']);
+        $me->notify(new DomainNotification('test', 'Hi'));
+        $notification = $me->notifications()->first();
+        $notification->markAsRead();
+
+        Sanctum::actingAs($me);
+
+        $this->postJson("/api/v1/notifications/{$notification->id}/unread")
+            ->assertOk()
+            ->assertJsonPath('unread_count', 1);
+
+        $this->assertNull($me->notifications()->first()->read_at);
     }
 
     public function test_mark_all_read(): void
@@ -132,5 +176,53 @@ class NotificationTest extends TestCase
 
         $this->assertSame(1, $agent->notifications()->count());
         $this->assertSame('visit_assigned', $agent->notifications()->first()->data['kind']);
+    }
+
+    public function test_a_new_office_visit_alerts_pipeline_overseers_and_project_contributors(): void
+    {
+        $agent = User::factory()->agent()->create();
+        $overseer = $this->userWithPermissions(['oversight.pipeline']);
+        $contributor = User::factory()->create();
+        $client = Client::factory()->create();
+        // contributorIds() = created_by + non-hidden viewers, so the creator is one.
+        $project = ClientProject::factory()->create([
+            'client_id' => $client->id, 'created_by' => $contributor->id,
+        ]);
+
+        app(ScheduleVisit::class)->handle([
+            'client_id' => $client->id,
+            'client_project_id' => $project->id,
+            'type' => VisitType::Office->value,
+            'agent_id' => $agent->id,
+            'scheduled_at' => now()->addDay(),
+        ]);
+
+        $this->assertSame('office_visit_scheduled', $overseer->notifications()->first()?->data['kind']);
+        $this->assertSame('office_visit_scheduled', $contributor->notifications()->first()?->data['kind']);
+        // The agent still gets only their own direct "assigned to you" alert.
+        $this->assertSame('visit_assigned', $agent->notifications()->first()->data['kind']);
+        $this->assertSame(1, $agent->notifications()->count());
+    }
+
+    public function test_reassigning_an_office_visit_does_not_re_alert_overseers(): void
+    {
+        $agent = User::factory()->agent()->create();
+        $other = User::factory()->agent()->create();
+        $overseer = $this->userWithPermissions(['oversight.pipeline']);
+        $client = Client::factory()->create();
+
+        $visit = app(ScheduleVisit::class)->handle([
+            'client_id' => $client->id,
+            'type' => VisitType::Office->value,
+            'agent_id' => $agent->id,
+            'scheduled_at' => now()->addDay(),
+        ]);
+        $overseer->notifications()->delete(); // drop the create-time alert
+
+        app(AssignVisit::class)->handle($visit, $other->id);
+
+        // Reassignment notifies the new agent only — not the overseers again.
+        $this->assertSame(0, $overseer->notifications()->count());
+        $this->assertSame('visit_assigned', $other->notifications()->first()?->data['kind']);
     }
 }

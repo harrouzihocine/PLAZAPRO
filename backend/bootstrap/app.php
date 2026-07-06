@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\SecurityHeaders;
+use App\Modules\Clients\Console\FlagEmptyClients;
 use App\Modules\Collaboration\Console\BackfillProjectChats;
 use App\Modules\Inventory\Console\ExpireHolds;
+use App\Modules\Inventory\Console\ExpireOnHold;
 use App\Modules\Payments\Console\MarkSchedulesOverdueCommand;
 use App\Modules\Pipeline\Console\DispatchReminders;
 use App\Modules\Pipeline\Console\MarkActionsOverdue;
@@ -27,11 +29,13 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withCommands([
         // Modular commands (auto-discovery only covers app/Console).
         ExpireHolds::class,
+        ExpireOnHold::class,
         MarkActionsOverdue::class,
         DispatchReminders::class,
         MarkSchedulesOverdueCommand::class,
         BackfillProjectChats::class,
         SendUpcomingDigest::class,
+        FlagEmptyClients::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         // Sanctum SPA (cookie) auth for the first-party frontend.

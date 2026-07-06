@@ -45,10 +45,20 @@ class DesireResource extends JsonResource
                 'id' => $this->type->id,
                 'label' => $this->type->label,
             ] : null),
+            'room_number' => $this->whenLoaded('roomNumber', fn () => $this->roomNumber ? [
+                'id' => $this->roomNumber->id,
+                'label' => $this->roomNumber->label,
+            ] : null),
+            'contract_type' => $this->whenLoaded('contractType', fn () => $this->contractType ? [
+                'id' => $this->contractType->id,
+                'label' => $this->contractType->label,
+            ] : null),
             // Raw ids too, so the edit form can pre-select without extra lookups.
             'wilaya_id' => $this->wilaya_id,
             'commune_id' => $this->commune_id,
             'type_id' => $this->type_id,
+            'room_number_id' => $this->room_number_id,
+            'contract_type_id' => $this->contract_type_id,
             'floor_id' => $this->floor_id,
             'updated_at' => $this->updated_at,
         ];

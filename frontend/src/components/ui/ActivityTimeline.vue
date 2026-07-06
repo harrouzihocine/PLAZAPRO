@@ -32,12 +32,26 @@ const ICONS = {
   export: 'pi pi-download',
 }
 
+// Marker chip tone per action (icon + ring on the rail).
 const TONES = {
-  create: 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300',
-  update: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
-  cancel: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
-  archive: 'bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-300',
+  create: 'bg-green-100 text-green-700 ring-green-200 dark:bg-green-500/15 dark:text-green-300 dark:ring-green-500/25',
+  update: 'bg-sky-100 text-sky-700 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-500/25',
+  cancel: 'bg-red-100 text-red-700 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/25',
+  archive: 'bg-surface-100 text-surface-600 ring-surface-200 dark:bg-surface-800 dark:text-surface-300 dark:ring-surface-700',
 }
+
+// Past-tense labels for the action pill (humanize('cancel')+'d' → "Canceld").
+const ACTION_LABELS = {
+  create: 'Created',
+  update: 'Updated',
+  cancel: 'Cancelled',
+  archive: 'Archived',
+  restore: 'Restored',
+  reactivate: 'Reactivated',
+  duplicate: 'Duplicated',
+  export: 'Exported',
+}
+const actionLabel = (action) => ACTION_LABELS[action] ?? humanize(action)
 
 // Noise fields nobody needs to read in a diff.
 const HIDDEN_FIELDS = new Set(['updated_at', 'created_at', 'id'])
@@ -121,55 +135,68 @@ watch(
       body="Changes to this record will appear here."
     />
 
-    <ol v-else class="relative space-y-0">
-      <li v-for="(entry, i) in visible" :key="entry.id" class="relative flex gap-3 pb-5">
-        <!-- connector line -->
+    <ol v-else class="relative">
+      <li v-for="(entry, i) in visible" :key="entry.id" class="relative flex gap-4 pb-7 last:pb-0">
+        <!-- connector rail -->
         <span
           v-if="i < visible.length - 1"
-          class="absolute left-4 top-9 h-[calc(100%-2rem)] w-px -translate-x-1/2 bg-line"
+          class="absolute left-[15px] top-9 bottom-0 w-px bg-line"
           aria-hidden="true"
         />
         <span
-          class="z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs"
-          :class="TONES[entry.action] ?? 'bg-highlight text-primary-700 dark:text-primary-300'"
+          class="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs ring-4 ring-surface-0 dark:ring-surface-950"
+          :class="TONES[entry.action] ?? 'bg-highlight text-primary-700 ring-surface-0 dark:text-primary-300 dark:ring-surface-950'"
         >
           <i :class="ICONS[entry.action] ?? 'pi pi-circle'" aria-hidden="true" />
         </span>
 
-        <div class="min-w-0 flex-1 pt-1">
-          <p class="text-sm text-ink">
-            <span class="font-semibold">{{ entry.user_name ?? 'System' }}</span>
-            <span class="text-mute"> · {{ humanize(entry.action) }}d</span>
+        <div class="min-w-0 flex-1">
+          <!-- header: who + what, with the time pushed to the right -->
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span
+              class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
+              :class="TONES[entry.action] ?? 'bg-highlight text-primary-700 dark:text-primary-300'"
+            >
+              {{ actionLabel(entry.action) }}
+            </span>
+            <span class="text-sm font-medium text-ink">{{ entry.user_name ?? 'System' }}</span>
+            <span
+              v-if="entry.role_at_time"
+              class="text-xs text-mute"
+            >· {{ entry.role_at_time }}</span>
             <span
               v-tooltip.top="formatDateTime(entry.created_at)"
-              class="cursor-default text-xs text-mute"
+              class="ml-auto shrink-0 cursor-default text-xs text-mute"
             >
-              · {{ timeAgo(entry.created_at) }}</span
-            >
+              {{ timeAgo(entry.created_at) }}
+            </span>
+          </div>
+
+          <p v-if="reasonOf(entry)" class="mt-2 border-l-2 border-line pl-3 text-sm italic text-mute">
+            {{ reasonOf(entry) }}
           </p>
 
-          <p v-if="reasonOf(entry)" class="mt-1 text-sm italic text-mute">
-            “{{ reasonOf(entry) }}”
-          </p>
-
-          <ul v-if="diffOf(entry).length" class="mt-1.5 space-y-1">
-            <li
-              v-for="d in diffOf(entry)"
+          <!-- changes: one roomy row per field, label column + before → after -->
+          <div
+            v-if="diffOf(entry).length"
+            class="mt-2.5 overflow-hidden rounded-lg border border-line"
+          >
+            <div
+              v-for="(d, di) in diffOf(entry)"
               :key="d.field"
-              class="flex flex-wrap items-center gap-1.5 text-xs"
+              class="flex flex-col gap-1 px-3 py-2 sm:flex-row sm:items-baseline sm:gap-3"
+              :class="di > 0 ? 'border-t border-line' : ''"
             >
-              <span class="font-medium text-mute">{{ humanize(d.field) }}</span>
-              <span
-                class="num rounded bg-surface-100 px-1.5 py-0.5 text-mute line-through dark:bg-surface-800"
-              >
-                {{ display(d.before) }}
+              <span class="shrink-0 text-xs font-medium text-mute sm:w-32">
+                {{ humanize(d.field) }}
               </span>
-              <i class="pi pi-arrow-right text-[9px] text-mute" aria-hidden="true" />
-              <span class="num rounded bg-highlight px-1.5 py-0.5 font-medium text-ink">
-                {{ display(d.after) }}
-              </span>
-            </li>
-          </ul>
+              <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm">
+                <span class="num break-all text-mute line-through">{{ display(d.before) }}</span>
+                <i class="pi pi-arrow-right text-[10px] text-mute" aria-hidden="true" />
+                <span class="num break-all font-medium text-ink">{{ display(d.after) }}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </li>
     </ol>

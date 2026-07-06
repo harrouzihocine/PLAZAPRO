@@ -13,6 +13,7 @@ import Tabs from 'primevue/tabs'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import MoneyInput from '@/components/base/MoneyInput.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
@@ -20,7 +21,7 @@ import StatusTag from '@/components/ui/StatusTag.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ActivityTimeline from '@/components/ui/ActivityTimeline.vue'
 import { useDynamicList } from '@/composables/useDynamicList'
-import { GTM_PRIORITIES, reservationsApi } from '@/features/inventory/api'
+import { GTM_PRIORITIES, locationsApi, mediaFileUrl, reservationsApi } from '@/features/inventory/api'
 import BoxesPanel from '@/features/inventory/components/BoxesPanel.vue'
 import GtmPriorityBadge from '@/features/inventory/components/GtmPriorityBadge.vue'
 import LocationMap from '@/features/inventory/components/LocationMap.vue'
@@ -28,12 +29,14 @@ import MediaGallery from '@/features/inventory/components/MediaGallery.vue'
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
 import StackingPlan from '@/features/inventory/components/StackingPlan.vue'
 import { googleMapsUrl } from '@/features/inventory/googleMaps'
+import { copyToClipboard } from '@/composables/useClipboard'
 import { useLocationsStore } from '@/features/inventory/locationsStore'
 import { useUnitsStore } from '@/features/inventory/unitsStore'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction } from '@/composables/useConfirm'
 import { formatDate } from '@/utils/format'
 import { formatMoney } from '@/features/payments/money'
+import FeedbackPanel from '@/features/analytics/components/FeedbackPanel.vue'
 
 // One project's workspace, organised in tabs so nothing drowns: Overview
 // (facts + map), Stacking plan, Units, Boxes, Media, and the full Activity
@@ -42,20 +45,23 @@ const props = defineProps({ id: { type: [String, Number], required: true } })
 const locations = useLocationsStore()
 const units = useUnitsStore()
 const auth = useAuthStore()
-const { items: unitTypes } = useDynamicList('unit_types')
+const { items: roomNumbers } = useDynamicList('room_numbers')
 const { items: floors } = useDynamicList('floors')
 
 const canManage = auth.can('units.manage')
 const canReserve = auth.can('units.reserve')
+// Voice-of-Client analytics is manager-level commercial intelligence.
+const canSeeFeedback = auth.can('reports.view')
 
 const mapsUrl = computed(() => googleMapsUrl(locations.current ?? {}))
 
 const stackingRef = ref(null)
 const reserving = ref(false)
+const insights = ref(null)
 
 // Sale-status mix across the project's units — the at-a-glance commercial state.
 const statusCounts = computed(() => {
-  const counts = { available: 0, reserved: 0, sold: 0 }
+  const counts = { available: 0, reserved: 0, onhold: 0, sold: 0 }
   for (const u of units.items) {
     if (u.sale_status in counts) counts[u.sale_status] += 1
   }
@@ -82,7 +88,7 @@ const convertHold = (unit) => afterHold(() => reservationsApi.convert(unit.reser
 
 const blank = {
   reference: '',
-  type_id: '',
+  room_number_id: '',
   floor_id: '',
   area_sqm: '',
   price: '',
@@ -96,9 +102,15 @@ const mode = ref(null) // 'create' | 'edit' | 'correct' | null
 const editingId = ref(null)
 const correction = reactive({ price: '', sale_status: '', reason: '' })
 
-onMounted(async () => {
-  await locations.fetchOne(props.id)
-  await units.fetchForLocation(props.id)
+onMounted(() => {
+  // The three reads are independent — fire them together instead of chaining
+  // so the page paints as soon as the slowest one returns, not their sum.
+  locations.fetchOne(props.id)
+  units.fetchForLocation(props.id)
+  locationsApi
+    .insights(props.id)
+    .then((data) => (insights.value = data))
+    .catch(() => (insights.value = null))
 })
 
 function openCreate() {
@@ -110,7 +122,7 @@ function openCreate() {
 function openEdit(u) {
   Object.assign(form, {
     reference: u.reference,
-    type_id: u.type_id ?? '',
+    room_number_id: u.room_number_id ?? '',
     floor_id: u.floor_id ?? '',
     area_sqm: u.area_sqm ?? '',
     price: u.price ?? '',
@@ -138,7 +150,7 @@ function num(v) {
 async function submit() {
   const specs = {
     reference: form.reference.trim(),
-    type_id: form.type_id || null,
+    room_number_id: form.room_number_id || null,
     floor_id: form.floor_id || null,
     area_sqm: num(form.area_sqm),
     block: form.block.trim() || null,
@@ -193,6 +205,29 @@ async function remove(u) {
     </div>
 
     <template v-else>
+      <!-- Cover hero (only when a cover picture is set) -->
+      <div
+        v-if="locations.current.cover_media_id"
+        class="relative mb-5 h-44 overflow-hidden rounded-2xl border border-line sm:h-56"
+      >
+        <img
+          :src="mediaFileUrl(locations.current.cover_media_id)"
+          :alt="locations.current.name"
+          class="h-full w-full object-cover"
+          :style="{
+            objectPosition: `${locations.current.cover_focus_x ?? 50}% ${locations.current.cover_focus_y ?? 50}%`,
+          }"
+        />
+        <div class="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+        <div class="absolute bottom-0 left-0 p-5">
+          <h1 class="text-2xl font-bold text-white drop-shadow-sm">{{ locations.current.name }}</h1>
+          <p class="num mt-0.5 text-sm text-white/80">
+            {{ locations.current.code }}
+            <template v-if="locations.current.wilaya"> · {{ locations.current.wilaya.name }}</template>
+          </p>
+        </div>
+      </div>
+
       <PageHeader :title="locations.current.name" :back="{ name: 'inventory.locations' }">
         <template #back-label>Projects</template>
         <template #badges>
@@ -236,6 +271,7 @@ async function remove(u) {
           :value="statusCounts.reserved"
           icon="pi pi-lock"
           tone="warning"
+          :hint="statusCounts.onhold ? `${statusCounts.onhold} on hold` : ''"
           :loading="units.loading"
         />
         <StatCard
@@ -247,10 +283,19 @@ async function remove(u) {
         />
       </div>
 
-      <Tabs value="overview" scrollable>
+      <!-- lazy: only the active tab's panel is mounted, so opening the page
+           doesn't eagerly boot the stacking grid, both DataTables, the media
+           gallery and the activity feed (each of which fetches on mount). -->
+      <Tabs value="overview" scrollable lazy>
         <TabList>
           <Tab value="overview"
             ><i class="pi pi-info-circle mr-2" aria-hidden="true" />Overview</Tab
+          >
+          <Tab value="performance"
+            ><i class="pi pi-chart-line mr-2" aria-hidden="true" />Performance</Tab
+          >
+          <Tab v-if="canSeeFeedback" value="feedback"
+            ><i class="pi pi-comments mr-2" aria-hidden="true" />Voice of Client</Tab
           >
           <Tab value="stacking"><i class="pi pi-table mr-2" aria-hidden="true" />Stacking plan</Tab>
           <Tab value="units"><i class="pi pi-th-large mr-2" aria-hidden="true" />Units</Tab>
@@ -268,16 +313,26 @@ async function remove(u) {
                     <dt class="text-mute">Address</dt>
                     <dd class="text-right text-ink">
                       {{ locations.current.address || '—' }}
-                      <a
-                        v-if="mapsUrl"
-                        :href="mapsUrl"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="ml-1 text-primary-600 hover:underline dark:text-primary-400"
-                      >
-                        <i class="pi pi-external-link text-xs" aria-hidden="true" />
-                        Maps
-                      </a>
+                      <template v-if="mapsUrl">
+                        <a
+                          :href="mapsUrl"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="ml-1 text-primary-600 hover:underline dark:text-primary-400"
+                        >
+                          <i class="pi pi-external-link text-xs" aria-hidden="true" />
+                          Maps
+                        </a>
+                        <button
+                          type="button"
+                          title="Copy Maps link"
+                          aria-label="Copy Maps link"
+                          class="ml-1 text-primary-600 hover:underline dark:text-primary-400"
+                          @click="copyToClipboard(mapsUrl, 'Maps link copied')"
+                        >
+                          <i class="pi pi-copy text-xs" aria-hidden="true" />
+                        </button>
+                      </template>
                     </dd>
                   </div>
                   <div class="flex justify-between gap-3">
@@ -289,6 +344,24 @@ async function remove(u) {
                   <div class="flex justify-between gap-3">
                     <dt class="text-mute">Contract type</dt>
                     <dd class="text-ink">{{ locations.current.contract_type || '—' }}</dd>
+                  </div>
+                  <div class="flex justify-between gap-3">
+                    <dt class="shrink-0 text-mute">Payment methods</dt>
+                    <dd class="text-right text-ink">
+                      <span
+                        v-if="locations.current.payment_methods?.length"
+                        class="flex flex-wrap justify-end gap-1"
+                      >
+                        <span
+                          v-for="m in locations.current.payment_methods"
+                          :key="m.id"
+                          class="inline-flex items-center rounded-full bg-highlight px-2 py-0.5 text-xs text-ink"
+                        >
+                          {{ m.label }}
+                        </span>
+                      </span>
+                      <template v-else>—</template>
+                    </dd>
                   </div>
                   <div class="flex justify-between gap-3">
                     <dt class="text-mute">GTM priority</dt>
@@ -325,6 +398,51 @@ async function remove(u) {
                 />
               </SectionCard>
             </div>
+          </TabPanel>
+
+          <!-- ── Performance (funnel, pipeline, revenue) ── -->
+          <TabPanel value="performance">
+            <div v-if="insights" class="space-y-5">
+              <SectionCard title="Inventory funnel" icon="pi pi-filter">
+                <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+                  <StatCard label="Units" :value="insights.units.total" icon="pi pi-th-large" />
+                  <StatCard label="Available" :value="insights.units.available" icon="pi pi-check-circle" tone="success" />
+                  <StatCard label="Reserved" :value="insights.units.reserved" icon="pi pi-lock" tone="warning" />
+                  <StatCard label="Sold" :value="insights.units.sold" icon="pi pi-flag-fill" tone="info" />
+                </div>
+                <div v-if="insights.boxes.total" class="mt-3 grid grid-cols-3 gap-3 sm:gap-4">
+                  <StatCard label="Boxes" :value="insights.boxes.total" icon="pi pi-car" />
+                  <StatCard label="Boxes available" :value="insights.boxes.available" icon="pi pi-check-circle" tone="success" />
+                  <StatCard label="Boxes sold" :value="insights.boxes.sold" icon="pi pi-flag-fill" tone="info" />
+                </div>
+              </SectionCard>
+
+              <SectionCard title="Pipeline" icon="pi pi-briefcase">
+                <div class="grid grid-cols-3 gap-3 sm:gap-4">
+                  <StatCard label="Active projects" :value="insights.pipeline.active_projects" icon="pi pi-users" />
+                  <StatCard label="Won" :value="insights.pipeline.won" icon="pi pi-trophy" tone="success" />
+                  <StatCard label="Lost" :value="insights.pipeline.lost" icon="pi pi-times-circle" tone="danger" />
+                </div>
+              </SectionCard>
+
+              <SectionCard v-if="insights.revenue" title="Revenue" icon="pi pi-money-bill">
+                <div class="grid grid-cols-2 gap-3 sm:gap-4">
+                  <StatCard label="Collected" :value="formatMoney(insights.revenue.collected)" icon="pi pi-wallet" tone="success" />
+                  <StatCard label="Sold value" :value="formatMoney(insights.revenue.sold_value)" icon="pi pi-chart-line" tone="info" />
+                </div>
+              </SectionCard>
+            </div>
+            <EmptyState
+              v-else
+              icon="pi pi-chart-line"
+              title="No performance data"
+              body="Performance figures will appear once the project has inventory and activity."
+            />
+          </TabPanel>
+
+          <!-- ── Voice of Client (log-mined feedback analytics) ── -->
+          <TabPanel v-if="canSeeFeedback" value="feedback">
+            <FeedbackPanel :id="props.id" scope="location" />
           </TabPanel>
 
           <!-- ── Stacking plan (colour-coded by sale status) ── -->
@@ -481,12 +599,20 @@ async function remove(u) {
     >
       <form class="space-y-4" @submit.prevent="submit">
         <div class="grid gap-3 sm:grid-cols-3">
-          <BaseInput v-model="form.reference" label="Reference" />
+          <BaseInput v-model="form.reference" label="Reference" required />
+          <!-- Project type is a project attribute the unit inherits — shown
+               read-only for context (edit it on the project). -->
+          <div>
+            <label class="mb-1 block text-sm font-medium text-mute">Project type</label>
+            <p class="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink">
+              {{ locations.current?.type || '—' }}
+            </p>
+          </div>
           <BaseSelect
-            v-model="form.type_id"
-            label="Type"
+            v-model="form.room_number_id"
+            label="Room number"
             placeholder="— none —"
-            :options="unitTypes.map((t) => ({ value: t.id, label: t.label }))"
+            :options="roomNumbers.map((r) => ({ value: r.id, label: r.label }))"
           />
           <BaseSelect
             v-model="form.floor_id"
@@ -495,7 +621,15 @@ async function remove(u) {
             :options="floors.map((f) => ({ value: f.id, label: f.label }))"
           />
           <BaseInput v-model="form.area_sqm" label="Area (m²)" type="number" />
-          <BaseInput v-if="mode === 'create'" v-model="form.price" label="Price" type="number" />
+          <!-- Contract type is a project attribute the unit inherits — shown
+               read-only for context (edit it on the project). -->
+          <div>
+            <label class="mb-1 block text-sm font-medium text-mute">Contract type</label>
+            <p class="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink">
+              {{ locations.current?.contract_type || '—' }}
+            </p>
+          </div>
+          <MoneyInput v-if="mode === 'create'" v-model="form.price" label="Price" required />
           <BaseInput v-model="form.block" label="Block" />
           <BaseInput v-model="form.stack_floor" label="Stack floor" type="number" />
           <BaseInput v-model="form.position" label="Position" type="number" />
@@ -525,7 +659,7 @@ async function remove(u) {
     >
       <form class="space-y-4" @submit.prevent="submitCorrection">
         <div class="grid gap-3 sm:grid-cols-3">
-          <BaseInput v-model="correction.price" label="Price" type="number" />
+          <MoneyInput v-model="correction.price" label="Price" />
           <BaseSelect
             v-model="correction.sale_status"
             label="Sale status"
@@ -536,7 +670,7 @@ async function remove(u) {
               { value: 'sold', label: 'Sold' },
             ]"
           />
-          <BaseInput v-model="correction.reason" label="Reason" />
+          <BaseInput v-model="correction.reason" label="Reason" required />
         </div>
         <p class="text-xs text-mute">
           This cancels the current row and creates a linked new version — the old value is kept.

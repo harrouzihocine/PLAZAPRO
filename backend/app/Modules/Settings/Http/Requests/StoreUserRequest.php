@@ -22,6 +22,9 @@ class StoreUserRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            // Login handle: lowercase letters/digits/dot/underscore. Set by an
+            // admin here; the owner can never change it themselves.
+            'username' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[a-z0-9._]+$/', 'unique:users,username'],
             'password' => ['required', 'string', Password::defaults()],
             // Exactly one role: a single id, required.
             'role_id' => ['required', 'integer', 'exists:roles,id'],

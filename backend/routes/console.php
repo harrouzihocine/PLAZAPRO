@@ -14,6 +14,10 @@ Artisan::command('inspire', function () {
 // container (schedule:work, or cron calling schedule:run). See Phase 7.
 Schedule::command('holds:expire')->everyFiveMinutes()->withoutOverlapping();
 
+// Return On Hold units whose holding-deposit window lapsed to the market
+// (reserved if backups remain, else available) and notify the former holder.
+Schedule::command('onhold:expire')->everyFiveMinutes()->withoutOverlapping();
+
 // Pipeline reminders: generate reminders for due/overdue next actions (hourly),
 // then dispatch the pending ones to their assigned agents (every minute).
 Schedule::command('actions:mark-overdue')->hourly()->withoutOverlapping();
@@ -25,3 +29,6 @@ Schedule::command('reminders:upcoming-digest')->dailyAt('08:00')->withoutOverlap
 
 // Flip past-due, unpaid payment-schedule instalments to overdue (daily).
 Schedule::command('schedules:mark-overdue')->dailyAt('00:15')->withoutOverlapping();
+
+// Nudge creators of clients left empty (no project/call/desire) for 48h — once.
+Schedule::command('clients:flag-empty')->dailyAt('07:00')->withoutOverlapping();

@@ -7,7 +7,9 @@ namespace Tests\Feature\Clients;
 use App\Modules\Clients\Models\Client;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Clients\Models\Desire;
+use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
+use App\Modules\Pipeline\Models\Call;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
@@ -34,7 +36,7 @@ class DesireFlexTest extends TestCase
     {
         $client = Client::factory()->create();
         $project = ClientProject::factory()->create(['client_id' => $client->id]);
-        Sanctum::actingAs($this->userWith(['clients.view', 'clients.manage', 'clients.create']));
+        Sanctum::actingAs($this->userWith(['clients.view', 'projects.manage', 'clients.create']));
 
         $this->postJson("/api/v1/projects/{$project->id}/shift-to-desire", ['budget_max' => '3000000', 'notes' => 'Wants something cheaper'])
             ->assertSuccessful();
@@ -68,10 +70,89 @@ class DesireFlexTest extends TestCase
         $this->getJson('/api/v1/desires/matches')->assertOk()->assertJsonCount(0, 'data');
     }
 
+    public function test_summary_carries_the_matches_count_agent_scoped_for_the_sidebar_badge(): void
+    {
+        $agent = $this->userWith(['clients.view', 'units.view'], isAgent: true);
+        $client = Client::factory()->create(['assigned_agent_id' => $agent->id]);
+        Desire::factory()->create([
+            'client_id' => $client->id, 'client_project_id' => null,
+            'budget_min' => null, 'budget_max' => '2000.00', 'type_id' => null,
+            'wilaya_id' => null, 'commune_id' => null,
+        ]);
+        Unit::factory()->create(['price' => '1000.00', 'sale_status' => 'available']);
+
+        // The owning agent's badge counts the waiting client.
+        Sanctum::actingAs($agent);
+        $this->getJson('/api/v1/oversight/summary')->assertOk()->assertJsonPath('data.matches', 1);
+
+        // A different agent's badge is 0 — scoped to their own book, same as the board.
+        Sanctum::actingAs($this->userWith(['clients.view', 'units.view'], isAgent: true));
+        $this->getJson('/api/v1/oversight/summary')->assertOk()->assertJsonPath('data.matches', 0);
+
+        // Without units.view (the board's own gate), the key is absent, not zero.
+        Sanctum::actingAs($this->userWith(['clients.view']));
+        $this->assertArrayNotHasKey('matches', $this->getJson('/api/v1/oversight/summary')->assertOk()->json('data'));
+    }
+
+    public function test_the_board_ships_the_full_property_card_and_the_desire_brief(): void
+    {
+        $agent = $this->userWith(['clients.view', 'units.view'], isAgent: true);
+        $client = Client::factory()->create(['assigned_agent_id' => $agent->id]);
+        Desire::factory()->create([
+            'client_id' => $client->id, 'client_project_id' => null,
+            'budget_min' => null, 'budget_max' => null, 'type_id' => null,
+            'wilaya_id' => null, 'commune_id' => null, 'notes' => 'Wants something nice',
+        ]);
+        $unit = Unit::factory()->create(['price' => '1000.00', 'sale_status' => 'available', 'area_sqm' => 75]);
+
+        Sanctum::actingAs($agent);
+
+        // Reference/price alone told an agent nothing about fit — the card now
+        // ships area/status/rank, and the desire rides through so "why this
+        // matched" doesn't need a trip to the client file.
+        $this->getJson('/api/v1/desires/matches')
+            ->assertOk()
+            ->assertJsonPath('data.0.matches.0.id', $unit->id)
+            ->assertJsonPath('data.0.matches.0.area_sqm', '75.00')
+            ->assertJsonPath('data.0.matches.0.sale_status', 'available')
+            ->assertJsonPath('data.0.matches.0.best_match', true)
+            ->assertJsonPath('data.0.desire.notes', 'Wants something nice');
+    }
+
+    public function test_the_board_links_back_to_the_project_the_desire_was_shifted_from(): void
+    {
+        $agent = $this->userWith(['clients.view', 'units.view', 'projects.manage', 'clients.create'], isAgent: true);
+        $client = Client::factory()->create(['assigned_agent_id' => $agent->id]);
+        $location = Location::factory()->create();
+        $project = ClientProject::factory()->create(['client_id' => $client->id, 'location_id' => $location->id]);
+        Sanctum::actingAs($agent);
+
+        $this->postJson("/api/v1/projects/{$project->id}/shift-to-desire", ['notes' => 'Wants something cheaper'])
+            ->assertSuccessful();
+        Unit::factory()->create(['price' => '1000.00', 'sale_status' => 'available']);
+
+        // A desire shifted off a project points back to it — the board's link.
+        $this->getJson('/api/v1/desires/matches')
+            ->assertOk()
+            ->assertJsonPath('data.0.origin_project.id', $project->id)
+            ->assertJsonPath('data.0.origin_project.label', $location->name);
+
+        // A desire captured straight off a call (no prior project) has none.
+        $freshClient = Client::factory()->create(['assigned_agent_id' => $agent->id]);
+        Desire::factory()->create([
+            'client_id' => $freshClient->id, 'client_project_id' => null,
+            'budget_min' => null, 'budget_max' => null, 'type_id' => null,
+            'wilaya_id' => null, 'commune_id' => null,
+        ]);
+        $this->getJson('/api/v1/desires/matches')
+            ->assertOk()
+            ->assertJsonPath('data.1.origin_project', null);
+    }
+
     public function test_shifting_marks_the_project_as_waiting_on_desire(): void
     {
         $project = ClientProject::factory()->create();
-        Sanctum::actingAs($this->userWith(['clients.view', 'clients.manage', 'clients.create', 'projects.view_all']));
+        Sanctum::actingAs($this->userWith(['clients.view', 'projects.manage', 'clients.create', 'projects.view_all']));
 
         $this->postJson("/api/v1/projects/{$project->id}/shift-to-desire", ['budget_max' => '100', 'notes' => 'Tiny budget for now'])
             ->assertSuccessful();
@@ -91,7 +172,7 @@ class DesireFlexTest extends TestCase
     {
         $client = Client::factory()->create();
         $project = ClientProject::factory()->create(['client_id' => $client->id]);
-        Sanctum::actingAs($this->userWith(['clients.view', 'clients.manage', 'clients.create', 'calls.log']));
+        Sanctum::actingAs($this->userWith(['clients.view', 'projects.manage', 'clients.create', 'calls.log']));
 
         $this->postJson("/api/v1/projects/{$project->id}/shift-to-desire", ['budget_max' => '100', 'notes' => 'Tiny budget for now'])
             ->assertSuccessful();
@@ -109,5 +190,71 @@ class DesireFlexTest extends TestCase
         $this->assertDatabaseHas('calls', [
             'client_id' => $client->id, 'client_project_id' => $project->id,
         ]);
+    }
+
+    // Desire Matches "Reconnect & qualify": a call that qualifies with properties
+    // (the Desire Matches board's action) both opens the project AND closes the
+    // waiting-list entry — otherwise the same client re-surfaces on the board on
+    // the very next matcher run despite already being back in an active pipeline.
+
+    public function test_reconnecting_with_properties_closes_the_waiting_desire(): void
+    {
+        $client = Client::factory()->create();
+        Desire::factory()->create(['client_id' => $client->id, 'client_project_id' => null]);
+        $unit = Unit::factory()->create();
+        Sanctum::actingAs($this->userWith(['clients.view', 'calls.log']));
+
+        $this->postJson("/api/v1/clients/{$client->id}/calls", [
+            'direction' => 'outbound',
+            'properties' => [['shortlistable_type' => 'unit', 'shortlistable_id' => $unit->id]],
+            'next_action' => ['type' => 'call', 'due_date' => now()->addDay()->toDateString()],
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('desires', [
+            'client_id' => $client->id, 'status' => 'cancelled',
+        ]);
+        $this->assertSame(1, ClientProject::query()->where('client_id', $client->id)->count());
+    }
+
+    public function test_a_reconnected_client_drops_off_the_desire_matches_board(): void
+    {
+        $agent = $this->userWith(['clients.view', 'units.view', 'calls.log'], isAgent: true);
+        $client = Client::factory()->create(['assigned_agent_id' => $agent->id]);
+        Desire::factory()->create([
+            'client_id' => $client->id, 'client_project_id' => null,
+            'budget_min' => null, 'budget_max' => null, 'type_id' => null,
+            'wilaya_id' => null, 'commune_id' => null,
+        ]);
+        $unit = Unit::factory()->create(['price' => '1000.00', 'sale_status' => 'available']);
+        Sanctum::actingAs($agent);
+
+        $this->getJson('/api/v1/desires/matches')->assertOk()->assertJsonCount(1, 'data');
+
+        $this->postJson("/api/v1/clients/{$client->id}/calls", [
+            'direction' => 'outbound',
+            'properties' => [['shortlistable_type' => 'unit', 'shortlistable_id' => $unit->id]],
+            'next_action' => ['type' => 'call', 'due_date' => now()->addDay()->toDateString()],
+        ])->assertCreated();
+
+        $this->getJson('/api/v1/desires/matches')->assertOk()->assertJsonCount(0, 'data');
+    }
+
+    public function test_a_closed_out_desire_is_revived_not_left_stuck_cancelled(): void
+    {
+        $client = Client::factory()->create();
+        Call::factory()->create(['client_id' => $client->id]); // call-first rule
+        $desire = Desire::factory()->create(['client_id' => $client->id, 'client_project_id' => null]);
+        $desire->cancel('Reconnected — back in an active project');
+        Sanctum::actingAs($this->userWith(['clients.view', 'clients.create']));
+
+        // updateOrCreate() finds the SAME row (same client_id + null project) —
+        // it must come back active, not silently stay cancelled forever.
+        $this->putJson("/api/v1/clients/{$client->id}/desire", ['budget_max' => '4000000', 'notes' => 'Back on the market'])
+            ->assertOk();
+
+        $this->assertDatabaseHas('desires', [
+            'client_id' => $client->id, 'status' => 'active',
+        ]);
+        $this->assertSame(1, Desire::where('client_id', $client->id)->count());
     }
 }

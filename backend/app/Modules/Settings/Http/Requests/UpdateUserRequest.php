@@ -25,6 +25,9 @@ class UpdateUserRequest extends FormRequest
         return [
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'email' => ['sometimes', 'required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($id)],
+            // Only an admin (this request is gated by users.manage) may change a
+            // username; the owner's own profile endpoint never touches it.
+            'username' => ['sometimes', 'required', 'string', 'min:3', 'max:50', 'regex:/^[a-z0-9._]+$/', Rule::unique('users', 'username')->ignore($id)],
             // Optional on update: only changed when a non-empty value is sent.
             'password' => ['nullable', 'string', Password::defaults()],
             // Still exactly one role.

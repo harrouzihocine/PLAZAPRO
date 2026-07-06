@@ -5,6 +5,7 @@ import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import MoneyInput from '@/components/base/MoneyInput.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { useDynamicList } from '@/composables/useDynamicList'
@@ -94,14 +95,14 @@ async function remove(b) {
       class="grid gap-3 border-b border-line px-4 py-4 sm:grid-cols-3 sm:px-5"
       @submit.prevent="submit"
     >
-      <BaseInput v-model="form.reference" label="Reference" />
+      <BaseInput v-model="form.reference" label="Reference" required />
       <BaseSelect
         v-model="form.type_id"
         label="Type"
         placeholder="— none —"
         :options="boxTypes.map((t) => ({ value: t.id, label: t.label }))"
       />
-      <BaseInput v-model="form.price" label="Price" type="number" />
+      <MoneyInput v-model="form.price" label="Price" required />
       <BaseSelect
         v-model="form.unit_id"
         label="Linked unit"

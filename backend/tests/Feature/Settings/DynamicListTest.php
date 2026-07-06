@@ -102,19 +102,32 @@ class DynamicListTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrorFor('value');
     }
 
+    public function test_value_is_auto_generated_from_the_label_when_omitted(): void
+    {
+        $list = DynamicList::factory()->create(['key' => 'payment_methods']);
+        Sanctum::actingAs($this->admin());
+
+        // First "Cheque" slugs to "cheque"; the second dedupes to "cheque_2".
+        $this->postJson('/api/v1/dynamic-lists/payment_methods/items', ['label' => 'Cheque'])
+            ->assertCreated()->assertJsonPath('data.value', 'cheque');
+
+        $this->postJson('/api/v1/dynamic-lists/payment_methods/items', ['label' => 'Cheque'])
+            ->assertCreated()->assertJsonPath('data.value', 'cheque_2');
+    }
+
     public function test_reorder_persists_sort_order(): void
     {
-        $list = DynamicList::factory()->create(['key' => 'unit_types']);
+        $list = DynamicList::factory()->create(['key' => 'project_types']);
         $a = $this->item($list, 'a', 0);
         $b = $this->item($list, 'b', 1);
         $c = $this->item($list, 'c', 2);
         Sanctum::actingAs($this->admin());
 
-        $this->postJson('/api/v1/dynamic-lists/unit_types/items/reorder', [
+        $this->postJson('/api/v1/dynamic-lists/project_types/items/reorder', [
             'order' => [$c->id, $b->id, $a->id],
         ])->assertOk();
 
-        $values = collect($this->getJson('/api/v1/dynamic-lists/unit_types')->json('data.items'))
+        $values = collect($this->getJson('/api/v1/dynamic-lists/project_types')->json('data.items'))
             ->pluck('value')->all();
         $this->assertSame(['c', 'b', 'a'], $values);
         $this->assertDatabaseHas('dynamic_list_items', ['id' => $c->id, 'sort_order' => 0]);

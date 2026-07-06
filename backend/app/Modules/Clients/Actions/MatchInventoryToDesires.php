@@ -14,7 +14,8 @@ use Illuminate\Support\Collection;
  * whose criteria it satisfies (wilaya / commune / type / floor / area / budget /
  * preferred sites), eager-loading each desire's client + assigned agent so the
  * caller can notify. Only criteria the client actually set are applied — the
- * mirror image of the forward matcher. An unavailable unit matches nothing.
+ * mirror image of the forward matcher. A SOLD unit matches nothing; a reserved
+ * or on-hold one still does (it can be taken as a backup / 2nd place).
  */
 class MatchInventoryToDesires
 {
@@ -23,13 +24,16 @@ class MatchInventoryToDesires
      */
     public function handle(Unit $unit): Collection
     {
-        if ($unit->sale_status !== SaleStatus::Available) {
+        if ($unit->sale_status === SaleStatus::Sold) {
             return collect();
         }
 
         $unit->loadMissing('location');
         $wilayaId = $unit->location?->wilaya_id;
         $communeId = $unit->location?->commune_id;
+        // Project type and contract type are project (location) attributes the unit inherits.
+        $projectTypeId = $unit->location?->type_id;
+        $contractTypeId = $unit->location?->contract_type_id;
 
         // A criterion the client set only matches when the unit actually has that
         // attribute; when the unit's value is null, only desires that left the
@@ -38,10 +42,22 @@ class MatchInventoryToDesires
         return Desire::query()
             ->active()
             ->with(['client.assignedAgent'])
-            ->where(function ($q) use ($unit) {
+            ->where(function ($q) use ($projectTypeId) {
                 $q->whereNull('type_id');
-                if ($unit->type_id !== null) {
-                    $q->orWhere('type_id', $unit->type_id);
+                if ($projectTypeId !== null) {
+                    $q->orWhere('type_id', $projectTypeId);
+                }
+            })
+            ->where(function ($q) use ($unit) {
+                $q->whereNull('room_number_id');
+                if ($unit->room_number_id !== null) {
+                    $q->orWhere('room_number_id', $unit->room_number_id);
+                }
+            })
+            ->where(function ($q) use ($contractTypeId) {
+                $q->whereNull('contract_type_id');
+                if ($contractTypeId !== null) {
+                    $q->orWhere('contract_type_id', $contractTypeId);
                 }
             })
             ->where(function ($q) use ($unit) {

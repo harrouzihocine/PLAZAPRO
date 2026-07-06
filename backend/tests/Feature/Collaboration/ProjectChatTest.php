@@ -46,7 +46,7 @@ class ProjectChatTest extends TestCase
 
     public function test_creating_a_project_creates_its_dedicated_chat(): void
     {
-        $creator = $this->userWith(['clients.view', 'clients.manage', 'chat.use']);
+        $creator = $this->userWith(['clients.view', 'clients.view_all', 'clients.create', 'projects.create', 'chat.use']);
         $client = Client::factory()->create();
         Sanctum::actingAs($creator);
 
@@ -62,7 +62,7 @@ class ProjectChatTest extends TestCase
 
     public function test_viewer_changes_sync_the_chat_participants(): void
     {
-        $creator = $this->userWith(['clients.view', 'clients.manage', 'projects.contributors', 'chat.use']);
+        $creator = $this->userWith(['clients.view', 'clients.view_all', 'clients.create', 'projects.create', 'projects.contributors', 'chat.use']);
         $viewer = $this->userWith(['chat.use']);
         $client = Client::factory()->create();
         Sanctum::actingAs($creator);
@@ -81,7 +81,7 @@ class ProjectChatTest extends TestCase
 
     public function test_the_project_conversation_endpoint_is_visibility_scoped(): void
     {
-        $creator = $this->userWith(['clients.view', 'clients.manage', 'chat.use']);
+        $creator = $this->userWith(['clients.view', 'clients.view_all', 'clients.create', 'projects.create', 'chat.use']);
         $outsider = $this->userWith(['chat.use']);
         $client = Client::factory()->create();
 
@@ -98,7 +98,7 @@ class ProjectChatTest extends TestCase
 
     public function test_oversight_permission_reads_project_chats_but_cannot_write(): void
     {
-        $creator = $this->userWith(['clients.view', 'clients.manage', 'chat.use']);
+        $creator = $this->userWith(['clients.view', 'clients.view_all', 'clients.create', 'projects.create', 'chat.use']);
         $overseer = $this->userWith(['chat.use', 'chat.view_project_chats']);
         $client = Client::factory()->create();
 
@@ -129,7 +129,7 @@ class ProjectChatTest extends TestCase
 
     public function test_participate_permission_reads_and_writes_project_chats(): void
     {
-        $creator = $this->userWith(['clients.view', 'clients.manage', 'chat.use']);
+        $creator = $this->userWith(['clients.view', 'clients.view_all', 'clients.create', 'projects.create', 'chat.use']);
         $participant = $this->userWith(['chat.use', 'chat.participate_project_chats']);
         $client = Client::factory()->create();
 
@@ -168,7 +168,7 @@ class ProjectChatTest extends TestCase
 
     public function test_without_the_permission_a_non_participant_cannot_read_a_project_chat(): void
     {
-        $creator = $this->userWith(['clients.view', 'clients.manage', 'chat.use']);
+        $creator = $this->userWith(['clients.view', 'clients.view_all', 'clients.create', 'projects.create', 'chat.use']);
         $stranger = $this->userWith(['chat.use']);
         $client = Client::factory()->create();
 

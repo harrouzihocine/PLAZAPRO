@@ -31,6 +31,15 @@ export const pipelineApi = {
     return data.data
   },
 
+  // Add apartment(s) to visit on a project, standalone (no need to complete an
+  // open visit first). Assigned → materializes the pending visit(s); unassigned
+  // → lands in the dispatch pool. Payload: { unit_ids, due_date, due_time?,
+  // assigned_to? } (assigned_to honored only for dispatchers, server-side).
+  async proposeInSiteVisit(projectId, payload) {
+    const { data } = await useApi().post(`/projects/${projectId}/in-site-visits`, payload)
+    return data.data
+  },
+
   // Corrections — every edit is a cancel + new version, so a reason is required.
   async correctCall(callId, payload) {
     const { data } = await useApi().post(`/calls/${callId}/correct`, payload)
@@ -45,6 +54,15 @@ export const pipelineApi = {
   async correctNextAction(nextActionId, payload) {
     const { data } = await useApi().post(`/next-actions/${nextActionId}/correct`, payload)
     return data.data
+  },
+
+  // The signed-in user's own workload for a week (`days` from `from`, default
+  // today), bucketed per day — the free/busy strip that helps an agent pick when
+  // to schedule the follow-up. `from` ('YYYY-MM-DD') shifts to a later week.
+  async myAgenda({ days = 7, from = null } = {}) {
+    const params = from ? { days, from } : { days }
+    const { data } = await useApi().get('/me/agenda', { params })
+    return data.data // [{ date, items: [{ kind, time, client, label }] }]
   },
 
   // The dispatch board (visits.dispatch): pending in-site pool + agent week grid.

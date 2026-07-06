@@ -36,26 +36,33 @@ class TimelineController extends Controller
         );
 
         $projectId = $request->query('project_id');
+
+        // Logs are visible per project: only those on a project the caller can see
+        // (ClientProject::visibleTo — projects.view_all sees all), plus client-level
+        // (no-project) qualifying logs. This silos a duplicate-resolution "separate
+        // project": the other agent's activity on the same client never surfaces
+        // here. ?project_id narrows the same visible set to one project's story.
+        $projectIds = ClientProject::query()
+            ->where('client_id', $client->id)
+            ->visibleTo($request->user())
+            ->when($projectId, fn ($q) => $q->whereKey($projectId))
+            ->pluck('id');
+
         $scoped = fn ($q) => $q->where(fn ($s) => $s
-            ->where('client_project_id', $projectId)
+            ->whereIn('client_project_id', $projectIds)
             ->orWhereNull('client_project_id'));
 
         // Cancelled/superseded versions are returned too — an edit never hides
         // its history (the FE nests old versions under their replacement).
         $calls = Call::query()
             ->where('client_id', $client->id)
-            ->when($projectId, $scoped)
+            ->where($scoped)
             ->with(['agent', 'outcome', 'supersedes'])->latest('called_at')->get();
 
         $visits = Visit::query()
             ->where('client_id', $client->id)
-            ->when($projectId, $scoped)
-            ->with(['agent', 'unit.type', 'unit.floor', 'unit.location', 'outcome', 'supersedes'])->orderByDesc('scheduled_at')->get();
-
-        $projectIds = ClientProject::query()
-            ->where('client_id', $client->id)
-            ->when($projectId, fn ($q) => $q->whereKey($projectId))
-            ->pluck('id');
+            ->where($scoped)
+            ->with(['agent', 'unit.floor', 'unit.location', 'unit.location.type', 'outcome', 'supersedes'])->orderByDesc('scheduled_at')->get();
 
         // Only active pending actions — a superseded (cancelled) row keeps its
         // 'pending' state value but must not surface as the open action.

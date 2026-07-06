@@ -29,17 +29,25 @@ class UnitResource extends JsonResource
                 'commune_id' => $this->location?->commune_id,
                 'commune' => $this->location?->commune?->name,
                 'contract_type' => $this->location?->contractType?->label,
+                // Project type (open / closed / semi-closed residence) — a project
+                // attribute the unit inherits, surfaced for context.
+                'type' => $this->location?->type?->label,
                 'expected_delivery_date' => $this->location?->expected_delivery_date?->toDateString(),
                 'gtm_priority' => $this->location?->gtm_priority?->value,
             ]),
             'reference' => $this->reference,
-            'type_id' => $this->type_id,
-            'type' => $this->whenLoaded('type', fn () => $this->type?->label),
+            'room_number_id' => $this->room_number_id,
+            'room_number' => $this->whenLoaded('roomNumber', fn () => $this->roomNumber?->label),
             'floor_id' => $this->floor_id,
             'floor' => $this->whenLoaded('floor', fn () => $this->floor?->label),
             'area_sqm' => $this->area_sqm,
             'price' => $this->price,
             'sale_status' => $this->sale_status?->value,
+            // How many distinct client projects hold this unit — the "Reserved N"
+            // counter. On Hold adds its deposit timer + holder project id.
+            'reserved_count' => $this->reservedCountForResource(),
+            'onhold_expires_at' => $this->onhold_expires_at?->toIso8601String(),
+            'onhold_project_id' => $this->onhold_project_id,
             'gtm_priority' => $this->gtm_priority?->value,
             'block' => $this->block,
             'stack_floor' => $this->stack_floor,
@@ -48,5 +56,23 @@ class UnitResource extends JsonResource
             'supersedes_id' => $this->supersedes_id,
             'created_at' => $this->created_at,
         ];
+    }
+
+    /**
+     * Distinct client projects with a live hold. Uses the eager-loaded
+     * activeReservations collection when present (list view — no N+1), else a
+     * scoped count (detail view).
+     */
+    private function reservedCountForResource(): int
+    {
+        if ($this->resource->relationLoaded('activeReservations')) {
+            return $this->activeReservations
+                ->pluck('client_project_id')
+                ->filter()
+                ->unique()
+                ->count();
+        }
+
+        return $this->reservedCount();
     }
 }

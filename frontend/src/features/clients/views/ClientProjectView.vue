@@ -57,9 +57,10 @@ async function openProjectChat() {
   }
 }
 
-const canManage = () => auth.can('clients.manage')
+const canManage = () => auth.can('projects.manage')
 const canDirectDeal = () => auth.can('deals.direct')
 const canViewPayments = () => auth.can('versements.view')
+const canFreeze = () => auth.can('projects.freeze')
 
 const loading = ref(true)
 
@@ -72,13 +73,49 @@ const project = computed(
 const isClosed = computed(() => project.value && project.value.status !== 'active')
 
 const unitLine = (u) =>
-  [u.reference, u.type, u.floor, u.area_sqm ? `${u.area_sqm} m²` : null].filter(Boolean).join(' · ')
+  [u.reference, u.type, u.room_number, u.floor, u.area_sqm ? `${u.area_sqm} m²` : null]
+    .filter(Boolean)
+    .join(' · ')
+
+// Payments track EACH apartment alone: one panel per apartment that carries an
+// agreed price on ANY of the project's deals (several deals may coexist) —
+// won now, or won-then-released (its recorded payments stay visible as
+// refundable history). Legacy wins (closed before per-apartment tracking)
+// fall back to one project-level panel scoped to the stamped unit.
+const paymentUnits = computed(() => {
+  const deals = store.deals[props.projectId] ?? []
+  const byUnit = new Map()
+  for (const d of deals) {
+    for (const u of (d.units ?? []).filter((x) => x.agreed_price != null)) {
+      const prev = byUnit.get(u.id)
+      if (!prev || (prev.state !== 'won' && u.state === 'won')) byUnit.set(u.id, u)
+    }
+  }
+  if (byUnit.size) {
+    return [...byUnit.values()].map((u) => ({
+      id: u.id,
+      released: u.state !== 'won',
+      label: u.reference + (u.state !== 'won' ? ' (released)' : ''),
+      price: u.agreed_price,
+    }))
+  }
+  if (project.value?.stage !== 'won') return []
+  return [
+    {
+      id: project.value?.unit?.id ?? null,
+      released: false,
+      label: project.value?.unit?.reference ?? null,
+      price: project.value?.total_price ?? null,
+    },
+  ]
+})
 
 async function refresh() {
   await Promise.all([
     store.load(props.id),
     store.loadProjects(props.id),
     store.loadArchivedProjects(props.id),
+    store.loadDeals(props.projectId),
   ])
 }
 
@@ -124,7 +161,7 @@ async function submitShift() {
 }
 
 function cancelShift() {
-  shiftDraft.discard()
+  // Cancel just closes — the draft is kept (resume it from the pencil icon).
   shiftOpen.value = false
 }
 
@@ -150,6 +187,24 @@ async function archiveProject() {
 
 async function reactivateProject() {
   await store.reactivateProject(props.id, props.projectId)
+}
+
+// --- Freeze / unfreeze (projects.freeze): a deliberate close-down to NEW
+// activity — calls, plans, visits, deals and chat stop; payments still flow.
+async function freezeProject() {
+  const { isConfirmed } = await Swal.fire({
+    title: 'Freeze this project?',
+    text: 'No new activity can be added (calls, visits, deals, chat) until it is unfrozen. Payments and documents continue.',
+    showCancelButton: true,
+    confirmButtonText: 'Freeze',
+    customClass: { confirmButton: 'plaza-swal-confirm', cancelButton: 'plaza-swal-cancel' },
+  })
+  if (!isConfirmed) return
+  await store.freezeProject(props.id, props.projectId)
+}
+
+async function unfreezeProject() {
+  await store.unfreezeProject(props.id, props.projectId)
 }
 
 // Removing is reserved for empty projects (nothing ever logged on them) — a
@@ -184,7 +239,7 @@ const directDealDraft = useModalDraft({
 })
 
 function cancelDirectDeal() {
-  directDealDraft.discard()
+  // Cancel just closes — the draft is kept (resume it from the pencil icon).
   directDealOpen.value = false
 }
 
@@ -199,7 +254,7 @@ onMounted(() => {
 async function submitDirectDeal() {
   const units = directDealUnits.value
     .filter((p) => p.shortlistable_type === 'unit')
-    .map((p) => ({ unit_id: p.shortlistable_id, box_count: p.box_count ?? 0 }))
+    .map((p) => ({ unit_id: p.shortlistable_id, box_ids: p.box_ids ?? [] }))
   if (!units.length) {
     toastError('Pick at least one apartment / local for the deal.')
     return
@@ -264,39 +319,65 @@ async function submitDirectDeal() {
         </template>
         <template #actions>
           <template v-if="!isClosed">
+            <!-- Freeze = deliberate close-down to new activity (payments flow). -->
             <Button
-              v-if="canDirectDeal() && !project.active_deal"
+              v-if="canFreeze() && !project.frozen_at"
+              label="Freeze"
+              icon="pi pi-lock"
+              size="small"
+              severity="secondary"
+              outlined
+              @click="freezeProject"
+            />
+            <Button
+              v-else-if="canFreeze() && project.frozen_at"
+              label="Unfreeze"
+              icon="pi pi-lock-open"
+              size="small"
+              @click="unfreezeProject"
+            />
+            <!-- Several deals may be open at once — one per committed apartment. -->
+            <Button
+              v-if="canDirectDeal()"
+              v-tooltip.bottom="project.frozen ? 'This project is frozen' : null"
               label="Direct deal"
               icon="pi pi-briefcase"
               size="small"
+              :disabled="!!project.frozen"
               @click="directDealOpen = true"
             />
+            <!-- An open deal holds reserved inventory — close it (won / lost)
+                 before the project can leave the pipeline. -->
             <Button
               v-if="canManage()"
+              v-tooltip.bottom="project.active_deal ? 'Close the deal (won / lost) first' : null"
               label="Shift to desire"
               icon="pi pi-heart"
               size="small"
               severity="secondary"
               outlined
+              :disabled="!!project.active_deal"
               @click="openShift"
             />
             <Button
               v-if="canManage()"
+              v-tooltip.bottom="project.active_deal ? 'Close the deal (won / lost) first' : null"
               label="Archive"
               icon="pi pi-inbox"
               size="small"
               severity="secondary"
               outlined
+              :disabled="!!project.active_deal"
               @click="archiveProject"
             />
             <Button
               v-if="canManage() && project.is_empty"
+              v-tooltip.bottom="'Only an empty project can be removed'"
               label="Remove"
               icon="pi pi-trash"
               size="small"
               severity="danger"
               outlined
-              v-tooltip.bottom="'Only an empty project can be removed'"
               @click="removeProject"
             />
           </template>
@@ -308,7 +389,7 @@ async function submitDirectDeal() {
             @click="reactivateProject"
           />
           <Button
-            v-if="auth.can('chat.use')"
+            v-if="auth.can('chat.use') && project.can_view_collaborators"
             label="Project chat"
             icon="pi pi-comments"
             size="small"
@@ -326,20 +407,55 @@ async function submitDirectDeal() {
         </template>
       </PageHeader>
 
+      <!-- Explicit freeze: the project is closed to NEW activity until unfrozen. -->
+      <p
+        v-if="project.frozen_at"
+        class="mb-4 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-ink dark:border-amber-500/40 dark:bg-amber-500/10"
+      >
+        <i class="pi pi-lock text-amber-600 dark:text-amber-400" aria-hidden="true" />
+        This project is frozen — no new activity can be added (calls, visits, deals, chat).
+        Payments and documents still flow.
+      </p>
+
+      <!-- Awaiting dispatch: the in-site plan is in the pool with no field agent
+           chosen yet — shown until a dispatcher assigns the in-site agent. -->
+      <p
+        v-if="project.awaiting_in_site_agent"
+        class="mb-4 flex items-center gap-2 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2.5 text-sm text-ink dark:border-sky-500/40 dark:bg-sky-500/10"
+      >
+        <i class="pi pi-user-plus text-sky-600 dark:text-sky-400" aria-hidden="true" />
+        Waiting for the dispatcher to assign the in-site agent for this project — the
+        field visit is queued on the dispatch board.
+      </p>
+
       <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
         <!-- Main column: deal → shortlist → payments → interaction timeline -->
         <div class="space-y-5 xl:col-span-2">
           <template v-if="!isClosed">
-            <DealPanel :client-id="id" :project-id="project.id" />
+            <DealPanel :client-id="id" :project-id="project.id" @changed="refresh" />
             <ShortlistPanel :project-id="project.id" @changed="refresh" />
+          </template>
+          <!-- One payments panel per apartment with an agreed price — each
+               tracked alone. Released apartments keep their history (refunds),
+               and an archived project still shows the money story. -->
+          <template v-if="canViewPayments()">
             <PaymentsPanel
-              v-if="canViewPayments() && project.total_price && project.stage === 'won'"
+              v-for="pu in paymentUnits"
+              :key="pu.id ?? 'project'"
               :project-id="project.id"
-              :total-price="project.total_price"
+              :total-price="pu.price"
+              :unit-id="pu.id"
+              :unit-label="paymentUnits.length > 1 || pu.released ? pu.label : null"
             />
           </template>
           <SectionCard>
-            <TimelinePanel :client-id="id" :project-id="project.id" @changed="refresh" />
+            <TimelinePanel
+              :client-id="id"
+              :project-id="project.id"
+              :frozen="project.frozen"
+              :deal-settled="project.stage === 'won' || !!project.active_deal"
+              @changed="refresh"
+            />
           </SectionCard>
         </div>
 
@@ -378,7 +494,13 @@ async function submitDirectDeal() {
             </dl>
           </SectionCard>
 
-          <ProjectViewersPanel :project-id="Number(projectId)" />
+          <!-- "Who can see this project" is collaborator identity — shown only to
+               members / detail-trusted users (backend sets can_view_collaborators),
+               so a name-only looker cannot discover whose client this is. -->
+          <ProjectViewersPanel
+            v-if="project.can_view_collaborators"
+            :project-id="Number(projectId)"
+          />
 
           <SectionCard title="History" icon="pi pi-clock">
             <ActivityTimeline :id="Number(projectId)" type="client_project" />
@@ -394,7 +516,7 @@ async function submitDirectDeal() {
         re-matches (and reopens) when new inventory arrives.
       </p>
       <form class="space-y-4" @submit.prevent="submitShift">
-        <DraftBanner :visible="shiftDraft.restored.value" @discard="shiftDraft.discard()" />
+        <DraftBanner :visible="shiftDraft.restored.value" />
         <DesireFields v-model="shiftForm" />
         <div class="flex gap-2">
           <Button
@@ -421,12 +543,10 @@ async function submitDirectDeal() {
         immediately.
       </p>
       <form class="space-y-4" @submit.prevent="submitDirectDeal">
-        <DraftBanner
-          :visible="directDealDraft.restored.value"
-          @discard="directDealDraft.discard()"
-        />
-        <ProjectUnitsPicker v-model="directDealUnits" with-boxes />
-        <BaseTextarea v-model="directDealNotes" label="Notes (optional)" :rows="2" />
+        <DraftBanner :visible="directDealDraft.restored.value" />
+        <!-- Deal context: apartments only — a box always rides WITH an apartment. -->
+        <ProjectUnitsPicker v-model="directDealUnits" units-only with-boxes />
+        <BaseTextarea v-model="directDealNotes" label="Notes" :rows="2" />
         <div class="flex gap-2">
           <Button
             type="submit"

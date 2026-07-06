@@ -30,10 +30,12 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $fillable = [
         'name',
         'email',
+        'username',
         'password',
         'role_id',
         'department_id',
         'phone',
+        'avatar_path',
         'is_active',
     ];
 
@@ -61,6 +63,24 @@ class User extends Authenticatable implements MustVerifyEmail
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    /**
+     * Public URL for the profile photo, or null. The avatar itself lives on the
+     * private `media` disk and is streamed through a permission-gated endpoint
+     * (never a public path); `?v=` busts the browser cache when it changes.
+     */
+    public function avatarUrl(): ?string
+    {
+        if ($this->avatar_path === null) {
+            return null;
+        }
+
+        // Root-relative on purpose: the <img> must resolve against whatever
+        // origin the SPA is on (localhost:8080, a LAN IP, …) so the same-origin
+        // session cookie is sent — an absolute url() built from APP_URL would
+        // point at the wrong host/port. `?v=` busts the cache when it changes.
+        return '/api/v1/users/'.$this->id.'/avatar?v='.($this->updated_at?->timestamp ?? 0);
     }
 
     /** Route-level permission check, resolved through the single role. */

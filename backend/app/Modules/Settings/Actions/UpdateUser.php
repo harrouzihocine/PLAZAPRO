@@ -26,7 +26,7 @@ class UpdateUser
         );
 
         $attributes = Arr::only($data, [
-            'name', 'email', 'role_id', 'department_id', 'phone', 'is_active',
+            'name', 'email', 'username', 'role_id', 'department_id', 'phone', 'is_active',
         ]);
 
         if (! empty($data['password'])) {
