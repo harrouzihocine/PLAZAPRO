@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Clients\Http\Controllers;
 
-use App\Modules\Clients\Actions\RecordShortlistOutcome;
 use App\Modules\Clients\Actions\SyncShortlist;
-use App\Modules\Clients\Http\Requests\ShortlistOutcomeRequest;
 use App\Modules\Clients\Http\Requests\SyncShortlistRequest;
 use App\Modules\Clients\Http\Resources\ShortlistItemResource;
 use App\Modules\Clients\Models\ClientProject;
-use App\Modules\Clients\Models\ShortlistItem;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
@@ -42,17 +39,5 @@ class ShortlistController extends Controller
         );
 
         return ShortlistItemResource::collection($items);
-    }
-
-    /** Phase-6 closure: win (buy) or lose an interested shortlisted property. */
-    public function outcome(ShortlistOutcomeRequest $request, ShortlistItem $item, RecordShortlistOutcome $action): ShortlistItemResource
-    {
-        $updated = $action->handle(
-            $item,
-            $request->validated('outcome'),
-            $request->validated('total_price'),
-        )->loadPropertyCard();
-
-        return new ShortlistItemResource($updated);
     }
 }

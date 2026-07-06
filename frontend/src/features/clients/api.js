@@ -141,12 +141,6 @@ export const shortlistApi = {
     })
     return data.data
   },
-
-  // Phase-6 closure: win (with total_price) or lose an interested property.
-  async outcome(itemId, payload) {
-    const { data } = await useApi().post(`/shortlist-items/${itemId}/outcome`, payload)
-    return data.data
-  },
 }
 
 // Deals (client_projects) hanging off a client. Stage moves through /advance.

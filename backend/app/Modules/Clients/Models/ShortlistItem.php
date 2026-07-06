@@ -61,30 +61,17 @@ class ShortlistItem extends BaseModel
     }
 
     /**
-     * Everything ShortlistItemResource's property card touches, per morph type.
-     * Eager-load through withProperty()/loadPropertyCard() — a bare
-     * with('shortlistable') leaves these to lazy-load once per item (N+1).
-     *
-     * @var array<class-string, list<string>>
+     * Eager-load everything ShortlistItemResource's property card touches, per
+     * morph type — a bare with('shortlistable') leaves these to lazy-load once
+     * per item (N+1).
      */
-    private const PROPERTY_CARD = [
-        Unit::class => ['roomNumber', 'floor', 'location'],
-        Box::class => ['type', 'location'],
-    ];
-
-    /** Query-side eager load of the full property card. */
     public function scopeWithProperty(Builder $query): Builder
     {
         return $query->with([
-            'shortlistable' => fn (MorphTo $morphTo) => $morphTo->morphWith(self::PROPERTY_CARD),
-        ]);
-    }
-
-    /** Instance-side equivalent, for single items about to hit the resource. */
-    public function loadPropertyCard(): static
-    {
-        return $this->load([
-            'shortlistable' => fn (MorphTo $morphTo) => $morphTo->morphWith(self::PROPERTY_CARD),
+            'shortlistable' => fn (MorphTo $morphTo) => $morphTo->morphWith([
+                Unit::class => ['roomNumber', 'floor', 'location'],
+                Box::class => ['type', 'location'],
+            ]),
         ]);
     }
 

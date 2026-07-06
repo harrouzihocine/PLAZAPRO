@@ -71,8 +71,8 @@ class ClosureQueueTest extends TestCase
         $interested = $this->itemInState($project, 'visited_interested');
         Sanctum::actingAs($this->userWithPermissions(['clients.view', 'deals.manage', 'projects.view_all']));
 
-        $this->postJson("/api/v1/shortlist-items/{$interested->id}/outcome", ['outcome' => 'lost'])
-            ->assertSuccessful();
+        // Losing the property (deal-close flow) takes it out of the closure queue.
+        $interested->update(['state' => 'lost']);
 
         // The queue empties: nothing pending, nothing in play.
         $this->getJson("/api/v1/clients/{$client->id}/projects")

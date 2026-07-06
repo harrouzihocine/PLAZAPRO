@@ -107,12 +107,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/projects/{project}/advance', [ClientProjectController::class, 'advance']);
     });
 
-    // Phase-6 per-property closure (won/lost) on an interested shortlisted
-    // property — the closure desk (deals.manage), same as closing a deal.
-    Route::middleware('can:deals.manage')->group(function () {
-        Route::post('/shortlist-items/{item}/outcome', [ShortlistController::class, 'outcome']);
-    });
-
     // Freeze / unfreeze a project — a deliberate close-down to new activity
     // (payments still flow). Its own permission: who may pull this lever.
     Route::middleware('can:projects.freeze')->group(function () {

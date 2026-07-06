@@ -84,34 +84,6 @@ class ShortlistTest extends TestCase
         $this->assertDatabaseHas('shortlist_items', ['shortlistable_id' => $unitA->id, 'status' => 'cancelled']);
     }
 
-    public function test_winning_an_interested_property_closes_the_deal(): void
-    {
-        $project = ClientProject::factory()->create();
-        $unit = Unit::factory()->create();
-        $item = ShortlistItem::factory()->create([
-            'client_project_id' => $project->id, 'shortlistable_type' => 'unit',
-            'shortlistable_id' => $unit->id, 'state' => 'visited_interested',
-        ]);
-        Sanctum::actingAs($this->userWith(['clients.view', 'deals.manage']));
-
-        $this->postJson("/api/v1/shortlist-items/{$item->id}/outcome", ['outcome' => 'won', 'total_price' => '2500000.00'])
-            ->assertOk()->assertJsonPath('data.state', 'won');
-
-        $this->assertDatabaseHas('client_projects', [
-            'id' => $project->id, 'unit_id' => $unit->id, 'stage' => 'won', 'total_price' => '2500000.00',
-        ]);
-        $this->assertDatabaseHas('units', ['id' => $unit->id, 'sale_status' => 'sold']);
-    }
-
-    public function test_only_a_visited_interested_property_can_be_closed(): void
-    {
-        $item = ShortlistItem::factory()->create(['state' => 'shortlisted']);
-        Sanctum::actingAs($this->userWith(['clients.view', 'deals.manage']));
-
-        $this->postJson("/api/v1/shortlist-items/{$item->id}/outcome", ['outcome' => 'lost'])
-            ->assertStatus(422);
-    }
-
     public function test_cannot_remove_a_unit_reserved_on_an_open_deal(): void
     {
         $project = ClientProject::factory()->create();
