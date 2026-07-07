@@ -9,6 +9,7 @@ use App\Core\Concerns\LogsActivity;
 use App\Core\Enums\RecordStatus;
 use App\Core\Exceptions\RecordDeletionException;
 use App\Modules\Analytics\Models\ActivityLog;
+use App\Modules\Collaboration\Notifications\DomainNotification;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -107,7 +108,8 @@ class User extends Authenticatable implements MustVerifyEmail
      * Count one failed password attempt; lock the account once the configured
      * limit (`login_max_attempts`) is reached. Returns true when the account
      * is locked after this attempt. Audited — the log row carries the caller's
-     * IP and user agent, so a brute-force source is traceable.
+     * IP and user agent, so a brute-force source is traceable — and every
+     * users.unlock holder is notified live (bell + flash) so someone can act.
      */
     public function recordFailedLoginAttempt(): bool
     {
@@ -126,9 +128,35 @@ class User extends Authenticatable implements MustVerifyEmail
 
         if ($lock) {
             ActivityLog::record('account_locked', $this, ['attempts' => $attempts]);
+            $this->notifyUnlockHolders($attempts);
         }
 
         return $this->isLoginLocked();
+    }
+
+    /**
+     * Tell everyone who can unlock accounts (users.unlock, plus super admins,
+     * who pass every gate) that this account just locked itself out.
+     */
+    private function notifyUnlockHolders(int $attempts): void
+    {
+        $unlockers = self::query()->active()
+            ->where('is_active', true)
+            ->where(fn ($q) => $q
+                ->whereHas('role.permissions', fn ($p) => $p->where('slug', 'users.unlock'))
+                ->orWhereHas('role', fn ($r) => $r->where('slug', 'super-admin')))
+            ->get();
+
+        foreach ($unlockers as $unlocker) {
+            $unlocker->notify(new DomainNotification(
+                kind: 'account_locked',
+                title: 'Account locked: '.$this->name,
+                body: $attempts.' failed sign-in attempts. Unlock it from the Users page.',
+                link: '/settings/users',
+                subjectType: self::class,
+                subjectId: $this->id,
+            ));
+        }
     }
 
     /** Reset the failed-attempt counter and any lock (successful login / admin unlock). */

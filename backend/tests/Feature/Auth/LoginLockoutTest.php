@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Auth;
 
+use App\Modules\Collaboration\Notifications\DomainNotification;
 use App\Modules\Settings\Models\AppSetting;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -225,6 +227,33 @@ class LoginLockoutTest extends TestCase
         Sanctum::actingAs($this->userWithPermissions(['users.unlock']));
 
         $this->putJson("/api/v1/users/{$user->id}/unlock")->assertStatus(422);
+    }
+
+    public function test_locking_notifies_unlock_holders_and_super_admins_only(): void
+    {
+        Notification::fake();
+
+        $unlocker = $this->userWithPermissions(['users.unlock']);
+        $superAdmin = User::factory()->create([
+            'role_id' => Role::factory()->create(['slug' => 'super-admin'])->id,
+        ]);
+        $bystander = User::factory()->create();
+        $user = $this->agent();
+
+        $this->failLogin();
+        $this->failLogin();
+        Notification::assertNothingSent();
+
+        $this->failLogin(); // third strike locks and alerts
+
+        $expected = fn (DomainNotification $n) => $n->kind === 'account_locked'
+            && $n->link === '/settings/users'
+            && $n->subjectId === $user->id;
+
+        Notification::assertSentTo($unlocker, DomainNotification::class, $expected);
+        Notification::assertSentTo($superAdmin, DomainNotification::class, $expected);
+        Notification::assertNotSentTo($bystander, DomainNotification::class);
+        Notification::assertNotSentTo($user, DomainNotification::class);
     }
 
     public function test_the_console_command_unlocks_an_account(): void

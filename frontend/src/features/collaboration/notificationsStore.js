@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { notificationsApi } from '@/features/collaboration/api'
 import { getEcho } from '@/composables/useEcho'
+import { toastInfo } from '@/composables/useConfirm'
 import { useChatDockStore } from '@/features/collaboration/chatDockStore'
 import { playNotificationSound } from '@/utils/notificationSound'
 
@@ -96,6 +97,12 @@ export const useNotificationsStore = defineStore('notifications', {
         useChatDockStore().noteIncoming(payload)
       } else {
         playNotificationSound()
+      }
+      // Security alert: an account locked itself out — flash it so whoever can
+      // unlock (this notification only goes to them) sees it without opening
+      // the bell.
+      if (payload.kind === 'account_locked') {
+        toastInfo(`${payload.title} — ${payload.body}`)
       }
     },
 
