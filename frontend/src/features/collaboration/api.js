@@ -70,6 +70,18 @@ export const chatApi = {
     return useApi().post(`/conversations/${conversationId}/read`)
   },
 
+  // Flip the caller's own mute flag; returns { muted }.
+  async toggleMute(conversationId) {
+    const { data } = await useApi().post(`/conversations/${conversationId}/mute`)
+    return data
+  },
+
+  // Toggle/replace the caller's emoji reaction; returns the updated message.
+  async react(messageId, emoji) {
+    const { data } = await useApi().post(`/messages/${messageId}/reactions`, { emoji })
+    return data.data
+  },
+
   deleteMessage(messageId) {
     return useApi().delete(`/messages/${messageId}`)
   },

@@ -4,11 +4,18 @@ import VoiceRecorder from '@/features/collaboration/components/VoiceRecorder.vue
 import AttachSheet from '@/components/ui/AttachSheet.vue'
 import { isNativeApp } from '@/utils/nativeApp'
 
-// The message composer: text, an image/file attach, and a voice-note recorder.
-// Emits send-text(string) and send-file({ file, durationMs }); the parent wires
-// these to the chat store so this component stays presentational.
-defineProps({ disabled: Boolean })
-const emit = defineEmits(['send-text', 'send-file'])
+// The message composer: text, an image/file attach, a voice-note recorder and
+// a WhatsApp-style reply banner when quoting. Emits send-text(string),
+// send-file({ file, durationMs }), typing (throttled by the parent/store) and
+// cancel-reply; the parent wires these to the chat store so this component
+// stays presentational.
+defineProps({
+  disabled: Boolean,
+  // The message being quoted (null = plain send). Shown as a banner above the
+  // input; the parent attaches reply_to_id on send.
+  replyTo: { type: Object, default: null },
+})
+const emit = defineEmits(['send-text', 'send-file', 'cancel-reply', 'typing'])
 
 const text = ref('')
 const fileInput = ref(null)
@@ -51,10 +58,40 @@ function onFile(event) {
 function onVoice({ file, durationMs }) {
   emit('send-file', { file, durationMs })
 }
+
+function replyExcerpt(m) {
+  if (!m) return ''
+  if (m.redacted) return 'Message deleted'
+  return (
+    { image: '📷 Photo', voice: '🎤 Voice note', file: '📎 File' }[m.type] ?? (m.body ?? '')
+  )
+}
 </script>
 
 <template>
-  <div class="flex items-end gap-1.5">
+  <div>
+    <!-- Reply banner (WhatsApp-style quote above the input) -->
+    <div
+      v-if="replyTo"
+      class="mb-1.5 flex items-center gap-2 rounded-xl border-l-4 border-primary bg-highlight px-3 py-1.5"
+    >
+      <div class="min-w-0 flex-1 text-xs">
+        <p class="font-semibold text-ink">
+          Replying to {{ replyTo.is_mine ? 'yourself' : (replyTo.author?.name ?? 'message') }}
+        </p>
+        <p class="truncate text-mute">{{ replyExcerpt(replyTo) }}</p>
+      </div>
+      <button
+        type="button"
+        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-mute hover:text-ink"
+        aria-label="Cancel reply"
+        @click="emit('cancel-reply')"
+      >
+        <i class="pi pi-times text-xs" aria-hidden="true" />
+      </button>
+    </div>
+
+    <div class="flex items-end gap-1.5">
     <button
       type="button"
       class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink disabled:opacity-50 dark:hover:bg-surface-800"
@@ -107,6 +144,7 @@ function onVoice({ file, durationMs }) {
       placeholder="Message…"
       class="max-h-32 min-h-[44px] flex-1 resize-none rounded-3xl border border-line bg-ground px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-primary"
       :disabled="disabled"
+      @input="emit('typing')"
       @keydown.enter.exact.prevent="submitText"
     ></textarea>
 
@@ -121,5 +159,6 @@ function onVoice({ file, durationMs }) {
     >
       <i class="pi pi-send" aria-hidden="true" />
     </button>
+    </div>
   </div>
 </template>

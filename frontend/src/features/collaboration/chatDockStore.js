@@ -78,7 +78,7 @@ export const useChatDockStore = defineStore('chatDock', {
       if (!id) return
 
       const readingNow =
-        (!this.suspended && this.openIds.includes(id)) || chat._channelId === id
+        (!this.suspended && this.openIds.includes(id)) || chat.activeId === id
       const convo = chat.conversations.find((c) => c.id === id)
       if (convo) {
         convo.last_message_at = payload.created_at ?? new Date().toISOString()
@@ -95,7 +95,8 @@ export const useChatDockStore = defineStore('chatDock', {
 
       if (!readingNow) {
         this.hiddenIds = this.hiddenIds.filter((h) => h !== id)
-        playChatSound()
+        // A muted thread still counts unread but never chimes (WhatsApp rule).
+        if (!convo?.is_muted) playChatSound()
       }
     },
   },

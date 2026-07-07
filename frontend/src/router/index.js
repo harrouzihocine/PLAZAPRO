@@ -98,10 +98,12 @@ const routes = [
         meta: { permission: 'chat.use' },
       },
       {
+        // Same view as /chat — it renders the thread (phone/web) or the
+        // two-pane (native tablet) from the :id param. The distinct route
+        // name stays: AppShell keys its phone chat takeover on it.
         path: 'chat/:id',
         name: 'chat.thread',
-        props: true,
-        component: () => import('@/features/collaboration/views/ThreadView.vue'),
+        component: () => import('@/features/collaboration/views/ChatView.vue'),
         meta: { permission: 'chat.use' },
       },
       {
