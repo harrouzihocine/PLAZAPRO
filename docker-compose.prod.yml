@@ -99,6 +99,10 @@ services:
       - --no-resolv                 # never read the container's resolv.conf
       - --no-hosts
       - --cache-size=1000
+      # Disables the implicit local-service filter, which drops LAN queries
+      # because they arrive via docker NAT from a "non-local" subnet. Exposure
+      # is already limited by publishing on the LAN IP only.
+      - --except-interface=lo
       - --address=/${LAN_TLS_DOMAIN:-app.plaza-pro.com}/${LAN_DNS_IP:-}
       - --server=8.8.8.8
       - --server=8.8.4.4
