@@ -126,8 +126,8 @@ onMounted(() => load(null))
 // the draggable source of truth (`${agentId}|${hour}`, 'u' = untimed) until the
 // view flattens back into `cells` on exit / day switch. The hour range covers
 // the working day and stretches to fit any out-of-hours card.
-const DAY_START = 8
-const DAY_END = 18
+const DAY_START = 7
+const DAY_END = 19
 const viewDay = ref(null) // 'YYYY-MM-DD' when zoomed, null = week view
 const hourCells = ref({})
 const dayHours = ref([])
