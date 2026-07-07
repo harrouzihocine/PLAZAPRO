@@ -101,6 +101,23 @@ html.native * {
     max-width: 26rem;
   }
 
+  /* ── Dropdown overlays never exceed the screen (long project/option labels
+     ellipsize instead of widening the layout viewport). ── */
+  html.native .p-select-overlay,
+  html.native .p-multiselect-overlay {
+    max-width: calc(100vw - 1.5rem);
+  }
+  html.native .p-select-option,
+  html.native .p-multiselect-option {
+    min-width: 0;
+  }
+  html.native .p-select-option-label,
+  html.native .p-multiselect-option-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   /* ── Tab strips swipe sideways instead of crushing (safety net for any
      TabList without the `scrollable` prop). ── */
   html.native .p-tablist-content {

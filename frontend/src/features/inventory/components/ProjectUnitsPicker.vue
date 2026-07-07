@@ -213,11 +213,13 @@ function setBoxIds(index, boxIds) {
     </div>
 
     <div class="flex items-end gap-2">
+      <!-- min-w-0: without it the flex item takes the placeholder's intrinsic
+           width and pushes the whole layout wider than a phone screen. -->
       <BaseSelect
         v-model="locationId"
-        class="flex-1"
+        class="min-w-0 flex-1"
         label="Project"
-        placeholder="Pick a project to browse its available properties"
+        placeholder="Pick a project"
         :options="locations.map((l) => ({ value: l.id, label: `${l.code} · ${l.name}` }))"
       />
       <button
