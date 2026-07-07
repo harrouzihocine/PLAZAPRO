@@ -22,6 +22,9 @@ class VisitResource extends JsonResource
             'type' => $this->type?->value,
             'scheduled_at' => $this->scheduled_at,
             'completed_at' => $this->completed_at,
+            // When the visit actually happened (agent-stated on the completion
+            // form) — vs completed_at, when the log was filled.
+            'visited_at' => $this->visited_at,
             'is_completed' => $this->completed_at !== null,
             'notes' => $this->notes,
             'checklist' => $this->checklist ?? [],

@@ -31,7 +31,7 @@ class AssignDispatchItem
     ) {}
 
     /**
-     * @param  array{kind: string, id: int, agent_id?: int|null, due_date?: string|null}  $change
+     * @param  array{kind: string, id: int, agent_id?: int|null, due_date?: string|null, due_time?: string|null}  $change
      */
     public function handle(array $change): void
     {
@@ -45,15 +45,24 @@ class AssignDispatchItem
             'Tasks can only be scheduled from today onwards.',
         );
 
-        DB::transaction(function () use ($change, $dueDate) {
+        // The dispatcher may pin the hour (day-view drop / time chip); validated
+        // H:i upstream, split here so both movers set it the same way.
+        $dueTime = isset($change['due_time'])
+            ? array_map('intval', explode(':', (string) $change['due_time']))
+            : null;
+
+        DB::transaction(function () use ($change, $dueDate, $dueTime) {
             match ($change['kind']) {
-                'action' => $this->moveAction($change, $dueDate),
-                'visit' => $this->moveVisit($change, $dueDate),
+                'action' => $this->moveAction($change, $dueDate, $dueTime),
+                'visit' => $this->moveVisit($change, $dueDate, $dueTime),
             };
         });
     }
 
-    private function moveAction(array $change, ?Carbon $dueDate): void
+    /**
+     * @param  list<int>|null  $dueTime  [hour, minute]
+     */
+    private function moveAction(array $change, ?Carbon $dueDate, ?array $dueTime): void
     {
         $action = NextAction::query()->active()->pending()->findOrFail($change['id']);
 
@@ -68,8 +77,12 @@ class AssignDispatchItem
             $updates['assigned_to'] = $change['agent_id'];
         }
         if ($dueDate !== null) {
-            // The board drops on a DAY; the concrete hour is the agent's to plan.
-            $updates['due_at'] = $dueDate->setTime(9, 0);
+            // The dispatcher's hour when pinned (day-view drop / time chip);
+            // a plain day drop keeps the board's default of 09:00.
+            $updates['due_at'] = $dueDate->setTime($dueTime[0] ?? 9, $dueTime[1] ?? 0);
+        } elseif ($dueTime !== null) {
+            // Time-only change: re-pin the hour on the plan's current day.
+            $updates['due_at'] = $action->due_at->copy()->setTime($dueTime[0], $dueTime[1]);
         }
         $action->update($updates);
         $action->refresh();
@@ -111,7 +124,10 @@ class AssignDispatchItem
         }
     }
 
-    private function moveVisit(array $change, ?Carbon $dueDate): void
+    /**
+     * @param  list<int>|null  $dueTime  [hour, minute]
+     */
+    private function moveVisit(array $change, ?Carbon $dueDate, ?array $dueTime): void
     {
         $visit = Visit::query()->active()->whereNull('completed_at')->findOrFail($change['id']);
 
@@ -142,9 +158,19 @@ class AssignDispatchItem
         }
 
         if ($dueDate !== null) {
+            // The dispatcher's hour when pinned; a plain day drop carries the
+            // visit's current time along to the new day.
             $time = $visit->scheduled_at;
             $visit->update([
-                'scheduled_at' => $dueDate->copy()->setTime((int) ($time?->format('H') ?? 9), (int) ($time?->format('i') ?? 0)),
+                'scheduled_at' => $dueDate->copy()->setTime(
+                    $dueTime[0] ?? (int) ($time?->format('H') ?? 9),
+                    $dueTime[1] ?? (int) ($time?->format('i') ?? 0),
+                ),
+            ]);
+        } elseif ($dueTime !== null) {
+            // Time-only change: re-pin the hour on the visit's current day.
+            $visit->update([
+                'scheduled_at' => $visit->scheduled_at->copy()->setTime($dueTime[0], $dueTime[1]),
             ]);
         }
 

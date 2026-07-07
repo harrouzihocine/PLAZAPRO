@@ -165,6 +165,70 @@ class DispatchTest extends TestCase
         Notification::assertSentTo($contributor, DomainNotification::class, fn ($n) => $n->kind === 'visit_agent_assigned');
     }
 
+    public function test_the_dispatcher_can_pin_the_hour_of_an_assignment(): void
+    {
+        $dispatcher = $this->userWith(['visits.dispatch']);
+        $agent = $this->userWith([], isAgent: true);
+        $project = $this->projectWithShortlist();
+
+        $action = NextAction::factory()->create([
+            'subject_type' => 'client_project', 'subject_id' => $project->id,
+            'type' => 'in_site_visit', 'state' => 'pending',
+            'assigned_to' => null, 'due_at' => now()->addDay(),
+        ]);
+
+        Sanctum::actingAs($dispatcher);
+
+        // Assign with a pinned hour: the plan AND its materialized visit land there.
+        $day = now()->addDays(2)->toDateString();
+        $this->postJson('/api/v1/dispatch/assign', ['changes' => [
+            ['kind' => 'action', 'id' => $action->id, 'agent_id' => $agent->id, 'due_date' => $day, 'due_time' => '14:30'],
+        ]])->assertOk();
+
+        $this->assertSame($day.' 14:30:00', $action->fresh()->due_at->toDateTimeString());
+        $visit = Visit::query()->firstOrFail();
+        $this->assertSame($day.' 14:30:00', $visit->scheduled_at->toDateTimeString());
+
+        // Time-only change (the board's time chip): same day, new hour.
+        $this->postJson('/api/v1/dispatch/assign', ['changes' => [
+            ['kind' => 'visit', 'id' => $visit->id, 'agent_id' => $agent->id, 'due_date' => $day, 'due_time' => '16:00'],
+        ]])->assertOk();
+
+        $this->assertSame($day.' 16:00:00', $visit->fresh()->scheduled_at->toDateTimeString());
+
+        // A malformed time never reaches the mover.
+        $this->postJson('/api/v1/dispatch/assign', ['changes' => [
+            ['kind' => 'visit', 'id' => $visit->id, 'agent_id' => $agent->id, 'due_date' => $day, 'due_time' => '25:99'],
+        ]])->assertStatus(422);
+    }
+
+    public function test_a_day_move_without_a_time_keeps_the_visits_current_hour(): void
+    {
+        $dispatcher = $this->userWith(['visits.dispatch']);
+        $agent = $this->userWith([], isAgent: true);
+        $project = $this->projectWithShortlist();
+
+        $action = NextAction::factory()->create([
+            'subject_type' => 'client_project', 'subject_id' => $project->id,
+            'type' => 'in_site_visit', 'state' => 'pending',
+            'assigned_to' => $agent->id, 'due_at' => now()->addDay(),
+        ]);
+        $visit = Visit::factory()->inSite()->create([
+            'client_id' => $project->client_id, 'client_project_id' => $project->id,
+            'agent_id' => $agent->id, 'next_action_id' => $action->id,
+            'scheduled_at' => now()->addDay()->setTime(10, 15), 'completed_at' => null,
+        ]);
+
+        Sanctum::actingAs($dispatcher);
+
+        $day = now()->addDays(3)->toDateString();
+        $this->postJson('/api/v1/dispatch/assign', ['changes' => [
+            ['kind' => 'visit', 'id' => $visit->id, 'agent_id' => $agent->id, 'due_date' => $day],
+        ]])->assertOk();
+
+        $this->assertSame($day.' 10:15:00', $visit->fresh()->scheduled_at->toDateTimeString());
+    }
+
     public function test_assignments_cannot_land_on_a_past_day(): void
     {
         $dispatcher = $this->userWith(['visits.dispatch']);

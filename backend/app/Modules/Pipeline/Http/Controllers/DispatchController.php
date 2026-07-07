@@ -60,6 +60,7 @@ class DispatchController extends Controller
                 'kind' => 'action',
                 'id' => $a->id,
                 'due_at' => $a->due_at,
+                'time' => $this->wallClock($a->due_at),
                 'client' => $a->subject?->client?->full_name,
                 'client_id' => $a->subject?->client_id,
                 'project_id' => $a->subject_type === 'client_project' ? $a->subject_id : null,
@@ -90,6 +91,7 @@ class DispatchController extends Controller
                 'agent_id' => $v->agent_id,
                 'at' => $v->scheduled_at,
                 'day' => $v->scheduled_at->toDateString(),
+                'time' => $this->wallClock($v->scheduled_at),
                 'is_completed' => $v->completed_at !== null,
                 'draggable' => $v->type->value === 'in_site' && $v->completed_at === null,
                 'can_unassign' => $v->type->value === 'in_site' && $v->completed_at === null && $v->next_action_id !== null,
@@ -115,6 +117,7 @@ class DispatchController extends Controller
                 'agent_id' => $a->assigned_to,
                 'at' => $a->due_at,
                 'day' => $a->due_at->toDateString(),
+                'time' => $this->wallClock($a->due_at),
                 'is_completed' => false,
                 'draggable' => false,
                 'client' => $a->subject?->client?->full_name ?? $a->subject?->full_name,
@@ -141,6 +144,20 @@ class DispatchController extends Controller
         });
 
         return response()->json(['saved' => true]);
+    }
+
+    /**
+     * The item's wall-clock time (app timezone) for the board's time chips and
+     * hour slots — null for the midnight "no time chosen" sentinel, so untimed
+     * plans don't masquerade as 00:00 appointments.
+     */
+    private function wallClock(?Carbon $at): ?string
+    {
+        if ($at === null || ($at->hour === 0 && $at->minute === 0)) {
+            return null;
+        }
+
+        return $at->format('H:i');
     }
 
     /**

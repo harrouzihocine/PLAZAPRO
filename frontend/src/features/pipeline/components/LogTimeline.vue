@@ -50,6 +50,11 @@ function entryTitle(e) {
 // each is its own pill instead of one long "·"-separated line.
 function entryChips(e) {
   const chips = [{ icon: 'pi pi-calendar', text: formatDateTime(e.at) }]
+  // In-site logs state when the visit ACTUALLY happened — worth a glance chip
+  // next to the scheduled slot (the detail view compares it to the log time).
+  if (e.kind === 'visit' && e.data.visited_at) {
+    chips.push({ icon: 'pi pi-map-marker', text: `Visited ${formatDateTime(e.data.visited_at)}` })
+  }
   if (e.loggedAt) chips.push({ icon: 'pi pi-clock', text: `Logged ${formatDateTime(e.loggedAt)}` })
   if (e.kind === 'visit' && e.data.unit) {
     chips.push({
@@ -193,8 +198,14 @@ const isExpanded = (e) => expanded.value.has(keyOf(e))
                 <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">Scheduled</dt>
                 <dd class="mt-0.5 text-ink">{{ formatDateTime(e.data.scheduled_at) }}</dd>
               </div>
+              <!-- When the visit actually happened (agent-stated) vs when its
+                   log was filled — the gap is the oversight signal. -->
+              <div v-if="e.data.visited_at">
+                <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">Visited</dt>
+                <dd class="mt-0.5 text-ink">{{ formatDateTime(e.data.visited_at) }}</dd>
+              </div>
               <div>
-                <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">Completed</dt>
+                <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">Log filled</dt>
                 <dd class="mt-0.5 text-ink">{{ e.data.completed_at ? formatDateTime(e.data.completed_at) : '—' }}</dd>
               </div>
             </template>

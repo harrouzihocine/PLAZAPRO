@@ -49,6 +49,8 @@ class CorrectVisitRequest extends FormRequest
             'type' => ['required', new Enum(VisitType::class)],
             'unit_id' => ['required_if:type,in_site', 'nullable', 'integer', 'exists:units,id'],
             'scheduled_at' => ['required', 'date'],
+            // A mis-stated actual visit time may be corrected like any detail.
+            'visited_at' => ['nullable', 'date', 'before_or_equal:'.now()->addMinutes(15)],
             'notes' => ['nullable', 'string', 'max:5000'],
             'checklist' => ['nullable', 'array'],
             'checklist.*' => ['integer', 'distinct', 'exists:dynamic_list_items,id'],

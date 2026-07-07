@@ -25,7 +25,7 @@ class Visit extends BaseModel
 
     protected $fillable = [
         'client_id', 'client_project_id', 'type', 'unit_id', 'agent_id',
-        'next_action_id', 'scheduled_at', 'completed_at', 'outcome_id', 'notes', 'checklist', 'objections',
+        'next_action_id', 'scheduled_at', 'completed_at', 'visited_at', 'outcome_id', 'notes', 'checklist', 'objections',
     ];
 
     protected function casts(): array
@@ -36,6 +36,7 @@ class Visit extends BaseModel
             'objections' => 'array',
             'scheduled_at' => 'datetime',
             'completed_at' => 'datetime',
+            'visited_at' => 'datetime',
         ]);
     }
 

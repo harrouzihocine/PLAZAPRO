@@ -10,6 +10,7 @@ use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Pipeline\Enums\VisitType;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Settings\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -54,6 +55,9 @@ class CompleteInteraction
         return DB::transaction(function () use ($visit, $data, $actor) {
             $visit->update([
                 'completed_at' => now(),
+                // Agent-stated actual visit time (required for in-site logs);
+                // completed_at above records when the log was filled.
+                'visited_at' => isset($data['visited_at']) ? Carbon::parse($data['visited_at']) : $visit->visited_at,
                 'outcome_id' => $data['outcome_id'] ?? $visit->outcome_id,
                 'notes' => $data['notes'] ?? $visit->notes,
                 'checklist' => $data['checklist'] ?? $visit->checklist,

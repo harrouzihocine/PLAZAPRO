@@ -13,27 +13,31 @@ import { copyToClipboard } from '@/composables/useClipboard'
 import { formatDateTime, humanize, todayInput } from '@/utils/format'
 
 // The dispatch board: unassigned in-site plans in the PENDING strip, and one
-// row per field agent × the 7 days of the shown week. Drag a pending task onto
-// an agent's day (or between agents / back to pending), then Save — the moves
-// are applied together, the agent and the project's contributors are notified.
+// row per field agent × the shown week. Drag a pending task onto an agent's
+// day (or between agents / back to pending), then Save — the moves are applied
+// together, the agent and the project's contributors are notified.
 // Only in-site items drag; calls and office visits show for workload context.
 // Drops are allowed from today onwards only.
+//
+// Time is a first-class dimension: every card wears its time chip (click to
+// set the exact HH:mm), and a day header zooms into DAY VIEW — the same agents
+// as rows but one column per hour, so dropping a card pins it to that hour.
 
 const loading = ref(true)
 const saving = ref(false)
 const weekStart = ref(null) // 'YYYY-MM-DD' (Monday)
 const agents = ref([])
 const pending = ref([]) // draggable list (pending strip)
-const cells = ref({}) // `${agentId}|${day}` -> draggable list
+const cells = ref({}) // `${agentId}|${day}` -> draggable list (week view)
 // One FINAL position per card (`kind:id` → move): dragging the same card
 // several times before saving must express only where it ended up — posting
 // every intermediate hop would assign/notify agents the card merely passed by.
 const moves = ref(new Map())
 
 // The board works in Algerian calendar dates: the backend (app timezone
-// Africa/Algiers) produces week_start, every item's `day`, and the "today
-// onwards" guard in local wall-clock — so "today" must be the browser's local
-// date too (toISOString would give the UTC date, a day back before 01:00).
+// Africa/Algiers) produces week_start, every item's `day` + `time`, and the
+// "today onwards" guard in local wall-clock — so "today" must be the browser's
+// local date too (toISOString would give the UTC date, a day back before 01:00).
 // addDays is pure Y-m-d string arithmetic (parse at UTC midnight, add, slice)
 // — timezone-neutral on purpose.
 function addDays(isoDate, n) {
@@ -66,9 +70,19 @@ const cellKey = (agentId, day) => `${agentId}|${day}`
 const cellList = (agentId, day) => cells.value[cellKey(agentId, day)] ?? []
 const hasChanges = computed(() => moves.value.size > 0)
 
+// Cards sort by their time within a cell; untimed ones float to the top.
+const byTime = (a, b) => (a.time ?? '').localeCompare(b.time ?? '')
+const itemHour = (item) => (item.time ? Number.parseInt(item.time.slice(0, 2), 10) : null)
+const pad2 = (n) => String(n).padStart(2, '0')
+
 async function load(week = weekStart.value) {
   loading.value = true
   moves.value = new Map()
+  // Remember the zoomed day across a save/reload; the stale hour grid itself
+  // is rebuilt below from the fresh cells.
+  const zoomedDay = viewDay.value
+  viewDay.value = null
+  hourCells.value = {}
   try {
     const data = await pipelineApi.dispatchBoard(week)
     weekStart.value = data.week_start
@@ -80,7 +94,9 @@ async function load(week = weekStart.value) {
       const key = cellKey(item.agent_id, item.day)
       if (grid[key]) grid[key].push(item)
     }
+    for (const key of Object.keys(grid)) grid[key].sort(byTime)
     cells.value = grid
+    if (zoomedDay && dayDates(data.week_start).includes(zoomedDay)) showDay(zoomedDay)
   } finally {
     loading.value = false
   }
@@ -96,6 +112,116 @@ function shiftWeek(deltaDays) {
 
 onMounted(() => load(null))
 
+// --- Day view (hour columns) ------------------------------------------------
+// Zooming into a day re-buckets that day's cards per hour: `hourCells` becomes
+// the draggable source of truth (`${agentId}|${hour}`, 'u' = untimed) until the
+// view flattens back into `cells` on exit / day switch. The hour range covers
+// the working day and stretches to fit any out-of-hours card.
+const DAY_START = 8
+const DAY_END = 18
+const viewDay = ref(null) // 'YYYY-MM-DD' when zoomed, null = week view
+const hourCells = ref({})
+const dayHours = ref([])
+const dayHasUntimed = ref(false)
+
+function showDay(day) {
+  flattenDay() // leaving another zoomed day: fold its buckets back first
+
+  let min = DAY_START
+  let max = DAY_END
+  let untimed = false
+  for (const a of agents.value) {
+    for (const item of cellList(a.id, day)) {
+      const h = itemHour(item)
+      if (h === null) untimed = true
+      else {
+        min = Math.min(min, h)
+        max = Math.max(max, h)
+      }
+    }
+  }
+  const hours = Array.from({ length: max - min + 1 }, (_, i) => min + i)
+
+  const grid = {}
+  for (const a of agents.value) {
+    grid[`${a.id}|u`] = []
+    for (const h of hours) grid[`${a.id}|${h}`] = []
+    for (const item of cellList(a.id, day)) {
+      const h = itemHour(item)
+      grid[`${a.id}|${h === null ? 'u' : h}`].push(item)
+    }
+  }
+
+  dayHours.value = hours
+  dayHasUntimed.value = untimed
+  hourCells.value = grid
+  viewDay.value = day
+}
+
+// Fold the zoomed day's hour buckets back into its week cell (cards may have
+// changed agent/hour or arrived from the pool while zoomed).
+function flattenDay() {
+  if (!viewDay.value) return
+  for (const a of agents.value) {
+    const merged = Object.entries(hourCells.value)
+      .filter(([key]) => key.startsWith(`${a.id}|`))
+      .flatMap(([, list]) => list)
+      .sort(byTime)
+    cells.value[cellKey(a.id, viewDay.value)] = merged
+  }
+}
+
+function exitDay() {
+  flattenDay()
+  viewDay.value = null
+}
+
+// Day-to-day arrows stay within the loaded week (the board loads one week).
+const canPrevDay = computed(() => viewDay.value && viewDay.value > weekStart.value)
+const canNextDay = computed(() => viewDay.value && viewDay.value < addDays(weekStart.value, 6))
+function shiftDay(n) {
+  const d = addDays(viewDay.value, n)
+  if (d >= weekStart.value && d <= addDays(weekStart.value, 6)) showDay(d)
+}
+const dayLabel = computed(() => days.value.find((d) => d.date === viewDay.value)?.label ?? viewDay.value)
+
+// The grid columns of the current view: week → the 7 days, day → the hours
+// (plus a read-only "No time" gutter when untimed cards exist that day).
+const columns = computed(() => {
+  if (!viewDay.value) {
+    return days.value.map((d) => ({
+      kind: 'day',
+      key: d.date,
+      label: d.label,
+      isPast: d.isPast,
+      isToday: d.isToday,
+    }))
+  }
+  const today = localToday()
+  const nowHour = new Date().getHours()
+  return [
+    ...(dayHasUntimed.value ? [{ kind: 'untimed', key: 'u', label: 'No time' }] : []),
+    ...dayHours.value.map((h) => ({
+      kind: 'hour',
+      key: h,
+      label: `${pad2(h)}:00`,
+      isToday: viewDay.value === today && h === nowHour,
+      isPast: false,
+    })),
+  ]
+})
+
+function listFor(agentId, col) {
+  return viewDay.value
+    ? (hourCells.value[`${agentId}|${col.key}`] ?? [])
+    : (cells.value[cellKey(agentId, col.key)] ?? [])
+}
+
+// Whatever the view, an agent's row counts every card it shows.
+function agentCount(agentId) {
+  return columns.value.reduce((n, col) => n + listFor(agentId, col).length, 0)
+}
+
 // --- Drag & drop ----------------------------------------------------------
 // vuedraggable moves items between the bound lists; we record the intent and
 // send everything on Save. `checkMove`-style rejection: past days don't accept.
@@ -105,17 +231,32 @@ function recordMove(item, move) {
   moves.value = next
 }
 
-function onDropToCell(evt, agentId, day) {
+const isMoved = (item) => moves.value.has(`${item.kind}:${item.id}`)
+
+function onDropToCell(evt, agentId, col) {
   const item = evt.added?.element
   if (!item) return
-  recordMove(item, {
+  const day = viewDay.value ?? col.key
+  const move = {
     kind: item.kind === 'action' ? 'action' : 'visit',
     id: item.id,
     agent_id: agentId,
     due_date: day,
-  })
+  }
+  if (viewDay.value && col.kind === 'hour') {
+    // Dropped on an hour slot: pin that hour — but a same-hour move (from
+    // another agent's row) keeps the card's exact minutes.
+    move.due_time = itemHour(item) === col.key && item.time ? item.time : `${pad2(col.key)}:00`
+  } else if (item.time) {
+    // Week view keeps the card's time across day/agent moves — and re-sending
+    // it means a later drop can never wipe an earlier time chip edit.
+    move.due_time = item.time
+  }
+  recordMove(item, move)
   item.agent_id = agentId
   item.day = day
+  if (move.due_time) item.time = move.due_time
+  item.at = `${day}T${item.time ?? '09:00'}:00`
 }
 
 function onDropToPending(evt) {
@@ -126,8 +267,22 @@ function onDropToPending(evt) {
 
 // Pending tasks always drag; grid items only when the server said so — and a
 // visit may only return to the pending strip when its plan is still open.
-const dragOptions = { animation: 150, group: 'dispatch' }
-const canReceive = (day) => !day.isPast
+// On touch (tablet / the Android shell) dragging starts on a long-press so a
+// finger can still scroll the board; mouse drags stay instant.
+const dragOptions = {
+  animation: 150,
+  group: 'dispatch',
+  delay: 200,
+  delayOnTouchOnly: true,
+  touchStartThreshold: 5,
+}
+
+function canReceive(col) {
+  if (!viewDay.value) return !col.isPast
+  // Hour slots accept from today onwards; the untimed gutter is display-only
+  // (dropping "onto no time" would be a lie — drag out of it to schedule).
+  return col.kind === 'hour' && viewDay.value >= localToday()
+}
 
 function checkMove(evt) {
   const el = evt.draggedContext?.element
@@ -155,6 +310,43 @@ async function save() {
   }
 }
 
+// --- Time chip editor -------------------------------------------------------
+// Click a card's time chip to set the exact HH:mm without dragging (the
+// "drop, then decide the time" path). Recorded as a move like any drag.
+const timeEditRef = ref(null)
+const timeEditItem = ref(null)
+const timeEditValue = ref('')
+const timeEditValid = computed(() => /^\d{2}:\d{2}$/.test(timeEditValue.value))
+
+// Editable time: any card the board may move (pool plans carry no `draggable`
+// flag — a freshly dropped one is editable right away), today onwards.
+const canEditTime = (item) =>
+  ('draggable' in item ? item.draggable : true) && !!item.day && item.day >= localToday()
+
+function openTimeEdit(event, item) {
+  timeEditItem.value = item
+  timeEditValue.value = item.time ?? ''
+  timeEditRef.value?.show(event)
+}
+
+function applyTimeEdit() {
+  const item = timeEditItem.value
+  const time = timeEditValue.value
+  if (!item || !timeEditValid.value) return
+  recordMove(item, {
+    kind: item.kind === 'action' ? 'action' : 'visit',
+    id: item.id,
+    agent_id: item.agent_id,
+    due_date: item.day,
+    due_time: time,
+  })
+  item.time = time
+  item.at = `${item.day}T${time}:00`
+  timeEditRef.value?.hide()
+  // Zoomed: the card may now belong to another hour bucket.
+  if (viewDay.value) showDay(viewDay.value)
+}
+
 // --- Details popover -------------------------------------------------------
 const detailsRef = ref(null)
 const detailsItem = ref(null)
@@ -175,12 +367,35 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
   <div>
     <PageHeader
       title="Dispatch board"
-      subtitle="Assign pending in-site visits to field agents — drag onto a day, then save."
+      subtitle="Assign pending in-site visits to field agents — drag onto a day (or an hour in day view), then save."
     >
       <template #actions>
-        <Button icon="pi pi-chevron-left" severity="secondary" text aria-label="Previous week" @click="shiftWeek(-7)" />
-        <span class="num self-center text-sm font-medium text-ink">week of {{ weekStart }}</span>
-        <Button icon="pi pi-chevron-right" severity="secondary" text aria-label="Next week" @click="shiftWeek(7)" />
+        <!-- Week navigation, or day navigation when zoomed into hours. -->
+        <template v-if="!viewDay">
+          <Button icon="pi pi-chevron-left" severity="secondary" text aria-label="Previous week" @click="shiftWeek(-7)" />
+          <span class="num self-center text-sm font-medium text-ink">week of {{ weekStart }}</span>
+          <Button icon="pi pi-chevron-right" severity="secondary" text aria-label="Next week" @click="shiftWeek(7)" />
+        </template>
+        <template v-else>
+          <Button
+            icon="pi pi-chevron-left"
+            severity="secondary"
+            text
+            aria-label="Previous day"
+            :disabled="!canPrevDay"
+            @click="shiftDay(-1)"
+          />
+          <span class="num self-center text-sm font-medium text-ink">{{ dayLabel }}</span>
+          <Button
+            icon="pi pi-chevron-right"
+            severity="secondary"
+            text
+            aria-label="Next day"
+            :disabled="!canNextDay"
+            @click="shiftDay(1)"
+          />
+          <Button label="Week view" icon="pi pi-calendar" severity="secondary" outlined @click="exitDay" />
+        </template>
         <Button
           label="Save assignments"
           icon="pi pi-check"
@@ -241,23 +456,34 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
       </template>
     </SectionCard>
 
-    <!-- Agents × weekdays grid -->
+    <!-- Agents × weekdays grid (or × hours when zoomed into a day) -->
     <SectionCard flush>
       <p v-if="loading" class="py-10 text-center text-sm text-mute">Loading the week…</p>
       <div v-else class="overflow-x-auto">
-        <table class="w-full min-w-[900px] border-collapse text-sm">
+        <table class="w-full border-collapse text-sm" :class="viewDay ? 'min-w-[1100px]' : 'min-w-[900px]'">
           <thead>
             <tr>
               <th class="sticky left-0 z-10 border-b border-line bg-card px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-mute">
                 Agent
               </th>
               <th
-                v-for="d in days"
-                :key="d.date"
+                v-for="col in columns"
+                :key="col.key"
                 class="border-b border-l border-line px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide"
-                :class="d.isToday ? 'bg-highlight text-primary-700 dark:text-primary-300' : d.isPast ? 'text-mute/60' : 'text-mute'"
+                :class="col.isToday ? 'bg-highlight text-primary-700 dark:text-primary-300' : col.isPast ? 'text-mute/60' : 'text-mute'"
               >
-                {{ d.label }}
+                <!-- A day header zooms into that day's hours. -->
+                <button
+                  v-if="col.kind === 'day'"
+                  type="button"
+                  class="group inline-flex items-center gap-1.5 uppercase tracking-wide transition-colors hover:text-ink"
+                  :title="`Zoom into ${col.label} by hour`"
+                  @click="showDay(col.key)"
+                >
+                  {{ col.label }}
+                  <i class="pi pi-search-plus text-[10px] opacity-40 transition-opacity group-hover:opacity-100" aria-hidden="true" />
+                </button>
+                <template v-else>{{ col.label }}</template>
               </th>
             </tr>
           </thead>
@@ -266,23 +492,24 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
               <th class="sticky left-0 z-10 border-b border-line bg-card px-3 py-2 text-left font-medium text-ink">
                 {{ agent.name }}
                 <span class="num mt-0.5 block text-xs font-normal text-mute">
-                  {{ days.reduce((n, d) => n + cellList(agent.id, d.date).length, 0) }} this week
+                  {{ agentCount(agent.id) }} {{ viewDay ? 'this day' : 'this week' }}
                 </span>
               </th>
               <td
-                v-for="d in days"
-                :key="d.date"
+                v-for="col in columns"
+                :key="col.key"
                 class="border-b border-l border-line p-1.5"
-                :class="{ 'bg-surface-50 dark:bg-surface-900/40': d.isPast, 'bg-highlight/40': d.isToday }"
+                :class="{ 'bg-surface-50 dark:bg-surface-900/40': col.isPast || col.kind === 'untimed', 'bg-highlight/40': col.isToday }"
               >
                 <draggable
-                  :list="cells[cellKey(agent.id, d.date)]"
+                  :list="listFor(agent.id, col)"
                   item-key="id"
                   v-bind="dragOptions"
                   :move="checkMove"
-                  :group="{ name: 'dispatch', put: canReceive(d), pull: true }"
+                  :group="{ name: 'dispatch', put: canReceive(col), pull: true }"
                   class="min-h-[52px] space-y-1"
-                  @change="(evt) => onDropToCell(evt, agent.id, d.date)"
+                  :class="viewDay ? 'min-w-[72px]' : ''"
+                  @change="(evt) => onDropToCell(evt, agent.id, col)"
                 >
                   <template #item="{ element }">
                     <div
@@ -291,6 +518,7 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
                         TYPE_TONES[element.type] ?? 'bg-surface-100 dark:bg-surface-800',
                         element.draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-default opacity-80',
                         element.is_completed ? 'line-through opacity-60' : '',
+                        isMoved(element) ? 'ring-1 ring-primary' : '',
                       ]"
                     >
                       <button
@@ -302,13 +530,36 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
                         <span class="min-w-0 flex-1 truncate font-medium">{{ element.client ?? '—' }}</span>
                         <span v-if="element.unit" class="num shrink-0">{{ element.unit }}</span>
                       </button>
+                      <!-- The time chip: the card's hour at a glance; click to set
+                           the exact time (recorded as a move, saved with the rest). -->
+                      <div class="mt-1 flex items-center">
+                        <button
+                          v-if="canEditTime(element)"
+                          type="button"
+                          class="num inline-flex items-center gap-1 rounded-full border border-current px-1.5 py-0.5 text-[10px] leading-none transition-opacity hover:opacity-100 native:max-md:px-2.5 native:max-md:py-1.5 native:max-md:text-xs"
+                          :class="element.time ? 'opacity-80' : 'opacity-60'"
+                          :aria-label="`Set the time (now ${element.time ?? 'not set'})`"
+                          title="Set the exact time"
+                          @click.stop="openTimeEdit($event, element)"
+                        >
+                          <i class="pi pi-clock text-[9px]" aria-hidden="true" />
+                          {{ element.time ?? 'set time' }}
+                        </button>
+                        <span
+                          v-else-if="element.time"
+                          class="num inline-flex items-center gap-1 px-0.5 text-[10px] leading-none opacity-70"
+                        >
+                          <i class="pi pi-clock text-[9px]" aria-hidden="true" />
+                          {{ element.time }}
+                        </span>
+                      </div>
                     </div>
                   </template>
                 </draggable>
               </td>
             </tr>
             <tr v-if="!agents.length">
-              <td colspan="8" class="px-4 py-8 text-center text-sm text-mute">
+              <td :colspan="columns.length + 1" class="px-4 py-8 text-center text-sm text-mute">
                 No field agents (is_agent roles) found.
               </td>
             </tr>
@@ -319,8 +570,29 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
 
     <p class="mt-2 text-xs text-mute">
       Drag between agents and days (today onwards), or back to the pending strip to un-assign.
-      Faded cards (calls, office visits, completed) are workload context and don't drag.
+      Click a day header to zoom into its hours and drop on an exact slot, or click a card's time
+      chip to set the time by hand. Faded cards (calls, office visits, completed) are workload
+      context and don't drag.
     </p>
+
+    <!-- Time chip editor: exact HH:mm without dragging. -->
+    <Popover ref="timeEditRef" class="w-60 max-w-[92vw]">
+      <form class="space-y-2.5" @submit.prevent="applyTimeEdit">
+        <p class="text-xs font-semibold uppercase tracking-wide text-mute">
+          Time — {{ timeEditItem?.client ?? 'task' }}
+        </p>
+        <input
+          v-model="timeEditValue"
+          type="time"
+          class="w-full rounded-md border border-line bg-card px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-primary"
+          aria-label="Time"
+        />
+        <div class="flex justify-end gap-2">
+          <Button label="Cancel" size="small" text severity="secondary" @click="timeEditRef?.hide()" />
+          <Button type="submit" label="Set time" size="small" :disabled="!timeEditValid" />
+        </div>
+      </form>
+    </Popover>
 
     <!-- Task details -->
     <Popover ref="detailsRef" class="w-80 max-w-[92vw]">

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
+import TimeField from '@/components/base/TimeField.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { useDynamicList } from '@/composables/useDynamicList'
 import { toastError } from '@/composables/useConfirm'
@@ -15,6 +16,7 @@ import { formatMoney } from '@/features/payments/money'
 import DraftBanner from '@/features/drafts/DraftBanner.vue'
 import NextActionFields from '@/features/pipeline/components/NextActionFields.vue'
 import { useModalDraft } from '@/composables/useModalDraft'
+import { todayInput } from '@/utils/format'
 
 // The rapid visit-completion log. It records the outcome + (office) the deal's
 // property shortlist, then MUST conclude — self-closing rule — into one of:
@@ -58,6 +60,19 @@ const notes = ref('')
 const checklist = ref([])
 const objections = ref([])
 
+// When the visit ACTUALLY happened (in-site only, required) — the log's own
+// completion moment is recorded server-side, so the gap between "visited" and
+// "logged" stays visible to oversight. Prefilled to now: agents usually log
+// right after the visit and just confirm.
+const nowTime = () => {
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+const today = todayInput()
+const visitedDate = ref(today)
+const visitedTime = ref(nowTime())
+
 // How the visit concludes: 'next_action' | 'deal' | 'desire' | 'archive' —
 // plus 'none' when the deal already settled the thread.
 const conclusion = ref(props.dealSettled ? 'none' : 'next_action')
@@ -78,6 +93,8 @@ const draft = props.draftKey
         notes: notes.value,
         checklist: checklist.value,
         objections: objections.value,
+        visitedDate: visitedDate.value,
+        visitedTime: visitedTime.value,
         conclusion: conclusion.value,
         interimDeal: interimDeal.value,
         nextAction: nextAction.value,
@@ -89,6 +106,8 @@ const draft = props.draftKey
         notes.value = d.notes ?? ''
         checklist.value = d.checklist ?? []
         objections.value = d.objections ?? []
+        visitedDate.value = d.visitedDate ?? today
+        visitedTime.value = d.visitedTime ?? nowTime()
         conclusion.value = d.conclusion ?? (props.dealSettled ? 'none' : 'next_action')
         interimDeal.value = d.interimDeal ?? false
         nextAction.value = d.nextAction ?? { type: 'call', due_date: '', due_time: '', assigned_to: '' }
@@ -212,7 +231,13 @@ const CONCLUSIONS = computed(() => {
   ]
 })
 
+// In-site logs must state when the visit actually happened (date + time).
+const visitedReady = computed(
+  () => isOffice.value || (!!visitedDate.value && !!visitedTime.value),
+)
+
 const ready = computed(() => {
+  if (!visitedReady.value) return false
   // Interim in-site log: result + notes only — unless a deal is being opened
   // for this apartment, which then needs its unit ticked.
   if (!showConclusion.value) return !interimDeal.value || includedDealUnits.value.length > 0
@@ -247,6 +272,11 @@ function submit() {
     notes: notes.value.trim() || null,
     checklist: checklist.value,
     objections: objections.value,
+  }
+  // In-site: when the visit actually happened, as the agent states it (local
+  // wall clock — the app timezone end-to-end).
+  if (!isOffice.value) {
+    payload.visited_at = `${visitedDate.value} ${visitedTime.value}`
   }
   if (isOffice.value && hasDeal.value) {
     payload.shortlist = finalShortlist.value.map(({ shortlistable_type, shortlistable_id }) => ({
@@ -314,6 +344,34 @@ function submit() {
         >
           {{ o.label }}
         </button>
+      </div>
+    </fieldset>
+
+    <!-- When the visit actually happened — required on in-site logs. The log's
+         own fill time is recorded automatically; this captures the real visit
+         moment (agents often log after leaving the site). -->
+    <fieldset v-if="!isOffice" class="rounded-xl border border-line p-3">
+      <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">
+        When did the visit happen?<span class="text-danger" aria-hidden="true"> *</span>
+      </legend>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <label class="block">
+          <span class="mb-1.5 block text-sm font-medium text-ink"
+            >Visit date<span class="text-danger" aria-hidden="true"> *</span></span
+          >
+          <input
+            v-model="visitedDate"
+            type="date"
+            :max="today"
+            class="w-full rounded-md border border-line bg-card px-3 py-2 min-h-[42px] text-sm text-ink outline-none transition-colors focus:border-primary"
+          />
+        </label>
+        <div class="block">
+          <span class="mb-1.5 block text-sm font-medium text-ink"
+            >Visit time<span class="text-danger" aria-hidden="true"> *</span></span
+          >
+          <TimeField v-model="visitedTime" aria-label="Visit time" />
+        </div>
       </div>
     </fieldset>
 

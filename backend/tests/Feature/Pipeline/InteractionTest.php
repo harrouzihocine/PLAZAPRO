@@ -450,6 +450,7 @@ class InteractionTest extends TestCase
 
         $this->postJson("/api/v1/visits/{$visit->id}/complete", [
             'outcome_id' => $interested->id,
+            'visited_at' => now()->subMinutes(30)->toDateTimeString(),
             'next_action' => $this->nextActionPayload($agent),
         ])->assertOk();
 
@@ -505,6 +506,7 @@ class InteractionTest extends TestCase
         // Sibling B is still open, so completing A needs NO conclusion.
         $this->postJson("/api/v1/visits/{$visitA->id}/complete", [
             'outcome_id' => $notVisited->id, 'notes' => 'Nobody home',
+            'visited_at' => now()->subMinutes(30)->toDateTimeString(),
         ])->assertOk();
 
         $this->assertNotNull($visitA->fresh()->completed_at);
@@ -534,6 +536,7 @@ class InteractionTest extends TestCase
 
         // The only open in-site visit → its archive closure is applied.
         $this->postJson("/api/v1/visits/{$visit->id}/complete", [
+            'visited_at' => now()->subMinutes(30)->toDateTimeString(),
             'closure' => ['type' => 'archive', 'reason_id' => $reason->id, 'note' => 'Client walked away'],
         ])->assertOk();
 
@@ -557,6 +560,7 @@ class InteractionTest extends TestCase
         Sanctum::actingAs($actor);
 
         $this->postJson("/api/v1/visits/{$visit->id}/complete", [
+            'visited_at' => now()->subMinutes(30)->toDateTimeString(),
             'next_action' => [
                 'type' => 'in_site_visit', 'due_date' => now()->addDay()->toDateString(),
                 'assigned_to' => $fieldAgent->id, 'unit_ids' => [$another->id],
@@ -593,6 +597,7 @@ class InteractionTest extends TestCase
 
         $this->postJson("/api/v1/visits/{$visit->id}/complete", [
             'outcome_id' => $interested->id,
+            'visited_at' => now()->subMinutes(30)->toDateTimeString(),
             'next_action' => [
                 'type' => 'in_site_visit', 'due_date' => now()->addDay()->toDateString(),
                 'assigned_to' => $fieldAgent->id, 'unit_ids' => [$unit->id],
@@ -676,20 +681,47 @@ class InteractionTest extends TestCase
         $visit = Visit::factory()->inSite()->create(['agent_id' => $actor->id]);
         Sanctum::actingAs($actor);
 
+        $visitedAt = now()->subHours(2)->startOfMinute();
         $this->postJson("/api/v1/visits/{$visit->id}/complete", [
+            'visited_at' => $visitedAt->toDateTimeString(),
             'next_action' => $this->nextActionPayload($agent),
         ])->assertOk()->assertJsonPath('data.is_completed', true);
 
+        // completed_at = when the log was filled; visited_at = the agent-stated
+        // actual visit moment — both recorded, independently.
         $this->assertNotNull($visit->fresh()->completed_at);
+        $this->assertTrue($visitedAt->equalTo($visit->fresh()->visited_at));
         $this->assertSame(1, NextAction::query()->pending()
             ->where('subject_type', 'client')->where('subject_id', $visit->client_id)->count());
+    }
+
+    public function test_an_in_site_completion_must_state_when_the_visit_happened(): void
+    {
+        $actor = $this->userWithPermissions(['clients.view', 'visits.conduct']);
+        $visit = Visit::factory()->inSite()->create(['agent_id' => $actor->id]);
+        Sanctum::actingAs($actor);
+
+        // Missing → rejected; far-future (beyond clock-skew grace) → rejected.
+        $this->postJson("/api/v1/visits/{$visit->id}/complete", [
+            'next_action' => $this->nextActionPayload($this->agent()),
+        ])->assertStatus(422)->assertJsonValidationErrors('visited_at');
+
+        $this->postJson("/api/v1/visits/{$visit->id}/complete", [
+            'visited_at' => now()->addHours(3)->toDateTimeString(),
+            'next_action' => $this->nextActionPayload($this->agent()),
+        ])->assertStatus(422)->assertJsonValidationErrors('visited_at');
+
+        $this->assertNull($visit->fresh()->completed_at);
     }
 
     public function test_an_in_site_visit_is_completed_only_by_its_agent_or_a_visit_admin(): void
     {
         $assigned = $this->userWithPermissions(['clients.view', 'visits.conduct']);
         $visit = Visit::factory()->inSite()->create(['agent_id' => $assigned->id]);
-        $payload = fn () => ['next_action' => $this->nextActionPayload($this->agent())];
+        $payload = fn () => [
+            'visited_at' => now()->subMinutes(30)->toDateTimeString(),
+            'next_action' => $this->nextActionPayload($this->agent()),
+        ];
 
         // Another conducting user (not the assigned agent) is rejected.
         Sanctum::actingAs($this->userWithPermissions(['clients.view', 'visits.conduct']));

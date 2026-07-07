@@ -225,6 +225,7 @@ class VisitMaterializationTest extends TestCase
         Sanctum::actingAs($fieldAgent); // the assigned agent completes his own visit
 
         $this->postJson("/api/v1/visits/{$visitA->id}/complete", [
+            'visited_at' => now()->subMinutes(30)->toDateTimeString(),
             'next_action' => ['type' => 'call', 'due_date' => now()->addDay()->toDateString(), 'assigned_to' => $fieldAgent->id],
         ])->assertOk();
 

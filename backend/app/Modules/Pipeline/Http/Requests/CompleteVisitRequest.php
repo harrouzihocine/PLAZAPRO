@@ -54,9 +54,19 @@ class CompleteVisitRequest extends FormRequest
      */
     public function rules(): array
     {
+        $visit = $this->route('visit');
+
         $rules = array_merge([
             'outcome_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
             'notes' => ['nullable', 'string', 'max:5000'],
+            // When the visit actually happened — REQUIRED on in-site logs (the
+            // agent states it; completed_at only says when the form was filled).
+            // A 15-minute grace absorbs device-clock skew on "just now" entries.
+            'visited_at' => [
+                $visit instanceof Visit && $visit->type === VisitType::InSite ? 'required' : 'nullable',
+                'date',
+                'before_or_equal:'.now()->addMinutes(15),
+            ],
             // Fast checkbox checklist (office_visit_checklist / insite_outcomes ids).
             'checklist' => ['nullable', 'array'],
             'checklist.*' => ['integer', 'distinct', 'exists:dynamic_list_items,id'],
