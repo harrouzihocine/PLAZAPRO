@@ -123,6 +123,46 @@ services:
       timeout: 5s
       retries: 3
 
+  # OPTIONAL DHCP takeover (profile lan-dhcp) — for routers whose firmware
+  # hides the DHCP-DNS setting (stock Nokia GPON). The router keeps routing;
+  # this hands out the leases instead, with DNS pointed at this server, so
+  # every office device gets split-horizon DNS with zero per-device setup.
+  #
+  # BEFORE enabling (order matters — two DHCP servers on one LAN fight):
+  #   1. disable the DHCP server in the router's own settings
+  #   2. docker compose stop dnsmasq        (they'd race for LAN-IP:53)
+  #   3. docker compose --profile lan-dhcp up -d --build dnsmasq-dhcp
+  dnsmasq-dhcp:
+    build: ./docker/dnsmasq
+    network_mode: host              # DHCP needs raw LAN broadcasts (no NAT)
+    cap_add: [NET_ADMIN, NET_RAW]
+    command:
+      - --keep-in-foreground
+      - --log-facility=-
+      - --no-resolv
+      - --no-hosts
+      - --cache-size=1000
+      - --bind-interfaces           # with listen-address: leaves systemd-resolved's
+      - --listen-address=${LAN_DNS_IP:-}   # 127.0.0.53 stub untouched
+      - --address=/${LAN_TLS_DOMAIN:-app.plaza-pro.com}/${LAN_DNS_IP:-}
+      - --server=8.8.8.8
+      - --server=8.8.4.4
+      - --dhcp-range=${LAN_DHCP_RANGE:-192.168.1.50,192.168.1.199,12h}
+      - --dhcp-option=option:router,${LAN_GATEWAY:-192.168.1.254}
+      - --dhcp-option=option:dns-server,${LAN_DNS_IP:-}
+      - --dhcp-authoritative        # sole DHCP on this LAN (router's is OFF)
+    environment: { TZ: Africa/Algiers }
+    restart: unless-stopped
+    init: true
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+    profiles: ["lan-dhcp"]
+    healthcheck:
+      test: ["CMD", "nslookup", "${LAN_TLS_DOMAIN:-app.plaza-pro.com}", "${LAN_DNS_IP:-127.0.0.1}"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   # Let's Encrypt via Cloudflare DNS-01 for the office-LAN listener. Never part
   # of `up` (profile) — invoked as one-shots by scripts/setup-lan-tls.sh and
   # the renew cron (scripts/renew-lan-cert.sh). DNS-01 needs no inbound port,
