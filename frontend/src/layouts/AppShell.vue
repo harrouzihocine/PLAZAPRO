@@ -16,6 +16,7 @@ import ChatDock from '@/features/collaboration/components/ChatDock.vue'
 import DraftsIndicator from '@/components/shell/DraftsIndicator.vue'
 import GlobalSearch from '@/components/shell/GlobalSearch.vue'
 import PullToRefresh from '@/components/shell/PullToRefresh.vue'
+import SyncIndicator from '@/components/shell/SyncIndicator.vue'
 import BrandLogo from '@/components/BrandLogo.vue'
 import UnitSoldCelebration from '@/features/inventory/components/UnitSoldCelebration.vue'
 import ProfileModal from '@/features/settings/components/ProfileModal.vue'
@@ -23,6 +24,7 @@ import OfflineBanner from '@/features/offline/OfflineBanner.vue'
 import { useAnnouncementsStore } from '@/features/inventory/announcementsStore'
 import { usePresenceStore } from '@/features/collaboration/presenceStore'
 import { useNetworkStore } from '@/features/offline/networkStore'
+import { useOutboxStore } from '@/features/offline/outboxStore'
 import { oversightApi } from '@/features/oversight/api'
 
 const { isNight, toggle } = useTheme()
@@ -55,17 +57,30 @@ const announcements = useAnnouncementsStore()
 
 // Connectivity: init the tracker, and when the link comes back after an
 // offline-snapshot boot, revalidate the session against the server (a real
-// 401 then logs out normally).
+// 401 then logs out normally) and replay the offline outbox.
 const network = useNetworkStore()
+const outbox = useOutboxStore()
 watch(
   () => network.online,
   (online) => {
-    if (online && auth.offlineSession) auth.fetchMe()
+    if (!online) return
+    if (auth.offlineSession) auth.fetchMe()
+    outbox.sync()
+  },
+)
+// A fresh login (including re-login after a mid-sync 401) resumes the queue.
+watch(
+  () => auth.user?.id,
+  (id) => {
+    outbox.load(id)
+    if (id) outbox.resumeAfterLogin()
   },
 )
 
 onMounted(async () => {
   network.init()
+  await outbox.load(auth.user?.id)
+  if (network.online) outbox.sync()
   announcements.subscribe()
   // Everyone joins the `online` presence channel so the app's green "Active
   // now" dots reflect web users too; the web UI itself never shows them.
@@ -442,6 +457,7 @@ async function logout() {
             :aria-label="isNight ? 'Switch to day theme' : 'Switch to night theme'"
             @click="toggle"
           />
+          <SyncIndicator />
           <DraftsIndicator />
           <NotificationBell v-if="auth.can('notifications.view')" />
 

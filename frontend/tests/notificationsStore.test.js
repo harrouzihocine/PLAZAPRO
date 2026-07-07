@@ -12,6 +12,13 @@ vi.mock('@/features/collaboration/api', () => ({
 }))
 // Real-time is off in unit tests: getEcho() returns null so subscribe() is a no-op.
 vi.mock('@/composables/useEcho', () => ({ getEcho: () => null }))
+// Read-marks route through the offline queue layer — mocked to "online" here.
+const { queueable } = vi.hoisted(() => ({ queueable: vi.fn() }))
+vi.mock('@/features/offline/apiOrQueue', () => ({ queueable }))
+vi.mock('@/features/offline/snapshots', () => ({
+  cacheSnapshot: vi.fn(),
+  serveSnapshot: vi.fn(async () => false),
+}))
 
 import { useNotificationsStore } from '@/features/collaboration/notificationsStore'
 
@@ -22,6 +29,7 @@ describe('notificationsStore', () => {
     markRead.mockReset()
     markUnread.mockReset()
     markAllRead.mockReset()
+    queueable.mockReset()
   })
 
   it('loads notifications and the unread count', async () => {
@@ -37,12 +45,25 @@ describe('notificationsStore', () => {
 
   it('marks a single notification read and updates the badge', async () => {
     list.mockResolvedValue({ data: [{ id: 'a', title: 'Hi', read_at: null }], unread_count: 1 })
-    markRead.mockResolvedValue({ unread_count: 0 })
+    queueable.mockResolvedValue({ queued: false, data: { unread_count: 0 } })
     const store = useNotificationsStore()
     await store.fetch()
 
     await store.markRead('a')
-    expect(markRead).toHaveBeenCalledWith('a')
+    expect(queueable).toHaveBeenCalledWith(
+      expect.objectContaining({ url: '/notifications/a/read', silent: true }),
+    )
+    expect(store.items[0].read_at).not.toBeNull()
+    expect(store.unreadCount).toBe(0)
+  })
+
+  it('a queued (offline) read-mark still drops the badge optimistically', async () => {
+    list.mockResolvedValue({ data: [{ id: 'a', title: 'Hi', read_at: null }], unread_count: 1 })
+    queueable.mockResolvedValue({ queued: true })
+    const store = useNotificationsStore()
+    await store.fetch()
+
+    await store.markRead('a')
     expect(store.items[0].read_at).not.toBeNull()
     expect(store.unreadCount).toBe(0)
   })

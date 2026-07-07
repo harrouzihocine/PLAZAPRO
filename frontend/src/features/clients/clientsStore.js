@@ -10,6 +10,8 @@ import {
 } from '@/features/clients/api'
 import { pipelineApi } from '@/features/pipeline/api'
 import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
+import { queueable } from '@/features/offline/apiOrQueue'
+import { useNetworkStore } from '@/features/offline/networkStore'
 
 // State for the Clients screens. Loads clients plus two agent catalogues: `agents`
 // (field agents, for visit/next-action pickers) and `followUpAgents` (sales agents
@@ -144,7 +146,19 @@ export const useClientsStore = defineStore('clients', {
       }
     },
 
+    // Actions that must NOT queue offline (interactive duplicate resolution,
+    // financial closes): toast a clear notice and stop before any request.
+    _requireOnline(what) {
+      if (!useNetworkStore().requireOnline(`You're offline — ${what} needs a connection.`)) {
+        const err = new Error('offline-blocked')
+        err.offlineBlocked = true
+        throw err
+      }
+    },
+
     async create(payload) {
+      // The duplicate-phone check must run live (its resolution is interactive).
+      this._requireOnline('creating a client')
       this.saving = true
       this.error = ''
       try {
@@ -215,6 +229,8 @@ export const useClientsStore = defineStore('clients', {
     // Returns the created project (the "new project" flow immediately logs the
     // first call onto it, so the caller needs the id).
     async createProject(clientId, payload = {}) {
+      // The new project's id anchors the opening call — it needs the server.
+      this._requireOnline('opening a project')
       const project = await this.mutate(() => projectsApi.create(clientId, payload))
       await this.loadProjects(clientId)
       return project
@@ -281,7 +297,22 @@ export const useClientsStore = defineStore('clients', {
     },
 
     async saveDesire(clientId, payload) {
-      this.desire = await this.mutate(() => desireApi.save(clientId, payload))
+      const res = await this.mutate(() =>
+        queueable({
+          method: 'put',
+          url: `/clients/${clientId}/desire`,
+          body: payload,
+          label: `Client desire — ${this.current?.name ?? 'client'}`,
+          entityHint: { route: `/clients/${clientId}` },
+        }),
+      )
+      if (res.queued) {
+        // Keep what the agent typed visible until the sync lands (the upsert
+        // is last-write-wins server-side).
+        this.desire = { ...(this.desire ?? {}), ...payload }
+        return this.desire
+      }
+      this.desire = res.data?.data ?? res.data
       return this.desire
     },
 
@@ -299,12 +330,14 @@ export const useClientsStore = defineStore('clients', {
     },
 
     async createDeal(clientId, projectId, payload) {
+      this._requireOnline('opening a deal')
       await this.mutate(() => dealsApi.create(projectId, payload))
       await this.loadDeals(projectId)
       return this.loadProjects(clientId)
     },
 
     async closeDeal(clientId, projectId, dealId, payload) {
+      this._requireOnline('closing a deal')
       await this.mutate(() => dealsApi.close(dealId, payload))
       await this.loadDeals(projectId)
       return this.loadProjects(clientId)
@@ -312,6 +345,7 @@ export const useClientsStore = defineStore('clients', {
 
     // Close ONE apartment on the deal (won with its own price / lost).
     async closeDealItem(clientId, projectId, dealId, itemId, payload) {
+      this._requireOnline('closing an apartment on the deal')
       await this.mutate(() => dealsApi.closeItem(dealId, itemId, payload))
       await this.loadDeals(projectId)
       return this.loadProjects(clientId)
@@ -319,6 +353,7 @@ export const useClientsStore = defineStore('clients', {
 
     // Release a WON apartment — it returns to the market; payments stay as history.
     async releaseDealItem(clientId, projectId, dealId, itemId, payload) {
+      this._requireOnline('releasing a won apartment')
       await this.mutate(() => dealsApi.releaseItem(dealId, itemId, payload))
       await this.loadDeals(projectId)
       return this.loadProjects(clientId)
@@ -326,6 +361,7 @@ export const useClientsStore = defineStore('clients', {
 
     // Sell extra boxes onto a WON apartment (agreed price grows).
     async addDealBoxes(clientId, projectId, dealId, itemId, payload) {
+      this._requireOnline('selling extra boxes')
       await this.mutate(() => dealsApi.addBoxes(dealId, itemId, payload))
       await this.loadDeals(projectId)
       return this.loadProjects(clientId)
@@ -355,8 +391,24 @@ export const useClientsStore = defineStore('clients', {
       return this.timeline
     },
 
+    // ── The field-agent write set: offline-queueable (X-Idempotency-Key).
+    // Online they run straight through; offline (or dead mid-flight) they land
+    // in the outbox and replay FIFO on reconnect. A queued action returns null
+    // and skips the refetch chain — the server's guards judge it later, and a
+    // rejection ("visit already completed", "project frozen"…) surfaces in the
+    // Sync Center with the server's reason. ──
+
     async logCall(clientId, payload) {
-      await this.mutate(() => pipelineApi.logCall(clientId, payload))
+      const res = await this.mutate(() =>
+        queueable({
+          method: 'post',
+          url: `/clients/${clientId}/calls`,
+          body: payload,
+          label: `Call log — ${this.current?.name ?? 'client'}`,
+          entityHint: { route: `/clients/${clientId}` },
+        }),
+      )
+      if (res.queued) return null
       // The first call unlocks the projects (has_calls flips), a call may open /
       // reopen a project or upsert the desire — refresh what the panels show.
       if (this.current && String(this.current.id) === String(clientId)) {
@@ -368,7 +420,16 @@ export const useClientsStore = defineStore('clients', {
     },
 
     async completeVisit(clientId, visitId, payload) {
-      await this.mutate(() => pipelineApi.completeVisit(visitId, payload))
+      const res = await this.mutate(() =>
+        queueable({
+          method: 'post',
+          url: `/visits/${visitId}/complete`,
+          body: payload,
+          label: `Visit completion — ${this.current?.name ?? 'client'}`,
+          entityHint: { route: `/clients/${clientId}` },
+        }),
+      )
+      if (res.queued) return null
       return this.loadTimeline(clientId)
     },
 
@@ -376,13 +437,31 @@ export const useClientsStore = defineStore('clients', {
     // complete first. The new pending visit(s) / pooled request show in the
     // refreshed timeline.
     async proposeInSiteVisit(clientId, projectId, payload) {
-      await this.mutate(() => pipelineApi.proposeInSiteVisit(projectId, payload))
+      const res = await this.mutate(() =>
+        queueable({
+          method: 'post',
+          url: `/projects/${projectId}/in-site-visits`,
+          body: payload,
+          label: `Add unit to visit — ${this.current?.name ?? 'client'}`,
+          entityHint: { route: `/clients/${clientId}/projects/${projectId}` },
+        }),
+      )
+      if (res.queued) return null
       return this.loadTimeline(clientId)
     },
 
     // Plan a next action after the fact (a log that didn't need one at the time).
     async createNextAction(clientId, payload) {
-      await this.mutate(() => pipelineApi.createNextAction(clientId, payload))
+      const res = await this.mutate(() =>
+        queueable({
+          method: 'post',
+          url: `/clients/${clientId}/next-actions`,
+          body: payload,
+          label: `Next action — ${this.current?.name ?? 'client'}`,
+          entityHint: { route: `/clients/${clientId}` },
+        }),
+      )
+      if (res.queued) return null
       return this.loadTimeline(clientId)
     },
 

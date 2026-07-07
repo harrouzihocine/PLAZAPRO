@@ -50,6 +50,13 @@ vi.mock('@/features/settings/store', () => ({
 }))
 // SweetAlert2 needs a real browser (matchMedia); the store only toasts.
 vi.mock('@/composables/useConfirm', () => ({ toastError: vi.fn() }))
+// Sends and read-marks route through the offline queue layer — mocked here.
+const { queueable } = vi.hoisted(() => ({ queueable: vi.fn() }))
+vi.mock('@/features/offline/apiOrQueue', () => ({ queueable }))
+vi.mock('@/features/offline/snapshots', () => ({
+  cacheSnapshot: vi.fn(),
+  serveSnapshot: vi.fn(async () => false),
+}))
 
 import { useChatStore } from '@/features/collaboration/chatStore'
 
@@ -77,7 +84,7 @@ describe('chatStore', () => {
 
   it('sends text optimistically then swaps in the server message', async () => {
     let resolveSend
-    sendMessage.mockReturnValue(new Promise((r) => (resolveSend = r)))
+    queueable.mockReturnValue(new Promise((r) => (resolveSend = r)))
     const store = useChatStore()
     store.thread(1).loaded = true
 
@@ -86,17 +93,35 @@ describe('chatStore', () => {
     expect(store.thread(1).messages).toHaveLength(1)
     expect(store.thread(1).messages[0].pending).toBe(true)
 
-    resolveSend({ id: 100, conversation_id: 1, type: 'text', body: 'hi', is_mine: true, created_at: '2026-07-07T10:00:00Z' })
+    resolveSend({
+      queued: false,
+      data: { data: { id: 100, conversation_id: 1, type: 'text', body: 'hi', is_mine: true, created_at: '2026-07-07T10:00:00Z' } },
+    })
     await promise
     // …replaced by the acked row.
     expect(store.thread(1).messages).toHaveLength(1)
     expect(store.thread(1).messages[0].id).toBe(100)
     expect(store.thread(1).messages[0].pending).toBeFalsy()
-    expect(sendMessage).toHaveBeenCalledWith(1, expect.any(FormData))
+    // The message's client_key doubles as its idempotency key.
+    expect(queueable).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: '/conversations/1/messages',
+        uuid: store.thread(1).messages[0].client_key ?? expect.any(String),
+      }),
+    )
+  })
+
+  it('a queued (offline) send keeps the pending clock bubble', async () => {
+    queueable.mockResolvedValue({ queued: true })
+    const store = useChatStore()
+    await store.sendText(1, 'hi')
+    const m = store.thread(1).messages[0]
+    expect(m.pending).toBe(true)
+    expect(m.failed).toBe(false)
   })
 
   it('a failed send keeps the bubble with the failed flag for retry', async () => {
-    sendMessage.mockRejectedValue({ response: { status: 422, data: { message: 'read-only' } } })
+    queueable.mockRejectedValue({ response: { status: 422, data: { message: 'read-only' } } })
     const store = useChatStore()
     await store.sendText(1, 'hi')
     const m = store.thread(1).messages[0]
@@ -134,17 +159,20 @@ describe('chatStore', () => {
     expect(await store.loadOlder(1)).toBe(0)
   })
 
-  it('markRead clears the badge at once and debounces the POST', async () => {
+  it('markRead clears the badge at once and debounces the (queueable) POST', async () => {
     vi.useFakeTimers()
-    markRead.mockResolvedValue({})
+    queueable.mockResolvedValue({ queued: false, data: {} })
     const store = useChatStore()
     store.conversations = [{ id: 3, unread_count: 4 }]
     store.markRead(3)
     store.markRead(3)
     expect(store.conversations[0].unread_count).toBe(0)
-    expect(markRead).not.toHaveBeenCalled()
+    expect(queueable).not.toHaveBeenCalled()
     vi.advanceTimersByTime(500)
-    expect(markRead).toHaveBeenCalledTimes(1)
+    expect(queueable).toHaveBeenCalledTimes(1)
+    expect(queueable).toHaveBeenCalledWith(
+      expect.objectContaining({ url: '/conversations/3/read', silent: true }),
+    )
     vi.useRealTimers()
   })
 

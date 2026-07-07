@@ -5,6 +5,7 @@ import { toastInfo } from '@/composables/useConfirm'
 import { useChatDockStore } from '@/features/collaboration/chatDockStore'
 import { playNotificationSound } from '@/utils/notificationSound'
 import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
+import { queueable } from '@/features/offline/apiOrQueue'
 
 // In-app notification feed backing the AppShell bell. Loads the latest page over
 // HTTP and keeps the unread badge live over Reverb (the user's private channel).
@@ -69,9 +70,18 @@ export const useNotificationsStore = defineStore('notifications', {
     async markRead(id) {
       const item = this.items.find((n) => n.id === id)
       if (item && !item.read_at) {
-        const { unread_count } = await notificationsApi.markRead(id)
+        // Optimistic + offline-queueable (silent): the badge drops at once and
+        // the mark replays on reconnect if we were offline.
         item.read_at = new Date().toISOString()
-        this.unreadCount = unread_count
+        this.unreadCount = Math.max(0, this.unreadCount - 1)
+        const res = await queueable({
+          method: 'post',
+          url: `/notifications/${id}/read`,
+          label: 'Notification read',
+          silent: true,
+          queuedToast: null,
+        })
+        if (!res.queued) this.unreadCount = res.data.unread_count
       }
     },
 
@@ -85,10 +95,18 @@ export const useNotificationsStore = defineStore('notifications', {
     },
 
     async markAllRead() {
-      const { unread_count } = await notificationsApi.markAllRead()
+      // Optimistic + offline-queueable (silent), like markRead.
       const now = new Date().toISOString()
       this.items.forEach((n) => (n.read_at = n.read_at ?? now))
-      this.unreadCount = unread_count
+      this.unreadCount = 0
+      const res = await queueable({
+        method: 'post',
+        url: '/notifications/read-all',
+        label: 'Notifications read',
+        silent: true,
+        queuedToast: null,
+      })
+      if (!res.queued) this.unreadCount = res.data.unread_count
     },
 
     // Prepend a notification that arrived live over the websocket.

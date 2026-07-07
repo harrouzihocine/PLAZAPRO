@@ -4,6 +4,7 @@ import { chatApi } from '@/features/collaboration/api'
 import { getEcho } from '@/composables/useEcho'
 import { useAuthStore } from '@/features/settings/store'
 import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
+import { queueable } from '@/features/offline/apiOrQueue'
 
 // Chat state. Messages live in a PER-CONVERSATION map (threads) consumed by the
 // /chat page, the tablet two-pane and the dock windows alike — one Echo channel
@@ -292,13 +293,20 @@ export const useChatStore = defineStore('chat', {
 
     // Debounced: clears the badge at once, posts the cursor shortly after (one
     // POST per burst of incoming messages, one ConversationRead broadcast).
+    // Offline it queues silently — read cursors replay with everything else.
     markRead(conversationId) {
       const id = Number(conversationId)
       const convo = this.conversation(id)
       if (convo) convo.unread_count = 0
       clearTimeout(this._readTimers[id])
       this._readTimers[id] = setTimeout(() => {
-        chatApi.markRead(id).catch(() => {})
+        queueable({
+          method: 'post',
+          url: `/conversations/${id}/read`,
+          label: 'Chat read cursor',
+          silent: true,
+          queuedToast: null,
+        }).catch(() => {})
       }, 400)
     },
 
@@ -380,14 +388,34 @@ export const useChatStore = defineStore('chat', {
       this.error = ''
       message.pending = true
       message.failed = false
+      const p = message._payload
       try {
-        const p = message._payload
-        const form = new FormData()
-        if (p.body) form.append('body', p.body)
-        if (p.file) form.append('attachment', p.file)
-        if (p.durationMs != null) form.append('duration_ms', String(Math.round(p.durationMs)))
-        if (p.replyToId) form.append('reply_to_id', String(p.replyToId))
-        const saved = await chatApi.sendMessage(conversationId, form)
+        // Offline-queueable: the message's client_key doubles as its
+        // idempotency key, so a replay can never post the bubble twice. While
+        // queued, the bubble keeps its clock (WhatsApp-style); the outbox
+        // swaps in the acked message on reconnect.
+        const res = await queueable({
+          method: 'post',
+          url: `/conversations/${Number(conversationId)}/messages`,
+          body: {
+            ...(p.body ? { body: p.body } : {}),
+            ...(p.durationMs != null ? { duration_ms: Math.round(p.durationMs) } : {}),
+            ...(p.replyToId ? { reply_to_id: p.replyToId } : {}),
+          },
+          files: p.file
+            ? [{ field: 'attachment', name: p.file.name ?? 'attachment', type: p.file.type ?? '', blob: p.file }]
+            : [],
+          label: `Chat message — ${this.conversation(conversationId)?.title ?? 'conversation'}`,
+          entityHint: {
+            conversationId: Number(conversationId),
+            clientKey: message.client_key,
+            route: `/chat/${Number(conversationId)}`,
+          },
+          uuid: message.client_key,
+          queuedToast: null, // the clock on the bubble says it already
+        })
+        if (res.queued) return null
+        const saved = res.data?.data ?? res.data
         this._resolvePending(conversationId, message.client_key, saved)
         return saved
       } catch (e) {

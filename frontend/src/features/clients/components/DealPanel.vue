@@ -17,6 +17,7 @@ import UnitBoxPicker from '@/features/inventory/components/UnitBoxPicker.vue'
 import { useAuthStore } from '@/features/settings/store'
 import { useDynamicList } from '@/composables/useDynamicList'
 import { versementsApi } from '@/features/payments/api'
+import { useNetworkStore } from '@/features/offline/networkStore'
 import { toastError, toastSuccess } from '@/composables/useConfirm'
 import { formatDate, todayInput } from '@/utils/format'
 import { dzdToMil, formatMoney, milToDzd, MIL_LABEL } from '@/features/payments/money'
@@ -65,6 +66,10 @@ function openDeposit(unit) {
 }
 
 async function submitDeposit() {
+  // Financial writes never queue offline — the reservation lock must be live.
+  if (!useNetworkStore().requireOnline("You're offline — recording a deposit needs a connection.")) {
+    return
+  }
   const f = depositFlow.value
   if (!f.amount || !f.method_id) {
     toastError('Enter a deposit amount and a payment method.')
