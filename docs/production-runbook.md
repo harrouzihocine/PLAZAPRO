@@ -56,37 +56,46 @@ docker compose --profile tunnel up -d  # start the tunnel
 
 Seed the first super-admin user, then verify §3.
 
-### 1.5 LAN HTTPS (split-horizon — office devices talk to the server directly)
+### 1.5 LAN HTTPS (office devices reach the server directly, trusted cert)
 
-Same hostname on both sides: the internet resolves `plaza.example.com` to the Cloudflare tunnel,
-the **office LAN resolves it to the server's LAN IP** and gets nginx:443 with a real Let's Encrypt
-certificate. Because the hostname never changes, cookies, Sanctum, CSP and websockets all just
-work; nothing in the app config knows the difference. The cert is issued/renewed via **DNS-01
-through the Cloudflare API**, so no inbound port opens — the tunnel-only posture stands.
+Goal: office devices open the app over HTTPS with a real green padlock, hitting the server
+**directly on the LAN** (fast, works even if the internet is down) instead of hairpinning out
+through the tunnel. The cert is always a real Let's Encrypt one, issued/renewed via **DNS-01
+through the Cloudflare API**, so no inbound port ever opens — the tunnel-only posture stands.
 
-1. Cloudflare dashboard → **My Profile → API Tokens → Create token**: one permission only,
-   **Zone → DNS → Edit**, scoped to this site's zone. Paste into `/srv/plaza/.env` →
-   `CLOUDFLARE_DNS_API_TOKEN=...`
-2. ```bash
-   ./scripts/setup-lan-tls.sh plaza.example.com
+**Recommended method — a second hostname published to the private IP (no router/device config).**
+This is what Plex/UniFi/Tailscale do and it works even behind a locked ISP router (the Algérie
+Télécom **Nokia G-1425G-B** hides its LAN DNS/DHCP settings from the `userAdmin` account):
+
+1. **Public DNS record**: in Cloudflare add `office.plaza-pro.com` → **A** `<server LAN IP>`,
+   **DNS only (grey cloud — NOT proxied)**. Cloudflare warns "private IP"; save anyway. A private
+   IP in public DNS only resolves to anything useful when you're actually on the LAN.
+2. **Cert covers both names** (tunnel host + office host as SANs on one cert):
+   ```bash
+   ./scripts/setup-lan-tls.sh app.plaza-pro.com office.plaza-pro.com
    ```
-   Issues the cert (stored in the `letsencrypt` docker volume), points nginx at it, reloads, and
-   installs a twice-daily renewal cron (`scripts/renew-lan-cert.sh`, logs to
-   `~/backups/plaza/cert-renew.log`). Idempotent — rerun any time.
-3. **Office DNS override** (the split-horizon half): make the office answer
-   `plaza.example.com` with the server's LAN IP. If the router supports "DNS host mapping" /
-   "local DNS records", use that. If not (e.g. the stock Nokia GPON gateway), run the bundled
-   forwarder: set `LAN_DNS_IP=<server LAN IP>` in `.env`, then
-   `docker compose --profile lan-dns up -d` — and in the router's **LAN/DHCP settings** set
-   primary DNS = the server's LAN IP (secondary 8.8.8.8: if the server is down, clients fall
-   back and simply reach the app via the tunnel instead). Give the server a static LAN IP.
-4. Verify from a LAN machine: `curl -v https://plaza.example.com/up` → 200 with a **Let's
-   Encrypt** cert (not Cloudflare's), and `nslookup plaza.example.com` returns the LAN IP.
-   Plain `http://` on the LAN answers 301 → https.
+   Issues/expands the cert (in the `letsencrypt` volume), points nginx at it, reloads, installs the
+   twice-daily renewal cron. Idempotent.
+3. **Trust the office origin** in Laravel — add it to `SANCTUM_STATEFUL_DOMAINS` in `backend/.env`
+   (comma-separated) and `docker compose exec app php artisan optimize`. `SESSION_DOMAIN=null`
+   keeps cookies per-host, so each URL gets its own valid session; the SPA builds API/websocket
+   URLs from `window.location`, so nothing else changes.
+4. **Result**: staff use `https://office.plaza-pro.com` at the office (direct, LAN speed);
+   everyone else uses `https://app.plaza-pro.com` (tunnel). Both show a trusted cert.
+
+Verify: `curl --resolve office.plaza-pro.com:443:<LAN IP> https://office.plaza-pro.com/up` → 200,
+`ssl_verify_result 0`; and query the router (`nslookup office.plaza-pro.com <router IP>`) returns
+the private IP — if it returns nothing, the router is doing **DNS-rebind protection** (see fallback).
+
+**Fallback if the router strips private IPs (rebind protection) — split-horizon via local DNS.**
+Run the bundled forwarder so LAN clients resolve the name locally instead of via public DNS:
+set `LAN_DNS_IP=<server LAN IP>` + `LAN_TLS_DOMAIN=office.plaza-pro.com` in `.env`, then
+`docker compose --profile lan-dns up -d` (dnsmasq answers the name → LAN IP, forwards the rest to
+8.8.8.8). Point clients at it via the router's DHCP-DNS if available, else per-device DNS, else the
+`lan-dhcp` profile (server runs DHCP; disable the router's first). All three need *some* client or
+router reach — the recommended method above needs none, which is why it's preferred.
 
 Notes:
-- If the router does DNS-rebind protection, whitelist the domain (the override itself is fine on
-  most firmwares; only *upstream* answers with private IPs get filtered).
 - Port 80 stays published for the container healthcheck and the HTTP→HTTPS redirect; the tunnel
   path is exempt from the redirect (Cloudflare already terminated TLS), so nothing loops.
 - nginx loads the cert from stable copies at `letsencrypt` volume path `/etc/letsencrypt/nginx/`;
