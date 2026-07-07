@@ -49,7 +49,12 @@ if ! grep -q '^APP_KEY=.\+' backend/.env; then
 fi
 
 echo "==> Backup before touching the schema"
-"$ROOT/scripts/backup-db.sh" manual || echo "  (backup skipped — empty/first-run database)"
+# File the snapshot under THIS stack's backup root (~/backups/plaza vs
+# ~/backups/plaza-prod) — without this, a pre-deploy prod snapshot lands in
+# the dev folder and is hard to find when it matters.
+project=$(grep -oP '^COMPOSE_PROJECT_NAME=\K.*' .env || echo plaza)
+PLAZA_BACKUP_DIR="${PLAZA_BACKUP_DIR:-$HOME/backups/$project}" "$ROOT/scripts/backup-db.sh" manual \
+    || echo "  (backup skipped — empty/first-run database)"
 
 echo "==> Maintenance window: migrate + rebuild caches"
 docker compose run --rm app php artisan down || true
