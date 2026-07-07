@@ -34,17 +34,24 @@ grep -q '^COMPOSE_FILE=docker-compose.prod.yml' .env 2>/dev/null || {
     exit 1
 }
 
+# One cert may cover several hostnames (SAN): the first is the primary (the
+# tunnel hostname), any extra are additional names on the same cert — e.g. the
+# LAN-direct hostname that resolves to the server's private IP in public DNS:
+#   ./scripts/setup-lan-tls.sh app.plaza-pro.com office.plaza-pro.com
 BOOTSTRAP_ONLY=0
 DOMAIN="${1:-}"
+DOMAINS=()
 if [[ "$DOMAIN" == "--bootstrap-only" ]]; then
     BOOTSTRAP_ONLY=1
     DOMAIN=""
 elif [[ -z "$DOMAIN" ]]; then
-    echo "Usage: $0 <public-domain>   e.g. $0 plaza.example.com" >&2
+    echo "Usage: $0 <primary-domain> [extra-domain ...]   e.g. $0 app.example.com office.example.com" >&2
     exit 1
-elif [[ "$DOMAIN" == *"://"* ]]; then
-    echo "Pass a bare hostname (plaza.example.com), not a URL." >&2
-    exit 1
+else
+    for d in "$@"; do
+        [[ "$d" == *"://"* ]] && { echo "Pass bare hostnames (app.example.com), not URLs." >&2; exit 1; }
+        DOMAINS+=(-d "$d")
+    done
 fi
 
 # --- 1. credentials file (also a placeholder in bootstrap mode: compose
@@ -90,8 +97,8 @@ docker compose run --rm certbot certonly \
     --dns-cloudflare \
     --dns-cloudflare-credentials /run/secrets/cloudflare-dns.ini \
     --dns-cloudflare-propagation-seconds 30 \
-    --cert-name "$CERT_NAME" -d "$DOMAIN" \
-    --keep-until-expiring --non-interactive --agree-tos "${EMAIL_ARGS[@]}"
+    --cert-name "$CERT_NAME" "${DOMAINS[@]}" \
+    --keep-until-expiring --expand --non-interactive --agree-tos "${EMAIL_ARGS[@]}"
 
 # --- 4. publish where nginx reads + reload ------------------------------
 docker compose run --rm --no-deps --entrypoint sh certbot -c \
