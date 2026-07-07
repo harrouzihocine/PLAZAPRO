@@ -229,6 +229,53 @@ class DispatchTest extends TestCase
         $this->assertSame($day.' 10:15:00', $visit->fresh()->scheduled_at->toDateTimeString());
     }
 
+    public function test_undone_past_visits_ride_the_overdue_rail_and_can_be_rescheduled(): void
+    {
+        $dispatcher = $this->userWith(['visits.dispatch']);
+        $agent = $this->userWith([], isAgent: true);
+        $project = $this->projectWithShortlist();
+
+        $action = NextAction::factory()->create([
+            'subject_type' => 'client_project', 'subject_id' => $project->id,
+            'type' => 'in_site_visit', 'state' => 'pending',
+            'assigned_to' => $agent->id, 'due_at' => now()->subDays(2),
+        ]);
+        // Yesterday's in-site visit, never completed → overdue rail, not the grid.
+        $undone = Visit::factory()->inSite()->create([
+            'client_id' => $project->client_id, 'client_project_id' => $project->id,
+            'agent_id' => $agent->id, 'next_action_id' => $action->id,
+            'scheduled_at' => now()->subDay()->setTime(10, 0), 'completed_at' => null,
+        ]);
+        // A completed one on the same past day stays gridded as plain history.
+        $done = Visit::factory()->inSite()->create([
+            'client_id' => $project->client_id, 'client_project_id' => $project->id,
+            'agent_id' => $agent->id,
+            'scheduled_at' => now()->subDay()->setTime(9, 0), 'completed_at' => now()->subDay(),
+        ]);
+
+        Sanctum::actingAs($dispatcher);
+
+        $board = $this->getJson('/api/v1/dispatch/board')->assertOk()->json('data');
+        $this->assertContains($undone->id, array_column($board['overdue'], 'id'));
+        $gridIds = array_column($board['items'], 'id');
+        $this->assertNotContains($undone->id, $gridIds);
+        // The completed sibling only grids when yesterday falls inside the shown week.
+        if (now()->subDay()->gte(now()->startOfWeek())) {
+            $this->assertContains($done->id, $gridIds);
+        }
+
+        // Dragging the overdue card onto a fresh day/hour reschedules it.
+        $day = now()->addDay()->toDateString();
+        $this->postJson('/api/v1/dispatch/assign', ['changes' => [
+            ['kind' => 'visit', 'id' => $undone->id, 'agent_id' => $agent->id, 'due_date' => $day, 'due_time' => '11:00'],
+        ]])->assertOk();
+
+        $this->assertSame($day.' 11:00:00', $undone->fresh()->scheduled_at->toDateTimeString());
+        $board = $this->getJson('/api/v1/dispatch/board')->assertOk()->json('data');
+        $this->assertNotContains($undone->id, array_column($board['overdue'], 'id'));
+        $this->assertContains($undone->id, array_column($board['items'], 'id'));
+    }
+
     public function test_assignments_cannot_land_on_a_past_day(): void
     {
         $dispatcher = $this->userWith(['visits.dispatch']);

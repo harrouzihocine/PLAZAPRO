@@ -76,33 +76,38 @@ class DispatchController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'role_id']);
 
-        // The week's workload: every open/completed visit scheduled in range,
-        // plus assigned call plans due in range (context only).
+        $todayStart = now()->startOfDay();
+
+        // The week's workload: every visit scheduled in range, plus assigned
+        // call plans due in range (context only). Undone in-site visits whose
+        // slot already passed are NOT gridded — past cells are history, not a
+        // to-do list; that work rides the OVERDUE rail below instead.
         $visits = Visit::query()->active()
             ->whereBetween('scheduled_at', [$start, $end])
             ->whereNotNull('agent_id')
+            ->where(function ($q) use ($todayStart) {
+                $q->where('scheduled_at', '>=', $todayStart)
+                    ->orWhereNotNull('completed_at')
+                    ->orWhere('type', '!=', 'in_site');
+            })
             ->with(['client:id,first_name,last_name', 'unit.location'])
             ->orderBy('scheduled_at')
             ->get()
-            ->map(fn (Visit $v) => [
-                'kind' => 'visit',
-                'id' => $v->id,
-                'type' => $v->type->value,
-                'agent_id' => $v->agent_id,
-                'at' => $v->scheduled_at,
-                'day' => $v->scheduled_at->toDateString(),
-                'time' => $this->wallClock($v->scheduled_at),
-                'is_completed' => $v->completed_at !== null,
-                'draggable' => $v->type->value === 'in_site' && $v->completed_at === null,
-                'can_unassign' => $v->type->value === 'in_site' && $v->completed_at === null && $v->next_action_id !== null,
-                'client' => $v->client?->full_name,
-                'unit' => $v->unit?->reference,
-                'location' => $v->unit?->location?->name,
-                'maps_url' => $v->unit?->location?->mapsUrl(),
-                'link' => $v->client_project_id
-                    ? '/clients/'.$v->client_id.'/projects/'.$v->client_project_id
-                    : ($v->client_id ? '/clients/'.$v->client_id : null),
-            ]);
+            ->map(fn (Visit $v) => $this->visitItem($v));
+
+        // Undone in-site work whose scheduled slot is already in the past —
+        // WHATEVER week it sat on. The dispatcher drags these onto a fresh
+        // upcoming day/hour (or back to the pool); an old visit never rots
+        // invisible inside a past week again.
+        $overdue = Visit::query()->active()
+            ->whereNull('completed_at')
+            ->where('type', 'in_site')
+            ->whereNotNull('agent_id')
+            ->where('scheduled_at', '<', $todayStart)
+            ->with(['client:id,first_name,last_name', 'unit.location'])
+            ->orderBy('scheduled_at')
+            ->get()
+            ->map(fn (Visit $v) => $this->visitItem($v));
 
         $callPlans = NextAction::query()->active()->pending()
             ->where('type', NextActionType::Call->value)
@@ -129,9 +134,39 @@ class DispatchController extends Controller
         return response()->json(['data' => [
             'week_start' => $start->toDateString(),
             'pending' => $pending->values(),
+            'overdue' => $overdue->values(),
             'agents' => $agents->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])->values(),
             'items' => $visits->concat($callPlans)->values(),
         ]]);
+    }
+
+    /**
+     * One grid/overdue card for a visit — shared shape so an overdue card drops
+     * onto the week exactly like a gridded one.
+     *
+     * @return array<string, mixed>
+     */
+    private function visitItem(Visit $v): array
+    {
+        return [
+            'kind' => 'visit',
+            'id' => $v->id,
+            'type' => $v->type->value,
+            'agent_id' => $v->agent_id,
+            'at' => $v->scheduled_at,
+            'day' => $v->scheduled_at->toDateString(),
+            'time' => $this->wallClock($v->scheduled_at),
+            'is_completed' => $v->completed_at !== null,
+            'draggable' => $v->type->value === 'in_site' && $v->completed_at === null,
+            'can_unassign' => $v->type->value === 'in_site' && $v->completed_at === null && $v->next_action_id !== null,
+            'client' => $v->client?->full_name,
+            'unit' => $v->unit?->reference,
+            'location' => $v->unit?->location?->name,
+            'maps_url' => $v->unit?->location?->mapsUrl(),
+            'link' => $v->client_project_id
+                ? '/clients/'.$v->client_id.'/projects/'.$v->client_project_id
+                : ($v->client_id ? '/clients/'.$v->client_id : null),
+        ];
     }
 
     public function assign(DispatchAssignRequest $request, AssignDispatchItem $action): JsonResponse

@@ -28,6 +28,10 @@ const saving = ref(false)
 const weekStart = ref(null) // 'YYYY-MM-DD' (Monday)
 const agents = ref([])
 const pending = ref([]) // draggable list (pending strip)
+// Undone in-site visits whose slot already passed (any week): the grid's past
+// cells are forbidden history, so this rail is where overdue work waits to be
+// dragged onto a fresh upcoming day/hour (or back to the pending pool).
+const overdue = ref([])
 const cells = ref({}) // `${agentId}|${day}` -> draggable list (week view)
 // One FINAL position per card (`kind:id` → move): dragging the same card
 // several times before saving must express only where it ended up — posting
@@ -72,6 +76,10 @@ const hasChanges = computed(() => moves.value.size > 0)
 
 // Cards sort by their time within a cell; untimed ones float to the top.
 const byTime = (a, b) => (a.time ?? '').localeCompare(b.time ?? '')
+
+// A pool plan whose due day already passed — flagged red so the dispatcher
+// assigns it first (the ISO date part compares as a plain string).
+const isDuePast = (el) => (el.due_at ?? '').slice(0, 10) < localToday()
 const itemHour = (item) => (item.time ? Number.parseInt(item.time.slice(0, 2), 10) : null)
 const pad2 = (n) => String(n).padStart(2, '0')
 
@@ -88,6 +96,7 @@ async function load(week = weekStart.value) {
     weekStart.value = data.week_start
     agents.value = data.agents
     pending.value = data.pending
+    overdue.value = data.overdue ?? []
     const grid = {}
     for (const a of data.agents) for (const d of dayDates(data.week_start)) grid[cellKey(a.id, d)] = []
     for (const item of data.items) {
@@ -206,7 +215,9 @@ const columns = computed(() => {
       key: h,
       label: `${pad2(h)}:00`,
       isToday: viewDay.value === today && h === nowHour,
-      isPast: false,
+      // A slot already behind the clock is forbidden ground — a past day's
+      // hours entirely, and today's hours before the current one.
+      isPast: viewDay.value < today || (viewDay.value === today && h < nowHour),
     })),
   ]
 })
@@ -279,9 +290,9 @@ const dragOptions = {
 
 function canReceive(col) {
   if (!viewDay.value) return !col.isPast
-  // Hour slots accept from today onwards; the untimed gutter is display-only
-  // (dropping "onto no time" would be a lie — drag out of it to schedule).
-  return col.kind === 'hour' && viewDay.value >= localToday()
+  // Hour slots accept unless the clock already passed them; the untimed gutter
+  // is display-only (dropping "onto no time" would be a lie — drag out of it).
+  return col.kind === 'hour' && !col.isPast
 }
 
 function checkMove(evt) {
@@ -449,11 +460,66 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
                 <i class="pi pi-building text-[10px]" aria-hidden="true" />
                 {{ element.sites.map((s) => s.name).join(', ') }}
               </span>
-              <span class="num text-xs text-mute">due {{ formatDateTime(element.due_at) }}</span>
+              <span
+                class="num text-xs"
+                :class="isDuePast(element) ? 'font-medium text-danger' : 'text-mute'"
+              >
+                due {{ formatDateTime(element.due_at) }}
+              </span>
             </div>
           </template>
         </draggable>
       </template>
+    </SectionCard>
+
+    <!-- Overdue rail: undone in-site visits whose slot already passed (any
+         week). Past grid cells are forbidden ground, so this is where that
+         work waits — drag a card onto an upcoming day/hour to reschedule it,
+         or back to the pending pool to un-assign. -->
+    <SectionCard
+      v-if="overdue.length"
+      :title="`Overdue — reschedule these (${overdue.length})`"
+      icon="pi pi-history"
+      class="mb-5"
+    >
+      <draggable
+        :list="overdue"
+        item-key="id"
+        v-bind="dragOptions"
+        :move="checkMove"
+        :group="{ name: 'dispatch', put: false, pull: true }"
+        class="flex min-h-[44px] flex-wrap gap-2 rounded-xl border border-dashed border-red-300 bg-red-50/50 p-2 dark:border-red-500/40 dark:bg-red-500/5"
+      >
+        <template #item="{ element }">
+          <div
+            class="flex max-w-xs cursor-grab flex-col gap-0.5 rounded-xl border border-dashed border-red-300 bg-red-50 px-3 py-2 text-sm active:cursor-grabbing dark:border-red-500/40 dark:bg-red-500/10"
+            :class="isMoved(element) ? 'ring-1 ring-primary' : ''"
+          >
+            <div class="flex items-center gap-2">
+              <i class="pi pi-exclamation-triangle text-red-600 dark:text-red-400" aria-hidden="true" />
+              <span class="min-w-0 flex-1 truncate font-medium text-ink">
+                {{ element.client ?? '—' }}
+              </span>
+              <span v-if="element.unit" class="num shrink-0 text-xs text-mute">{{ element.unit }}</span>
+              <button
+                type="button"
+                class="text-mute transition-colors hover:text-ink"
+                aria-label="Task details"
+                @click.stop="showDetails($event, element)"
+              >
+                <i class="pi pi-info-circle" aria-hidden="true" />
+              </button>
+            </div>
+            <span class="num text-xs text-red-700 dark:text-red-300">
+              was {{ formatDateTime(element.at) }}
+            </span>
+          </div>
+        </template>
+      </draggable>
+      <p class="mt-2 text-xs text-mute">
+        These field visits were never completed — drag each onto a new upcoming day (or an hour in
+        day view), or back to the pending pool.
+      </p>
     </SectionCard>
 
     <!-- Agents × weekdays grid (or × hours when zoomed into a day) -->
@@ -470,20 +536,25 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
                 v-for="col in columns"
                 :key="col.key"
                 class="border-b border-l border-line px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide"
-                :class="col.isToday ? 'bg-highlight text-primary-700 dark:text-primary-300' : col.isPast ? 'text-mute/60' : 'text-mute'"
+                :class="col.isToday ? 'bg-highlight text-primary-700 dark:text-primary-300' : col.isPast ? 'text-mute/50' : 'text-mute'"
               >
-                <!-- A day header zooms into that day's hours. -->
+                <!-- A day header zooms into that day's hours; past slots wear
+                     the ban mark — history only, no drops. -->
                 <button
                   v-if="col.kind === 'day'"
                   type="button"
                   class="group inline-flex items-center gap-1.5 uppercase tracking-wide transition-colors hover:text-ink"
-                  :title="`Zoom into ${col.label} by hour`"
+                  :title="col.isPast ? `${col.label} — past, history only` : `Zoom into ${col.label} by hour`"
                   @click="showDay(col.key)"
                 >
+                  <i v-if="col.isPast" class="pi pi-ban text-[10px] text-danger/60" aria-hidden="true" />
                   {{ col.label }}
                   <i class="pi pi-search-plus text-[10px] opacity-40 transition-opacity group-hover:opacity-100" aria-hidden="true" />
                 </button>
-                <template v-else>{{ col.label }}</template>
+                <template v-else>
+                  <i v-if="col.isPast" class="pi pi-ban mr-1 text-[10px] text-danger/60" aria-hidden="true" />
+                  {{ col.label }}
+                </template>
               </th>
             </tr>
           </thead>
@@ -499,7 +570,11 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
                 v-for="col in columns"
                 :key="col.key"
                 class="border-b border-l border-line p-1.5"
-                :class="{ 'bg-surface-50 dark:bg-surface-900/40': col.isPast || col.kind === 'untimed', 'bg-highlight/40': col.isToday }"
+                :class="{
+                  'forbidden-zone bg-surface-50 dark:bg-surface-900/40': col.isPast,
+                  'bg-surface-50 dark:bg-surface-900/40': col.kind === 'untimed',
+                  'bg-highlight/40': col.isToday,
+                }"
               >
                 <draggable
                   :list="listFor(agent.id, col)"
@@ -569,10 +644,11 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
     </SectionCard>
 
     <p class="mt-2 text-xs text-mute">
-      Drag between agents and days (today onwards), or back to the pending strip to un-assign.
-      Click a day header to zoom into its hours and drop on an exact slot, or click a card's time
-      chip to set the time by hand. Faded cards (calls, office visits, completed) are workload
-      context and don't drag.
+      Drag between agents and days, or back to the pending strip to un-assign. Striped cells are
+      the past — forbidden ground for drops; overdue work sits in its own rail above. Click a day
+      header to zoom into its hours and drop on an exact slot, or click a card's time chip to set
+      the time by hand. Faded cards (calls, office visits, completed) are workload context and
+      don't drag.
     </p>
 
     <!-- Time chip editor: exact HH:mm without dragging. -->
@@ -700,3 +776,16 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
     </Popover>
   </div>
 </template>
+
+<style scoped>
+/* Past days/hours are forbidden ground: red-hatched, no-drop cursor. The
+   faint stripes read in light and dark themes alike (low-alpha red). */
+.forbidden-zone {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 6px,
+    rgb(239 68 68 / 0.07) 6px 12px
+  );
+  cursor: not-allowed;
+}
+</style>
