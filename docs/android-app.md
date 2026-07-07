@@ -110,6 +110,40 @@ Open **Menu → Mobile App** (or `/install`) → *Download for Android (.apk)*.
 Chrome warns once about unknown apps: **Settings → "Allow from this source"**,
 back, **Install**. The page shows these steps.
 
+## Push notifications (FCM) — one-time setup
+
+The shell shows **system-tray notifications** (chat messages, visits, payments,
+reminders — everything that hits the bell) with deep links back into the app,
+even when it is closed. It rides Firebase Cloud Messaging; without the two
+files below everything still builds and runs, push just stays off.
+
+One-time setup (~10 minutes, any Google account):
+
+1. <https://console.firebase.google.com> → **Add project** (name e.g.
+   `plaza-pro`, Analytics off).
+2. **Add app → Android**, package name exactly `com.plazapro.app` → download
+   **google-services.json** → put it at
+   `~/plaza-prod/secrets/android/google-services.json` (build-android.sh copies
+   it in; it is gitignored).
+3. **Project settings → Service accounts → Generate new private key** →
+   save the JSON on the prod host, e.g.
+   `~/plaza-prod/secrets/firebase-credentials.json`, mount it into the app +
+   queue-worker containers, and set in the backend `.env`:
+   `FIREBASE_CREDENTIALS=/var/www/html/storage/app/firebase-credentials.json`
+   (match the mount path). Restart the queue worker.
+4. Rebuild + republish the APK (`scripts/build-android.sh` — bump versionCode
+   first). Phones get the runtime "allow notifications" prompt (Android 13+)
+   on first launch.
+
+How it works: `DomainNotification` adds an FCM channel when
+`FIREBASE_CREDENTIALS` is set and the recipient has a registered device
+(`device_tokens`, registered by the web layer via `window.PlazaNative`). The
+backend sends **data-only** messages (`FcmClient`, no SDK); the shell's
+`PlazaMessagingService` renders them — channel per kind, one tray entry per
+conversation (payload `tag`), tap → `MainActivity` → the SPA routes to the
+payload `link`. Foreground pushes are suppressed (the in-app toast/chime
+already covers them). Logout releases the device token.
+
 ## Future: bundled-assets mode (Play Store)
 
 If the app ever goes to a store, remote mode won't pass review. Switch:

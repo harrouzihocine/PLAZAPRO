@@ -13,7 +13,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import NativeList from '@/components/ui/NativeList.vue'
 import { useNativePhone } from '@/composables/useNativeMode'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
-import { toastError } from '@/composables/useConfirm'
+import { BASE_SWAL_OPTS, toastError } from '@/composables/useConfirm'
 import { paymentsOverviewApi } from '@/features/payments/api'
 import { dealsApi } from '@/features/clients/api'
 import { dzdToMil, formatMoney, milToDzd, MIL_LABEL } from '@/features/payments/money'
@@ -68,6 +68,7 @@ async function declareSold(h) {
     return
   }
   const { value, isConfirmed } = await Swal.fire({
+    ...BASE_SWAL_OPTS,
     title: `${h.reference} — declare sold 🎉`,
     text: `Agreed price in ${MIL_LABEL} DZD (its boxes included).`,
     input: 'number',

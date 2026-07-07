@@ -171,6 +171,7 @@ export const useChatStore = defineStore('chat', {
       echo
         .private(`conversation.${id}`)
         .listen('.message.sent', (p) => this.receive(p))
+        .listen('.message.updated', (p) => this.applyMessageUpdate(p))
         .listen('.message.reaction', (p) => this.applyReactions(p))
         .listen('.conversation.read', (p) => this.applyReadCursor(p))
         .listenForWhisper('typing', (p) => this.noteTyping(id, p))
@@ -224,6 +225,26 @@ export const useChatStore = defineStore('chat', {
         }
       }
       if (this.activeId === id && document.visibilityState !== 'hidden') this.markRead(id)
+    },
+
+    // A message changed in place (edited or redacted) — patch the bubble live,
+    // and the inbox preview when it was the thread's latest message.
+    applyMessageUpdate(payload) {
+      const id = Number(payload.conversation_id)
+      const m = this.threads[id]?.messages.find((x) => x.id === payload.id)
+      if (m) {
+        m.body = payload.body
+        m.redacted = payload.redacted
+        m.edited_at = payload.edited_at
+        if (payload.redacted) {
+          m.attachments = []
+          m.reactions = []
+        }
+      }
+      const convo = this.conversation(id)
+      if (convo && convo.last_message?.id === payload.id) {
+        convo.last_message = { ...convo.last_message, preview: payload.preview }
+      }
     },
 
     // Full reaction set for one message (broadcast) → grouped pills.
@@ -525,6 +546,43 @@ export const useChatStore = defineStore('chat', {
       const t = this.thread(conversationId)
       const idx = t.messages.findIndex((m) => m.id === messageId)
       if (idx !== -1) t.messages.splice(idx, 1, data.data)
+    },
+
+    // Edit my own text message in place; the broadcast patches everyone else.
+    async editMessage(conversationId, messageId, body) {
+      try {
+        const saved = await chatApi.editMessage(messageId, body)
+        const t = this.thread(conversationId)
+        const idx = t.messages.findIndex((m) => m.id === messageId)
+        if (idx !== -1) t.messages.splice(idx, 1, { ...t.messages[idx], ...saved })
+        return saved
+      } catch (e) {
+        toastError(e.response?.data?.message ?? 'Could not edit the message.')
+        return null
+      }
+    },
+
+    // Forward a message to other threads. Target threads that are open receive
+    // their copy over the broadcast, like any fresh send.
+    async forwardMessage(messageId, conversationIds) {
+      try {
+        await chatApi.forwardMessage(messageId, conversationIds)
+        return true
+      } catch (e) {
+        toastError(e.response?.data?.message ?? 'Could not forward the message.')
+        return false
+      }
+    },
+
+    // Messenger-style per-user delete: the thread drops out of MY inbox (and my
+    // view of its history); the other side keeps everything. A new message
+    // resurrects the thread automatically.
+    async deleteConversation(conversationId) {
+      const id = Number(conversationId)
+      await chatApi.deleteConversation(id)
+      this.conversations = this.conversations.filter((c) => c.id !== id)
+      delete this.threads[id]
+      if (this.activeId === id) this.activeId = null
     },
 
     async toggleMute(conversationId) {

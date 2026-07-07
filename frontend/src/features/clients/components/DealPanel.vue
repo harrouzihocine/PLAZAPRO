@@ -18,7 +18,7 @@ import { useAuthStore } from '@/features/settings/store'
 import { useDynamicList } from '@/composables/useDynamicList'
 import { versementsApi } from '@/features/payments/api'
 import { useNetworkStore } from '@/features/offline/networkStore'
-import { toastError, toastSuccess } from '@/composables/useConfirm'
+import { BASE_SWAL_OPTS, toastError, toastSuccess } from '@/composables/useConfirm'
 import { formatDate, todayInput } from '@/utils/format'
 import { dzdToMil, formatMoney, milToDzd, MIL_LABEL } from '@/features/payments/money'
 
@@ -213,6 +213,7 @@ function releaseUnit(deal, unit) {
 
 async function confirmRelease(deal, unit) {
   const { isConfirmed } = await Swal.fire({
+    ...BASE_SWAL_OPTS,
     title: `Release ${unit.reference}?`,
     text: 'The apartment and its boxes return to available inventory. The project continues on what is still open or won.',
     showCancelButton: true,
@@ -242,6 +243,7 @@ function closeLostAll(deal) {
 // Cancel THIS deal only — the project continues on its other deal(s).
 async function confirmLoseWholeDeal(deal) {
   const { isConfirmed } = await Swal.fire({
+    ...BASE_SWAL_OPTS,
     title: 'Release everything on this deal?',
     text: 'Every remaining apartment returns to available inventory. The project continues on its other deal(s).',
     showCancelButton: true,
@@ -290,6 +292,7 @@ function releaseWon(deal, unit) {
 
 async function confirmReleaseWon(deal, unit) {
   const { isConfirmed } = await Swal.fire({
+    ...BASE_SWAL_OPTS,
     title: `Release ${unit.reference}?`,
     text: 'The sale fell through — the apartment and its boxes return to available inventory. Its recorded payments stay as history (refund them from the payments panel).',
     showCancelButton: true,

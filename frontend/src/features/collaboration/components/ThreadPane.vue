@@ -6,9 +6,10 @@ import Tag from 'primevue/tag'
 import ThreadHeader from '@/features/collaboration/components/ThreadHeader.vue'
 import MessageList from '@/features/collaboration/components/MessageList.vue'
 import MessageComposer from '@/features/collaboration/components/MessageComposer.vue'
+import ForwardDialog from '@/features/collaboration/components/ForwardDialog.vue'
 import { useChatStore } from '@/features/collaboration/chatStore'
 import { useAuthStore } from '@/features/settings/store'
-import { confirmAction, toastError } from '@/composables/useConfirm'
+import { confirmAction, toastError, toastSuccess } from '@/composables/useConfirm'
 
 // One full conversation: header + message list + composer (with reply quoting
 // and typing signals). Used by the phone thread page and the tablet two-pane —
@@ -24,6 +25,8 @@ const auth = useAuthStore()
 const router = useRouter()
 const showInfo = ref(false)
 const replyTo = ref(null)
+const editing = ref(null) // message being edited (composer switches mode)
+const forwarding = ref(null) // message being forwarded (dialog target)
 
 const convo = computed(() => store.conversation(props.conversationId))
 const isGroup = computed(() => convo.value?.type === 'group')
@@ -49,6 +52,8 @@ async function open(id) {
   }
   showInfo.value = false
   replyTo.value = null
+  editing.value = null
+  forwarding.value = null
   try {
     await store.openThread(id)
   } catch (e) {
@@ -103,6 +108,35 @@ async function leave() {
   await store.removeParticipant(props.conversationId, auth.user.id)
   emit('back')
 }
+
+async function saveEdit(body) {
+  const target = editing.value
+  editing.value = null
+  if (!target || body === target.body) return
+  await store.editMessage(props.conversationId, target.id, body)
+}
+
+// Messenger-style delete: my inbox + my history only; project chats never
+// (their thread follows the project — the server refuses those anyway).
+async function deleteConversation() {
+  if (
+    !(await confirmAction({
+      title: 'Delete this conversation?',
+      text: 'It disappears from your chats only — the other participants keep it. A new message will bring the thread back, without your deleted history.',
+      confirmText: 'Delete',
+      danger: true,
+    }))
+  )
+    return
+  try {
+    await store.deleteConversation(props.conversationId)
+  } catch (e) {
+    toastError(e.response?.data?.message ?? 'Could not delete the conversation.')
+    return
+  }
+  toastSuccess('Conversation deleted.')
+  emit('back')
+}
 </script>
 
 <template>
@@ -113,6 +147,7 @@ async function leave() {
       :info-open="showInfo"
       @back="emit('back')"
       @toggle-info="showInfo = !showInfo"
+      @delete-conversation="deleteConversation"
     />
 
     <!-- Group info / participants -->
@@ -166,7 +201,13 @@ async function leave() {
     </div>
 
     <p v-if="store.loadingThread" class="bg-ground py-4 text-center text-sm text-mute">Loading…</p>
-    <MessageList v-else :conversation-id="conversationId" @reply="replyTo = $event" />
+    <MessageList
+      v-else
+      :conversation-id="conversationId"
+      @reply="replyTo = $event"
+      @edit="editing = $event"
+      @forward="forwarding = $event"
+    />
 
     <div
       class="border-t border-line px-3 py-2 native:max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-4"
@@ -180,11 +221,16 @@ async function leave() {
         v-else
         :disabled="store.sending"
         :reply-to="replyTo"
+        :editing="editing"
         @send-text="sendText"
         @send-file="sendFile"
         @cancel-reply="replyTo = null"
+        @save-edit="saveEdit"
+        @cancel-edit="editing = null"
         @typing="store.sendTyping(conversationId)"
       />
     </div>
+
+    <ForwardDialog :open="!!forwarding" :message="forwarding" @close="forwarding = null" />
   </div>
 </template>

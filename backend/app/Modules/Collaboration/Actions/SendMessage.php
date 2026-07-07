@@ -76,6 +76,14 @@ class SendMessage
             // saveQuietly: bumping the inbox cursor is not an audited "update".
             $conversation->forceFill(['last_message_at' => now()])->saveQuietly();
 
+            // Messenger semantics: a new message resurrects the thread for any
+            // participant who had "deleted" it (their cleared_at keeps the old
+            // history hidden from them; only the inbox row comes back).
+            DB::table('conversation_user')
+                ->where('conversation_id', $conversation->id)
+                ->whereNotNull('hidden_at')
+                ->update(['hidden_at' => null]);
+
             return $message;
         });
 

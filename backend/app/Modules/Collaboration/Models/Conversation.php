@@ -50,7 +50,7 @@ class Conversation extends BaseModel
     public function participants(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'conversation_user')
-            ->withPivot(['role', 'joined_at', 'last_read_at', 'muted']);
+            ->withPivot(['role', 'joined_at', 'last_read_at', 'muted', 'hidden_at', 'cleared_at']);
     }
 
     public function messages(): HasMany

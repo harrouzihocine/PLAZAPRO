@@ -2,6 +2,12 @@ import Swal from 'sweetalert2'
 
 // App-wide replacement for native alert()/confirm(). Buttons/popup are themed via
 // swal.css using the same CSS tokens as the rest of the app (light/dark aware).
+//
+// heightAuto MUST stay false on every popup/toast: SweetAlert2's default stamps
+// `swal2-height-auto` (height:auto !important) on <html>/<body>, which makes the
+// whole app jump vertically inside the Android WebView every time a toast or
+// dialog flashes. Any direct Swal.fire elsewhere should spread BASE_SWAL_OPTS.
+export const BASE_SWAL_OPTS = { heightAuto: false }
 
 // Ask the user to confirm an action. Resolves to true only when confirmed.
 export function confirmAction({
@@ -12,6 +18,7 @@ export function confirmAction({
   danger = false,
 } = {}) {
   return Swal.fire({
+    ...BASE_SWAL_OPTS,
     title,
     text,
     icon: danger ? 'warning' : 'question',
@@ -30,6 +37,7 @@ export function confirmAction({
 // Show a simple informational/error message (replaces alert()).
 export function alertMessage({ title = '', text = '', icon = 'info' } = {}) {
   return Swal.fire({
+    ...BASE_SWAL_OPTS,
     title,
     text,
     icon,
@@ -41,6 +49,7 @@ export function alertMessage({ title = '', text = '', icon = 'info' } = {}) {
 // Non-blocking toast anchored to the top-right corner. Used for flash
 // success/error feedback instead of inline messages scattered through views.
 const Toast = Swal.mixin({
+  ...BASE_SWAL_OPTS,
   toast: true,
   position: 'top-end',
   showConfirmButton: false,

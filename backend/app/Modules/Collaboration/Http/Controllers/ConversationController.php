@@ -7,6 +7,7 @@ namespace App\Modules\Collaboration\Http\Controllers;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Collaboration\Actions\AddParticipants;
 use App\Modules\Collaboration\Actions\CreateConversation;
+use App\Modules\Collaboration\Actions\DeleteConversationForUser;
 use App\Modules\Collaboration\Actions\EnsureProjectConversation;
 use App\Modules\Collaboration\Actions\MarkConversationRead;
 use App\Modules\Collaboration\Actions\RemoveParticipant;
@@ -39,6 +40,10 @@ class ConversationController extends Controller
 
         $conversations = Conversation::query()
             ->visibleTo($user)
+            // Threads the user "deleted" stay out of their inbox until a new
+            // message resurrects them (SendMessage clears hidden_at).
+            ->whereHas('participants', fn ($q) => $q->where('users.id', $user->id)
+                ->whereNull('conversation_user.hidden_at'))
             ->with(['participants', 'latestMessage.author', 'subject'])
             ->withCount(['messages as unread_count' => function ($q) use ($user) {
                 $q->where('messages.user_id', '!=', $user->id)
@@ -150,6 +155,24 @@ class ConversationController extends Controller
         $message = $action->handle($conversation, $request->user(), $subject, $request->input('note'));
 
         return new MessageResource($message->load(['author', 'attachments', 'subject']));
+    }
+
+    /**
+     * "Delete" a conversation, Messenger-style: per-user only — it leaves MY
+     * inbox and MY view of the history clears; the other participants keep
+     * everything (zero-deletion). Project chats are not deletable: they follow
+     * the project, not any one participant.
+     */
+    public function destroy(Request $request, Conversation $conversation, DeleteConversationForUser $action): JsonResponse
+    {
+        $me = $request->user();
+
+        abort_if($conversation->type === ConversationType::Project, 422, 'Project chats cannot be deleted — they follow the project.');
+        abort_unless($conversation->hasParticipant($me), 403);
+
+        $action->handle($conversation, $me);
+
+        return response()->json(['deleted' => true]);
     }
 
     /**

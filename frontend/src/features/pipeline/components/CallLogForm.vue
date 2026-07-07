@@ -14,6 +14,7 @@ import { formatMoney } from '@/features/payments/money'
 import DraftBanner from '@/features/drafts/DraftBanner.vue'
 import NextActionFields from '@/features/pipeline/components/NextActionFields.vue'
 import { useModalDraft } from '@/composables/useModalDraft'
+import { unitLine } from '@/utils/format'
 
 // The fast-entry call log (qualification happens on the phone): direction
 // defaults to outbound, what-was-discussed is one tap-chip list, free-text notes.
@@ -75,17 +76,7 @@ const existingShortlistKeys = computed(() =>
 )
 
 const propertyLabel = (p) =>
-  p
-    ? [
-        p.reference,
-        p.property_type,
-        p.floor,
-        p.area_sqm ? `${p.area_sqm} m²` : null,
-        p.price ? formatMoney(p.price) : null,
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : null
+  p ? unitLine(p, { price: p.price ? formatMoney(p.price) : null }) : null
 
 // The interested list = the shortlisted apartments/locals the client has not
 // passed on. Loaded once; the deal picks from it.

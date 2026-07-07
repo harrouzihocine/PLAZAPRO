@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import VoiceRecorder from '@/features/collaboration/components/VoiceRecorder.vue'
 import AttachSheet from '@/components/ui/AttachSheet.vue'
 import { messagePreview } from '@/features/collaboration/preview'
@@ -9,17 +9,31 @@ import { isNativeApp } from '@/utils/nativeApp'
 // a WhatsApp-style reply banner when quoting. Emits send-text(string),
 // send-file({ file, durationMs }), typing (throttled by the parent/store) and
 // cancel-reply; the parent wires these to the chat store so this component
-// stays presentational.
-defineProps({
+// stays presentational. When `editing` is set the composer switches to edit
+// mode (prefilled text, ✓ saves via save-edit, attach/voice hidden).
+const props = defineProps({
   disabled: Boolean,
   // The message being quoted (null = plain send). Shown as a banner above the
   // input; the parent attaches reply_to_id on send.
   replyTo: { type: Object, default: null },
+  // The message being edited (null = plain send).
+  editing: { type: Object, default: null },
 })
-const emit = defineEmits(['send-text', 'send-file', 'cancel-reply', 'typing'])
+const emit = defineEmits([
+  'send-text',
+  'send-file',
+  'cancel-reply',
+  'typing',
+  'save-edit',
+  'cancel-edit',
+])
 
 const text = ref('')
 const fileInput = ref(null)
+
+// While a voice note is being held down, the recorder takes over the whole
+// composer row (timer + slide-to-cancel), Messenger-style.
+const recordingVoice = ref(false)
 
 // Android shell: the paperclip opens a WhatsApp-style source sheet (camera /
 // gallery multi-select / document) instead of the bare file manager. No video
@@ -30,10 +44,22 @@ const cameraInput = ref(null)
 const galleryInput = ref(null)
 const documentInput = ref(null)
 
+// Entering edit mode prefills the draft; leaving restores an empty composer.
+watch(
+  () => props.editing,
+  (m) => {
+    text.value = m ? (m.body ?? '') : ''
+  },
+)
+
 function submitText() {
   const value = text.value.trim()
   if (!value) return
-  emit('send-text', value)
+  if (props.editing) {
+    emit('save-edit', value)
+  } else {
+    emit('send-text', value)
+  }
   text.value = ''
 }
 
@@ -65,9 +91,28 @@ const replyExcerpt = messagePreview
 
 <template>
   <div>
+    <!-- Edit banner -->
+    <div
+      v-if="editing"
+      class="mb-1.5 flex items-center gap-2 rounded-xl border-l-4 border-primary bg-highlight px-3 py-1.5"
+    >
+      <div class="min-w-0 flex-1 text-xs">
+        <p class="font-semibold text-ink"><i class="pi pi-pencil text-[10px]" aria-hidden="true" /> Edit message</p>
+        <p class="truncate text-mute">{{ editing.body }}</p>
+      </div>
+      <button
+        type="button"
+        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-mute hover:text-ink"
+        aria-label="Cancel edit"
+        @click="emit('cancel-edit')"
+      >
+        <i class="pi pi-times text-xs" aria-hidden="true" />
+      </button>
+    </div>
+
     <!-- Reply banner (WhatsApp-style quote above the input) -->
     <div
-      v-if="replyTo"
+      v-else-if="replyTo"
       class="mb-1.5 flex items-center gap-2 rounded-xl border-l-4 border-primary bg-highlight px-3 py-1.5"
     >
       <div class="min-w-0 flex-1 text-xs">
@@ -88,6 +133,7 @@ const replyExcerpt = messagePreview
 
     <div class="flex items-end gap-1.5">
     <button
+      v-show="!recordingVoice && !editing"
       type="button"
       class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink disabled:opacity-50 dark:hover:bg-surface-800"
       aria-label="Attach a photo or file"
@@ -134,6 +180,7 @@ const replyExcerpt = messagePreview
     />
 
     <textarea
+      v-show="!recordingVoice"
       v-model="text"
       rows="1"
       placeholder="Message…"
@@ -143,16 +190,17 @@ const replyExcerpt = messagePreview
       @keydown.enter.exact.prevent="submitText"
     ></textarea>
 
-    <VoiceRecorder @recorded="onVoice" />
+    <VoiceRecorder v-if="!editing" @recorded="onVoice" @recording="(v) => (recordingVoice = v)" />
 
     <button
+      v-show="!recordingVoice"
       type="button"
       class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-primary text-primary-contrast transition-opacity hover:opacity-90 disabled:opacity-40"
-      aria-label="Send message"
+      :aria-label="editing ? 'Save changes' : 'Send message'"
       :disabled="disabled || !text.trim()"
       @click="submitText"
     >
-      <i class="pi pi-send" aria-hidden="true" />
+      <i :class="editing ? 'pi pi-check' : 'pi pi-send'" aria-hidden="true" />
     </button>
     </div>
   </div>

@@ -27,8 +27,8 @@ import { chatApi } from '@/features/collaboration/api'
 import { useClientsStore } from '@/features/clients/clientsStore'
 import { useAuthStore } from '@/features/settings/store'
 import { useDynamicList } from '@/composables/useDynamicList'
-import { confirmAction, toastError } from '@/composables/useConfirm'
-import { formatDateTime } from '@/utils/format'
+import { BASE_SWAL_OPTS, confirmAction, toastError } from '@/composables/useConfirm'
+import { formatDateTime, unitLine as formatUnitLine } from '@/utils/format'
 import { formatMoney } from '@/features/payments/money'
 
 // ONE project engagement, on its own page: the full story — deal, shortlist,
@@ -73,10 +73,7 @@ const project = computed(
 )
 const isClosed = computed(() => project.value && project.value.status !== 'active')
 
-const unitLine = (u) =>
-  [u.reference, u.type, u.room_number, u.floor, u.area_sqm ? `${u.area_sqm} m²` : null]
-    .filter(Boolean)
-    .join(' · ')
+const unitLine = formatUnitLine
 
 // Payments track EACH apartment alone: one panel per apartment that carries an
 // agreed price on ANY of the project's deals (several deals may coexist) —
@@ -171,6 +168,7 @@ function cancelShift() {
 // --- Archive (reason required; blocked once payments exist) ---
 async function archiveProject() {
   const { value, isConfirmed } = await Swal.fire({
+    ...BASE_SWAL_OPTS,
     title: 'Close this project?',
     text: 'Pick a reason. Nothing more can be logged on it until it is reactivated.',
     input: 'select',
@@ -196,6 +194,7 @@ async function reactivateProject() {
 // activity — calls, plans, visits, deals and chat stop; payments still flow.
 async function freezeProject() {
   const { isConfirmed } = await Swal.fire({
+    ...BASE_SWAL_OPTS,
     title: 'Freeze this project?',
     text: 'No new activity can be added (calls, visits, deals, chat) until it is unfrozen. Payments and documents continue.',
     showCancelButton: true,

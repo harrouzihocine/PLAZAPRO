@@ -129,7 +129,7 @@ function resetModal() {
     :class="
       nativePhone
         ? 'h-[calc(100dvh-4rem)]'
-        : 'h-[calc(100vh-10.5rem)] rounded-xl border border-line shadow-card lg:h-[calc(100vh-7.5rem)]'
+        : 'h-[calc(100dvh-10.5rem)] rounded-xl border border-line shadow-card lg:h-[calc(100dvh-7.5rem)]'
     "
   >
     <ThreadPane :key="selectedId" :conversation-id="selectedId" show-back @back="back" />

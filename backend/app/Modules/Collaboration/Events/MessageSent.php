@@ -60,6 +60,7 @@ class MessageSent implements ShouldBroadcast
             // Same shapes as MessageResource so a live-appended message renders
             // identically to a fetched one (grouped avatars, quotes, reactions).
             'reply_to' => $message->replyPreview(),
+            'forwarded' => $message->forwarded_from_id !== null,
             'reactions' => [],
             'subject_type' => $message->subject_type,
             'subject_id' => $message->subject_id,

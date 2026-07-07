@@ -23,7 +23,7 @@ class Message extends BaseModel
     use HasFactory;
 
     protected $fillable = [
-        'conversation_id', 'user_id', 'type', 'body', 'subject_type', 'subject_id', 'reply_to_id', 'edited_at',
+        'conversation_id', 'user_id', 'type', 'body', 'subject_type', 'subject_id', 'reply_to_id', 'forwarded_from_id', 'edited_at',
     ];
 
     protected function casts(): array
@@ -58,6 +58,12 @@ class Message extends BaseModel
     public function replyTo(): BelongsTo
     {
         return $this->belongsTo(self::class, 'reply_to_id');
+    }
+
+    /** Provenance of a forwarded copy (renders the "Forwarded" tag). */
+    public function forwardedFrom(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'forwarded_from_id');
     }
 
     public function reactions(): HasMany

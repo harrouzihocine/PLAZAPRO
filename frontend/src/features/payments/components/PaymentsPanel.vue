@@ -11,7 +11,7 @@ import { useDynamicList } from '@/composables/useDynamicList'
 import { documentsApi, scheduleApi, versementsApi } from '@/features/payments/api'
 import { formatMoney } from '@/features/payments/money'
 import { useAuthStore } from '@/features/settings/store'
-import { toastError } from '@/composables/useConfirm'
+import { BASE_SWAL_OPTS, toastError } from '@/composables/useConfirm'
 import { formatDate, todayInput } from '@/utils/format'
 
 // Payments for ONE apartment on the project (unitId scopes the schedule, the
@@ -175,6 +175,7 @@ async function submitCorrect() {
 /* ---- Refund a done payment (money went back; the row stays as history) ---- */
 async function refund(v) {
   const { value, isConfirmed } = await Swal.fire({
+    ...BASE_SWAL_OPTS,
     title: `Refund ${formatMoney(v.amount)}?`,
     text: 'The money went back to the client. The payment stays in history flagged refunded and no longer counts toward the balance.',
     input: 'text',

@@ -16,7 +16,7 @@ import { formatMoney } from '@/features/payments/money'
 import DraftBanner from '@/features/drafts/DraftBanner.vue'
 import NextActionFields from '@/features/pipeline/components/NextActionFields.vue'
 import { useModalDraft } from '@/composables/useModalDraft'
-import { todayInput } from '@/utils/format'
+import { todayInput, unitLine } from '@/utils/format'
 
 // The rapid visit-completion log. It records the outcome + (office) the deal's
 // property shortlist, then MUST conclude — self-closing rule — into one of:
@@ -127,17 +127,7 @@ const additions = ref([])
 const dealUnits = ref([]) // [{ unit_id, label, location_id, include, box_ids }]
 
 const propertyLabel = (p) =>
-  p
-    ? [
-        p.reference,
-        p.property_type,
-        p.floor,
-        p.area_sqm ? `${p.area_sqm} m²` : null,
-        p.price ? formatMoney(p.price) : null,
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : null
+  p ? unitLine(p, { price: p.price ? formatMoney(p.price) : null }) : null
 
 onMounted(async () => {
   if (isOffice.value && hasDeal.value) {

@@ -21,6 +21,16 @@
             </intent-filter>
         </activity>
 
+        <!-- FCM receiver: system-tray push with deep links (PlazaPush). Builds
+             without google-services.json compile fine — push just stays off. -->
+        <service
+            android:name=".PlazaMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -33,6 +43,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- System-tray push (Android 13+ runtime prompt — MainActivity asks). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Webview media: photo capture from <input type="file"> (unit/client media
          uploads) and getUserMedia for chat voice notes (VoiceRecorder.vue).
          Capacitor's WebChromeClient requests these at runtime when the page

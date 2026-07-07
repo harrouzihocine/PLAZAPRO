@@ -63,6 +63,7 @@ class MessageResource extends JsonResource
                 fn () => $this->subjectCard($request),
             ),
             'is_mine' => $request->user()?->id === $this->user_id,
+            'forwarded' => $this->forwarded_from_id !== null,
             'created_at' => $this->created_at,
             'edited_at' => $this->edited_at,
         ];

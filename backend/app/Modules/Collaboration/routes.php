@@ -14,11 +14,18 @@ declare(strict_types=1);
 
 use App\Modules\Collaboration\Http\Controllers\AttachmentController;
 use App\Modules\Collaboration\Http\Controllers\ConversationController;
+use App\Modules\Collaboration\Http\Controllers\DeviceTokenController;
 use App\Modules\Collaboration\Http\Controllers\MessageController;
 use App\Modules\Collaboration\Http\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth:sanctum')->group(function () {
+    // FCM device registration (Android shell push). Any authenticated user —
+    // system-tray notifications aren't gated by a permission, the content they
+    // announce is (the notification pipeline already scopes recipients).
+    Route::post('/device-tokens', [DeviceTokenController::class, 'store']);
+    Route::post('/device-tokens/forget', [DeviceTokenController::class, 'forget']);
+
     // In-app notification feed. Each user reads only their own notifications.
     Route::middleware('can:notifications.view')->group(function () {
         Route::get('/notifications', [NotificationController::class, 'index']);
@@ -37,6 +44,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/conversations', [ConversationController::class, 'store']);
         Route::post('/conversations/{conversation}/read', [ConversationController::class, 'read'])->middleware('idempotent');
         Route::post('/conversations/{conversation}/mute', [ConversationController::class, 'mute']);
+        // Per-user Messenger-style delete (direct/group only — never project chats).
+        Route::delete('/conversations/{conversation}', [ConversationController::class, 'destroy']);
 
         // A project's dedicated chat (find-or-create; guarded by project visibility).
         Route::get('/projects/{project}/conversation', [ConversationController::class, 'forProject']);
@@ -54,6 +63,8 @@ Route::middleware('auth:sanctum')->group(function () {
         // the original message, never post a duplicate.
         Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store'])->middleware('idempotent');
         Route::delete('/messages/{message}', [MessageController::class, 'destroy']);
+        Route::patch('/messages/{message}', [MessageController::class, 'update']);
+        Route::post('/messages/{message}/forward', [MessageController::class, 'forward']);
         Route::post('/messages/{message}/reactions', [MessageController::class, 'react']);
 
         Route::get('/attachments/{attachment}', [AttachmentController::class, 'show']);

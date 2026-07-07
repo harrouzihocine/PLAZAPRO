@@ -332,11 +332,16 @@ async function removeUnit(u) {
             {{ locationName[item.location_id] ?? '—' }}
             <template v-if="item.location?.wilaya"> · {{ item.location.wilaya }}</template>
           </p>
+          <!-- Labeled facts — bare "· 1 · 1 ·" numbers read as noise on a card. -->
           <p class="num mt-1.5 text-sm text-ink">
             <span class="font-semibold">{{ formatMoney(item.price) }}</span>
             <span class="text-mute">
-              <template v-if="item.room_number"> · {{ item.room_number }}</template>
-              <template v-if="item.floor"> · {{ item.floor }}</template>
+              <template v-if="item.room_number">
+                · {{ item.room_number }} room{{ Number(item.room_number) === 1 ? '' : 's' }}
+              </template>
+              <template v-if="item.floor !== null && item.floor !== '' && item.floor !== undefined">
+                · {{ Number(item.floor) === 0 ? 'Ground floor' : `Floor ${item.floor}` }}
+              </template>
               <template v-if="item.area_sqm"> · {{ item.area_sqm }} m²</template>
             </span>
           </p>

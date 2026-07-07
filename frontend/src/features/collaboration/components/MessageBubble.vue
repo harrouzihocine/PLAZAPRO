@@ -19,7 +19,17 @@ const props = defineProps({
   // Every other participant's read cursor has passed this message (✓✓).
   seen: { type: Boolean, default: false },
 })
-const emit = defineEmits(['reply', 'react', 'delete', 'open-media', 'jump', 'retry', 'discard'])
+const emit = defineEmits([
+  'reply',
+  'react',
+  'delete',
+  'edit',
+  'forward',
+  'open-media',
+  'jump',
+  'retry',
+  'discard',
+])
 
 const isNative = isNativeApp()
 const menuOpen = ref(false)
@@ -29,6 +39,10 @@ const interactive = computed(
   () => props.canPost && !props.m.redacted && !props.m.pending && !props.m.failed,
 )
 const myReaction = computed(() => props.m.reactions?.find((g) => g.mine)?.emoji ?? null)
+// Editing: my own plain-text messages only (Messenger rules).
+const canEdit = computed(() => props.m.is_mine && props.m.type === 'text' && !props.m.subject_type)
+// Forwarding copies body + attachments; shared-record cards stay in their thread.
+const canForward = computed(() => !props.m.subject_type && props.m.type !== 'system')
 
 // ── Swipe-to-reply (native): horizontal-intent drag with resistance ──
 let startX = 0
@@ -98,6 +112,8 @@ function pickReaction(emoji) {
 function act(action) {
   menuOpen.value = false
   if (action === 'reply') emit('reply', props.m)
+  if (action === 'edit') emit('edit', props.m)
+  if (action === 'forward') emit('forward', props.m)
   if (action === 'delete') emit('delete', props.m)
 }
 </script>
@@ -139,6 +155,22 @@ function act(action) {
               @click.stop="act('reply')"
             >
               <i class="pi pi-reply text-[11px]" aria-hidden="true" /> Reply
+            </button>
+            <button
+              v-if="canForward"
+              type="button"
+              class="flex h-8 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-ink active:bg-highlight"
+              @click.stop="act('forward')"
+            >
+              <i class="pi pi-share-alt text-[11px]" aria-hidden="true" /> Forward
+            </button>
+            <button
+              v-if="canEdit"
+              type="button"
+              class="flex h-8 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-ink active:bg-highlight"
+              @click.stop="act('edit')"
+            >
+              <i class="pi pi-pencil text-[11px]" aria-hidden="true" /> Edit
             </button>
             <button
               v-if="m.is_mine"
@@ -211,6 +243,10 @@ function act(action) {
         <p v-if="m.redacted" class="text-sm italic opacity-70">Message deleted</p>
 
         <template v-else>
+          <!-- Provenance tag on a forwarded copy, Messenger-style. -->
+          <p v-if="m.forwarded" class="mb-0.5 flex items-center gap-1 text-[11px] italic opacity-70">
+            <i class="pi pi-share-alt text-[10px]" aria-hidden="true" /> Forwarded
+          </p>
           <template v-for="a in m.attachments" :key="a.id">
             <button
               v-if="a.kind === 'image'"
@@ -270,6 +306,7 @@ function act(action) {
           v-if="!m.redacted && (groupLast || m.pending || m.failed) && !compact"
           class="num mt-0.5 flex items-center justify-end gap-1 text-right text-[10px] opacity-70"
         >
+          <span v-if="m.edited_at" class="italic">edited</span>
           {{ formatTime(m.created_at) }}
           <template v-if="m.is_mine">
             <i v-if="m.pending" class="pi pi-clock text-[10px]" aria-hidden="true" title="Sending…" />

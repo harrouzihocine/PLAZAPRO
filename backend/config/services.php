@@ -37,6 +37,13 @@ return [
         ],
     ],
 
+    // Firebase service-account JSON (FCM HTTP v1) — powers the Android shell's
+    // system-tray push notifications. Absent = push quietly disabled; the bell
+    // and websocket channels keep working. See docs/android-app.md §Push.
+    'fcm' => [
+        'credentials' => env('FIREBASE_CREDENTIALS'),
+    ],
+
     // LibreOffice headless binary used to render PPTX -> PDF for inline preview.
     // Installed in the queue-worker container; overridable per environment.
     'libreoffice' => [

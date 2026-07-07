@@ -13,6 +13,7 @@ use App\Modules\Collaboration\Notifications\DomainNotification;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -66,6 +67,12 @@ class User extends Authenticatable implements MustVerifyEmail
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    /** FCM registrations of this user's devices (Android shell push). */
+    public function deviceTokens(): HasMany
+    {
+        return $this->hasMany(\App\Modules\Collaboration\Models\DeviceToken::class);
     }
 
     /**

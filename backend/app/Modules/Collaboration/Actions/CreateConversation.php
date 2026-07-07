@@ -38,6 +38,11 @@ class CreateConversation
                     ->first();
 
                 if ($existing !== null) {
+                    // Reopening a 1:1 the caller had "deleted": un-hide it for
+                    // THEM only (their cleared_at still hides the old history;
+                    // the other side's inbox is untouched until a message lands).
+                    $existing->participants()->updateExistingPivot($creator->id, ['hidden_at' => null]);
+
                     return $existing;
                 }
             }

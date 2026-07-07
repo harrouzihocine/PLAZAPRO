@@ -116,3 +116,24 @@ export function humanize(value) {
   const s = String(value).replaceAll('_', ' ')
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
+
+// One human-readable unit summary — "REF-A12 · Apartment · 3 rooms · Floor 2 ·
+// 85 m²". These facts used to be joined unlabeled ("… · 1 · 1 · …"), which read
+// as meaningless digits on the phone cards; every number now carries its label.
+// Accepts both API shapes (type/property_type). Pass a formatted price string
+// via `price` when the caller wants it appended.
+export function unitLine(u, { price = null } = {}) {
+  if (!u) return ''
+  const rooms = u.room_number
+  const floor = u.floor
+  return [
+    u.reference,
+    humanize(u.property_type ?? u.type),
+    rooms != null && rooms !== '' ? `${rooms} room${Number(rooms) === 1 ? '' : 's'}` : null,
+    floor != null && floor !== '' ? (Number(floor) === 0 ? 'Ground floor' : `Floor ${floor}`) : null,
+    u.area_sqm ? `${u.area_sqm} m²` : null,
+    price,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}

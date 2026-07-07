@@ -17,7 +17,7 @@ import CallLogForm from '@/features/pipeline/components/CallLogForm.vue'
 import { useClientsStore } from '@/features/clients/clientsStore'
 import { useAuthStore } from '@/features/settings/store'
 import { formatPhone } from '@/data/countryCodes'
-import { formatDate, formatDateTime, humanize, initials } from '@/utils/format'
+import { formatDate, formatDateTime, humanize, initials, unitLine as formatUnitLine } from '@/utils/format'
 import { formatMoney } from '@/features/payments/money'
 import ShareToChat from '@/features/collaboration/components/ShareToChat.vue'
 
@@ -48,10 +48,7 @@ const editOpen = ref(false)
 const activeProjects = computed(() => store.projects)
 const closedProjects = computed(() => store.archivedProjects)
 
-const unitLine = (u) =>
-  [u.reference, u.type, u.room_number, u.floor, u.area_sqm ? `${u.area_sqm} m²` : null]
-    .filter(Boolean)
-    .join(' · ')
+const unitLine = formatUnitLine
 
 // Opens WhatsApp (app or web) with the client's number — digits only, E.164.
 const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, '')}`

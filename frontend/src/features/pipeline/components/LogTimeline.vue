@@ -6,7 +6,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import { useDynamicList } from '@/composables/useDynamicList'
 import { googleMapsUrl } from '@/features/inventory/googleMaps'
 import { copyToClipboard } from '@/composables/useClipboard'
-import { formatDateTime, humanize } from '@/utils/format'
+import { formatDateTime, humanize, unitLine } from '@/utils/format'
 
 // The presentational interaction timeline: one expandable card per entry
 // (call / visit / next action), newest first, with edited logs keeping their
@@ -241,16 +241,7 @@ const isExpanded = (e) => expanded.value.has(keyOf(e))
           <div v-if="e.kind === 'visit' && e.data.unit" class="rounded-lg bg-surface-50 p-3 dark:bg-surface-800/50">
             <p class="text-[11px] font-medium uppercase tracking-wide text-mute">Property</p>
             <p class="mt-1 font-medium text-ink">
-              {{
-                [
-                  e.data.unit.reference,
-                  e.data.unit.property_type,
-                  e.data.unit.floor,
-                  e.data.unit.area_sqm ? `${e.data.unit.area_sqm} m²` : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')
-              }}
+              {{ unitLine(e.data.unit) }}
               <template v-if="e.data.unit.location?.name"> — {{ e.data.unit.location.name }}</template>
             </p>
             <div v-if="e.data.type === 'in_site' && mapsUrl(e.data)" class="mt-2 flex items-center gap-3">

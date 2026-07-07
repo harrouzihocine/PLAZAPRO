@@ -9,6 +9,7 @@ import Tag from 'primevue/tag'
 import { useTheme } from '@/composables/useTheme'
 import { useNativePhone } from '@/composables/useNativeMode'
 import { isNativeApp } from '@/utils/nativeApp'
+import { initNativePush } from '@/utils/nativePush'
 import { useAuthStore } from '@/features/settings/store'
 import { initials } from '@/utils/format'
 import NotificationBell from '@/features/collaboration/components/NotificationBell.vue'
@@ -79,6 +80,9 @@ watch(
 
 onMounted(async () => {
   network.init()
+  // APK: register this device for system-tray push + route a tapped
+  // notification's deep link (no-op on the web / without Firebase config).
+  initNativePush()
   await outbox.load(auth.user?.id)
   if (network.online) outbox.sync()
   announcements.subscribe()
@@ -510,8 +514,10 @@ async function logout() {
         </div>
       </header>
 
-      <!-- Offline notice (all platforms — the PWA benefits too). -->
-      <OfflineBanner />
+      <!-- Offline notice (all platforms — the PWA benefits too). Fixed overlay:
+           the lg: offsets keep it clear of the sidebar; it must never push the
+           page content down (that reflow made the app jump on flaky signal). -->
+      <OfflineBanner :class="collapsed ? 'lg:left-[76px]' : 'lg:left-64'" />
 
       <!-- Facebook-style pull-to-refresh (APK only; the chat takeover thread
            and any open overlay stand down). -->

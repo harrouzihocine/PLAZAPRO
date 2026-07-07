@@ -5,7 +5,7 @@ import TimeField from '@/components/base/TimeField.vue'
 import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPicker.vue'
 import AgentAgendaStrip from '@/features/pipeline/components/AgentAgendaStrip.vue'
 import { useAuthStore } from '@/features/settings/store'
-import { todayInput } from '@/utils/format'
+import { todayInput, unitLine } from '@/utils/format'
 
 // The next-action fieldset, shared by the log-call and complete-visit forms.
 // Emits a merged object so the parent owns the value (no prop mutation).
@@ -68,11 +68,7 @@ const showApartmentChoice = computed(() => isInSite.value && !!props.currentUnit
 const unitMode = ref('same') // 'same' | 'another'
 const anotherPicks = ref([]) // ProjectUnitsPicker v-model (units-only)
 
-const currentUnitLabel = computed(() => {
-  const u = props.currentUnit
-  if (!u) return ''
-  return [u.reference, u.property_type, u.floor].filter(Boolean).join(' · ')
-})
+const currentUnitLabel = computed(() => unitLine(props.currentUnit))
 
 function update(field, value) {
   emit('update:modelValue', { ...props.modelValue, [field]: value })

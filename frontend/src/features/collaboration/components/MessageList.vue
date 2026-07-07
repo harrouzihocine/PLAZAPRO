@@ -15,7 +15,7 @@ const props = defineProps({
   conversationId: { type: Number, required: true },
   compact: { type: Boolean, default: false },
 })
-const emit = defineEmits(['reply'])
+const emit = defineEmits(['reply', 'edit', 'forward'])
 
 const store = useChatStore()
 const auth = useAuthStore()
@@ -221,6 +221,8 @@ function openMedia(attachment) {
           :can-post="canPost"
           :seen="isSeen(r.m)"
           @reply="emit('reply', $event)"
+          @edit="emit('edit', $event)"
+          @forward="emit('forward', $event)"
           @react="react"
           @delete="remove"
           @open-media="openMedia"

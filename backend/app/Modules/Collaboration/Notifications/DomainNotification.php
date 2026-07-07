@@ -32,11 +32,44 @@ class DomainNotification extends Notification implements ShouldQueue
     ) {}
 
     /**
-     * @return list<string>
+     * @return list<class-string|string>
      */
     public function via(object $notifiable): array
     {
-        return ['database', 'broadcast'];
+        $channels = ['database', 'broadcast'];
+
+        // System-tray push (Android shell): only when FCM is configured and the
+        // user has a registered device — an optional layer, never a dependency.
+        if (config('services.fcm.credentials')
+            && method_exists($notifiable, 'deviceTokens')
+            && $notifiable->deviceTokens()->exists()) {
+            $channels[] = FcmChannel::class;
+        }
+
+        return $channels;
+    }
+
+    /**
+     * The FCM data payload (all values must be strings). Data-only on purpose:
+     * the shell's PlazaMessagingService renders the tray notification itself —
+     * channel by kind, tag-based stacking (one entry per conversation), and the
+     * deep `link` that MainActivity routes on tap.
+     *
+     * @return array<string, string>
+     */
+    public function toFcm(object $notifiable): array
+    {
+        $tag = $this->kind === 'chat_message'
+            ? 'chat-'.($this->subjectId ?? 0)
+            : $this->kind.'-'.($this->subjectId ?? 0);
+
+        return [
+            'kind' => $this->kind,
+            'title' => $this->title,
+            'body' => $this->body,
+            'link' => (string) ($this->link ?? ''),
+            'tag' => $tag,
+        ];
     }
 
     /**

@@ -16,7 +16,7 @@ const props = defineProps({
   showBack: { type: Boolean, default: true },
   infoOpen: { type: Boolean, default: false },
 })
-const emit = defineEmits(['back', 'toggle-info'])
+const emit = defineEmits(['back', 'toggle-info', 'delete-conversation'])
 
 const store = useChatStore()
 const auth = useAuthStore()
@@ -107,6 +107,19 @@ async function toggleMute() {
       @click="toggleMute"
     >
       <i :class="convo.is_muted ? 'pi pi-bell-slash text-danger' : 'pi pi-bell'" aria-hidden="true" />
+    </button>
+
+    <!-- Messenger-style delete — direct/group chats only; a project chat
+         follows its project and cannot be deleted. -->
+    <button
+      v-if="convo && convo.type !== 'project'"
+      v-tooltip.bottom="'Delete conversation'"
+      type="button"
+      class="flex h-10 w-10 items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-danger dark:hover:bg-surface-800"
+      aria-label="Delete conversation"
+      @click="emit('delete-conversation')"
+    >
+      <i class="pi pi-trash" aria-hidden="true" />
     </button>
 
     <!-- A project thread deep-links back to its project workspace. -->

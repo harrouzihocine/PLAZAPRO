@@ -41,6 +41,16 @@ OUT_DIR=frontend/android/artifacts
     exit 1
 }
 
+# Firebase config for system-tray push: kept with the prod secrets, copied in
+# for the build. Absent = the APK builds fine with push disabled.
+if [[ -f "$KEYSTORE_DIR/google-services.json" ]]; then
+    cp "$KEYSTORE_DIR/google-services.json" frontend/android/app/google-services.json
+    echo "==> google-services.json found — push notifications ENABLED"
+else
+    echo "==> No google-services.json in $KEYSTORE_DIR — building WITHOUT push"
+    echo "    (docs/android-app.md §Push explains the one-time Firebase setup)"
+fi
+
 echo "==> Web deps + Capacitor sync (stub webDir, plugin manifests)"
 docker run --rm -u "$(id -u):$(id -g)" -e npm_config_cache=/tmp/npm-cache \
     -v "$ROOT/frontend":/app -w /app \

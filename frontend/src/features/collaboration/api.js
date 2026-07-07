@@ -86,6 +86,26 @@ export const chatApi = {
     return useApi().delete(`/messages/${messageId}`)
   },
 
+  // Edit the caller's own text message in place; returns the updated message.
+  async editMessage(messageId, body) {
+    const { data } = await useApi().patch(`/messages/${messageId}`, { body })
+    return data.data
+  },
+
+  // Forward a message into other conversations; returns the created copies.
+  async forwardMessage(messageId, conversationIds) {
+    const { data } = await useApi().post(`/messages/${messageId}/forward`, {
+      conversation_ids: conversationIds,
+    })
+    return data.data
+  },
+
+  // Per-user Messenger-style delete (direct/group only — the server refuses
+  // project chats). The thread leaves MY inbox; nobody else loses anything.
+  deleteConversation(conversationId) {
+    return useApi().delete(`/conversations/${conversationId}`)
+  },
+
   async addParticipants(conversationId, userIds) {
     const { data } = await useApi().post(`/conversations/${conversationId}/participants`, {
       user_ids: userIds,

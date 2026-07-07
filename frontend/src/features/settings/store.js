@@ -118,6 +118,14 @@ export const useAuthStore = defineStore('auth', {
 
     async logout() {
       try {
+        // APK: release this device's push registration first — the endpoint is
+        // authenticated, and the next user must not get this user's pushes.
+        const { forgetPushToken } = await import('@/utils/nativePush')
+        await forgetPushToken()
+      } catch {
+        /* best-effort */
+      }
+      try {
         await authApi.logout()
       } finally {
         this.clear()
