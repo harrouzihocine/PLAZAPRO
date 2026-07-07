@@ -65,6 +65,10 @@ export const useUsersStore = defineStore('users', {
       return this.mutate(() => usersApi.setActive(id, isActive))
     },
 
+    unlock(id) {
+      return this.mutate(() => usersApi.unlock(id))
+    },
+
     cancel(id) {
       return this.mutate(() => usersApi.cancel(id))
     },

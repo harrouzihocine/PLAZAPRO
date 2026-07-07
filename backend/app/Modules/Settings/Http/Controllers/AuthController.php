@@ -25,9 +25,16 @@ use Laravel\Sanctum\PersonalAccessToken;
  *
  * Thin controller: validation lives in the FormRequests; the credential-
  * accepting routes are throttled (see Settings/routes.php).
+ *
+ * Brute-force lockout: consecutive failed password attempts are counted per
+ * account and, past the configured limit, the account locks — even the correct
+ * password is refused — until an admin unlocks it in Settings → Users (see
+ * User::isLoginLocked / recordFailedLoginAttempt).
  */
 class AuthController extends Controller
 {
+    private const LOCKED_MESSAGE = 'This account is locked after too many failed sign-in attempts. Ask an administrator to unlock it.';
+
     public function login(LoginRequest $request): UserResource
     {
         $credentials = $request->validated();
@@ -35,10 +42,13 @@ class AuthController extends Controller
         // Accept either an email or a username as the login identifier.
         $field = filter_var($credentials['login'], FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
 
+        // A locked account is refused before the password is even checked, so
+        // an attacker can't keep verifying guesses against a locked account.
+        $account = User::where($field, $credentials['login'])->first();
+        $this->rejectIfLocked($account, 'login');
+
         if (! Auth::attempt([$field => $credentials['login'], 'password' => $credentials['password']], true)) {
-            throw ValidationException::withMessages([
-                'login' => [__('auth.failed')],
-            ]);
+            $this->handleFailedAttempt($account, 'login');
         }
 
         if (! Auth::user()->is_active) {
@@ -51,12 +61,43 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         $user = Auth::user();
+        $user->clearLoginLockout();
         $user->forceFill(['last_login_at' => now()])->saveQuietly();
         $user->load('role.permissions');
 
         ActivityLog::record('login', $user);
 
         return new UserResource($user);
+    }
+
+    /** Refuse a locked account outright (same shape as a credential failure). */
+    private function rejectIfLocked(?User $account, string $errorKey): void
+    {
+        if ($account?->isLoginLocked()) {
+            throw ValidationException::withMessages([
+                $errorKey => [__(self::LOCKED_MESSAGE)],
+            ]);
+        }
+
+        // A lock that timed out (login_lockout_minutes > 0) is cleared lazily
+        // here so the stale locked_at doesn't linger in the users list.
+        if ($account !== null && $account->locked_at !== null) {
+            $account->clearLoginLockout();
+        }
+    }
+
+    /**
+     * Count the failed attempt against the account (when the identifier matched
+     * one) and answer with the generic credentials error — or the locked notice
+     * when this attempt tripped the lock.
+     */
+    private function handleFailedAttempt(?User $account, string $errorKey): never
+    {
+        $locked = $account !== null && $account->recordFailedLoginAttempt();
+
+        throw ValidationException::withMessages([
+            $errorKey => [$locked ? __(self::LOCKED_MESSAGE) : __('auth.failed')],
+        ]);
     }
 
     /**
@@ -71,10 +112,10 @@ class AuthController extends Controller
 
         $user = User::where('email', $credentials['email'])->first();
 
+        $this->rejectIfLocked($user, 'email');
+
         if (! $user || ! Hash::check($credentials['password'], $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => [__('auth.failed')],
-            ]);
+            $this->handleFailedAttempt($user, 'email');
         }
 
         if (! $user->is_active) {
@@ -82,6 +123,8 @@ class AuthController extends Controller
                 'email' => [__('This account is inactive.')],
             ]);
         }
+
+        $user->clearLoginLockout();
 
         // One token per device: re-login on the same device replaces the old
         // token rather than accumulating stale ones.

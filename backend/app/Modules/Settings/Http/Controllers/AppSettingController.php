@@ -20,6 +20,10 @@ class AppSettingController extends Controller
     private const KEYS = [
         'interest_hold_hours' => ['required', 'integer', 'min:1', 'max:8760'],
         'reserved_hold_hours' => ['required', 'integer', 'min:1', 'max:8760'],
+        // Brute-force lockout: attempts before the account locks, and how long
+        // the lock lasts (0 = until an admin unlocks it in Settings → Users).
+        'login_max_attempts' => ['required', 'integer', 'min:1', 'max:10'],
+        'login_lockout_minutes' => ['required', 'integer', 'min:0', 'max:10080'],
     ];
 
     public function index(): JsonResponse

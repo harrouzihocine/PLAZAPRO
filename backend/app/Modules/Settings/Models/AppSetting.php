@@ -36,4 +36,14 @@ class AppSetting extends Model
         self::query()->updateOrCreate(['key' => $key], ['value' => $value]);
         self::$remembered = null;
     }
+
+    /**
+     * Drop the per-request cache. Tests must call this in setUp: the static
+     * survives across tests in one PHP process, so values a previous test set
+     * would otherwise outlive RefreshDatabase.
+     */
+    public static function flushRemembered(): void
+    {
+        self::$remembered = null;
+    }
 }

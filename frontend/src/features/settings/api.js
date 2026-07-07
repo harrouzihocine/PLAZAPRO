@@ -201,6 +201,12 @@ export const usersApi = {
     return useApi().put(`/users/${id}/active`, { is_active: isActive })
   },
 
+  // Clear a brute-force login lock (3 failed passwords by default) so the
+  // user can sign in again.
+  unlock(id) {
+    return useApi().put(`/users/${id}/unlock`)
+  },
+
   cancel(id) {
     return useApi().delete(`/users/${id}`)
   },

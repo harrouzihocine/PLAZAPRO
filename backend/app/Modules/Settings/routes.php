@@ -125,6 +125,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/roles/{role}', [RoleController::class, 'destroy']);
     });
 
+    // Clear a brute-force login lock. Its own permission (split from
+    // users.manage) so unlocking can be delegated without full user admin.
+    Route::put('/users/{user}/unlock', [UserController::class, 'unlock'])
+        ->middleware('can:users.unlock');
+
     // Users — admin only. Created with exactly one role; deactivated or
     // cancelled, never deleted.
     Route::middleware('can:users.manage')->group(function () {

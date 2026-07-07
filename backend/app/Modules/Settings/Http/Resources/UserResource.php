@@ -40,6 +40,7 @@ class UserResource extends JsonResource
                 fn () => $this->role->permissions->pluck('slug'),
             ),
             'last_login_at' => $this->last_login_at,
+            'locked_at' => $this->locked_at,
         ];
     }
 }

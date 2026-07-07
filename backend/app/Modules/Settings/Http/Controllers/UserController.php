@@ -7,6 +7,7 @@ namespace App\Modules\Settings\Http\Controllers;
 use App\Modules\Settings\Actions\CancelUser;
 use App\Modules\Settings\Actions\CreateUser;
 use App\Modules\Settings\Actions\SetUserActive;
+use App\Modules\Settings\Actions\UnlockUser;
 use App\Modules\Settings\Actions\UpdateUser;
 use App\Modules\Settings\Http\Requests\SetUserActiveRequest;
 use App\Modules\Settings\Http\Requests\StoreUserRequest;
@@ -143,6 +144,12 @@ class UserController extends Controller
         return new UserResource(
             $action->handle($user, $request->user(), $request->boolean('is_active')),
         );
+    }
+
+    /** Clear a brute-force login lock so the user can sign in again. */
+    public function unlock(User $user, UnlockUser $action): UserResource
+    {
+        return new UserResource($action->handle($user));
     }
 
     public function destroy(Request $request, User $user, CancelUser $action): UserResource

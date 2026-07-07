@@ -8,6 +8,7 @@ use App\Core\Concerns\Cancellable;
 use App\Core\Concerns\LogsActivity;
 use App\Core\Enums\RecordStatus;
 use App\Core\Exceptions\RecordDeletionException;
+use App\Modules\Analytics\Models\ActivityLog;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -49,6 +50,7 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'locked_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
             'status' => RecordStatus::class,
@@ -81,6 +83,62 @@ class User extends Authenticatable implements MustVerifyEmail
         // session cookie is sent — an absolute url() built from APP_URL would
         // point at the wrong host/port. `?v=` busts the cache when it changes.
         return '/api/v1/users/'.$this->id.'/avatar?v='.($this->updated_at?->timestamp ?? 0);
+    }
+
+    /**
+     * Whether the account is currently locked out of login (too many failed
+     * password attempts). Owner's rule: a lock NEVER expires — only a user
+     * with users.unlock clears it in Settings → Users (or `user:unlock` on
+     * the console). Setting `login_lockout_minutes` (> 0) can opt into a
+     * timed auto-expiry, but the default is 0 = until unlocked.
+     */
+    public function isLoginLocked(): bool
+    {
+        if ($this->locked_at === null) {
+            return false;
+        }
+
+        $minutes = AppSetting::integer('login_lockout_minutes', 0);
+
+        return $minutes <= 0 || $this->locked_at->addMinutes($minutes)->isFuture();
+    }
+
+    /**
+     * Count one failed password attempt; lock the account once the configured
+     * limit (`login_max_attempts`) is reached. Returns true when the account
+     * is locked after this attempt. Audited — the log row carries the caller's
+     * IP and user agent, so a brute-force source is traceable.
+     */
+    public function recordFailedLoginAttempt(): bool
+    {
+        // A previous lock that timed out starts a fresh window.
+        if ($this->locked_at !== null && ! $this->isLoginLocked()) {
+            $this->forceFill(['failed_login_attempts' => 0, 'locked_at' => null]);
+        }
+
+        $attempts = $this->failed_login_attempts + 1;
+        $lock = $this->locked_at === null && $attempts >= AppSetting::integer('login_max_attempts', 3);
+
+        $this->forceFill([
+            'failed_login_attempts' => $attempts,
+            'locked_at' => $lock ? now() : $this->locked_at,
+        ])->saveQuietly();
+
+        if ($lock) {
+            ActivityLog::record('account_locked', $this, ['attempts' => $attempts]);
+        }
+
+        return $this->isLoginLocked();
+    }
+
+    /** Reset the failed-attempt counter and any lock (successful login / admin unlock). */
+    public function clearLoginLockout(): void
+    {
+        if ($this->failed_login_attempts === 0 && $this->locked_at === null) {
+            return;
+        }
+
+        $this->forceFill(['failed_login_attempts' => 0, 'locked_at' => null])->saveQuietly();
     }
 
     /** Route-level permission check, resolved through the single role. */

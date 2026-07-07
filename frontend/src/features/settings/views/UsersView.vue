@@ -9,10 +9,12 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import UserFormModal from '@/features/settings/components/UserFormModal.vue'
 import { useUsersStore } from '@/features/settings/usersStore'
+import { useAuthStore } from '@/features/settings/store'
 import { confirmAction } from '@/composables/useConfirm'
 import { initials } from '@/utils/format'
 
 const store = useUsersStore()
+const auth = useAuthStore()
 
 const modalOpen = ref(false)
 const modalUser = ref(null) // null = creating
@@ -41,6 +43,20 @@ async function onSave(payload) {
 
 function toggleActive(user) {
   store.setActive(user.id, !user.is_active)
+}
+
+// Clear a brute-force login lock (too many failed passwords) so the user can
+// sign in again.
+async function unlockUser(user) {
+  if (
+    await confirmAction({
+      title: `Unlock "${user.name}"?`,
+      text: 'The account was locked after too many failed sign-in attempts. Unlocking lets them try again.',
+      confirmText: 'Unlock',
+    })
+  ) {
+    store.unlock(user.id)
+  }
 }
 
 async function cancelUser(user) {
@@ -117,6 +133,13 @@ async function cancelUser(user) {
               <p class="flex flex-wrap items-center gap-2">
                 <span class="truncate text-sm font-medium text-ink">{{ user.name }}</span>
                 <Tag v-if="!user.is_active" value="inactive" severity="secondary" />
+                <Tag
+                  v-if="user.locked_at"
+                  v-tooltip.top="'Locked after too many failed sign-in attempts'"
+                  value="locked"
+                  severity="danger"
+                  icon="pi pi-lock"
+                />
                 <Tag v-if="user.role?.is_agent" value="agent" severity="info" />
               </p>
               <p class="truncate text-xs text-mute">
@@ -136,6 +159,15 @@ async function cancelUser(user) {
               severity="secondary"
               aria-label="Edit user"
               @click="openEdit(user)"
+            />
+            <Button
+              v-if="user.locked_at && auth.can('users.unlock')"
+              icon="pi pi-lock-open"
+              label="Unlock"
+              text
+              size="small"
+              severity="warn"
+              @click="unlockUser(user)"
             />
             <Button
               :icon="user.is_active ? 'pi pi-pause' : 'pi pi-play'"

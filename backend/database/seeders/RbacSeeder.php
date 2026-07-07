@@ -37,8 +37,10 @@ class RbacSeeder extends Seeder
      * @var list<string>
      */
     private array $permissions = [
-        // Settings / admin
-        'users.manage', 'roles.manage', 'settings.manage', 'audit.view', 'audit.export',
+        // Settings / admin. users.unlock is split out of users.manage: clearing
+        // a brute-force login lock, grantable on its own (e.g. to a manager)
+        // without handing over full account administration.
+        'users.manage', 'users.unlock', 'roles.manage', 'settings.manage', 'audit.view', 'audit.export',
         // Inventory
         'locations.manage', 'units.view', 'units.interest', 'units.manage', 'media.manage',
         // Clients — the client record itself. clients.manage covers ONLY the
@@ -113,6 +115,7 @@ class RbacSeeder extends Seeder
     private array $permissionDescriptions = [
         // Settings / admin
         'users.manage' => 'Create, edit and deactivate staff accounts and set each person\'s role.',
+        'users.unlock' => 'Unlock an account that was locked after too many failed sign-in attempts.',
         'roles.manage' => 'Create roles and choose exactly what each role is allowed to do.',
         'settings.manage' => 'Edit workspace settings: dropdown lists, wilayas & communes, departments and general options.',
         'audit.view' => 'Open the audit trail and see who changed what.',
@@ -218,6 +221,9 @@ class RbacSeeder extends Seeder
         // use them before (via the broad grant) keep doing so.
         'next_actions.plan' => 'calls.log',
         'visits.propose' => 'visits.conduct',
+        // Split from users.manage: clearing a brute-force login lock without
+        // full account administration.
+        'users.unlock' => 'users.manage',
     ];
 
     /**
