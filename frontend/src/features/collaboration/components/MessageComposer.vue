@@ -1,6 +1,8 @@
 <script setup>
 import { ref } from 'vue'
 import VoiceRecorder from '@/features/collaboration/components/VoiceRecorder.vue'
+import AttachSheet from '@/components/ui/AttachSheet.vue'
+import { isNativeApp } from '@/utils/nativeApp'
 
 // The message composer: text, an image/file attach, and a voice-note recorder.
 // Emits send-text(string) and send-file({ file, durationMs }); the parent wires
@@ -11,6 +13,15 @@ const emit = defineEmits(['send-text', 'send-file'])
 const text = ref('')
 const fileInput = ref(null)
 
+// Android shell: the paperclip opens a WhatsApp-style source sheet (camera /
+// gallery multi-select / document) instead of the bare file manager. No video
+// source here — chat's backend reads video containers as voice notes.
+const isNative = isNativeApp()
+const attachOpen = ref(false)
+const cameraInput = ref(null)
+const galleryInput = ref(null)
+const documentInput = ref(null)
+
 function submitText() {
   const value = text.value.trim()
   if (!value) return
@@ -19,12 +30,21 @@ function submitText() {
 }
 
 function pickFile() {
-  fileInput.value?.click()
+  if (isNative) attachOpen.value = true
+  else fileInput.value?.click()
+}
+
+function onAttachPick(kind) {
+  attachOpen.value = false
+  const input = { 'camera-photo': cameraInput, library: galleryInput, document: documentInput }[
+    kind
+  ]
+  input?.value?.click()
 }
 
 function onFile(event) {
-  const file = event.target.files?.[0]
-  if (file) emit('send-file', { file, durationMs: null })
+  // Multi-select sends one message per file, like the messaging apps do.
+  for (const file of event.target.files ?? []) emit('send-file', { file, durationMs: null })
   event.target.value = '' // allow re-picking the same file
 }
 
@@ -50,6 +70,35 @@ function onVoice({ file, durationMs }) {
       class="hidden"
       accept="image/*,audio/*,application/pdf"
       @change="onFile"
+    />
+    <input
+      ref="cameraInput"
+      type="file"
+      accept="image/*"
+      capture="environment"
+      class="hidden"
+      @change="onFile"
+    />
+    <input
+      ref="galleryInput"
+      type="file"
+      accept="image/*"
+      multiple
+      class="hidden"
+      @change="onFile"
+    />
+    <input
+      ref="documentInput"
+      type="file"
+      accept="application/pdf"
+      class="hidden"
+      @change="onFile"
+    />
+    <AttachSheet
+      :open="attachOpen"
+      :kinds="['camera-photo', 'library', 'document']"
+      @close="attachOpen = false"
+      @pick="onAttachPick"
     />
 
     <textarea

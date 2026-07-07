@@ -1,9 +1,38 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { mediaDownloadUrl, mediaFileUrl, mediaPreviewUrl } from '@/features/inventory/api'
+import { isNativeApp } from '@/utils/nativeApp'
 
-const props = defineProps({ media: { type: Object, required: true } })
-defineEmits(['close'])
+const props = defineProps({
+  media: { type: Object, required: true },
+  // The gallery tab's items — enables prev/next + swipe between them (shell).
+  items: { type: Array, default: () => [] },
+})
+const emit = defineEmits(['close', 'navigate'])
+
+// Messenger-style browsing in the Android shell: chevrons + swipe move
+// through the current tab's media. Web keeps the single-item lightbox.
+const isNative = isNativeApp()
+const index = computed(() => props.items.findIndex((i) => i.id === props.media.id))
+const canNavigate = computed(() => isNative && props.items.length > 1 && index.value !== -1)
+
+function go(delta) {
+  if (!canNavigate.value) return
+  const n = props.items[(index.value + delta + props.items.length) % props.items.length]
+  emit('navigate', n)
+}
+
+let touchStartX = null
+function onTouchStart(e) {
+  touchStartX = e.changedTouches[0]?.clientX ?? null
+}
+function onTouchEnd(e) {
+  if (touchStartX === null) return
+  const dx = (e.changedTouches[0]?.clientX ?? touchStartX) - touchStartX
+  touchStartX = null
+  // A zoomed photo pans instead of paging.
+  if (Math.abs(dx) > 60 && zoom.value === 1) go(dx < 0 ? 1 : -1)
+}
 
 const ZOOM_MIN = 1
 const ZOOM_MAX = 4
@@ -47,7 +76,7 @@ watch(() => props.media?.id, resetZoom)
     @click.self="$emit('close')"
   >
     <div
-      class="relative flex max-h-full w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-card shadow-pop"
+      class="relative flex max-h-full w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-card shadow-pop native:max-md:h-full native:max-md:max-h-none native:max-md:rounded-none"
     >
       <div class="flex items-center justify-between gap-2 border-b border-line px-4 py-2">
         <span class="truncate text-sm font-medium text-ink">{{ media.original_name }}</span>
@@ -96,9 +125,34 @@ watch(() => props.media?.id, resetZoom)
         </div>
       </div>
 
+      <!-- Prev / next through the tab's media (Android shell only) -->
+      <template v-if="canNavigate">
+        <button
+          class="absolute left-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white active:bg-black/60"
+          aria-label="Previous"
+          @click.stop="go(-1)"
+        >
+          <i class="pi pi-chevron-left" aria-hidden="true" />
+        </button>
+        <button
+          class="absolute right-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white active:bg-black/60"
+          aria-label="Next"
+          @click.stop="go(1)"
+        >
+          <i class="pi pi-chevron-right" aria-hidden="true" />
+        </button>
+        <span
+          class="num absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/40 px-2.5 py-0.5 text-xs text-white"
+        >
+          {{ index + 1 }} / {{ items.length }}
+        </span>
+      </template>
+
       <div
         class="flex min-h-[50vh] flex-1 items-center justify-center overflow-auto p-2"
         @wheel="onWheel"
+        @touchstart.passive="onTouchStart"
+        @touchend.passive="onTouchEnd"
       >
         <img
           v-if="media.type === 'photo'"

@@ -34,6 +34,7 @@ class MessageResource extends JsonResource
             'author' => $this->whenLoaded('author', fn () => $this->author ? [
                 'id' => $this->author->id,
                 'name' => $this->author->name,
+                'avatar_url' => $this->author->avatarUrl(),
             ] : null),
             'attachments' => $redacted
                 ? []

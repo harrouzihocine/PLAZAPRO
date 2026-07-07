@@ -5,8 +5,10 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { MEDIA_COLLECTIONS, mediaDownloadUrl, mediaFileUrl } from '@/features/inventory/api'
 import MediaViewer from '@/features/inventory/components/MediaViewer.vue'
+import AttachSheet from '@/components/ui/AttachSheet.vue'
 import { useMediaStore } from '@/features/inventory/mediaStore'
 import { confirmAction } from '@/composables/useConfirm'
+import { isNativeApp } from '@/utils/nativeApp'
 
 const props = defineProps({
   mediableType: { type: String, required: true }, // 'locations' | 'units'
@@ -22,6 +24,33 @@ const dragging = ref(false)
 const fileInput = ref(null)
 const replaceInput = ref(null)
 const replacingId = ref(null)
+
+// In the Android shell, "Upload" opens a WhatsApp-style source sheet (camera /
+// video / gallery multi-select / document) instead of the bare file manager.
+// Each source is its own hidden input: `capture` opens the camera app
+// directly; the image/video accept combo opens Android's photo-picker grid.
+const isNative = isNativeApp()
+const attachOpen = ref(false)
+const cameraPhotoInput = ref(null)
+const cameraVideoInput = ref(null)
+const libraryInput = ref(null)
+const documentInput = ref(null)
+
+function openUpload() {
+  if (isNative) attachOpen.value = true
+  else fileInput.value?.click()
+}
+
+function onAttachPick(kind) {
+  attachOpen.value = false
+  const input = {
+    'camera-photo': cameraPhotoInput,
+    'camera-video': cameraVideoInput,
+    library: libraryInput,
+    document: documentInput,
+  }[kind]
+  input?.value?.click()
+}
 
 const typeIcon = {
   photo: 'pi pi-image',
@@ -86,11 +115,45 @@ async function remove(item) {
         :label="`Upload to ${activeLabel}`"
         icon="pi pi-upload"
         size="small"
-        @click="fileInput?.click()"
+        @click="openUpload"
       />
     </template>
     <input ref="fileInput" type="file" multiple class="hidden" @change="onPick" />
     <input ref="replaceInput" type="file" class="hidden" @change="onReplacePick" />
+    <!-- Native attach sources (AttachSheet drives which one is clicked) -->
+    <input
+      ref="cameraPhotoInput"
+      type="file"
+      accept="image/*"
+      capture="environment"
+      class="hidden"
+      @change="onPick"
+    />
+    <input
+      ref="cameraVideoInput"
+      type="file"
+      accept="video/*"
+      capture="environment"
+      class="hidden"
+      @change="onPick"
+    />
+    <input
+      ref="libraryInput"
+      type="file"
+      accept="image/*,video/*"
+      multiple
+      class="hidden"
+      @change="onPick"
+    />
+    <input
+      ref="documentInput"
+      type="file"
+      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+      multiple
+      class="hidden"
+      @change="onPick"
+    />
+    <AttachSheet :open="attachOpen" @close="attachOpen = false" @pick="onAttachPick" />
 
     <!-- Category tabs (mirror the backend MediaCollection enum) -->
     <nav class="-mt-1 flex flex-wrap gap-1 border-b border-line">
@@ -212,6 +275,12 @@ async function remove(item) {
       </div>
     </div>
 
-    <MediaViewer v-if="viewing" :media="viewing" @close="viewing = null" />
+    <MediaViewer
+      v-if="viewing"
+      :media="viewing"
+      :items="tabItems"
+      @navigate="viewing = $event"
+      @close="viewing = null"
+    />
   </SectionCard>
 </template>

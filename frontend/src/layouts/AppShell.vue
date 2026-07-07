@@ -19,6 +19,7 @@ import BrandLogo from '@/components/BrandLogo.vue'
 import UnitSoldCelebration from '@/features/inventory/components/UnitSoldCelebration.vue'
 import ProfileModal from '@/features/settings/components/ProfileModal.vue'
 import { useAnnouncementsStore } from '@/features/inventory/announcementsStore'
+import { usePresenceStore } from '@/features/collaboration/presenceStore'
 import { oversightApi } from '@/features/oversight/api'
 
 const { isNight, toggle } = useTheme()
@@ -51,6 +52,9 @@ const announcements = useAnnouncementsStore()
 
 onMounted(async () => {
   announcements.subscribe()
+  // Everyone joins the `online` presence channel so the app's green "Active
+  // now" dots reflect web users too; the web UI itself never shows them.
+  usePresenceStore().join()
 
   if (!OVERSIGHT_PERMS.some((p) => auth.can(p))) return
   try {

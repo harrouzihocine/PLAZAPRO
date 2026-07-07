@@ -35,6 +35,7 @@ import { useUnitsStore } from '@/features/inventory/unitsStore'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction } from '@/composables/useConfirm'
 import { formatDate } from '@/utils/format'
+import { isNativeApp } from '@/utils/nativeApp'
 import { formatMoney } from '@/features/payments/money'
 import FeedbackPanel from '@/features/analytics/components/FeedbackPanel.vue'
 
@@ -54,6 +55,14 @@ const canMarkInterest = auth.can('units.interest')
 const canSeeFeedback = auth.can('reports.view')
 
 const mapsUrl = computed(() => googleMapsUrl(locations.current ?? {}))
+
+// Android shell: fire the address + Maps link straight into WhatsApp (its
+// contact picker opens). wa.me without a number = "share to anyone".
+const isNative = isNativeApp()
+const whatsappMapsUrl = computed(() => {
+  const place = [locations.current?.name, locations.current?.address].filter(Boolean).join(' — ')
+  return `https://wa.me/?text=${encodeURIComponent(`${place}\n${mapsUrl.value}`)}`
+})
 
 const stackingRef = ref(null)
 const holdBusy = ref(false)
@@ -333,6 +342,17 @@ async function remove(u) {
                         >
                           <i class="pi pi-copy text-xs" aria-hidden="true" />
                         </button>
+                        <a
+                          v-if="isNative"
+                          :href="whatsappMapsUrl"
+                          target="_blank"
+                          rel="noopener"
+                          title="Send via WhatsApp"
+                          aria-label="Send address via WhatsApp"
+                          class="ml-1 text-emerald-600 dark:text-emerald-400"
+                        >
+                          <i class="pi pi-whatsapp text-xs" aria-hidden="true" />
+                        </a>
                       </template>
                     </dd>
                   </div>

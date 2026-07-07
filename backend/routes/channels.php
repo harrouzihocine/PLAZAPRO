@@ -35,3 +35,11 @@ Broadcast::channel('conversation.{conversationId}', function (User $user, int $c
 
     return $conversation !== null && $conversation->isReadableBy($user);
 });
+
+// Who is online right now (presence). Any authenticated user may join; the
+// member payload is intentionally minimal (id + name). Powers the green
+// "Active now" dots in the Android app's chat — web users still JOIN (so
+// they count as online to app users) even though the web UI shows no dots.
+Broadcast::channel('online', function (User $user) {
+    return ['id' => $user->id, 'name' => $user->name];
+});

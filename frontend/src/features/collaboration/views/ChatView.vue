@@ -11,10 +11,24 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { useChatStore } from '@/features/collaboration/chatStore'
+import { usePresenceStore } from '@/features/collaboration/presenceStore'
+import { useAuthStore } from '@/features/settings/store'
 import { initials, timeAgo } from '@/utils/format'
+import { isNativeApp } from '@/utils/nativeApp'
 
 const store = useChatStore()
 const router = useRouter()
+
+// Messenger-style extras in the Android shell: profile photos + a green
+// "online" dot on direct threads. Web keeps its plain inbox.
+const isNative = isNativeApp()
+const presence = usePresenceStore()
+const auth = useAuthStore()
+
+function otherOf(c) {
+  if (c.type !== 'direct') return null
+  return c.participants?.find((p) => p.id !== auth.user?.id) ?? null
+}
 
 const modalOpen = ref(false)
 const groupMode = ref(false)
@@ -77,12 +91,20 @@ function resetModal() {
             class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-50 native:py-4 native:active:bg-highlight sm:px-5 dark:hover:bg-surface-800"
             @click="open(c.id)"
           >
-            <Avatar
-              :label="initials(c.title ?? 'C')"
-              shape="circle"
-              size="large"
-              class="shrink-0 !bg-highlight !text-primary-700 dark:!text-primary-300"
-            />
+            <span class="relative shrink-0">
+              <Avatar
+                :image="(isNative && otherOf(c)?.avatar_url) || undefined"
+                :label="isNative && otherOf(c)?.avatar_url ? undefined : initials(c.title ?? 'C')"
+                shape="circle"
+                size="large"
+                class="!bg-highlight !text-primary-700 dark:!text-primary-300"
+              />
+              <span
+                v-if="isNative && otherOf(c) && presence.isOnline(otherOf(c).id)"
+                class="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-card bg-green-500"
+                aria-label="Online"
+              />
+            </span>
             <span class="min-w-0 flex-1">
               <span class="flex items-center justify-between gap-2">
                 <span

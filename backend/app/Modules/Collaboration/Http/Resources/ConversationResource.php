@@ -47,6 +47,7 @@ class ConversationResource extends JsonResource
             'participants' => $this->whenLoaded('participants', fn () => $this->participants->map(fn (User $u) => [
                 'id' => $u->id,
                 'name' => $u->name,
+                'avatar_url' => $u->avatarUrl(),
                 'role' => $u->pivot->role,
                 'muted' => (bool) $u->pivot->muted,
             ])->values()),
