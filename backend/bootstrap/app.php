@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\EnsureUserActive;
+use App\Http\Middleware\IdempotencyKey;
 use App\Http\Middleware\SecurityHeaders;
 use App\Modules\Clients\Console\FlagEmptyClients;
 use App\Modules\Collaboration\Console\BackfillProjectChats;
@@ -59,6 +60,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Global API rate limiting (named limiter defined in RbacServiceProvider).
         $middleware->throttleApi('api');
+
+        // Replay protection for offline-queued writes (X-Idempotency-Key).
+        // Route middleware — applied to the queueable field-agent endpoints.
+        $middleware->alias(['idempotent' => IdempotencyKey::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

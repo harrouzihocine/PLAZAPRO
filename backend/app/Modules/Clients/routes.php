@@ -71,7 +71,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/clients', [ClientController::class, 'store']);
 
         // Capturing/updating the desire is part of qualifying the lead.
-        Route::put('/clients/{client}/desire', [DesireController::class, 'upsert']);
+        // `idempotent`: queueable offline (X-Idempotency-Key); the upsert is
+        // last-write-wins so a replay is harmless but keeps the ledger uniform.
+        Route::put('/clients/{client}/desire', [DesireController::class, 'upsert'])->middleware('idempotent');
     });
 
     // Editing, reassigning and cancelling a CLIENT require its manage permission.
@@ -124,7 +126,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // add properties via "Add unit to visit" instead). The office-visit picker
     // is gated the same way in the completion form.
     Route::middleware('can:shortlist.manage')->group(function () {
-        Route::put('/projects/{project}/shortlist', [ShortlistController::class, 'sync']);
+        Route::put('/projects/{project}/shortlist', [ShortlistController::class, 'sync'])->middleware('idempotent');
     });
 
     // Deals: opened from an interaction log — visit or call — (visits.conduct;

@@ -22,8 +22,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // In-app notification feed. Each user reads only their own notifications.
     Route::middleware('can:notifications.view')->group(function () {
         Route::get('/notifications', [NotificationController::class, 'index']);
-        Route::post('/notifications/read-all', [NotificationController::class, 'readAll']);
-        Route::post('/notifications/{id}/read', [NotificationController::class, 'read']);
+        // `idempotent`: read-marks queue offline; replays must not double-count.
+        Route::post('/notifications/read-all', [NotificationController::class, 'readAll'])->middleware('idempotent');
+        Route::post('/notifications/{id}/read', [NotificationController::class, 'read'])->middleware('idempotent');
         Route::post('/notifications/{id}/unread', [NotificationController::class, 'unread']);
     });
 
@@ -34,7 +35,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/chat/contacts', [ConversationController::class, 'contacts']);
         Route::get('/conversations', [ConversationController::class, 'index']);
         Route::post('/conversations', [ConversationController::class, 'store']);
-        Route::post('/conversations/{conversation}/read', [ConversationController::class, 'read']);
+        Route::post('/conversations/{conversation}/read', [ConversationController::class, 'read'])->middleware('idempotent');
         Route::post('/conversations/{conversation}/mute', [ConversationController::class, 'mute']);
 
         // A project's dedicated chat (find-or-create; guarded by project visibility).
@@ -49,7 +50,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/conversations/{conversation}/share', [ConversationController::class, 'share']);
 
         Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index']);
-        Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store']);
+        // `idempotent`: chat sends queue offline — a replayed send must return
+        // the original message, never post a duplicate.
+        Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store'])->middleware('idempotent');
         Route::delete('/messages/{message}', [MessageController::class, 'destroy']);
         Route::post('/messages/{message}/reactions', [MessageController::class, 'react']);
 

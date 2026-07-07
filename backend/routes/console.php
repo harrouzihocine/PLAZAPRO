@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
@@ -32,3 +33,9 @@ Schedule::command('schedules:mark-overdue')->dailyAt('00:15')->withoutOverlappin
 
 // Nudge creators of clients left empty (no project/call/desire) for 48h — once.
 Schedule::command('clients:flag-empty')->dailyAt('07:00')->withoutOverlapping();
+
+// Idempotency-key replay ledger (offline outbox): rows older than 7 days are
+// dead weight — the client never replays that old.
+Schedule::call(fn () => DB::table('idempotency_keys')->where('created_at', '<', now()->subDays(7))->delete())
+    ->name('idempotency:prune')
+    ->dailyAt('04:00');

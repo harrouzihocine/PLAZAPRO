@@ -35,7 +35,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // also run under calls.log — every edit is a cancel + new version, captured
     // in history with a reason.
     Route::middleware('can:calls.log')->group(function () {
-        Route::post('/clients/{client}/calls', [CallController::class, 'store']);
+        // `idempotent`: queueable offline (X-Idempotency-Key) — a replay after a
+        // lost response must not double-log the call.
+        Route::post('/clients/{client}/calls', [CallController::class, 'store'])->middleware('idempotent');
         Route::post('/calls/{call}/correct', [CallController::class, 'correct']);
         Route::post('/next-actions/{nextAction}/correct', [NextActionController::class, 'correct']);
     });
@@ -43,7 +45,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Planning a standalone next action ("Plan next action") has its own grant,
     // split from calls.log so it can be handed out person-by-person.
     Route::middleware('can:next_actions.plan')->group(function () {
-        Route::post('/clients/{client}/next-actions', [NextActionController::class, 'store']);
+        Route::post('/clients/{client}/next-actions', [NextActionController::class, 'store'])->middleware('idempotent');
     });
 
     // The dispatch board: pending in-site pool + agents × weekdays, drag & drop.
@@ -66,11 +68,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Add apartment(s) to visit on a project, standalone (no need to complete an
     // open visit first). visits.propose holders who can see the project — the
     // request is the gate, so no permission middleware here.
-    Route::post('/projects/{project}/in-site-visits', [VisitController::class, 'proposeInSite']);
+    Route::post('/projects/{project}/in-site-visits', [VisitController::class, 'proposeInSite'])->middleware('idempotent');
 
     // Completing a visit (conducting it) always leaves a next action.
     Route::middleware('can:visits.conduct')->group(function () {
-        Route::post('/visits/{visit}/complete', [VisitController::class, 'complete']);
+        Route::post('/visits/{visit}/complete', [VisitController::class, 'complete'])->middleware('idempotent');
     });
 
     // Tasks (to-dos). The dedicated tasks page is built in Phase 5.
