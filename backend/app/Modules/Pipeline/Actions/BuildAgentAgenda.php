@@ -27,7 +27,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 class BuildAgentAgenda
 {
     /**
-     * @return list<array{date: string, items: list<array{kind: string, time: ?string, client: ?string, label: ?string}>}>
+     * @return list<array{date: string, items: list<array{kind: string, time: ?string, client: ?string, label: ?string, link: ?string}>}>
      */
     public function handle(User $user, CarbonImmutable $today, int $days): array
     {
@@ -41,7 +41,7 @@ class BuildAgentAgenda
             $buckets[$start->addDays($i)->toDateString()] = [];
         }
 
-        $push = function (?CarbonImmutable $due, string $kind, ?string $client, ?string $label) use (&$buckets): void {
+        $push = function (?CarbonImmutable $due, string $kind, ?string $client, ?string $label, ?string $link = null) use (&$buckets): void {
             if ($due === null) {
                 return;
             }
@@ -56,6 +56,10 @@ class BuildAgentAgenda
                 'time' => $due->format('H:i') === '00:00' ? null : $due->format('H:i'),
                 'client' => $client,
                 'label' => $label,
+                // SPA route where the item is actually DONE (the project workspace
+                // for pipeline work, the tasks board for to-dos) — powers the
+                // mobile app's tappable "next tasks" quick list.
+                'link' => $link,
             ];
         };
 
@@ -67,7 +71,15 @@ class BuildAgentAgenda
             ->whereBetween('due_at', [$start, $end])
             ->with(['subject' => fn (MorphTo $m) => $m->morphWith([ClientProject::class => ['client:id,first_name,last_name']])])
             ->get()
-            ->each(fn (NextAction $a) => $push($a->due_at?->toImmutable(), 'call', $this->clientNameOf($a->subject), null));
+            ->each(fn (NextAction $a) => $push(
+                $a->due_at?->toImmutable(),
+                'call',
+                $this->clientNameOf($a->subject),
+                null,
+                $a->subject instanceof ClientProject
+                    ? '/clients/'.$a->subject->client_id.'/projects/'.$a->subject->id
+                    : null,
+            ));
 
         // Visits she is the agent for — office and in-site alike.
         Visit::query()->active()
@@ -81,6 +93,9 @@ class BuildAgentAgenda
                 $v->type->value === 'in_site' ? 'in_site_visit' : 'office_visit',
                 $v->client?->full_name,
                 null,
+                $v->client_project_id !== null
+                    ? '/clients/'.$v->client_id.'/projects/'.$v->client_project_id
+                    : null,
             ));
 
         // Standalone to-dos assigned to her.
@@ -89,7 +104,7 @@ class BuildAgentAgenda
             ->where('assigned_to', $user->id)
             ->whereBetween('due_at', [$start, $end])
             ->get()
-            ->each(fn (Task $t) => $push($t->due_at?->toImmutable(), 'task', null, $t->title));
+            ->each(fn (Task $t) => $push($t->due_at?->toImmutable(), 'task', null, $t->title, '/tasks'));
 
         $out = [];
         foreach ($buckets as $date => $items) {

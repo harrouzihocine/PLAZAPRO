@@ -8,8 +8,14 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import WorkItemGroups from '@/features/analytics/components/WorkItemGroups.vue'
+import UpcomingTasksCard from '@/features/pipeline/components/UpcomingTasksCard.vue'
+import { isNativeApp } from '@/utils/nativeApp'
 
 const auth = useAuthStore()
+
+// The app pins the user's own next tasks above everything else — opening the
+// app answers "what do I do now" in one glance. Web keeps its dashboard as-is.
+const isNative = isNativeApp()
 
 const data = ref(null)
 const loading = ref(true)
@@ -80,6 +86,9 @@ onMounted(async () => {
     <PageHeader :title="`${greeting}, ${firstName}`">
       <template #subtitle>Here's your own book at a glance today.</template>
     </PageHeader>
+
+    <!-- Android app: the "do this next" fast lane, first thing on open. -->
+    <UpcomingTasksCard v-if="isNative" class="mb-5" />
 
     <SectionCard v-if="denied">
       <EmptyState
