@@ -13,6 +13,7 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import NativeList from '@/components/ui/NativeList.vue'
+import FilterPanel from '@/components/ui/FilterPanel.vue'
 import OfflineStamp from '@/components/ui/OfflineStamp.vue'
 import { useNativePhone } from '@/composables/useNativeMode'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
@@ -27,6 +28,7 @@ import { useLocationsStore } from '@/features/inventory/locationsStore'
 import { useUnitsStore } from '@/features/inventory/unitsStore'
 import { useAuthStore } from '@/features/settings/store'
 import { formatMoney } from '@/features/payments/money'
+import { countActiveFilters, floorLabel, roomsLabel } from '@/utils/format'
 
 const units = useUnitsStore()
 const locations = useLocationsStore()
@@ -107,6 +109,7 @@ const statusOptions = [
 const priorityOptions = GTM_PRIORITIES
 
 const showAdvanced = ref(false)
+const activeFilterCount = computed(() => countActiveFilters(units.filters))
 
 onMounted(() => {
   // Projects (for the name lookup + filter) and units are independent reads —
@@ -233,6 +236,7 @@ async function removeUnit(u) {
     <OfflineStamp :at="units.offlineAt" />
 
     <SectionCard flush class="mb-5">
+      <FilterPanel :active-count="activeFilterCount">
       <div class="flex flex-wrap items-end gap-2 px-4 py-3 sm:px-5">
         <BaseSelect
           v-model="units.filters.location_id"
@@ -304,6 +308,7 @@ async function removeUnit(u) {
         <MoneyInput v-model="units.filters.min_price" label="Min price" />
         <MoneyInput v-model="units.filters.max_price" label="Max price" />
       </div>
+      </FilterPanel>
     </SectionCard>
 
     <SectionCard flush>
@@ -336,12 +341,8 @@ async function removeUnit(u) {
           <p class="num mt-1.5 text-sm text-ink">
             <span class="font-semibold">{{ formatMoney(item.price) }}</span>
             <span class="text-mute">
-              <template v-if="item.room_number">
-                · {{ item.room_number }} room{{ Number(item.room_number) === 1 ? '' : 's' }}
-              </template>
-              <template v-if="item.floor !== null && item.floor !== '' && item.floor !== undefined">
-                · {{ Number(item.floor) === 0 ? 'Ground floor' : `Floor ${item.floor}` }}
-              </template>
+              <template v-if="roomsLabel(item.room_number)"> · {{ roomsLabel(item.room_number) }}</template>
+              <template v-if="floorLabel(item.floor)"> · {{ floorLabel(item.floor) }}</template>
               <template v-if="item.area_sqm"> · {{ item.area_sqm }} m²</template>
             </span>
           </p>

@@ -13,6 +13,7 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import NativeList from '@/components/ui/NativeList.vue'
+import FilterPanel from '@/components/ui/FilterPanel.vue'
 import OfflineStamp from '@/components/ui/OfflineStamp.vue'
 import { useNativePhone } from '@/composables/useNativeMode'
 import ClientFormDrawer from '@/features/clients/components/ClientFormDrawer.vue'
@@ -22,7 +23,7 @@ import { useDynamicList } from '@/composables/useDynamicList'
 import { useClientsStore } from '@/features/clients/clientsStore'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction } from '@/composables/useConfirm'
-import { formatDateTime, initials } from '@/utils/format'
+import { formatDateTime, initials, countActiveFilters } from '@/utils/format'
 
 const store = useClientsStore()
 const auth = useAuthStore()
@@ -44,6 +45,7 @@ const editing = ref(null) // null = creating
 // Android-shell phones swap the table for tappable cards (NativeList below);
 // native tablets and the web keep the full table.
 const nativePhone = useNativePhone()
+const activeFilterCount = computed(() => countActiveFilters(store.filters))
 
 onMounted(() => store.fetch())
 useRefreshable(() => store.fetch()) // pull-to-refresh (APK)
@@ -122,6 +124,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
 
     <SectionCard flush>
       <!-- Filter toolbar -->
+      <FilterPanel :active-count="activeFilterCount">
       <div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
         <div class="relative w-full sm:w-72">
           <i
@@ -167,6 +170,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
           @click="resetFilters"
         />
       </div>
+      </FilterPanel>
 
       <!-- APK phones: card list, one client per card, tap to open the file. -->
       <NativeList

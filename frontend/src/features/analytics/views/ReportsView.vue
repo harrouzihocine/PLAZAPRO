@@ -6,6 +6,7 @@ import DataTable from 'primevue/datatable'
 import BaseInput from '@/components/base/BaseInput.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
+import FilterPanel from '@/components/ui/FilterPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { analyticsApi } from '@/features/analytics/api'
 import { formatMoney } from '@/features/payments/money'
@@ -94,11 +95,13 @@ onMounted(loadRoi)
 
     <!-- Source ROI: which lead source actually sells (cohort by lead) -->
     <SectionCard v-show="tab === 'roi'" flush>
+      <FilterPanel :active-count="(range.from ? 1 : 0) + (range.to ? 1 : 0)">
       <div class="flex flex-wrap items-end gap-2 border-b border-line px-4 py-3 sm:px-5">
         <BaseInput v-model="range.from" type="date" label="Leads from" />
         <BaseInput v-model="range.to" type="date" label="Leads to" />
         <Button label="Apply" icon="pi pi-refresh" @click="loadRoi" />
       </div>
+      </FilterPanel>
 
       <DataTable :value="roi" :loading="roiLoading" data-key="source_id" sort-mode="single">
         <template #empty>

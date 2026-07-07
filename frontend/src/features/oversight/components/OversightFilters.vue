@@ -8,8 +8,9 @@ import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import Button from 'primevue/button'
 import { staffApi } from '@/features/clients/api'
+import FilterPanel from '@/components/ui/FilterPanel.vue'
 
-defineProps({
+const props = defineProps({
   from: { type: String, default: '' },
   to: { type: String, default: '' },
   userId: { type: [String, Number], default: '' },
@@ -29,6 +30,8 @@ const userOptions = computed(() => [
   ...staff.value.map((u) => ({ value: u.id, label: u.name })),
 ])
 
+const activeCount = computed(() => [props.from, props.to, props.userId].filter(Boolean).length)
+
 function clear() {
   emit('update:from', '')
   emit('update:to', '')
@@ -38,7 +41,8 @@ function clear() {
 </script>
 
 <template>
-  <div class="mb-4 flex flex-wrap items-end gap-2">
+  <FilterPanel card :active-count="activeCount" class="mb-4">
+  <div class="flex flex-wrap items-end gap-2 max-sm:px-4 max-sm:py-3">
     <BaseInput
       :model-value="from"
       type="date"
@@ -64,4 +68,5 @@ function clear() {
     <Button label="Apply" icon="pi pi-filter" size="small" @click="emit('apply')" />
     <Button v-if="from || to || userId" label="Clear" size="small" text severity="secondary" @click="clear" />
   </div>
+  </FilterPanel>
 </template>

@@ -11,11 +11,13 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import OfflineStamp from '@/components/ui/OfflineStamp.vue'
+import FilterPanel from '@/components/ui/FilterPanel.vue'
 import { useTasksStore } from '@/features/pipeline/tasksStore'
 import { confirmAction } from '@/composables/useConfirm'
-import { todayInput } from '@/utils/format'
+import { countActiveFilters, todayInput } from '@/utils/format'
 
 const store = useTasksStore()
+const activeFilterCount = computed(() => countActiveFilters(store.filters, ['scope']))
 
 const emptyForm = () => ({
   title: '',
@@ -133,6 +135,7 @@ function formatDue(value) {
 
     <SectionCard flush>
       <!-- Filter toolbar -->
+      <FilterPanel :active-count="activeFilterCount">
       <div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
         <BaseSelect
           v-model="store.filters.scope"
@@ -173,6 +176,7 @@ function formatDue(value) {
           Overdue only
         </label>
       </div>
+      </FilterPanel>
 
       <p v-if="store.loading" class="py-8 text-center text-sm text-mute">Loading…</p>
 

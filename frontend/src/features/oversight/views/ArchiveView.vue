@@ -10,6 +10,7 @@ import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
+import FilterPanel from '@/components/ui/FilterPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ReactivateHandoffModal from '@/features/oversight/components/ReactivateHandoffModal.vue'
 import { oversightApi } from '@/features/oversight/api'
@@ -19,7 +20,7 @@ import { useDynamicList } from '@/composables/useDynamicList'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction, toastSuccess, toastError } from '@/composables/useConfirm'
 import { formatMoney } from '@/features/payments/money'
-import { formatDateTime, todayInput } from '@/utils/format'
+import { formatDateTime, todayInput, countActiveFilters } from '@/utils/format'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -80,6 +81,7 @@ const sortOptions = [
   { value: 'oldest', label: 'Oldest first' },
 ]
 
+const activeFilterCount = computed(() => countActiveFilters(filters, ['sort']))
 const hasFilters = computed(() =>
   Object.entries(filters).some(([k, v]) => k !== 'sort' && v !== '' && v !== null),
 )
@@ -257,6 +259,7 @@ function ageLabel(days) {
 
     <SectionCard flush>
       <!-- Filters -->
+      <FilterPanel :active-count="activeFilterCount">
       <div class="border-b border-line px-4 py-3 sm:px-5">
         <div class="grid grid-cols-2 items-end gap-2 sm:grid-cols-3 lg:grid-cols-4">
           <BaseInput v-model="filters.search" label="Search client / phone" @keyup.enter="apply" />
@@ -291,6 +294,7 @@ function ageLabel(days) {
           />
         </div>
       </div>
+      </FilterPanel>
 
       <!-- Bulk action bar -->
       <div

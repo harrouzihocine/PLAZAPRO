@@ -1,19 +1,21 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
+import FilterPanel from '@/components/ui/FilterPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import UserFormModal from '@/features/settings/components/UserFormModal.vue'
 import { useUsersStore } from '@/features/settings/usersStore'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction } from '@/composables/useConfirm'
-import { initials } from '@/utils/format'
+import { countActiveFilters, initials } from '@/utils/format'
 
 const store = useUsersStore()
+const activeFilterCount = computed(() => countActiveFilters(store.filters))
 const auth = useAuthStore()
 
 const modalOpen = ref(false)
@@ -83,6 +85,7 @@ async function cancelUser(user) {
 
     <SectionCard flush>
       <!-- Filters -->
+      <FilterPanel :active-count="activeFilterCount">
       <div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
         <BaseSelect
           v-model="store.filters.role_id"
@@ -112,6 +115,7 @@ async function cancelUser(user) {
           @change="store.fetch()"
         />
       </div>
+      </FilterPanel>
 
       <EmptyState v-if="!store.items.length" icon="pi pi-users" title="No users match" />
 

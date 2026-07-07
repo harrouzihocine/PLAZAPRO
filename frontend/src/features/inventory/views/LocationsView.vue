@@ -11,11 +11,13 @@ import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
+import FilterPanel from '@/components/ui/FilterPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { useAutoFilter } from '@/composables/useAutoFilter'
 import { useDynamicList } from '@/composables/useDynamicList'
 import { useWilayas, useCommunes } from '@/composables/useGeography'
 import { GTM_PRIORITIES } from '@/features/inventory/api'
+import { countActiveFilters } from '@/utils/format'
 import CoverImageUpload from '@/features/inventory/components/CoverImageUpload.vue'
 import LocationCard from '@/features/inventory/components/LocationCard.vue'
 import LocationMap from '@/features/inventory/components/LocationMap.vue'
@@ -77,6 +79,8 @@ watch(
     loadFormCommunes(id)
   },
 )
+const activeFilterCount = computed(() => countActiveFilters(store.filters))
+
 watch(
   () => store.filters.wilaya_id,
   (id, prev) => {
@@ -197,7 +201,8 @@ function toggleArchived() {
     </PageHeader>
 
     <!-- Filter toolbar -->
-    <div class="mb-5 flex flex-wrap items-center gap-2">
+    <FilterPanel card :active-count="activeFilterCount" class="mb-5">
+    <div class="flex flex-wrap items-center gap-2 max-sm:px-4 max-sm:py-3">
       <div class="relative w-full sm:w-64">
         <i
           class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-mute"
@@ -232,6 +237,7 @@ function toggleArchived() {
         :options="GTM_PRIORITIES"
       />
     </div>
+    </FilterPanel>
 
     <!-- Project cards -->
     <div v-if="store.loading" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">

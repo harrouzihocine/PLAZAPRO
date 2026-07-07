@@ -7,13 +7,14 @@ import BaseSelect from '@/components/base/BaseSelect.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
+import FilterPanel from '@/components/ui/FilterPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { analyticsApi } from '@/features/analytics/api'
 import { staffApi } from '@/features/clients/api'
 import { useAutoFilter } from '@/composables/useAutoFilter'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { useAuthStore } from '@/features/settings/store'
-import { formatDateTime } from '@/utils/format'
+import { formatDateTime, countActiveFilters } from '@/utils/format'
 
 const KIND = {
   call: { label: 'Call', icon: 'pi pi-phone' },
@@ -34,6 +35,7 @@ const pageSubtitle = computed(() =>
 )
 
 const filters = ref({ user_id: '', type: '', mode: 'logged', from: '', to: '' })
+const activeFilterCount = computed(() => countActiveFilters(filters.value, ['mode']))
 const page = ref(1)
 const items = ref([])
 const summary = ref({})
@@ -122,6 +124,7 @@ useAutoFilter(
 
     <SectionCard flush>
       <!-- Filters -->
+      <FilterPanel :active-count="activeFilterCount">
       <div class="grid grid-cols-2 items-end gap-2 border-b border-line px-4 py-3 sm:grid-cols-3 sm:px-5 lg:grid-cols-5">
         <BaseSelect
           v-if="canViewAll"
@@ -135,6 +138,7 @@ useAutoFilter(
         <BaseInput v-model="filters.from" label="From" type="date" />
         <BaseInput v-model="filters.to" label="To" type="date" />
       </div>
+      </FilterPanel>
 
       <p v-if="loading" class="py-8 text-center text-sm text-mute">Loading…</p>
       <EmptyState

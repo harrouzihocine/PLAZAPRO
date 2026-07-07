@@ -117,23 +117,50 @@ export function humanize(value) {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
+// Room/floor values come from dynamic lists and are often already labels
+// ("F3", "6th Floor", "RDC") — only BARE NUMBERS get a label added, so a card
+// never shows "1 · 1" but also never doubles up ("Floor 6th Floor").
+export function roomsLabel(value) {
+  if (value === null || value === undefined || value === '') return null
+  const n = Number(value)
+  return Number.isFinite(n) ? `${n} room${n === 1 ? '' : 's'}` : String(value)
+}
+
+export function floorLabel(value) {
+  if (value === null || value === undefined || value === '') return null
+  const n = Number(value)
+  if (!Number.isFinite(n)) return String(value)
+  return n === 0 ? 'Ground floor' : `Floor ${value}`
+}
+
 // One human-readable unit summary — "REF-A12 · Apartment · 3 rooms · Floor 2 ·
 // 85 m²". These facts used to be joined unlabeled ("… · 1 · 1 · …"), which read
-// as meaningless digits on the phone cards; every number now carries its label.
-// Accepts both API shapes (type/property_type). Pass a formatted price string
-// via `price` when the caller wants it appended.
+// as meaningless digits on the phone cards. Accepts both API shapes
+// (type/property_type). Pass a formatted price string via `price` to append it.
 export function unitLine(u, { price = null } = {}) {
   if (!u) return ''
-  const rooms = u.room_number
-  const floor = u.floor
   return [
     u.reference,
     humanize(u.property_type ?? u.type),
-    rooms != null && rooms !== '' ? `${rooms} room${Number(rooms) === 1 ? '' : 's'}` : null,
-    floor != null && floor !== '' ? (Number(floor) === 0 ? 'Ground floor' : `Floor ${floor}`) : null,
+    roomsLabel(u.room_number),
+    floorLabel(u.floor),
     u.area_sqm ? `${u.area_sqm} m²` : null,
     price,
   ]
     .filter(Boolean)
     .join(' · ')
+}
+
+// How many filters are actually applied — feeds the badge on the phone
+// "Filters" toggle. Empty string/null/undefined/empty array = not applied.
+export function countActiveFilters(filters, ignore = []) {
+  return Object.entries(filters ?? {}).filter(
+    ([key, v]) =>
+      !ignore.includes(key) &&
+      v !== null &&
+      v !== undefined &&
+      v !== '' &&
+      v !== false &&
+      !(Array.isArray(v) && v.length === 0),
+  ).length
 }

@@ -1,17 +1,19 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import BaseInput from '@/components/base/BaseInput.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
+import FilterPanel from '@/components/ui/FilterPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { useAutoFilter } from '@/composables/useAutoFilter'
 import { useAuditStore } from '@/features/analytics/auditStore'
 import { useAuthStore } from '@/features/settings/store'
-import { formatDateTime } from '@/utils/format'
+import { formatDateTime, countActiveFilters } from '@/utils/format'
 
 const store = useAuditStore()
+const activeFilterCount = computed(() => countActiveFilters(store.filters))
 const auth = useAuthStore()
 const expanded = ref(null)
 
@@ -70,6 +72,7 @@ useAutoFilter(() => store.filters, () => store.applyFilters())
 
     <SectionCard flush>
       <!-- Filters -->
+      <FilterPanel :active-count="activeFilterCount">
       <div
         class="grid grid-cols-2 items-end gap-2 border-b border-line px-4 py-3 sm:grid-cols-3 sm:px-5 lg:grid-cols-6"
       >
@@ -79,6 +82,7 @@ useAutoFilter(() => store.filters, () => store.applyFilters())
         <BaseInput v-model="store.filters.from" label="From" type="date" />
         <BaseInput v-model="store.filters.to" label="To" type="date" />
       </div>
+      </FilterPanel>
 
       <p v-if="store.loading" class="py-8 text-center text-sm text-mute">Loading…</p>
       <EmptyState
