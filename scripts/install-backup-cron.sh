@@ -3,9 +3,9 @@
 # THIS checkout. Idempotent: replaces any previous PLAZA-BACKUPS block, leaves
 # unrelated crontab lines untouched.
 #
-# Cadence (see backup-db.sh for retention):
-#   */30 07:00–18:30  DB, day period
-#   hourly 19:00–06:00 DB, night period
+# Cadence (see backup-db.sh for retention — 3 days kept per period):
+#   */30 06:00–18:30   DB, day period
+#   hourly 19:00–05:00 DB, night period
 #   21:30 nightly      media archive
 #
 # Logs append to $PLAZA_BACKUP_DIR/backup.log (default ~/backups/plaza/).
@@ -28,8 +28,8 @@ $MARK_BEGIN
 #   sudo timedatectl set-timezone Africa/Algiers
 TZ=Africa/Algiers
 CRON_TZ=Africa/Algiers
-*/30 7-18 * * * PLAZA_BACKUP_DIR=$BACKUP_ROOT $ROOT/scripts/backup-db.sh >> $LOG 2>&1
-0 19-23,0-6 * * * PLAZA_BACKUP_DIR=$BACKUP_ROOT $ROOT/scripts/backup-db.sh >> $LOG 2>&1
+*/30 6-18 * * * PLAZA_BACKUP_DIR=$BACKUP_ROOT $ROOT/scripts/backup-db.sh >> $LOG 2>&1
+0 19-23,0-5 * * * PLAZA_BACKUP_DIR=$BACKUP_ROOT $ROOT/scripts/backup-db.sh >> $LOG 2>&1
 30 21 * * * PLAZA_BACKUP_DIR=$BACKUP_ROOT $ROOT/scripts/backup-media.sh >> $LOG 2>&1
 $MARK_END
 CRON
