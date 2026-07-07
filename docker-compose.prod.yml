@@ -50,6 +50,10 @@ services:
     volumes:
       - ./backend:/var/www/html:ro
       - ./frontend/dist:/var/www/spa:ro
+      # Android APK download (gitignored dir, survives SPA rebuilds — dist/ is
+      # wiped on every deploy). Publish: scripts/build-android.sh prints the cp.
+      # Create the dir BEFORE `up` or docker makes it root-owned (no sudo here).
+      - ./downloads:/var/www/downloads:ro
       - ./docker/nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro
       # Certs live in the named volume (certbot writes, nginx only reads).
       # setup-lan-tls.sh MUST run before first start — nginx refuses to boot

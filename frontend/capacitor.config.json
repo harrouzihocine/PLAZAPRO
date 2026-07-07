@@ -1,0 +1,19 @@
+{
+  "appId": "com.plazapro.app",
+  "appName": "PLAZA PRO",
+  "webDir": "native-shell",
+  "appendUserAgent": "PlazaProNative/1",
+  "backgroundColor": "#1e214b",
+  "server": {
+    "url": "https://app.plaza-pro.com",
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "launchAutoHide": true,
+      "backgroundColor": "#1e214b",
+      "showSpinner": false
+    }
+  }
+}

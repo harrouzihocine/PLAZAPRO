@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PLAZA PRO</string>
+    <string name="title_activity_main">PLAZA PRO</string>
+    <string name="package_name">com.plazapro.app</string>
+    <string name="custom_url_scheme">com.plazapro.app</string>
+</resources>

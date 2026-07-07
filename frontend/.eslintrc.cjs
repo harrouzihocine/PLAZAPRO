@@ -18,5 +18,6 @@ module.exports = {
     rules: {
         'vue/multi-word-component-names': 'off',
     },
-    ignorePatterns: ['dist/', 'node_modules/', 'coverage/'],
+    // android/ = Capacitor shell (generated bridge js inside); native-shell/ = its stub webDir
+    ignorePatterns: ['dist/', 'node_modules/', 'coverage/', 'android/', 'native-shell/'],
 }

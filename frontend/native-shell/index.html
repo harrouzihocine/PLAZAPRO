@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <!--
+    Stub webDir for the Capacitor Android shell (REMOTE mode).
+
+    The native app loads https://app.plaza-pro.com directly (capacitor.config.json
+    server.url), so this page is never shown in normal use — Capacitor just needs a
+    webDir to sync. It doubles as a branded placeholder if the remote URL ever
+    fails to load on first launch.
+
+    Future "bundled assets" mode (store submission): point webDir at "dist",
+    remove server.url, and switch the API/Echo base URLs to absolute — see
+    docs/android-app.md.
+  -->
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PLAZA PRO</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #1e214b;
+        color: #c9a227;
+        font-family: system-ui, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <h1 style="font-weight: 600; letter-spacing: 0.05em">PLAZA PRO</h1>
+      <p style="color: #9aa0c3">Connecting to app.plaza-pro.com&hellip;<br />Check your internet connection and reopen the app.</p>
+    </div>
+  </body>
+</html>

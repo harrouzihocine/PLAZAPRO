@@ -24,6 +24,14 @@
 /frontend/.env
 /frontend/.env.production
 
+# Android shell (Capacitor) — frontend/android/.gitignore covers gradle/build
+# outputs; here: signing secrets (NEVER in git) and local build artifacts.
+/frontend/android/keystore.properties
+/frontend/android/artifacts/
+*.keystore
+# Published-APK dir on the prod host (mounted into nginx as /downloads/)
+/downloads/
+
 # OS / editor
 .DS_Store
 Thumbs.db

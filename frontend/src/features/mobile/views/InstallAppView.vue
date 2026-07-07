@@ -1,16 +1,33 @@
 <script setup>
+import { onMounted, ref } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import { useInstallPrompt } from '@/composables/useInstallPrompt'
+import { isNativeApp } from '@/utils/nativeApp'
 
-// The "Mobile App" page every user can open from the navbar: installs PLAZA PRO
-// on the phone's home screen (same app, same login, fullscreen — no browser bar).
-// Android/desktop Chromium get a real one-tap install; iOS shows the manual
-// Add-to-Home-Screen steps Safari requires.
+// The "Mobile App" page every user can open from the navbar. Android staff get
+// the dedicated app: a signed APK downloaded straight from this server
+// (sideload — no Play Store). iOS keeps the PWA (Add to Home Screen), and the
+// PWA remains the no-download fallback everywhere else. Inside the Android app
+// itself all install prompts collapse into an "installed" state.
 const { canInstall, installed, isStandalone, isIOS, promptInstall } = useInstallPrompt()
 
+const isNative = isNativeApp()
 const appUrl = window.location.origin
+const apkUrl = '/downloads/plaza-pro.apk'
+
+// Version of the APK currently published next to it by scripts/build-android.sh.
+// Missing/unparseable (e.g. dev stack, SPA fallback HTML) just hides the line.
+const apkVersion = ref(null)
+onMounted(async () => {
+  try {
+    const res = await fetch('/downloads/version.json', { cache: 'no-store' })
+    if (res.ok) apkVersion.value = (await res.json()).versionName || null
+  } catch {
+    apkVersion.value = null
+  }
+})
 </script>
 
 <template>
@@ -39,52 +56,86 @@ const appUrl = window.location.origin
         </div>
       </SectionCard>
 
-      <!-- Already installed -->
-      <SectionCard v-if="isStandalone || installed" title="Installed" icon="pi pi-check-circle">
+      <!-- Inside the Android app: nothing to install -->
+      <SectionCard v-if="isNative" title="Installed" icon="pi pi-check-circle">
         <p class="text-sm text-ink">
-          You are using the installed app — nothing more to do. The icon is on your home
-          screen and stays signed in like the website.
+          You are using the PLAZA PRO Android app — nothing more to do. New features
+          arrive automatically with every update of the web app.
         </p>
       </SectionCard>
 
-      <!-- Android / desktop: native one-tap install -->
-      <SectionCard v-else-if="canInstall" title="Install now" icon="pi pi-download">
-        <p class="mb-4 text-sm text-mute">
-          One tap adds PLAZA PRO to your home screen and opens it fullscreen.
-        </p>
-        <BaseButton label="Install PLAZA PRO" icon="pi pi-mobile" @click="promptInstall" />
-      </SectionCard>
+      <template v-else>
+        <!-- Android: the dedicated app, downloaded directly from this server -->
+        <SectionCard v-if="!isIOS" title="Android app" icon="pi pi-android">
+          <p class="mb-1 text-sm text-mute">
+            The dedicated PLAZA PRO app for Android — download it straight from here, no
+            Play Store needed.
+          </p>
+          <p v-if="apkVersion" class="mb-4 text-xs text-mute">Version {{ apkVersion }}</p>
+          <p v-else class="mb-4"></p>
+          <BaseButton as="a" :href="apkUrl" icon="pi pi-download" label="Download for Android (.apk)" />
+          <ol class="mt-4 list-inside list-decimal space-y-2 text-sm text-ink">
+            <li>Open the finished download (tap it in Chrome's download bar).</li>
+            <li>
+              If Chrome warns about unknown apps: tap
+              <span class="font-medium">Settings</span> →
+              <span class="font-medium">"Allow from this source"</span>, then go back.
+            </li>
+            <li>Tap <span class="font-medium">Install</span> — the PLAZA PRO icon appears on your home screen.</li>
+          </ol>
+        </SectionCard>
 
-      <!-- iOS: Safari's manual flow -->
-      <SectionCard v-else-if="isIOS" title="Install on iPhone / iPad" icon="pi pi-apple">
-        <ol class="list-inside list-decimal space-y-2 text-sm text-ink">
-          <li>Open <span class="font-medium">{{ appUrl }}</span> in <span class="font-medium">Safari</span> (not Chrome).</li>
-          <li>Tap the <span class="font-medium">Share</span> button <i class="pi pi-upload text-mute" aria-hidden="true" /> in the toolbar.</li>
-          <li>Scroll and tap <span class="font-medium">"Add to Home Screen"</span>.</li>
-          <li>Tap <span class="font-medium">Add</span> — the PLAZA PRO icon appears on your home screen.</li>
-        </ol>
-      </SectionCard>
+        <!-- Already installed as PWA -->
+        <SectionCard v-if="isStandalone || installed" title="Installed" icon="pi pi-check-circle">
+          <p class="text-sm text-ink">
+            You are using the installed app — nothing more to do. The icon is on your home
+            screen and stays signed in like the website.
+          </p>
+        </SectionCard>
 
-      <!-- Fallback: browser without the install event (e.g. Firefox desktop) -->
-      <SectionCard v-else title="Install on your phone" icon="pi pi-mobile">
-        <div class="space-y-4 text-sm text-ink">
-          <div>
-            <div class="mb-1 font-medium">Android (Chrome)</div>
-            <p class="text-mute">
-              Open <span class="font-medium text-ink">{{ appUrl }}</span> in Chrome → menu
-              <i class="pi pi-ellipsis-v text-xs" aria-hidden="true" /> →
-              <span class="font-medium text-ink">"Add to Home screen"</span> → Install.
-            </p>
+        <!-- Android / desktop: native one-tap install -->
+        <SectionCard
+          v-else-if="canInstall"
+          :title="isIOS ? 'Install now' : 'Prefer no download? Install the web app'"
+          icon="pi pi-download"
+        >
+          <p class="mb-4 text-sm text-mute">
+            One tap adds PLAZA PRO to your home screen and opens it fullscreen.
+          </p>
+          <BaseButton label="Install PLAZA PRO" icon="pi pi-mobile" @click="promptInstall" />
+        </SectionCard>
+
+        <!-- iOS: Safari's manual flow -->
+        <SectionCard v-else-if="isIOS" title="Install on iPhone / iPad" icon="pi pi-apple">
+          <ol class="list-inside list-decimal space-y-2 text-sm text-ink">
+            <li>Open <span class="font-medium">{{ appUrl }}</span> in <span class="font-medium">Safari</span> (not Chrome).</li>
+            <li>Tap the <span class="font-medium">Share</span> button <i class="pi pi-upload text-mute" aria-hidden="true" /> in the toolbar.</li>
+            <li>Scroll and tap <span class="font-medium">"Add to Home Screen"</span>.</li>
+            <li>Tap <span class="font-medium">Add</span> — the PLAZA PRO icon appears on your home screen.</li>
+          </ol>
+        </SectionCard>
+
+        <!-- Fallback: browser without the install event (e.g. Firefox desktop) -->
+        <SectionCard v-else title="Or install the web app" icon="pi pi-mobile">
+          <div class="space-y-4 text-sm text-ink">
+            <div>
+              <div class="mb-1 font-medium">Android (Chrome)</div>
+              <p class="text-mute">
+                Open <span class="font-medium text-ink">{{ appUrl }}</span> in Chrome → menu
+                <i class="pi pi-ellipsis-v text-xs" aria-hidden="true" /> →
+                <span class="font-medium text-ink">"Add to Home screen"</span> → Install.
+              </p>
+            </div>
+            <div>
+              <div class="mb-1 font-medium">iPhone / iPad (Safari)</div>
+              <p class="text-mute">
+                Open <span class="font-medium text-ink">{{ appUrl }}</span> in Safari → Share →
+                <span class="font-medium text-ink">"Add to Home Screen"</span> → Add.
+              </p>
+            </div>
           </div>
-          <div>
-            <div class="mb-1 font-medium">iPhone / iPad (Safari)</div>
-            <p class="text-mute">
-              Open <span class="font-medium text-ink">{{ appUrl }}</span> in Safari → Share →
-              <span class="font-medium text-ink">"Add to Home Screen"</span> → Add.
-            </p>
-          </div>
-        </div>
-      </SectionCard>
+        </SectionCard>
+      </template>
 
       <!-- What you get -->
       <SectionCard title="What you get" icon="pi pi-sparkles">
