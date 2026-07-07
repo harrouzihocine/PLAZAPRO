@@ -47,6 +47,11 @@ const searching = ref(false)
 const geoError = ref('')
 const results = ref([])
 const expanded = ref(false)
+// True when OSM tiles fail to load — e.g. the office LAN is up but the internet
+// is down. Drives a friendly placeholder instead of a broken grey map. Toggled
+// by Leaflet tile events (navigator.onLine is useless here: it reports the LAN
+// as "online" even with no internet). Self-heals when a tile loads again.
+const tilesUnavailable = ref(false)
 
 function toNum(v) {
   return v === '' || v === null || v === undefined ? null : Number(v)
@@ -170,11 +175,19 @@ onMounted(() => {
     start,
     hasCoords() ? PICKED_ZOOM : DEFAULT_ZOOM,
   )
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution:
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map)
+  // A failed tile fetch (internet down) shows the placeholder; the next tile that
+  // does load clears it — so it recovers on its own when the connection returns.
+  tiles.on('tileerror', () => {
+    tilesUnavailable.value = true
+  })
+  tiles.on('tileload', () => {
+    tilesUnavailable.value = false
+  })
 
   if (hasCoords()) placeMarker(toNum(props.latitude), toNum(props.longitude))
   if (props.editable) map.on('click', (e) => commit(e.latlng.lat, e.latlng.lng))
@@ -222,10 +235,17 @@ onBeforeUnmount(() => {
   <div :class="expanded ? 'fixed inset-0 z-[1000] flex flex-col gap-2 bg-bg p-4' : 'space-y-2'">
     <div v-if="editable" class="space-y-2">
       <div class="flex flex-wrap items-center gap-2">
-        <BaseButton type="button" variant="ghost" :disabled="searching" @click="search">
+        <BaseButton
+          type="button"
+          variant="ghost"
+          :disabled="searching || tilesUnavailable"
+          @click="search"
+        >
           {{ searching ? 'Searching…' : 'Search this address' }}
         </BaseButton>
-        <span class="text-xs opacity-60">or click the map / drag the marker</span>
+        <span class="text-xs opacity-60">
+          {{ tilesUnavailable ? 'Address search needs internet' : 'or click the map / drag the marker' }}
+        </span>
       </div>
       <ul
         v-if="results.length"
@@ -246,6 +266,43 @@ onBeforeUnmount(() => {
 
     <div class="relative" :class="expanded ? 'min-h-0 flex-1' : 'h-72'">
       <div ref="mapEl" class="absolute inset-0 rounded-lg border border-line" />
+
+      <!-- Offline placeholder: covers the broken grey tiles with a calm message.
+           Sits below the expand button (z-1000) so that stays usable. -->
+      <div
+        v-if="tilesUnavailable"
+        class="absolute inset-0 z-[500] flex flex-col items-center justify-center gap-2 rounded-lg border border-line bg-card px-4 text-center"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="34"
+          height="34"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="opacity-40"
+          aria-hidden="true"
+        >
+          <path d="m2 2 20 20" />
+          <path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193" />
+          <path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07" />
+        </svg>
+        <p class="text-sm font-medium text-ink">Map preview needs internet</p>
+        <p class="max-w-xs text-xs opacity-60">
+          You’re working offline. The location is saved — the map reappears once the connection is
+          back.
+        </p>
+        <p
+          v-if="hasCoords()"
+          class="mt-1 rounded-md bg-highlight px-2 py-1 text-xs font-medium text-ink"
+        >
+          📍 {{ Number(latitude).toFixed(5) }}, {{ Number(longitude).toFixed(5) }}
+        </p>
+      </div>
+
       <button
         type="button"
         class="absolute right-2 top-2 z-[1000] flex items-center justify-center rounded-lg border border-line bg-card p-2 text-ink shadow-card hover:opacity-90"
