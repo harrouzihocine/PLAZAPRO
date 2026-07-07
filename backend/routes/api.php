@@ -15,6 +15,12 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     Route::get('/ping', fn () => response()->json(['pong' => true, 'ts' => now()]));
 
+    // Boot-time client flags (public, tiny, never SW-cached — /api is in the
+    // worker's BYPASS list). service_worker=false is the SW kill-switch.
+    Route::get('/app-config', fn () => response()->json([
+        'service_worker' => (bool) config('app.service_worker'),
+    ]));
+
     require app_path('Modules/Settings/routes.php');
     require app_path('Modules/Inventory/routes.php');
     require app_path('Modules/Clients/routes.php');

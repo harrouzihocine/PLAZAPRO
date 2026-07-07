@@ -8,7 +8,8 @@
 //     every deploy, so a stale file can never be served under a fresh name.
 //
 // Bump the version to force-drop every old cache on the next visit.
-const CACHE = 'plaza-pwa-v1'
+// v2: the worker now also runs inside the Android shell (offline boot).
+const CACHE = 'plaza-pwa-v2'
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png']
 
 // Paths the worker must stay out of: Laravel API + auth cookies + websockets.

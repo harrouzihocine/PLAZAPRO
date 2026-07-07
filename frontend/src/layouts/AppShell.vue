@@ -19,8 +19,10 @@ import PullToRefresh from '@/components/shell/PullToRefresh.vue'
 import BrandLogo from '@/components/BrandLogo.vue'
 import UnitSoldCelebration from '@/features/inventory/components/UnitSoldCelebration.vue'
 import ProfileModal from '@/features/settings/components/ProfileModal.vue'
+import OfflineBanner from '@/features/offline/OfflineBanner.vue'
 import { useAnnouncementsStore } from '@/features/inventory/announcementsStore'
 import { usePresenceStore } from '@/features/collaboration/presenceStore'
+import { useNetworkStore } from '@/features/offline/networkStore'
 import { oversightApi } from '@/features/oversight/api'
 
 const { isNight, toggle } = useTheme()
@@ -51,7 +53,19 @@ const OVERSIGHT_PERMS = [
 // new units) over the public channel — subscribe once for the whole session.
 const announcements = useAnnouncementsStore()
 
+// Connectivity: init the tracker, and when the link comes back after an
+// offline-snapshot boot, revalidate the session against the server (a real
+// 401 then logs out normally).
+const network = useNetworkStore()
+watch(
+  () => network.online,
+  (online) => {
+    if (online && auth.offlineSession) auth.fetchMe()
+  },
+)
+
 onMounted(async () => {
+  network.init()
   announcements.subscribe()
   // Everyone joins the `online` presence channel so the app's green "Active
   // now" dots reflect web users too; the web UI itself never shows them.
@@ -479,6 +493,9 @@ async function logout() {
           </Popover>
         </div>
       </header>
+
+      <!-- Offline notice (all platforms — the PWA benefits too). -->
+      <OfflineBanner />
 
       <!-- Facebook-style pull-to-refresh (APK only; the chat takeover thread
            and any open overlay stand down). -->

@@ -58,6 +58,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Service worker kill-switch
+    |--------------------------------------------------------------------------
+    |
+    | The SPA (web PWA and the Android shell's WebView) registers /sw.js for
+    | offline boot. Every launch first checks GET /api/v1/app-config; setting
+    | APP_SW_ENABLED=false makes each device unregister its worker on the next
+    | online launch — the fleet-wide rollback if a WebView build misbehaves,
+    | with no APK re-release.
+    |
+    */
+
+    'service_worker' => (bool) env('APP_SW_ENABLED', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '@/features/settings/store'
+import { useNetworkStore } from '@/features/offline/networkStore'
 
 // One Axios instance for the whole app. Sanctum SPA (cookie) auth: no token
 // header — the session cookie is sent with withCredentials. Components call
@@ -12,9 +13,17 @@ const api = axios.create({
 })
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    useNetworkStore().noteOnline() // any answer proves the link is up
+    return response
+  },
   async (error) => {
     const status = error.response?.status
+    if (error.response) {
+      useNetworkStore().noteOnline() // even a 4xx/5xx is a live connection
+    } else if (error.code !== 'ERR_CANCELED') {
+      useNetworkStore().noteOffline() // no response at all → offline signal
+    }
     if (status === 401) {
       useAuthStore().clear() // session expired → clear local auth state
     }

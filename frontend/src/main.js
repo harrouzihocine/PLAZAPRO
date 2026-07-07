@@ -12,7 +12,7 @@ import 'primeicons/primeicons.css'
 import 'sweetalert2/dist/sweetalert2.min.css'
 import '@/assets/styles/swal.css'
 import '@/assets/styles/native.css'
-import { initNativeMode, isNativeApp } from '@/utils/nativeApp'
+import { initNativeMode } from '@/utils/nativeApp'
 
 // APK-only design layer: stamp <html class="native"> before the first paint so
 // the shell's app-grade styling (native.css + `native:` classes) applies from
@@ -37,22 +37,30 @@ app.directive('tooltip', Tooltip)
 
 app.mount('#app')
 
-// Installable app (PWA): register the service worker in production builds only —
-// the Vite dev server doesn't ship /sw.js, and caching would fight HMR anyway.
-// The Capacitor Android shell must NOT run it: SW-served navigations bypass the
-// webview request layer, and the shell has its own update path (every page load
-// is the live site). Unregister defensively in case one was ever registered.
-if ('serviceWorker' in navigator) {
-  if (isNativeApp()) {
-    navigator.serviceWorker
-      .getRegistrations()
-      .then((regs) => regs.forEach((reg) => reg.unregister()))
-      .catch(() => {})
-  } else if (import.meta.env.PROD) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch(() => {
-        // Registration failing (old browser, private mode) must never break the app.
-      })
+// Installable app (PWA) + offline boot for the Android shell: the service
+// worker caches the app shell so the SPA opens with zero signal (remote-mode
+// Capacitor loads the live URL — without the worker there is no app offline).
+// Production builds only: the Vite dev server doesn't ship /sw.js.
+//
+// Kill-switch: /api/v1/app-config (public, never SW-cached — /api is in the
+// worker's BYPASS list) can turn the worker off fleet-wide via APP_SW_ENABLED
+// if a WebView build misbehaves — no APK re-release needed. When the check
+// itself fails we are offline: keep the registered worker, that IS the feature.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', async () => {
+    try {
+      const res = await fetch('/api/v1/app-config', { cache: 'no-store' })
+      const cfg = await res.json()
+      if (cfg.service_worker === false) {
+        const regs = await navigator.serviceWorker.getRegistrations()
+        regs.forEach((reg) => reg.unregister())
+        return
+      }
+    } catch {
+      /* offline launch — leave any existing worker in place */
+    }
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // Registration failing (old browser, private mode) must never break the app.
     })
-  }
+  })
 }
