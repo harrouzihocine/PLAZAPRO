@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive } from 'vue'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import Tag from 'primevue/tag'
@@ -25,6 +26,7 @@ const emptyForm = () => ({
 const form = reactive(emptyForm())
 
 onMounted(() => store.fetch())
+useRefreshable(() => store.fetch()) // pull-to-refresh (APK)
 
 // Open tasks first (board top), then done; overdue open tasks flagged in danger.
 const openTasks = computed(() => store.items.filter((t) => t.state === 'open'))

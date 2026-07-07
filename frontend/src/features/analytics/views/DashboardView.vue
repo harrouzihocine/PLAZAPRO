@@ -9,6 +9,7 @@ import StatCard from '@/components/ui/StatCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import WorkItemGroups from '@/features/analytics/components/WorkItemGroups.vue'
 import UpcomingTasksCard from '@/features/pipeline/components/UpcomingTasksCard.vue'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { isNativeApp } from '@/utils/nativeApp'
 
 const auth = useAuthStore()
@@ -69,16 +70,19 @@ const monthTiles = computed(() => {
   ]
 })
 
-onMounted(async () => {
+async function load() {
   try {
     data.value = await analyticsApi.dashboard()
+    error.value = ''
   } catch (e) {
     if (e.response?.status === 403) denied.value = true
     else error.value = 'Could not load the dashboard. Please try again.'
   } finally {
     loading.value = false
   }
-})
+}
+onMounted(load)
+useRefreshable(load) // pull-to-refresh (APK)
 </script>
 
 <template>

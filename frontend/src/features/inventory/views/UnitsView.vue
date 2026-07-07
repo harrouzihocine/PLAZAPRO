@@ -14,6 +14,7 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import NativeList from '@/components/ui/NativeList.vue'
 import { useNativePhone } from '@/composables/useNativeMode'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { confirmAction } from '@/composables/useConfirm'
 import { useAutoFilter } from '@/composables/useAutoFilter'
 import { useDynamicList } from '@/composables/useDynamicList'
@@ -112,6 +113,8 @@ onMounted(() => {
   if (!locations.items.length) locations.fetch()
   units.fetch()
 })
+// pull-to-refresh (APK)
+useRefreshable(() => Promise.all([locations.fetch(), units.fetch()]))
 
 function reset() {
   // The auto-filter watcher picks the change up and refetches.

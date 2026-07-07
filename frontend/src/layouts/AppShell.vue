@@ -15,6 +15,7 @@ import NotificationBell from '@/features/collaboration/components/NotificationBe
 import ChatDock from '@/features/collaboration/components/ChatDock.vue'
 import DraftsIndicator from '@/components/shell/DraftsIndicator.vue'
 import GlobalSearch from '@/components/shell/GlobalSearch.vue'
+import PullToRefresh from '@/components/shell/PullToRefresh.vue'
 import BrandLogo from '@/components/BrandLogo.vue'
 import UnitSoldCelebration from '@/features/inventory/components/UnitSoldCelebration.vue'
 import ProfileModal from '@/features/settings/components/ProfileModal.vue'
@@ -478,6 +479,10 @@ async function logout() {
           </Popover>
         </div>
       </header>
+
+      <!-- Facebook-style pull-to-refresh (APK only; the chat takeover thread
+           and any open overlay stand down). -->
+      <PullToRefresh v-if="isNative" :disabled="chatTakeover" />
 
       <!-- Routed content -->
       <main

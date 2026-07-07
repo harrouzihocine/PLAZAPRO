@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { RouterLink } from 'vue-router'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
@@ -112,16 +113,18 @@ const mode = ref(null) // 'create' | 'edit' | 'correct' | null
 const editingId = ref(null)
 const correction = reactive({ price: '', sale_status: '', reason: '' })
 
-onMounted(() => {
+function load() {
   // The three reads are independent — fire them together instead of chaining
   // so the page paints as soon as the slowest one returns, not their sum.
   locations.fetchOne(props.id)
   units.fetchForLocation(props.id)
-  locationsApi
+  return locationsApi
     .insights(props.id)
     .then((data) => (insights.value = data))
     .catch(() => (insights.value = null))
-})
+}
+onMounted(load)
+useRefreshable(load) // pull-to-refresh (APK)
 
 function openCreate() {
   Object.assign(form, blank)

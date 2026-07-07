@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
 import InputText from 'primevue/inputtext'
@@ -65,6 +66,7 @@ const mapsUrl = computed(() => googleMapsUrl(form))
 const showArchived = ref(false)
 
 onMounted(() => store.fetch())
+useRefreshable(() => store.fetch()) // pull-to-refresh (APK)
 
 // Cascade: reload the dependent commune list when the chosen wilaya changes.
 // A user-driven change also clears the previously-picked commune.

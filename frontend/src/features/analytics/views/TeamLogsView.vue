@@ -11,6 +11,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import { analyticsApi } from '@/features/analytics/api'
 import { staffApi } from '@/features/clients/api'
 import { useAutoFilter } from '@/composables/useAutoFilter'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { useAuthStore } from '@/features/settings/store'
 import { formatDateTime } from '@/utils/format'
 
@@ -79,6 +80,8 @@ function goToPage(p) {
   page.value = p
   fetch()
 }
+
+useRefreshable(() => fetch()) // pull-to-refresh (APK)
 
 onMounted(async () => {
   fetch()

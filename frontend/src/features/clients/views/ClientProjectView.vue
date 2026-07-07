@@ -1,6 +1,7 @@
 <script setup>
 import Swal from 'sweetalert2'
 import { computed, onMounted, ref } from 'vue'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
@@ -126,6 +127,8 @@ onMounted(async () => {
     loading.value = false
   }
 })
+// pull-to-refresh (APK)
+useRefreshable(() => Promise.all([refresh(), store.loadDesire(props.id)]))
 
 // --- Shift to desire (modal): archive the project + re-capture the wants ---
 const shiftOpen = ref(false)

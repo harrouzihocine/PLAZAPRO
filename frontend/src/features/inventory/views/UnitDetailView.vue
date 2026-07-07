@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { RouterLink } from 'vue-router'
 import Skeleton from 'primevue/skeleton'
 import Tab from 'primevue/tab'
@@ -48,10 +49,11 @@ const saleHint = computed(() => {
   return ''
 })
 
-onMounted(async () => {
+async function load() {
   units.fetchOne(props.id)
   try {
     insights.value = await unitsApi.insights(props.id)
+    insightsError.value = false
   } catch (e) {
     // Fail soft (the spec sheet + media still render) but never silently: a
     // swallowed error here makes the whole stats/payments block vanish with no
@@ -60,7 +62,9 @@ onMounted(async () => {
     insightsError.value = true
     console.error('Failed to load unit insights', e)
   }
-})
+}
+onMounted(load)
+useRefreshable(load) // pull-to-refresh (APK)
 </script>
 
 <template>

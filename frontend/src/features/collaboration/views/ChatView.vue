@@ -13,6 +13,7 @@ import ConversationList from '@/features/collaboration/components/ConversationLi
 import ThreadPane from '@/features/collaboration/components/ThreadPane.vue'
 import { useChatStore } from '@/features/collaboration/chatStore'
 import { useIsPhone, useNativePhone } from '@/composables/useNativeMode'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { isNativeApp } from '@/utils/nativeApp'
 import { initials } from '@/utils/format'
 
@@ -34,6 +35,11 @@ const selectedId = computed(() => (route.params.id ? Number(route.params.id) : n
 onMounted(() => {
   if (!store.conversations.length) store.fetchConversations()
   if (!store.contacts.length) store.fetchContacts()
+})
+// pull-to-refresh (APK): reload the inbox, and the open thread if any.
+useRefreshable(async () => {
+  await store.fetchConversations()
+  if (selectedId.value) await store.loadThread(selectedId.value)
 })
 
 function select(id) {

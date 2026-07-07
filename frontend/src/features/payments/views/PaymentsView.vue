@@ -12,6 +12,7 @@ import StatusTag from '@/components/ui/StatusTag.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import NativeList from '@/components/ui/NativeList.vue'
 import { useNativePhone } from '@/composables/useNativeMode'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { toastError } from '@/composables/useConfirm'
 import { paymentsOverviewApi } from '@/features/payments/api'
 import { dealsApi } from '@/features/clients/api'
@@ -45,6 +46,7 @@ async function load() {
   }
 }
 onMounted(load)
+useRefreshable(load) // pull-to-refresh (APK)
 
 // Live reservation countdown (all rows share one ticking clock).
 const now = ref(Date.now())

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import Avatar from 'primevue/avatar'
 import Badge from 'primevue/badge'
@@ -78,6 +79,8 @@ onMounted(async () => {
     store.loadArchivedProjects(props.id),
   ])
 })
+// pull-to-refresh (APK)
+useRefreshable(() => Promise.all([refresh(), store.loadDesire(props.id)]))
 
 // --- New project: the first thing captured is its call log. ---
 const newProjectOpen = ref(false)

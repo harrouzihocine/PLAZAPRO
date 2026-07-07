@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { useRouter } from 'vue-router'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
@@ -44,6 +45,7 @@ const editing = ref(null) // null = creating
 const nativePhone = useNativePhone()
 
 onMounted(() => store.fetch())
+useRefreshable(() => store.fetch()) // pull-to-refresh (APK)
 
 // Filters apply themselves as they change — no "Filter" button. A filter change
 // resets to page 1 (results shrink/shift, so the old page number is meaningless).
