@@ -217,7 +217,7 @@ async function submitEditNa() {
       </h3>
       <!-- One pending log at a time: the call CTA shows only when the open next
            action IS a call (or nothing is planned yet). -->
-      <span class="flex items-center gap-2">
+      <span class="flex flex-wrap items-center justify-end gap-2">
         <Button
           v-if="canPlanNextAction && !pending && !frozen"
           label="Plan next action"

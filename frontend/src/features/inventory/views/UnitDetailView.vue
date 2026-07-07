@@ -160,7 +160,7 @@ onMounted(async () => {
         />
       </div>
 
-      <Tabs value="overview" lazy>
+      <Tabs value="overview" scrollable lazy>
         <TabList>
           <Tab value="overview">Overview</Tab>
           <Tab v-if="insights?.payments" value="payments">Payments</Tab>

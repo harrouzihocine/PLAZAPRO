@@ -101,6 +101,13 @@ html.native * {
     max-width: 26rem;
   }
 
+  /* ── Tab strips swipe sideways instead of crushing (safety net for any
+     TabList without the `scrollable` prop). ── */
+  html.native .p-tablist-content {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
   /* ── Tables that stay tables scroll sideways under a finger instead of
      crushing their columns (main lists render as cards instead — NativeList). */
   html.native .p-datatable-table-container {
@@ -112,6 +119,59 @@ html.native * {
   html.native .p-paginator button {
     min-width: 2.75rem;
     min-height: 2.75rem;
+  }
+
+  /* ── Page-header actions: a tidy two-column grid instead of a wrapped pile
+     (ClientProjectView alone has 7 — Freeze, Direct deal, Shift, Archive…).
+     A lone action keeps the full row. */
+  html.native .page-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  html.native .page-actions .p-button {
+    width: 100%;
+    justify-content: center;
+  }
+  html.native .page-actions > :only-child {
+    grid-column: 1 / -1;
+  }
+
+  /* ── Forms in sheets & drawers: pair the short fields ──
+     House field grids (`grid gap-3 sm:grid-cols-N`) collapse to one long
+     column below sm — that's the "scroll forever to fill a call log" problem.
+     Two columns halve the scrolling; anything wide keeps the full row:
+     explicit col-spans, headings/notes, and wrappers holding a textarea or
+     the phone input. */
+  html.native .p-dialog-content [class*='sm:grid-cols'],
+  html.native .p-drawer-content [class*='sm:grid-cols'] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  html.native .p-dialog-content [class*='sm:grid-cols'] > :is([class*='col-span'], h1, h2, h3, h4, p, fieldset),
+  html.native .p-dialog-content [class*='sm:grid-cols'] > :has(textarea, input[type='tel']),
+  html.native .p-drawer-content [class*='sm:grid-cols'] > :is([class*='col-span'], h1, h2, h3, h4, p, fieldset),
+  html.native .p-drawer-content [class*='sm:grid-cols'] > :has(textarea, input[type='tel']) {
+    grid-column: 1 / -1;
+  }
+
+  /* ── The submit/cancel row stays pinned while the sheet scrolls — never
+     hunt for Save again. Matches the house convention: the form's last
+     `.flex.gap-2` row. Offset cancels the content's bottom padding. */
+  html.native .p-dialog-content form > .flex.gap-2:last-child,
+  html.native .p-drawer-content form > .flex.gap-2:last-child {
+    position: sticky;
+    bottom: calc(-1 * max(1.25rem, env(safe-area-inset-bottom)));
+    z-index: 5;
+    margin-top: 0.75rem;
+    padding: 0.75rem 0 max(0.75rem, env(safe-area-inset-bottom));
+    background: var(--p-content-background);
+    border-top: 1px solid var(--p-content-border-color);
+  }
+  html.native .p-dialog-content form > .flex.gap-2:last-child .p-button,
+  html.native .p-drawer-content form > .flex.gap-2:last-child .p-button {
+    flex: 1 1 0;
   }
 
   /* ── SweetAlert2 confirms ride from the bottom too, with thumb-sized

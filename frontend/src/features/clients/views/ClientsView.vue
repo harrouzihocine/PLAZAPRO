@@ -97,6 +97,9 @@ function resetFilters() {
 function openFile(event) {
   router.push({ name: 'clients.file', params: { id: event.data.id } })
 }
+
+// Same deep link as the client file header (phones are stored E.164).
+const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, '')}`
 </script>
 
 <template>
@@ -206,16 +209,27 @@ function openFile(event) {
                 {{ item.assigned_agent?.name ?? 'Unassigned' }}
               </p>
             </div>
-            <!-- One-tap call — the reason this list exists on a phone. -->
-            <a
-              v-if="canSeeDetails && item.phone"
-              :href="`tel:${item.phone}`"
-              class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-highlight text-primary-600 active:opacity-70 dark:text-primary-400"
-              :aria-label="`Call ${item.full_name}`"
-              @click.stop
-            >
-              <i class="pi pi-phone" aria-hidden="true" />
-            </a>
+            <!-- One-tap call / WhatsApp — the reason this list exists on a phone. -->
+            <span v-if="canSeeDetails && item.phone" class="flex shrink-0 items-center gap-2">
+              <a
+                :href="`tel:${item.phone}`"
+                class="flex h-11 w-11 items-center justify-center rounded-full bg-highlight text-primary-600 active:opacity-70 dark:text-primary-400"
+                :aria-label="`Call ${item.full_name}`"
+                @click.stop
+              >
+                <i class="pi pi-phone" aria-hidden="true" />
+              </a>
+              <a
+                :href="whatsappLink(item.phone)"
+                target="_blank"
+                rel="noopener"
+                class="flex h-11 w-11 items-center justify-center rounded-full bg-green-500/10 text-green-600 active:opacity-70 dark:text-green-400"
+                :aria-label="`WhatsApp ${item.full_name}`"
+                @click.stop
+              >
+                <i class="pi pi-whatsapp" aria-hidden="true" />
+              </a>
+            </span>
           </div>
         </template>
       </NativeList>

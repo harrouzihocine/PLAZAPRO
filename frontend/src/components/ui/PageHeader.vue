@@ -32,7 +32,9 @@ defineProps({
       </p>
     </div>
 
-    <div v-if="$slots.actions" class="flex shrink-0 flex-wrap items-center gap-2">
+    <!-- page-actions: on Android-shell phones native.css reflows this into a
+         two-column grid of full-width buttons instead of a wrapped pile. -->
+    <div v-if="$slots.actions" class="page-actions flex shrink-0 flex-wrap items-center gap-2">
       <slot name="actions" />
     </div>
   </header>
