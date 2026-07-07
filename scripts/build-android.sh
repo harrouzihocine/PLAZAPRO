@@ -90,5 +90,5 @@ EOF
 
 echo
 echo "Built $OUT_DIR/plaza-pro.apk (v$VERSION_NAME, code $VERSION_CODE, $(du -h "$OUT_DIR/plaza-pro.apk" | cut -f1))"
-echo "Publish it on the prod host:"
-echo "  cp $OUT_DIR/plaza-pro.apk $OUT_DIR/version.json ~/plaza-prod/downloads/"
+echo "Publish it on the prod host (the versioned copy is what the install page links):"
+echo "  cp $OUT_DIR/plaza-pro.apk $OUT_DIR/plaza-pro-v$VERSION_NAME.apk $OUT_DIR/version.json ~/plaza-prod/downloads/"

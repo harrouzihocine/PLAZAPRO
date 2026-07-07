@@ -15,15 +15,22 @@ const { canInstall, installed, isStandalone, isIOS, promptInstall } = useInstall
 
 const isNative = isNativeApp()
 const appUrl = window.location.origin
-const apkUrl = '/downloads/plaza-pro.apk'
 
-// Version of the APK currently published next to it by scripts/build-android.sh.
-// Missing/unparseable (e.g. dev stack, SPA fallback HTML) just hides the line.
+// VERSIONED download URL, derived from version.json. Every release gets a
+// brand-new URL, so no cache between the phone and the server (Cloudflare
+// edge, browser HTTP cache — .apk is on Cloudflare's default cache list) can
+// ever replay an old build. Bare plaza-pro.apk stays as the fallback while
+// version.json hasn't loaded. Both files published by scripts/build-android.sh.
+const apkUrl = ref('/downloads/plaza-pro.apk')
 const apkVersion = ref(null)
 onMounted(async () => {
   try {
     const res = await fetch('/downloads/version.json', { cache: 'no-store' })
-    if (res.ok) apkVersion.value = (await res.json()).versionName || null
+    if (res.ok) {
+      const v = (await res.json()).versionName || null
+      apkVersion.value = v
+      if (v) apkUrl.value = `/downloads/plaza-pro-v${v}.apk`
+    }
   } catch {
     apkVersion.value = null
   }
