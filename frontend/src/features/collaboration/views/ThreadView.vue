@@ -8,7 +8,9 @@ import { useAuthStore } from '@/features/settings/store'
 import { useChatStore } from '@/features/collaboration/chatStore'
 import MessageComposer from '@/features/collaboration/components/MessageComposer.vue'
 import { confirmAction, toastError } from '@/composables/useConfirm'
-import { initials } from '@/utils/format'
+import { useNativePhone } from '@/composables/useNativeMode'
+import { isNativeApp } from '@/utils/nativeApp'
+import { formatTime, initials } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,6 +18,13 @@ const auth = useAuthStore()
 const store = useChatStore()
 const scroller = ref(null)
 const showInfo = ref(false)
+
+// Android shell: on phones the thread takes over the viewport edge-to-edge
+// (the AppShell drops its padding and bottom bar on this route); on every
+// native size the bubbles get the messaging-app treatment (timestamps,
+// always-visible delete — there is no hover on touch).
+const isNative = isNativeApp()
+const nativePhone = useNativePhone()
 
 const isGroup = computed(() => store.active?.type === 'group')
 // Oversight readers (project chats via chat.view_project_chats) see the thread
@@ -101,7 +110,12 @@ onBeforeUnmount(() => store.unsubscribe())
 
 <template>
   <div
-    class="flex h-[calc(100vh-10.5rem)] flex-col overflow-hidden rounded-xl border border-line bg-card shadow-card lg:h-[calc(100vh-7.5rem)]"
+    class="flex flex-col overflow-hidden bg-card"
+    :class="
+      nativePhone
+        ? 'h-[calc(100dvh-4rem)]'
+        : 'h-[calc(100vh-10.5rem)] rounded-xl border border-line shadow-card lg:h-[calc(100vh-7.5rem)]'
+    "
   >
     <!-- Thread header -->
     <div class="flex items-center gap-2 border-b border-line px-3 py-2.5 sm:px-4">
@@ -200,11 +214,11 @@ onBeforeUnmount(() => store.unsubscribe())
         :class="m.is_mine ? 'justify-end' : 'justify-start'"
       >
         <div
-          class="group max-w-[80%] rounded-2xl px-3.5 py-2 shadow-card"
+          class="group max-w-[80%] rounded-2xl px-3.5 py-2 shadow-card native:max-w-[85%] native:rounded-[1.25rem] native:px-4 native:py-2.5 native:shadow-none"
           :class="
             m.is_mine
-              ? 'rounded-br-md bg-primary text-primary-contrast'
-              : 'rounded-bl-md border border-line bg-card text-ink'
+              ? 'rounded-br-md bg-primary text-primary-contrast native:rounded-br-[0.4rem]'
+              : 'rounded-bl-md border border-line bg-card text-ink native:rounded-bl-[0.4rem]'
           "
         >
           <p v-if="!m.is_mine && m.author" class="mb-0.5 text-xs font-medium text-mute">
@@ -245,13 +259,23 @@ onBeforeUnmount(() => store.unsubscribe())
               </RouterLink>
             </div>
 
-            <p v-if="m.body" class="whitespace-pre-wrap break-words text-sm">{{ m.body }}</p>
+            <p
+              v-if="m.body"
+              class="whitespace-pre-wrap break-words text-sm native:text-[15px] native:leading-snug"
+            >
+              {{ m.body }}
+            </p>
           </template>
+
+          <!-- Native: clock time like every messaging app; web keeps its clean look. -->
+          <p v-if="isNative && !m.redacted" class="num mt-0.5 text-right text-[10px] opacity-60">
+            {{ formatTime(m.created_at) }}
+          </p>
 
           <button
             v-if="m.is_mine && !m.redacted"
             type="button"
-            class="mt-1 hidden text-[10px] opacity-70 hover:opacity-100 group-hover:inline"
+            class="mt-1 hidden text-[10px] opacity-70 hover:opacity-100 group-hover:inline native:inline"
             @click="remove(m)"
           >
             Delete
@@ -266,7 +290,9 @@ onBeforeUnmount(() => store.unsubscribe())
       </p>
     </div>
 
-    <div class="border-t border-line px-3 py-2 sm:px-4">
+    <div
+      class="border-t border-line px-3 py-2 native:max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-4"
+    >
       <p v-if="!canPost" class="flex items-center gap-2 py-1.5 text-sm text-mute">
         <i class="pi pi-eye" aria-hidden="true" />
         Oversight view — you can read this project chat but not write. Join the project as a

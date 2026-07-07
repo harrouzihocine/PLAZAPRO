@@ -1,0 +1,131 @@
+/* native.css — the APK-only design layer.
+ *
+ * Every rule is scoped under html.native, which only the Capacitor Android
+ * shell sets (utils/nativeApp.js initNativeMode; dev preview: ?native=1) — the
+ * web app never sees any of this. Phone-sized screens get the app-grade
+ * treatment; native tablets keep the desktop-style layouts, which are already
+ * comfortable for touch at that size. Colors come from the existing theme
+ * tokens so day/night both work.
+ */
+
+/* ══ All native sizes ══════════════════════════════════════════════════ */
+
+html.native {
+  /* Kill the grey tap flash — active states below give the feedback instead. */
+  -webkit-tap-highlight-color: transparent;
+  /* No pull-to-refresh bounce fighting scrollable panes inside the app. */
+  overscroll-behavior-y: none;
+}
+
+/* Momentum scrolling everywhere a pane scrolls. */
+html.native * {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ══ Phones only (below Tailwind md) ═══════════════════════════════════ */
+
+@media (max-width: 767px) {
+  /* 16px floor on text entry so the Android keyboard never zooms the page. */
+  html.native .p-inputtext,
+  html.native .p-textarea,
+  html.native .p-select-label,
+  html.native .p-multiselect-label-container,
+  html.native textarea,
+  html.native input:not([type='checkbox']):not([type='radio']) {
+    font-size: 16px;
+  }
+
+  /* Roomier fields and buttons — thumb-sized targets. */
+  html.native .p-inputtext,
+  html.native .p-select,
+  html.native .p-multiselect {
+    min-height: 2.9rem;
+  }
+  html.native .p-button:not(.p-button-sm) {
+    min-height: 2.9rem;
+  }
+
+  /* ── Dialogs become bottom sheets ─────────────────────────────────────
+     Applies to every BaseModal + raw Dialog in the app at once. The
+     fullscreen variant opts out via its own !important sizing classes. */
+  html.native .p-dialog-mask {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  html.native .p-dialog:not(.p-dialog-maximized) {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    max-height: 92dvh;
+    margin: 0;
+    border-radius: 1.25rem 1.25rem 0 0;
+    border-bottom: 0;
+    animation: native-sheet-up 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  /* Grab handle, like every Android sheet. */
+  html.native .p-dialog:not(.p-dialog-maximized) .p-dialog-header {
+    position: relative;
+    padding-top: 1.5rem;
+  }
+  html.native .p-dialog:not(.p-dialog-maximized) .p-dialog-header::before {
+    content: '';
+    position: absolute;
+    top: 0.5rem;
+    left: 50%;
+    width: 2.5rem;
+    height: 0.3rem;
+    transform: translateX(-50%);
+    border-radius: 999px;
+    background: var(--p-content-border-color);
+  }
+  html.native .p-dialog:not(.p-dialog-maximized) .p-dialog-content {
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  }
+
+  @keyframes native-sheet-up {
+    from {
+      transform: translateY(60%);
+      opacity: 0.4;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  /* ── Side drawers span (almost) the screen ──
+     The position class sits on the MASK (p-drawer-mask p-drawer-left); the
+     sliding panel itself is the .p-drawer inside it. */
+  html.native .p-drawer-left .p-drawer,
+  html.native .p-drawer-right .p-drawer {
+    width: 90vw !important;
+    max-width: 26rem;
+  }
+
+  /* ── Tables that stay tables scroll sideways under a finger instead of
+     crushing their columns (main lists render as cards instead — NativeList). */
+  html.native .p-datatable-table-container {
+    overflow-x: auto;
+  }
+  html.native .p-datatable-tbody > tr > td {
+    padding: 0.85rem 0.75rem;
+  }
+  html.native .p-paginator button {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+
+  /* ── SweetAlert2 confirms ride from the bottom too, with thumb-sized
+     buttons (keeps swal.css branding, changes placement only). */
+  html.native .swal2-container {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  html.native .swal2-popup {
+    width: 100% !important;
+    border-radius: 1.25rem 1.25rem 0 0 !important;
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom)) !important;
+  }
+  html.native .swal2-actions .swal2-styled {
+    min-height: 2.9rem;
+  }
+}

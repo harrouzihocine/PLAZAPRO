@@ -8,6 +8,7 @@ import { useChatDockStore } from '@/features/collaboration/chatDockStore'
 import { useNotificationsStore } from '@/features/collaboration/notificationsStore'
 import ChatDockWindow from '@/features/collaboration/components/ChatDockWindow.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import { useNativePhone } from '@/composables/useNativeMode'
 import { initials, timeAgo } from '@/utils/format'
 
 // Facebook-style chat dock, mounted once in the AppShell: unread conversations
@@ -19,6 +20,12 @@ const route = useRoute()
 const chat = useChatStore()
 const dock = useChatDockStore()
 const notifications = useNotificationsStore()
+
+// Android-shell phones: no floating dock — it would fight the bottom tab bar,
+// and Chat has its own tab there. The component must stay MOUNTED though: its
+// onMounted() subscription is what delivers live chat (and the pop sound) for
+// users whose role hides the notification bell.
+const nativePhone = useNativePhone()
 
 // The full /chat page has its own inbox and drives the chat store's single
 // active thread — the dock suspends there (windows keep their ids and come
@@ -88,7 +95,7 @@ async function startChat(userId) {
 
 <template>
   <div
-    v-if="!dock.suspended"
+    v-if="!dock.suspended && !nativePhone"
     class="fixed bottom-20 right-3 z-40 flex items-end gap-2.5 pb-[env(safe-area-inset-bottom)] lg:bottom-5 lg:right-5"
   >
     <!-- Popup threads, side by side next to the launcher column -->

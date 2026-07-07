@@ -11,6 +11,8 @@ import BaseSelect from '@/components/base/BaseSelect.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import NativeList from '@/components/ui/NativeList.vue'
+import { useNativePhone } from '@/composables/useNativeMode'
 import ClientFormDrawer from '@/features/clients/components/ClientFormDrawer.vue'
 import { formatPhone } from '@/data/countryCodes'
 import { useAutoFilter } from '@/composables/useAutoFilter'
@@ -36,6 +38,10 @@ const canSeeOwnership = computed(() => auth.can('clients.manage'))
 
 const drawerOpen = ref(false)
 const editing = ref(null) // null = creating
+
+// Android-shell phones swap the table for tappable cards (NativeList below);
+// native tablets and the web keep the full table.
+const nativePhone = useNativePhone()
 
 onMounted(() => store.fetch())
 
@@ -155,7 +161,67 @@ function openFile(event) {
         />
       </div>
 
+      <!-- APK phones: card list, one client per card, tap to open the file. -->
+      <NativeList
+        v-if="nativePhone"
+        :items="store.items"
+        :loading="store.loading"
+        :rows="store.rows"
+        :page="store.page"
+        :total="store.total"
+        clickable
+        empty-icon="pi pi-users"
+        empty-title="No clients match"
+        empty-body="Adjust the filters or add a new client."
+        @page="onPage"
+        @item-click="(c) => openFile({ data: c })"
+      >
+        <template #item="{ item }">
+          <div class="flex items-center gap-3">
+            <Avatar
+              :label="initials(item.full_name)"
+              shape="circle"
+              size="large"
+              class="shrink-0 !bg-highlight !text-primary-700 dark:!text-primary-300"
+            />
+            <div class="min-w-0 flex-1">
+              <p class="truncate font-medium text-ink">{{ item.full_name }}</p>
+              <p v-if="canSeeDetails && item.phone" class="num mt-0.5 text-sm text-mute">
+                {{ formatPhone(item.phone) }}
+              </p>
+              <p
+                v-if="canSeeDetails && (item.source || item.rating)"
+                class="mt-1.5 flex flex-wrap items-center gap-1.5"
+              >
+                <Tag
+                  v-if="item.source"
+                  :icon="item.source.icon || undefined"
+                  :value="item.source.label"
+                  severity="secondary"
+                />
+                <Tag v-if="item.rating" :value="item.rating.label" severity="secondary" />
+              </p>
+              <p v-if="canSeeOwnership" class="mt-1 truncate text-xs text-mute">
+                <i class="pi pi-user text-[10px]" aria-hidden="true" />
+                {{ item.assigned_agent?.name ?? 'Unassigned' }}
+              </p>
+            </div>
+            <!-- One-tap call — the reason this list exists on a phone. -->
+            <a
+              v-if="canSeeDetails && item.phone"
+              :href="`tel:${item.phone}`"
+              class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-highlight text-primary-600 active:opacity-70 dark:text-primary-400"
+              :aria-label="`Call ${item.full_name}`"
+              @click.stop
+            >
+              <i class="pi pi-phone" aria-hidden="true" />
+            </a>
+          </div>
+        </template>
+      </NativeList>
+
       <DataTable
+        v-else
         :value="store.items"
         :loading="store.loading"
         lazy

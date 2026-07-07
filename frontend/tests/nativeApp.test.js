@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { isNativeApp } from '@/utils/nativeApp'
+import { initNativeMode, isNativeApp } from '@/utils/nativeApp'
 
 const setUserAgent = (value) =>
   Object.defineProperty(window.navigator, 'userAgent', { value, configurable: true })
@@ -8,6 +8,8 @@ describe('isNativeApp', () => {
   afterEach(() => {
     setUserAgent('Mozilla/5.0 (jsdom)')
     delete window.Capacitor
+    localStorage.clear()
+    document.documentElement.classList.remove('native')
   })
 
   it('is false in a plain browser', () => {
@@ -27,5 +29,19 @@ describe('isNativeApp', () => {
   it('ignores a Capacitor bridge that reports web platform', () => {
     window.Capacitor = { isNativePlatform: () => false }
     expect(isNativeApp()).toBe(false)
+  })
+
+  it('honours the dev preview flag (dev builds only)', () => {
+    localStorage.setItem('plaza-native-preview', '1')
+    expect(isNativeApp()).toBe(true) // vitest runs as a dev build
+  })
+
+  it('initNativeMode stamps html.native only inside the shell', () => {
+    initNativeMode()
+    expect(document.documentElement.classList.contains('native')).toBe(false)
+
+    setUserAgent('PlazaProNative/1')
+    initNativeMode()
+    expect(document.documentElement.classList.contains('native')).toBe(true)
   })
 })

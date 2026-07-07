@@ -74,7 +74,7 @@ function resetModal() {
         <li v-for="c in store.conversations" :key="c.id">
           <button
             type="button"
-            class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-50 sm:px-5 dark:hover:bg-surface-800"
+            class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-50 native:py-4 native:active:bg-highlight sm:px-5 dark:hover:bg-surface-800"
             @click="open(c.id)"
           >
             <Avatar

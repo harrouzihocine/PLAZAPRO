@@ -1,3 +1,4 @@
+import plugin from 'tailwindcss/plugin'
 import primeui from 'tailwindcss-primeui'
 
 /** @type {import('tailwindcss').Config} */
@@ -41,5 +42,11 @@ export default {
       },
     },
   },
-  plugins: [primeui],
+  plugins: [
+    primeui,
+    // `native:` — styles that apply only inside the Capacitor Android shell
+    // (html.native, stamped by utils/nativeApp.js). Stacks with breakpoints:
+    // `native:max-md:…` targets phones in the app.
+    plugin(({ addVariant }) => addVariant('native', '.native &')),
+  ],
 }

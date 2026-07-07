@@ -12,6 +12,8 @@ import MoneyInput from '@/components/base/MoneyInput.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import NativeList from '@/components/ui/NativeList.vue'
+import { useNativePhone } from '@/composables/useNativeMode'
 import { confirmAction } from '@/composables/useConfirm'
 import { useAutoFilter } from '@/composables/useAutoFilter'
 import { useDynamicList } from '@/composables/useDynamicList'
@@ -34,6 +36,10 @@ const { wilayas } = useWilayas()
 const { load: loadCommunes } = useCommunes()
 
 const canManage = auth.can('units.manage')
+
+// Android-shell phones swap the table for tappable cards (NativeList below);
+// manage actions live on the unit page / bigger screens there.
+const nativePhone = useNativePhone()
 
 // Map location id -> name so the table shows the project, not a raw FK.
 const locationName = computed(() => Object.fromEntries(locations.items.map((l) => [l.id, l.name])))
@@ -296,7 +302,47 @@ async function removeUnit(u) {
     </SectionCard>
 
     <SectionCard flush>
+      <!-- APK phones: inventory as cards — reference + status up top, the
+           numbers that matter (rooms · floor · area · price) underneath. -->
+      <NativeList
+        v-if="nativePhone"
+        :items="units.items"
+        :loading="units.loading"
+        :rows="units.rows"
+        :page="units.page"
+        :total="units.total"
+        clickable
+        empty-icon="pi pi-th-large"
+        empty-title="No units match"
+        empty-body="Loosen the filters to see more inventory."
+        @page="onPage"
+        @item-click="(u) => openUnit({ data: u })"
+      >
+        <template #item="{ item }">
+          <div class="flex items-center justify-between gap-2">
+            <p class="truncate font-semibold text-ink">{{ item.reference }}</p>
+            <SaleStatusBadge :status="item.sale_status" :interested-count="item.interested_count" />
+          </div>
+          <p class="mt-0.5 truncate text-sm text-mute">
+            {{ locationName[item.location_id] ?? '—' }}
+            <template v-if="item.location?.wilaya"> · {{ item.location.wilaya }}</template>
+          </p>
+          <p class="num mt-1.5 text-sm text-ink">
+            <span class="font-semibold">{{ formatMoney(item.price) }}</span>
+            <span class="text-mute">
+              <template v-if="item.room_number"> · {{ item.room_number }}</template>
+              <template v-if="item.floor"> · {{ item.floor }}</template>
+              <template v-if="item.area_sqm"> · {{ item.area_sqm }} m²</template>
+            </span>
+          </p>
+          <p v-if="item.gtm_priority" class="mt-1.5">
+            <GtmPriorityBadge :priority="item.gtm_priority" />
+          </p>
+        </template>
+      </NativeList>
+
       <DataTable
+        v-else
         :value="units.items"
         :loading="units.loading"
         lazy

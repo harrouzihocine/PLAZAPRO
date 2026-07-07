@@ -67,6 +67,14 @@ export function formatTimeIfSet(value) {
   return d.getHours() === 0 && d.getMinutes() === 0 ? '' : timeFmt.format(d)
 }
 
+// Always-on clock time (chat bubbles) — unlike formatTimeIfSet, midnight is a
+// real send time here, not a "no time chosen" sentinel.
+export function formatTime(value) {
+  if (!value) return ''
+  const d = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(d.getTime()) ? '' : timeFmt.format(d)
+}
+
 const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
 const STEPS = [
   ['year', 31536000],

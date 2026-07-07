@@ -6,7 +6,9 @@
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <link rel="icon" type="image/png" href="/logo.png" />
         <meta name="theme-color" content="#1e214b" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <!-- viewport-fit=cover: lets env(safe-area-inset-*) resolve in edge-to-edge
+             webviews (Android shell / iOS PWA); no effect in ordinary browsers. -->
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
         <!-- Installable app (PWA): manifest + iOS home-screen metadata -->
         <link rel="manifest" href="/manifest.webmanifest" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />

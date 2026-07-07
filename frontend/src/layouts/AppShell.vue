@@ -7,6 +7,8 @@ import Drawer from 'primevue/drawer'
 import Popover from 'primevue/popover'
 import Tag from 'primevue/tag'
 import { useTheme } from '@/composables/useTheme'
+import { useNativePhone } from '@/composables/useNativeMode'
+import { isNativeApp } from '@/utils/nativeApp'
 import { useAuthStore } from '@/features/settings/store'
 import { initials } from '@/utils/format'
 import NotificationBell from '@/features/collaboration/components/NotificationBell.vue'
@@ -23,6 +25,14 @@ const { isNight, toggle } = useTheme()
 const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
+
+// APK-only design: the Android shell gets an app-grade chrome (Chat in the
+// bottom bar, pill highlights, edge-to-edge chat) while the web keeps today's.
+const isNative = isNativeApp()
+const nativePhone = useNativePhone()
+// A chat thread on a native phone takes over the viewport like a messaging
+// app: no page padding, no bottom bar — just the conversation.
+const chatTakeover = computed(() => nativePhone.value && route.name === 'chat.thread')
 
 // Oversight sidebar badge counts (only fetched for users who can see any monitor).
 const badges = ref({})
@@ -240,10 +250,13 @@ watch(
   },
 )
 
-// Mobile bottom bar: the four most-used destinations + "More".
+// Mobile bottom bar: the four most-used destinations + "More". In the Android
+// shell, Chat earns a permanent slot — it's the most app-like destination.
 const bottomNav = computed(() => {
   const flat = sections.value.flatMap((s) => s.items)
-  const order = ['/', '/clients', '/inventory/locations', '/tasks']
+  const order = isNative
+    ? ['/', '/clients', '/chat', '/inventory/units']
+    : ['/', '/clients', '/inventory/locations', '/tasks']
   return order.map((to) => flat.find((i) => i.to === to)).filter(Boolean)
 })
 
@@ -369,7 +382,9 @@ async function logout() {
       <header
         class="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-2 border-b border-line bg-card/85 px-3 backdrop-blur sm:px-5"
       >
+        <!-- The shell's bottom "More" replaces the hamburger — one menu, not two. -->
         <Button
+          v-if="!isNative"
           icon="pi pi-bars"
           text
           rounded
@@ -461,7 +476,10 @@ async function logout() {
       </header>
 
       <!-- Routed content -->
-      <main class="mx-auto w-full max-w-[1500px] flex-1 px-3 py-5 pb-24 sm:px-6 lg:pb-8">
+      <main
+        class="mx-auto w-full max-w-[1500px] flex-1"
+        :class="chatTakeover ? 'flex flex-col' : 'px-3 py-5 pb-24 sm:px-6 lg:pb-8'"
+      >
         <RouterView v-slot="{ Component }">
           <Transition name="page" mode="out-in">
             <component :is="Component" />
@@ -503,7 +521,8 @@ async function logout() {
 
     <!-- ══ Mobile bottom bar ══ -->
     <nav
-      class="fixed inset-x-0 bottom-0 z-20 flex h-16 items-stretch justify-around border-t border-line bg-card pb-[env(safe-area-inset-bottom)] lg:hidden"
+      v-if="!chatTakeover"
+      class="fixed inset-x-0 bottom-0 z-20 flex h-16 items-stretch justify-around border-t border-line bg-card pb-[env(safe-area-inset-bottom)] native:h-[4.25rem] lg:hidden"
     >
       <RouterLink
         v-for="item in bottomNav"
@@ -514,7 +533,13 @@ async function logout() {
           isActive(item.to) ? 'font-semibold text-primary-600 dark:text-primary-400' : 'text-mute'
         "
       >
-        <i :class="item.icon" class="text-lg" aria-hidden="true" />
+        <!-- In the shell the active icon sits in a Material-style pill. -->
+        <span
+          class="flex items-center justify-center native:h-8 native:w-14 native:rounded-full native:transition-colors"
+          :class="isActive(item.to) && 'native:bg-highlight'"
+        >
+          <i :class="item.icon" class="text-lg" aria-hidden="true" />
+        </span>
         {{ item.label }}
       </RouterLink>
       <button
@@ -522,7 +547,9 @@ async function logout() {
         class="flex min-w-[56px] flex-col items-center justify-center gap-0.5 text-[11px] text-mute"
         @click="mobileNav = true"
       >
-        <i class="pi pi-ellipsis-h text-lg" aria-hidden="true" />
+        <span class="flex items-center justify-center native:h-8 native:w-14">
+          <i class="pi pi-ellipsis-h text-lg" aria-hidden="true" />
+        </span>
         More
       </button>
     </nav>

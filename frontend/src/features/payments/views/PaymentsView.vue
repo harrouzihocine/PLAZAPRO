@@ -10,6 +10,8 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import NativeList from '@/components/ui/NativeList.vue'
+import { useNativePhone } from '@/composables/useNativeMode'
 import { toastError } from '@/composables/useConfirm'
 import { paymentsOverviewApi } from '@/features/payments/api'
 import { dealsApi } from '@/features/clients/api'
@@ -24,6 +26,10 @@ import { formatDate } from '@/utils/format'
 // path as the deal panel).
 const auth = useAuthStore()
 const canDeclare = computed(() => auth.can('deals.manage'))
+
+// Android-shell phones swap the three tables for card lists (short, unpaged —
+// the follow-up sets are small by nature; `due` just scrolls).
+const nativePhone = useNativePhone()
 
 const data = ref({ reserved: [], interested: [], due: [], totals: {} })
 const loading = ref(false)
@@ -101,7 +107,50 @@ const t = computed(() => data.value.totals ?? {})
 
     <!-- Reserved: units off the market on a deposit -->
     <SectionCard title="Reserved (holding deposits)" icon="pi pi-lock" class="mb-5" flush>
-      <DataTable :value="data.reserved" :loading="loading" data-key="id" class="text-sm">
+      <NativeList v-if="nativePhone" :items="data.reserved" :loading="loading">
+        <template #item="{ item: h }">
+          <div class="flex items-center justify-between gap-2">
+            <RouterLink
+              :to="{ name: 'inventory.unit', params: { id: h.id } }"
+              class="truncate font-semibold text-ink"
+            >
+              {{ h.reference }}
+            </RouterLink>
+            <span class="num shrink-0 text-sm font-semibold text-warning">
+              <i class="pi pi-clock text-xs" aria-hidden="true" />
+              {{ remaining(h.reserved_expires_at) ?? '—' }}
+            </span>
+          </div>
+          <p v-if="h.location" class="truncate text-xs text-mute">{{ h.location }}</p>
+          <p class="num mt-1 text-sm text-ink">
+            {{ formatMoney(h.deposit) }} <span class="text-mute">deposit</span>
+            <span class="text-mute"> · {{ formatMoney(h.price) }}</span>
+          </p>
+          <div class="mt-2.5 flex gap-2">
+            <RouterLink
+              v-if="h.client_id && h.project_id"
+              :to="{ name: 'clients.project', params: { id: h.client_id, projectId: h.project_id } }"
+              class="flex-1"
+            >
+              <Button label="Project" icon="pi pi-external-link" size="small" outlined severity="secondary" class="w-full" />
+            </RouterLink>
+            <Button
+              v-if="canDeclare && h.deal_id"
+              label="Declare sold"
+              icon="pi pi-trophy"
+              size="small"
+              severity="success"
+              class="flex-1"
+              @click="declareSold(h)"
+            />
+          </div>
+        </template>
+        <template #empty>
+          <EmptyState icon="pi pi-lock" title="Nothing reserved" body="No unit is currently reserved on a deposit." />
+        </template>
+      </NativeList>
+
+      <DataTable v-else :value="data.reserved" :loading="loading" data-key="id" class="text-sm">
         <template #empty>
           <EmptyState icon="pi pi-lock" title="Nothing reserved" body="No unit is currently reserved on a deposit." />
         </template>
@@ -152,7 +201,29 @@ const t = computed(() => data.value.totals ?? {})
 
     <!-- Interested: the "Interested N" pool -->
     <SectionCard title="Interested" icon="pi pi-thumbs-up" class="mb-5" flush>
-      <DataTable :value="data.interested" :loading="loading" data-key="id" class="text-sm">
+      <NativeList v-if="nativePhone" :items="data.interested" :loading="loading">
+        <template #item="{ item: r }">
+          <div class="flex items-center justify-between gap-2">
+            <RouterLink
+              :to="{ name: 'inventory.unit', params: { id: r.id } }"
+              class="truncate font-semibold text-ink"
+            >
+              {{ r.reference }}
+            </RouterLink>
+            <StatusTag
+              value="interested"
+              :label="`${r.interested_count} project${r.interested_count === 1 ? '' : 's'}`"
+            />
+          </div>
+          <p v-if="r.location" class="truncate text-xs text-mute">{{ r.location }}</p>
+          <p class="num mt-1 text-sm text-mute">{{ formatMoney(r.price) }}</p>
+        </template>
+        <template #empty>
+          <EmptyState icon="pi pi-thumbs-up" title="No interested clients" body="No unit currently has an interested client." />
+        </template>
+      </NativeList>
+
+      <DataTable v-else :value="data.interested" :loading="loading" data-key="id" class="text-sm">
         <template #empty>
           <EmptyState icon="pi pi-thumbs-up" title="No interested clients" body="No unit currently has an interested client." />
         </template>
@@ -180,7 +251,30 @@ const t = computed(() => data.value.totals ?? {})
 
     <!-- Instalments to chase -->
     <SectionCard title="Instalments to chase" icon="pi pi-calendar-times" flush>
-      <DataTable :value="data.due" :loading="loading" data-key="id" paginator :rows="15" class="text-sm">
+      <NativeList
+        v-if="nativePhone"
+        :items="data.due"
+        :loading="loading"
+        clickable
+        @item-click="(s) => s.link && $router.push(s.link)"
+      >
+        <template #item="{ item: s }">
+          <div class="flex items-center justify-between gap-2">
+            <span class="truncate text-sm font-medium text-ink">{{ s.unit || '—' }}</span>
+            <StatusTag :value="s.state" />
+          </div>
+          <p class="mt-0.5 text-xs text-mute">Due {{ formatDate(s.due_date) }}</p>
+          <p class="num mt-1 text-sm text-ink">
+            <span class="font-semibold">{{ formatMoney(s.balance) }}</span>
+            <span class="text-mute"> of {{ formatMoney(s.amount) }}</span>
+          </p>
+        </template>
+        <template #empty>
+          <EmptyState icon="pi pi-check-circle" title="Nothing due" body="No overdue or upcoming instalments on your projects." />
+        </template>
+      </NativeList>
+
+      <DataTable v-else :value="data.due" :loading="loading" data-key="id" paginator :rows="15" class="text-sm">
         <template #empty>
           <EmptyState icon="pi pi-check-circle" title="Nothing due" body="No overdue or upcoming instalments on your projects." />
         </template>

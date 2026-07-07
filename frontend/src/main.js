@@ -11,7 +11,13 @@ import '@/assets/styles/tailwind.css'
 import 'primeicons/primeicons.css'
 import 'sweetalert2/dist/sweetalert2.min.css'
 import '@/assets/styles/swal.css'
-import { isNativeApp } from '@/utils/nativeApp'
+import '@/assets/styles/native.css'
+import { initNativeMode, isNativeApp } from '@/utils/nativeApp'
+
+// APK-only design layer: stamp <html class="native"> before the first paint so
+// the shell's app-grade styling (native.css + `native:` classes) applies from
+// frame one. The web app never gets the class and keeps its design untouched.
+initNativeMode()
 
 const app = createApp(App)
 
