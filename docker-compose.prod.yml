@@ -121,8 +121,9 @@ services:
     networks: [edge]                # needs egress to the upstream resolvers
     profiles: ["lan-dns"]           # enable with: docker compose --profile lan-dns up -d
     healthcheck:
-      # Answered locally by the --address rule — proves dnsmasq itself is alive.
-      test: ["CMD", "nslookup", "${LAN_TLS_DOMAIN:-app.plaza-pro.com}", "127.0.0.1"]
+      # Query the container's own interface (dnsmasq skips lo via --except-interface),
+      # proving the --address rule answers. 127.0.0.1 would fail — nothing listens there.
+      test: ["CMD-SHELL", "nslookup ${LAN_TLS_DOMAIN:-app.plaza-pro.com} $(hostname -i) >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
