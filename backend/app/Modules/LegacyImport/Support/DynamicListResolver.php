@@ -95,6 +95,14 @@ class DynamicListResolver
     private function create(string $listKey, string $label, string $norm, array $extraMeta): int
     {
         $spec = $this->creates[$listKey][$norm] ?? null;
+
+        // A creates-spec renames the item (label ≠ legacy label), so the
+        // normalized-label lookup misses on re-runs — its value acts as a pin
+        // once the item exists.
+        if ($spec !== null && isset($this->byValue[$listKey][$spec['value']])) {
+            return $this->byLabel[$listKey][$norm] = $this->byValue[$listKey][$spec['value']];
+        }
+
         $useLabel = $spec['label'] ?? $label;
         $value = $spec['value'] ?? $this->uniqueValue($listKey, $this->transform->slug($label));
 

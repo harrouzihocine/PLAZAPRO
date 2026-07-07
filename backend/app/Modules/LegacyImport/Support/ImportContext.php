@@ -17,9 +17,9 @@ use RuntimeException;
  */
 class ImportContext
 {
-    public readonly Connection $target;
+    public Connection $target;
 
-    public readonly Connection $legacy;
+    public Connection $legacy;
 
     /** @var array<string, mixed> config('legacy_import') snapshot */
     public readonly array $config;
@@ -55,6 +55,13 @@ class ImportContext
     public function cfg(string $key, mixed $default = null): mixed
     {
         return data_get($this->config, $key, $default);
+    }
+
+    /** Re-resolve both connections (the staging loader purges them). */
+    public function refreshConnections(): void
+    {
+        $this->target = DB::connection();
+        $this->legacy = DB::connection($this->config['connection']);
     }
 
     /* ------------------------------------------------------------------ */
