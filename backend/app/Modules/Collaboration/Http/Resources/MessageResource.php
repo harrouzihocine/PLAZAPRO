@@ -39,6 +39,20 @@ class MessageResource extends JsonResource
             'attachments' => $redacted
                 ? []
                 : MessageAttachmentResource::collection($this->whenLoaded('attachments')),
+            // The quoted message (WhatsApp reply). Kept even when THIS message is
+            // redacted — the slot still shows what it answered, like WhatsApp.
+            'reply_to' => $this->when($this->reply_to_id !== null && $this->relationLoaded('replyTo'),
+                fn () => $this->replyPreview()),
+            // Grouped for the pill row: one entry per emoji, `mine` marks the
+            // viewer's own so a tap toggles it off. Hidden once redacted.
+            'reactions' => $redacted || ! $this->relationLoaded('reactions')
+                ? []
+                : $this->reactions->groupBy('emoji')->map(fn ($group, $emoji) => [
+                    'emoji' => $emoji,
+                    'count' => $group->count(),
+                    'mine' => $group->contains('user_id', $request->user()?->id),
+                    'users' => $group->map(fn ($r) => ['id' => $r->user_id, 'name' => $r->user?->name])->values(),
+                ])->values(),
             'subject_type' => $this->subject_type,
             'subject_id' => $this->subject_id,
             // The shared-record card — revealed only to participants whose RBAC

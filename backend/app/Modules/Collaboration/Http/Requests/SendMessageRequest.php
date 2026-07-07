@@ -38,6 +38,8 @@ class SendMessageRequest extends FormRequest
                 'mimetypes:'.implode(',', AttachmentKind::allowedMimes()),
             ],
             'duration_ms' => ['nullable', 'integer', 'min:0'],
+            // Same-conversation membership is enforced in SendMessage (422).
+            'reply_to_id' => ['nullable', 'integer', 'exists:messages,id'],
         ];
     }
 }

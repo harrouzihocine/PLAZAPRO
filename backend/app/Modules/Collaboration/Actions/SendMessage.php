@@ -30,8 +30,20 @@ class SendMessage
         ?string $body,
         ?UploadedFile $attachment = null,
         ?int $durationMs = null,
+        ?int $replyToId = null,
     ): Message {
         abort_if($body === null && $attachment === null, 422, 'A message needs text or an attachment.');
+
+        // A quoted reply must point inside this thread — a queued/offline reply
+        // whose target moved (or a crafted id) is rejected, never cross-linked.
+        if ($replyToId !== null) {
+            $target = Message::query()->whereKey($replyToId)->first();
+            abort_if(
+                $target === null || $target->conversation_id !== $conversation->id,
+                422,
+                'The message you are replying to is not in this conversation.',
+            );
+        }
 
         // A closed project's chat is read-only: won / archived / cancelled projects
         // accept no new messages (oversight can still read the history).
@@ -49,11 +61,12 @@ class SendMessage
             $type = $kind->messageType();
         }
 
-        $message = DB::transaction(function () use ($conversation, $author, $body, $type, $attachment, $durationMs) {
+        $message = DB::transaction(function () use ($conversation, $author, $body, $type, $attachment, $durationMs, $replyToId) {
             $message = $conversation->messages()->create([
                 'user_id' => $author->id,
                 'type' => $type->value,
                 'body' => $body,
+                'reply_to_id' => $replyToId,
             ]);
 
             if ($attachment !== null) {
@@ -66,7 +79,7 @@ class SendMessage
             return $message;
         });
 
-        MessageSent::dispatch($message->load(['author', 'attachments']));
+        MessageSent::dispatch($message->load(['author', 'attachments', 'replyTo.author']));
 
         return $message;
     }

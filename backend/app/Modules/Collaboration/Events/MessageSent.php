@@ -45,7 +45,7 @@ class MessageSent implements ShouldBroadcast
      */
     public function broadcastWith(): array
     {
-        $message = $this->message->loadMissing(['author', 'attachments']);
+        $message = $this->message->loadMissing(['author', 'attachments', 'replyTo.author']);
 
         return [
             'id' => $message->id,
@@ -55,7 +55,12 @@ class MessageSent implements ShouldBroadcast
             'author' => [
                 'id' => $message->author?->id,
                 'name' => $message->author?->name,
+                'avatar_url' => $message->author?->avatarUrl(),
             ],
+            // Same shapes as MessageResource so a live-appended message renders
+            // identically to a fetched one (grouped avatars, quotes, reactions).
+            'reply_to' => $message->replyPreview(),
+            'reactions' => [],
             'subject_type' => $message->subject_type,
             'subject_id' => $message->subject_id,
             'created_at' => $message->created_at?->toIso8601String(),

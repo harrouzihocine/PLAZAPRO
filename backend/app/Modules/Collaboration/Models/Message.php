@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Str;
 
 /**
  * A single chat message. `subject` optionally references a shared record
@@ -22,7 +23,7 @@ class Message extends BaseModel
     use HasFactory;
 
     protected $fillable = [
-        'conversation_id', 'user_id', 'type', 'body', 'subject_type', 'subject_id', 'edited_at',
+        'conversation_id', 'user_id', 'type', 'body', 'subject_type', 'subject_id', 'reply_to_id', 'edited_at',
     ];
 
     protected function casts(): array
@@ -51,5 +52,47 @@ class Message extends BaseModel
     public function subject(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /** The message this one quotes (WhatsApp-style reply). */
+    public function replyTo(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'reply_to_id');
+    }
+
+    public function reactions(): HasMany
+    {
+        return $this->hasMany(MessageReaction::class);
+    }
+
+    /**
+     * Compact block describing the quoted message — shared by MessageResource
+     * and the MessageSent broadcast so live-appended replies render identically.
+     * A redacted target keeps its author but withholds the excerpt.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function replyPreview(): ?array
+    {
+        $target = $this->replyTo;
+        if ($target === null) {
+            return null;
+        }
+
+        $redacted = $target->isCancelled();
+
+        return [
+            'id' => $target->id,
+            'author_id' => $target->user_id,
+            'author_name' => $target->author?->name,
+            'type' => $target->type->value,
+            'redacted' => $redacted,
+            'excerpt' => $redacted ? null : match ($target->type->value) {
+                'image' => '📷 Photo',
+                'voice' => '🎤 Voice note',
+                'file' => '📎 File',
+                default => Str::limit((string) ($target->body ?? ''), 80),
+            },
+        ];
     }
 }

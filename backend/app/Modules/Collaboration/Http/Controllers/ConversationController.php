@@ -11,6 +11,7 @@ use App\Modules\Collaboration\Actions\EnsureProjectConversation;
 use App\Modules\Collaboration\Actions\MarkConversationRead;
 use App\Modules\Collaboration\Actions\RemoveParticipant;
 use App\Modules\Collaboration\Actions\ShareRecord;
+use App\Modules\Collaboration\Actions\ToggleConversationMute;
 use App\Modules\Collaboration\Enums\ConversationType;
 use App\Modules\Collaboration\Http\Requests\AddParticipantsRequest;
 use App\Modules\Collaboration\Http\Requests\CreateConversationRequest;
@@ -110,6 +111,12 @@ class ConversationController extends Controller
         $action->handle($conversation, $request->user());
 
         return response()->json(['read' => true]);
+    }
+
+    /** Flip the caller's own mute flag (notifications + chime off; access unchanged). */
+    public function mute(Request $request, Conversation $conversation, ToggleConversationMute $action): JsonResponse
+    {
+        return response()->json(['muted' => $action->handle($conversation, $request->user())]);
     }
 
     /** Add members to a group (admin only — enforced in AddParticipantsRequest). */

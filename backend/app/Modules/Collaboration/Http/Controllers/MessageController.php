@@ -6,13 +6,16 @@ namespace App\Modules\Collaboration\Http\Controllers;
 
 use App\Modules\Collaboration\Actions\RedactMessage;
 use App\Modules\Collaboration\Actions\SendMessage;
+use App\Modules\Collaboration\Actions\ToggleMessageReaction;
 use App\Modules\Collaboration\Http\Requests\SendMessageRequest;
 use App\Modules\Collaboration\Http\Resources\MessageResource;
 use App\Modules\Collaboration\Models\Conversation;
 use App\Modules\Collaboration\Models\Message;
+use App\Modules\Collaboration\Models\MessageReaction;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
+use Illuminate\Validation\Rule;
 
 /**
  * Messages within a conversation. Every action is participant-scoped; redacting a
@@ -29,7 +32,7 @@ class MessageController extends Controller
         // Latest window, oldest-first for display. `before` (a message id) pages
         // backwards for "load older". Redacted messages are kept (shown deleted).
         $messages = $conversation->messages()
-            ->with(['author', 'attachments', 'subject'])
+            ->with(['author', 'attachments', 'subject', 'replyTo.author', 'reactions.user'])
             ->when($request->filled('before'), fn ($q) => $q->where('id', '<', $request->integer('before')))
             ->orderByDesc('id')
             ->limit(50)
@@ -48,9 +51,26 @@ class MessageController extends Controller
             $request->input('body'),
             $request->file('attachment'),
             $request->integer('duration_ms') ?: null,
+            $request->integer('reply_to_id') ?: null,
         );
 
-        return new MessageResource($message->load(['author', 'attachments']));
+        return new MessageResource($message->load(['author', 'attachments', 'replyTo.author']));
+    }
+
+    /** Toggle the caller's emoji reaction (write-scoped — observers can't react). */
+    public function react(Request $request, Message $message, ToggleMessageReaction $action): MessageResource
+    {
+        // Same gate as posting: participants minus downgraded observers, plus
+        // participate-overseers on project chats. View-only readers get 403.
+        abort_unless($message->conversation->isWritableBy($request->user()), 403);
+
+        $validated = $request->validate([
+            'emoji' => ['required', 'string', Rule::in(MessageReaction::EMOJIS)],
+        ]);
+
+        $action->handle($message, $request->user(), $validated['emoji']);
+
+        return new MessageResource($message->load(['author', 'attachments', 'replyTo.author', 'reactions.user']));
     }
 
     public function destroy(Request $request, Message $message, RedactMessage $action): MessageResource

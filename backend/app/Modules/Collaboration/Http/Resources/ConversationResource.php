@@ -27,6 +27,9 @@ class ConversationResource extends JsonResource
     public function toArray(Request $request): array
     {
         $me = $request->user();
+        $myRow = $this->relationLoaded('participants')
+            ? $this->participants->firstWhere('id', $me?->id)
+            : null;
 
         return [
             'id' => $this->id,
@@ -44,12 +47,17 @@ class ConversationResource extends JsonResource
             // Participants and participate-overseers write; a view-only
             // oversight reader (chat.view_project_chats) gets a locked composer.
             'can_post' => $this->canPost($me),
+            // The caller's own mute flag (notification + chime suppression).
+            'is_muted' => (bool) ($myRow?->pivot->muted ?? false),
             'participants' => $this->whenLoaded('participants', fn () => $this->participants->map(fn (User $u) => [
                 'id' => $u->id,
                 'name' => $u->name,
                 'avatar_url' => $u->avatarUrl(),
                 'role' => $u->pivot->role,
                 'muted' => (bool) $u->pivot->muted,
+                // Read cursor — the "seen ✓✓" source: my message is seen once
+                // every other participant's cursor passed its created_at.
+                'last_read_at' => $u->pivot->last_read_at,
             ])->values()),
             'last_message' => $this->whenLoaded('latestMessage', fn () => $this->latestMessage
                 ? [

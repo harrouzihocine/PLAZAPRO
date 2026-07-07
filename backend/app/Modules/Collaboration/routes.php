@@ -35,6 +35,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/conversations', [ConversationController::class, 'index']);
         Route::post('/conversations', [ConversationController::class, 'store']);
         Route::post('/conversations/{conversation}/read', [ConversationController::class, 'read']);
+        Route::post('/conversations/{conversation}/mute', [ConversationController::class, 'mute']);
 
         // A project's dedicated chat (find-or-create; guarded by project visibility).
         Route::get('/projects/{project}/conversation', [ConversationController::class, 'forProject']);
@@ -50,6 +51,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index']);
         Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store']);
         Route::delete('/messages/{message}', [MessageController::class, 'destroy']);
+        Route::post('/messages/{message}/reactions', [MessageController::class, 'react']);
 
         Route::get('/attachments/{attachment}', [AttachmentController::class, 'show']);
     });
