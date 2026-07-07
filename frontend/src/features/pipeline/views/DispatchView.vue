@@ -278,15 +278,11 @@ function onDropToPending(evt) {
 
 // Pending tasks always drag; grid items only when the server said so — and a
 // visit may only return to the pending strip when its plan is still open.
-// On touch (tablet / the Android shell) dragging starts on a long-press so a
-// finger can still scroll the board; mouse drags stay instant.
-const dragOptions = {
-  animation: 150,
-  group: 'dispatch',
-  delay: 200,
-  delayOnTouchOnly: true,
-  touchStartThreshold: 5,
-}
+// NO drag delay, on purpose: a touch delay (delayOnTouchOnly) cancels the drag
+// when the finger moves during the hold — SortableJS divides the threshold by
+// devicePixelRatio, ~1px of tolerance on a phone — so a natural press-and-move
+// never starts and the board feels dead. Instant drag works on mouse AND touch.
+const dragOptions = { animation: 150, group: 'dispatch' }
 
 function canReceive(col) {
   if (!viewDay.value) return !col.isPast
