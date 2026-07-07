@@ -73,10 +73,13 @@ through the Cloudflare API**, so no inbound port opens — the tunnel-only postu
    Issues the cert (stored in the `letsencrypt` docker volume), points nginx at it, reloads, and
    installs a twice-daily renewal cron (`scripts/renew-lan-cert.sh`, logs to
    `~/backups/plaza/cert-renew.log`). Idempotent — rerun any time.
-3. **Office DNS override** (the split-horizon half): make the office router/DNS answer
-   `plaza.example.com` with the server's LAN IP — dnsmasq/Pi-hole:
-   `address=/plaza.example.com/192.168.x.y`; most routers call it "DNS host mapping" or "local
-   DNS record". Give the server a static LAN IP (DHCP reservation).
+3. **Office DNS override** (the split-horizon half): make the office answer
+   `plaza.example.com` with the server's LAN IP. If the router supports "DNS host mapping" /
+   "local DNS records", use that. If not (e.g. the stock Nokia GPON gateway), run the bundled
+   forwarder: set `LAN_DNS_IP=<server LAN IP>` in `.env`, then
+   `docker compose --profile lan-dns up -d` — and in the router's **LAN/DHCP settings** set
+   primary DNS = the server's LAN IP (secondary 8.8.8.8: if the server is down, clients fall
+   back and simply reach the app via the tunnel instead). Give the server a static LAN IP.
 4. Verify from a LAN machine: `curl -v https://plaza.example.com/up` → 200 with a **Let's
    Encrypt** cert (not Cloudflare's), and `nslookup plaza.example.com` returns the LAN IP.
    Plain `http://` on the LAN answers 301 → https.

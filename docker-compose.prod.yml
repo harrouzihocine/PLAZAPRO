@@ -86,6 +86,39 @@ services:
     networks: [tunnel]         # egress to Cloudflare + nginx; nothing else
     profiles: ["tunnel"]       # enable with: docker compose --profile tunnel up -d
 
+  # Split-horizon DNS for the office LAN (the Nokia GPON gateway has no local
+  # DNS records feature): answers the app hostname with the server's LAN IP,
+  # forwards everything else upstream. Point the router's DHCP DNS at
+  # LAN_DNS_IP (runbook §1.5). Binds 53 on the LAN IP only — never 0.0.0.0 —
+  # so it can't collide with systemd-resolved's 127.0.0.53 stub.
+  dnsmasq:
+    build: ./docker/dnsmasq
+    command:
+      - --keep-in-foreground
+      - --log-facility=-            # stdout → docker logs
+      - --no-resolv                 # never read the container's resolv.conf
+      - --no-hosts
+      - --cache-size=1000
+      - --address=/${LAN_TLS_DOMAIN:-app.plaza-pro.com}/${LAN_DNS_IP:-}
+      - --server=8.8.8.8
+      - --server=8.8.4.4
+    environment: { TZ: Africa/Algiers }
+    ports:
+      - "${LAN_DNS_IP:-127.0.0.1}:53:53/udp"
+      - "${LAN_DNS_IP:-127.0.0.1}:53:53/tcp"
+    restart: unless-stopped
+    init: true
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+    networks: [edge]                # needs egress to the upstream resolvers
+    profiles: ["lan-dns"]           # enable with: docker compose --profile lan-dns up -d
+    healthcheck:
+      # Answered locally by the --address rule — proves dnsmasq itself is alive.
+      test: ["CMD", "nslookup", "${LAN_TLS_DOMAIN:-app.plaza-pro.com}", "127.0.0.1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   # Let's Encrypt via Cloudflare DNS-01 for the office-LAN listener. Never part
   # of `up` (profile) — invoked as one-shots by scripts/setup-lan-tls.sh and
   # the renew cron (scripts/renew-lan-cert.sh). DNS-01 needs no inbound port,
