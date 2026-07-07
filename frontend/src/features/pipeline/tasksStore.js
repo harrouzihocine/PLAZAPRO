@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { toastError } from '@/composables/useConfirm'
 import { tasksApi } from '@/features/pipeline/api'
 import { agentsApi } from '@/features/clients/api'
+import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
 
 // State for the tasks board. Filters are sent to the server (scope mine/team,
 // state, priority, overdue); every write refetches so the list reflects server
@@ -14,11 +15,18 @@ export const useTasksStore = defineStore('tasks', {
     loading: false,
     saving: false,
     error: '',
+    offlineAt: null, // data served from the offline snapshot (views show a stamp)
   }),
 
   actions: {
     async fetch() {
       this.loading = true
+      // Offline snapshot covers the default view ("mine", no extra filters).
+      const defaultView =
+        this.filters.scope === 'mine' &&
+        !this.filters.state &&
+        !this.filters.priority &&
+        !this.filters.overdue
       try {
         const params = {}
         for (const [k, v] of Object.entries(this.filters)) {
@@ -27,6 +35,15 @@ export const useTasksStore = defineStore('tasks', {
         const [tasks, agents] = await Promise.all([tasksApi.list(params), agentsApi.list()])
         this.items = tasks
         this.agents = agents
+        this.offlineAt = null
+        if (defaultView) cacheSnapshot('tasks:list', { items: tasks, agents })
+      } catch (e) {
+        const served = await serveSnapshot(e, 'tasks:list', (data, at) => {
+          this.items = data.items
+          this.agents = data.agents ?? []
+          this.offlineAt = at
+        })
+        if (!served) throw e
       } finally {
         this.loading = false
       }

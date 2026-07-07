@@ -9,6 +9,7 @@ import {
   projectsApi,
 } from '@/features/clients/api'
 import { pipelineApi } from '@/features/pipeline/api'
+import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
 
 // State for the Clients screens. Loads clients plus two agent catalogues: `agents`
 // (field agents, for visit/next-action pickers) and `followUpAgents` (sales agents
@@ -35,6 +36,9 @@ export const useClientsStore = defineStore('clients', {
     loading: false,
     saving: false,
     error: '',
+    // Set when data came from the IndexedDB snapshot (offline) — views show
+    // an "Offline — data from {time}" stamp; cleared on any live fetch.
+    offlineAt: null,
   }),
 
   actions: {
@@ -43,6 +47,9 @@ export const useClientsStore = defineStore('clients', {
       // Filters auto-apply on every change (useAutoFilter): tag the request so
       // a slower, older response can never overwrite a newer one.
       const ticket = ++this._fetchTicket
+      // Only the landing view (page 1, no filters) is snapshotted for offline.
+      const defaultView =
+        this.page === 1 && Object.values(this.filters).every((v) => v === '' || v === null)
       try {
         const params = { page: this.page, per_page: this.rows }
         for (const [k, v] of Object.entries(this.filters)) {
@@ -59,6 +66,25 @@ export const useClientsStore = defineStore('clients', {
         this.total = clients.total
         this.agents = agents
         this.followUpAgents = followUpAgents
+        this.offlineAt = null
+        if (defaultView) {
+          cacheSnapshot('clients:list', {
+            items: this.items,
+            total: this.total,
+            agents: this.agents,
+            followUpAgents: this.followUpAgents,
+          })
+        }
+      } catch (e) {
+        if (ticket !== this._fetchTicket) return
+        const served = await serveSnapshot(e, 'clients:list', (data, at) => {
+          this.items = data.items
+          this.total = data.total
+          this.agents = data.agents ?? []
+          this.followUpAgents = data.followUpAgents ?? []
+          this.offlineAt = at
+        })
+        if (!served) throw e
       } finally {
         if (ticket === this._fetchTicket) this.loading = false
       }
@@ -81,8 +107,22 @@ export const useClientsStore = defineStore('clients', {
       this.loading = true
       try {
         this.current = await clientsApi.get(id)
-        if (!this.agents.length) this.agents = await agentsApi.list()
-        if (!this.followUpAgents.length) this.followUpAgents = await followUpAgentsApi.list()
+        this.offlineAt = null
+        cacheSnapshot(`clients:file:${id}`, this.current)
+        try {
+          if (!this.agents.length) this.agents = await agentsApi.list()
+          if (!this.followUpAgents.length) this.followUpAgents = await followUpAgentsApi.list()
+        } catch {
+          /* the agent catalogues only feed pickers — optional offline */
+        }
+        return this.current
+      } catch (e) {
+        // A recently-opened client file works offline from its snapshot.
+        const served = await serveSnapshot(e, `clients:file:${id}`, (data, at) => {
+          this.current = data
+          this.offlineAt = at
+        })
+        if (!served) throw e
         return this.current
       } finally {
         this.loading = false
@@ -145,12 +185,30 @@ export const useClientsStore = defineStore('clients', {
     // --- Deals (client_projects) on the currently-loaded client ---
 
     async loadProjects(clientId) {
-      this.projects = await projectsApi.list(clientId)
+      try {
+        this.projects = await projectsApi.list(clientId)
+        cacheSnapshot(`clients:projects:${clientId}`, this.projects)
+      } catch (e) {
+        const served = await serveSnapshot(e, `clients:projects:${clientId}`, (data, at) => {
+          this.projects = data
+          this.offlineAt = at
+        })
+        if (!served) throw e
+      }
       return this.projects
     },
 
     async loadArchivedProjects(clientId) {
-      this.archivedProjects = await projectsApi.list(clientId, 'archived')
+      try {
+        this.archivedProjects = await projectsApi.list(clientId, 'archived')
+        cacheSnapshot(`clients:archived:${clientId}`, this.archivedProjects)
+      } catch (e) {
+        const served = await serveSnapshot(e, `clients:archived:${clientId}`, (data, at) => {
+          this.archivedProjects = data
+          this.offlineAt = at
+        })
+        if (!served) throw e
+      }
       return this.archivedProjects
     },
 
@@ -209,7 +267,16 @@ export const useClientsStore = defineStore('clients', {
     // --- Desire + inventory matching ---
 
     async loadDesire(clientId) {
-      this.desire = await desireApi.get(clientId)
+      try {
+        this.desire = await desireApi.get(clientId)
+        cacheSnapshot(`clients:desire:${clientId}`, this.desire)
+      } catch (e) {
+        const served = await serveSnapshot(e, `clients:desire:${clientId}`, (data, at) => {
+          this.desire = data
+          this.offlineAt = at
+        })
+        if (!served) throw e
+      }
       return this.desire
     },
 
@@ -274,7 +341,17 @@ export const useClientsStore = defineStore('clients', {
     // Scoped to one project when projectId is given (the per-project story).
     async loadTimeline(clientId, projectId = this.timelineProjectId) {
       this.timelineProjectId = projectId ?? null
-      this.timeline = await pipelineApi.timeline(clientId, this.timelineProjectId)
+      const key = `clients:timeline:${clientId}:${this.timelineProjectId ?? 'all'}`
+      try {
+        this.timeline = await pipelineApi.timeline(clientId, this.timelineProjectId)
+        cacheSnapshot(key, this.timeline)
+      } catch (e) {
+        const served = await serveSnapshot(e, key, (data, at) => {
+          this.timeline = data
+          this.offlineAt = at
+        })
+        if (!served) throw e
+      }
       return this.timeline
     },
 

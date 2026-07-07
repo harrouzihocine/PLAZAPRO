@@ -13,6 +13,7 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import NativeList from '@/components/ui/NativeList.vue'
+import OfflineStamp from '@/components/ui/OfflineStamp.vue'
 import { useNativePhone } from '@/composables/useNativeMode'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { confirmAction } from '@/composables/useConfirm'
@@ -229,6 +230,7 @@ async function removeUnit(u) {
 <template>
   <div>
     <PageHeader title="Units" subtitle="All apartments and lots across projects." />
+    <OfflineStamp :at="units.offlineAt" />
 
     <SectionCard flush class="mb-5">
       <div class="flex flex-wrap items-end gap-2 px-4 py-3 sm:px-5">

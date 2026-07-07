@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { toastError } from '@/composables/useConfirm'
 import { unitsApi } from '@/features/inventory/api'
+import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
 
 // State for the Units screens (the global filterable table and the per-location
 // list on a project detail). Network lives in api.js; writes refetch the current
@@ -16,6 +17,7 @@ export const useUnitsStore = defineStore('units', {
     loading: false,
     saving: false,
     error: '',
+    offlineAt: null, // data served from the offline snapshot (views show a stamp)
     scope: null, // location_id when scoped to a project, else null (global)
     filters: {
       location_id: '',
@@ -56,6 +58,20 @@ export const useUnitsStore = defineStore('units', {
         this.scope = null
         this.items = items
         this.total = total
+        this.offlineAt = null
+        // Offline snapshot covers the landing view (page 1, no filters).
+        if (this.page === 1 && Object.keys(params).length === 0) {
+          cacheSnapshot('units:list', { items, total })
+        }
+      } catch (e) {
+        if (ticket !== this._fetchTicket) return
+        const served = await serveSnapshot(e, 'units:list', (data, at) => {
+          this.scope = null
+          this.items = data.items
+          this.total = data.total
+          this.offlineAt = at
+        })
+        if (!served) throw e
       } finally {
         if (ticket === this._fetchTicket) this.loading = false
       }

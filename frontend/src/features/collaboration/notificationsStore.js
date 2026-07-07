@@ -4,6 +4,7 @@ import { getEcho } from '@/composables/useEcho'
 import { toastInfo } from '@/composables/useConfirm'
 import { useChatDockStore } from '@/features/collaboration/chatDockStore'
 import { playNotificationSound } from '@/utils/notificationSound'
+import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
 
 // In-app notification feed backing the AppShell bell. Loads the latest page over
 // HTTP and keeps the unread badge live over Reverb (the user's private channel).
@@ -32,6 +33,19 @@ export const useNotificationsStore = defineStore('notifications', {
         this.unreadCount = res.unread_count ?? 0
         this.page = res.meta?.current_page ?? 1
         this.lastPage = res.meta?.last_page ?? 1
+        cacheSnapshot('notifications:p1', {
+          items: this.items,
+          unreadCount: this.unreadCount,
+          lastPage: this.lastPage,
+        })
+      } catch (e) {
+        const served = await serveSnapshot(e, 'notifications:p1', (data) => {
+          this.items = data.items
+          this.unreadCount = data.unreadCount ?? 0
+          this.page = 1
+          this.lastPage = data.lastPage ?? 1
+        })
+        if (!served) throw e
       } finally {
         this.loading = false
       }

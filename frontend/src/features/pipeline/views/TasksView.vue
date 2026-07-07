@@ -10,6 +10,7 @@ import TimeField from '@/components/base/TimeField.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import OfflineStamp from '@/components/ui/OfflineStamp.vue'
 import { useTasksStore } from '@/features/pipeline/tasksStore'
 import { confirmAction } from '@/composables/useConfirm'
 import { todayInput } from '@/utils/format'
@@ -84,6 +85,7 @@ function formatDue(value) {
 <template>
   <div>
     <PageHeader title="Tasks" subtitle="Your to-dos and the team's. Overdue items are flagged." />
+    <OfflineStamp :at="store.offlineAt" />
 
     <!-- Quick add -->
     <SectionCard title="Quick add" icon="pi pi-plus-circle" class="mb-5">

@@ -3,6 +3,7 @@ import { toastError } from '@/composables/useConfirm'
 import { chatApi } from '@/features/collaboration/api'
 import { getEcho } from '@/composables/useEcho'
 import { useAuthStore } from '@/features/settings/store'
+import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
 
 // Chat state. Messages live in a PER-CONVERSATION map (threads) consumed by the
 // /chat page, the tablet two-pane and the dock windows alike — one Echo channel
@@ -68,6 +69,12 @@ export const useChatStore = defineStore('chat', {
       this.loadingList = true
       try {
         this.conversations = await chatApi.conversations()
+        cacheSnapshot('chat:conversations', this.conversations)
+      } catch (e) {
+        const served = await serveSnapshot(e, 'chat:conversations', (data) => {
+          if (!this.conversations.length) this.conversations = data
+        })
+        if (!served) throw e
       } finally {
         this.loadingList = false
       }
@@ -122,7 +129,19 @@ export const useChatStore = defineStore('chat', {
 
     async loadThread(conversationId) {
       const t = this.thread(conversationId)
-      const batch = await chatApi.messages(conversationId)
+      let batch
+      try {
+        batch = await chatApi.messages(conversationId)
+        cacheSnapshot(`chat:thread:${Number(conversationId)}`, batch)
+      } catch (e) {
+        // Offline: a recently-opened thread renders from its snapshot (reading
+        // history + queueing replies still works; new live messages resume on
+        // reconnect).
+        const served = await serveSnapshot(e, `chat:thread:${Number(conversationId)}`, (data) => {
+          batch = data
+        })
+        if (!served) throw e
+      }
       // Keep unsent optimistic bubbles at the tail across reloads.
       const keep = t.messages.filter(
         (m) => (m.pending || m.failed) && !batch.some((b) => b.id === m.id),

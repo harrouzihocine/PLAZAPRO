@@ -13,6 +13,7 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import NativeList from '@/components/ui/NativeList.vue'
+import OfflineStamp from '@/components/ui/OfflineStamp.vue'
 import { useNativePhone } from '@/composables/useNativeMode'
 import ClientFormDrawer from '@/features/clients/components/ClientFormDrawer.vue'
 import { formatPhone } from '@/data/countryCodes'
@@ -106,6 +107,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
 
 <template>
   <div>
+    <OfflineStamp :at="store.offlineAt" />
     <PageHeader title="Clients" subtitle="Leads and buyers — searchable by name or phone.">
       <template #actions>
         <Button

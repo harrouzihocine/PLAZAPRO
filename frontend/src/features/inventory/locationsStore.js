@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { toastError } from '@/composables/useConfirm'
 import { locationsApi } from '@/features/inventory/api'
+import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
 
 // State for the Locations (projects) screen. Network lives in api.js; every write
 // refetches so the list reflects the server (status filters, cancel guards, ...).
@@ -31,6 +32,13 @@ export const useLocationsStore = defineStore('locations', {
         const items = await locationsApi.list(params)
         if (ticket !== this._fetchTicket) return
         this.items = items
+        if (Object.keys(params).length === 0) cacheSnapshot('locations:list', items)
+      } catch (e) {
+        if (ticket !== this._fetchTicket) return
+        const served = await serveSnapshot(e, 'locations:list', (data) => {
+          this.items = data
+        })
+        if (!served) throw e
       } finally {
         if (ticket === this._fetchTicket) this.loading = false
       }

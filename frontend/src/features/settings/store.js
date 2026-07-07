@@ -45,12 +45,19 @@ export const useAuthStore = defineStore('auth', {
     },
 
     clear() {
+      const leavingUserId = this.user?.id
       this.user = null
       this.permissions = []
       this.offlineSession = false
       localStorage.removeItem(SESSION_SNAPSHOT_KEY)
-      // Never show one user's drafts to the next one on this browser.
+      // Never show one user's data to the next one on this browser: drafts
+      // reset, and the offline read-cache for that user is wiped.
       useDraftsStore().reset()
+      if (leavingUserId) {
+        import('@/features/offline/snapshots').then(({ clearUserSnapshots }) =>
+          clearUserSnapshots(leavingUserId),
+        )
+      }
     },
 
     async login(login, password) {
