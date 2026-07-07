@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { runRefresh, ptrLocked } from '@/composables/useRefreshRegistry'
+import { runRefresh } from '@/composables/useRefreshRegistry'
 import { isNativeApp } from '@/utils/nativeApp'
 
 // Facebook-style pull-to-refresh for the APK (phones AND tablets), mounted
@@ -18,10 +18,6 @@ const route = useRoute()
 const THRESHOLD = 72
 const MAX = 140
 
-// The dispatch board is one big drag surface (vuedraggable) — a card dragged
-// downward at scroll-top must never fire a refresh mid-move.
-const EXEMPT_ROUTES = new Set(['dispatch'])
-
 const pull = ref(0)
 const refreshing = ref(false)
 let startY = 0
@@ -34,9 +30,15 @@ function overlayOpen() {
   return !!document.querySelector('.p-dialog-mask, .p-drawer-mask, .swal2-container, .p-overlay-mask')
 }
 
+// A Sortable/vuedraggable drag in progress (dispatch board or any future drag
+// surface) owns the gesture — Sortable stamps these classes on the moved card.
+function dragInProgress() {
+  return !!document.querySelector('.sortable-chosen, .sortable-ghost, .sortable-drag, .sortable-fallback')
+}
+
 function onTouchStart(e) {
-  if (refreshing.value || props.disabled || ptrLocked() || overlayOpen()) return
-  if (EXEMPT_ROUTES.has(route.name) || window.scrollY > 0) return
+  if (refreshing.value || props.disabled || overlayOpen() || dragInProgress()) return
+  if (window.scrollY > 0) return
   // A pull inside a nested scrollable area (chat list, table wrapper…) that
   // isn't itself at the top belongs to that area, not to PTR.
   const scrollable = e.target.closest?.('.overflow-y-auto, .overflow-auto')
@@ -48,6 +50,11 @@ function onTouchStart(e) {
 function onTouchMove(e) {
   if (mode !== 'tracking' && mode !== 'pulling') return
   if (refreshing.value) return
+  if (mode === 'tracking' && dragInProgress()) {
+    // Sortable chose a card after our touchstart — cede the gesture entirely.
+    mode = 'idle'
+    return
+  }
   const dy = e.touches[0].clientY - startY
   if (dy <= 0 || window.scrollY > 0) {
     mode = 'tracking'

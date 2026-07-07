@@ -66,6 +66,24 @@ class Message extends BaseModel
     }
 
     /**
+     * The message as a one-line label — inbox previews and reply excerpts
+     * (mirrored by the frontend's features/collaboration/preview.js).
+     */
+    public function previewLabel(): string
+    {
+        if ($this->isCancelled()) {
+            return 'Message deleted';
+        }
+
+        return match ($this->type->value) {
+            'image' => '📷 Photo',
+            'voice' => '🎤 Voice note',
+            'file' => '📎 File',
+            default => (string) ($this->body ?? ''),
+        };
+    }
+
+    /**
      * Compact block describing the quoted message — shared by MessageResource
      * and the MessageSent broadcast so live-appended replies render identically.
      * A redacted target keeps its author but withholds the excerpt.
@@ -87,12 +105,7 @@ class Message extends BaseModel
             'author_name' => $target->author?->name,
             'type' => $target->type->value,
             'redacted' => $redacted,
-            'excerpt' => $redacted ? null : match ($target->type->value) {
-                'image' => '📷 Photo',
-                'voice' => '🎤 Voice note',
-                'file' => '📎 File',
-                default => Str::limit((string) ($target->body ?? ''), 80),
-            },
+            'excerpt' => $redacted ? null : Str::limit($target->previewLabel(), 80),
         ];
     }
 }

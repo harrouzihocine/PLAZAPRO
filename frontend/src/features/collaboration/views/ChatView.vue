@@ -36,11 +36,12 @@ onMounted(() => {
   if (!store.conversations.length) store.fetchConversations()
   if (!store.contacts.length) store.fetchContacts()
 })
-// pull-to-refresh (APK): reload the inbox, and the open thread if any.
+// pull-to-refresh (APK): reload the inbox, and the open thread if any. One
+// component instance backs BOTH routes — register under both names.
 useRefreshable(async () => {
   await store.fetchConversations()
   if (selectedId.value) await store.loadThread(selectedId.value)
-})
+}, ['chat', 'chat.thread'])
 
 function select(id) {
   if (id === selectedId.value) return

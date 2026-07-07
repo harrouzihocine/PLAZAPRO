@@ -5,6 +5,8 @@ import { getEcho } from '@/composables/useEcho'
 import { useAuthStore } from '@/features/settings/store'
 import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
 import { queueable } from '@/features/offline/apiOrQueue'
+import { messagePreview } from '@/features/collaboration/preview'
+import { newUuid } from '@/utils/uuid'
 
 // Chat state. Messages live in a PER-CONVERSATION map (threads) consumed by the
 // /chat page, the tablet two-pane and the dock windows alike — one Echo channel
@@ -13,16 +15,6 @@ import { queueable } from '@/features/offline/apiOrQueue'
 const PAGE = 50
 const TYPING_TTL_MS = 4000
 const TYPING_THROTTLE_MS = 2500
-
-function previewOf(message) {
-  return (
-    {
-      image: '📷 Photo',
-      voice: '🎤 Voice note',
-      file: '📎 File',
-    }[message.type] ?? (message.body || 'New message')
-  )
-}
 
 export const useChatStore = defineStore('chat', {
   state: () => ({
@@ -194,6 +186,12 @@ export const useChatStore = defineStore('chat', {
       } else {
         this._subs[id] = n - 1
       }
+      // Last channel gone → nobody can receive typing whispers; stop sweeping.
+      if (Object.keys(this._subs).length === 0 && this._typingSweeper) {
+        clearInterval(this._typingSweeper)
+        this._typingSweeper = null
+        this.typing = {}
+      }
     },
 
     // An incoming broadcast message: append (deduped), bump the inbox preview,
@@ -221,7 +219,7 @@ export const useChatStore = defineStore('chat', {
         convo.last_message = {
           id: payload.id,
           type: payload.type,
-          preview: payload.redacted ? 'Message deleted' : previewOf(payload),
+          preview: payload.redacted ? 'Message deleted' : messagePreview(payload),
           created_at: convo.last_message_at,
         }
       }
@@ -305,6 +303,7 @@ export const useChatStore = defineStore('chat', {
           url: `/conversations/${id}/read`,
           label: 'Chat read cursor',
           silent: true,
+          ledger: false, // last-write-wins cursor — no idempotency row per mark
           queuedToast: null,
         }).catch(() => {})
       }, 400)
@@ -351,8 +350,7 @@ export const useChatStore = defineStore('chat', {
 
     _optimistic(conversationId, { type, body, attachments = [], payload, replyTo }) {
       const me = useAuthStore().user
-      const clientKey =
-        globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
+      const clientKey = newUuid() // doubles as the send's idempotency key
       const message = {
         id: `tmp:${clientKey}`,
         client_key: clientKey,
@@ -373,7 +371,7 @@ export const useChatStore = defineStore('chat', {
               author_name: replyTo.author?.name ?? null,
               type: replyTo.type,
               redacted: !!replyTo.redacted,
-              excerpt: replyTo.redacted ? null : previewOf(replyTo).slice(0, 80),
+              excerpt: replyTo.redacted ? null : messagePreview(replyTo).slice(0, 80),
             }
           : null,
         created_at: new Date().toISOString(),
@@ -448,20 +446,42 @@ export const useChatStore = defineStore('chat', {
         convo.last_message = {
           id: saved.id,
           type: saved.type,
-          preview: previewOf(saved),
+          preview: messagePreview(saved),
           created_at: saved.created_at,
         }
       }
     },
 
-    retrySend(conversationId, message) {
-      if (!message?._payload) return
+    // Retry/Discard from the bubble must stay one thing with the outbox: a
+    // failed QUEUED send has a failed outbox record too — retrying/discarding
+    // only the bubble would leave a phantom entry in the Sync Center.
+    async retrySend(conversationId, message) {
+      if (!message) return
+      const record = await this._outboxRecordFor(message.client_key)
+      if (record) {
+        message.pending = true
+        message.failed = false
+        const { useOutboxStore } = await import('@/features/offline/outboxStore')
+        return useOutboxStore().retry(record.uuid)
+      }
+      if (!message._payload) return
       return this._send(conversationId, message)
     },
 
-    discardPending(conversationId, clientKey) {
+    async discardPending(conversationId, clientKey) {
       const t = this.thread(conversationId)
       t.messages = t.messages.filter((m) => m.client_key !== clientKey)
+      const record = await this._outboxRecordFor(clientKey)
+      if (record) {
+        const { useOutboxStore } = await import('@/features/offline/outboxStore')
+        await useOutboxStore()._remove(record.uuid)
+      }
+    },
+
+    async _outboxRecordFor(clientKey) {
+      if (!clientKey) return null
+      const { useOutboxStore } = await import('@/features/offline/outboxStore')
+      return useOutboxStore().items.find((i) => i.entityHint?.clientKey === clientKey) ?? null
     },
 
     // Optimistic toggle, reconciled by the HTTP response (and the broadcast).

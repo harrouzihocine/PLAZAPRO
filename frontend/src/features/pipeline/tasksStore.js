@@ -38,11 +38,15 @@ export const useTasksStore = defineStore('tasks', {
         this.offlineAt = null
         if (defaultView) cacheSnapshot('tasks:list', { items: tasks, agents })
       } catch (e) {
-        const served = await serveSnapshot(e, 'tasks:list', (data, at) => {
-          this.items = data.items
-          this.agents = data.agents ?? []
-          this.offlineAt = at
-        })
+        // Only the default view may serve its snapshot — a filtered view must
+        // never render default-view data under the wrong filter chips.
+        const served =
+          defaultView &&
+          (await serveSnapshot(e, 'tasks:list', (data, at) => {
+            this.items = data.items
+            this.agents = data.agents ?? []
+            this.offlineAt = at
+          }))
         if (!served) throw e
       } finally {
         this.loading = false

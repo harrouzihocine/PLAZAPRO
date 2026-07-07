@@ -11,22 +11,29 @@ const props = defineProps({
   onPrimary: { type: Boolean, default: false },
 })
 
-const audio = new Audio()
-audio.preload = 'metadata'
-audio.src = props.src
+// The Audio element is created LAZILY on first play — long threads hold many
+// voice notes, and an eager metadata-preloading element per bubble is wasted
+// network and memory. The recorded duration_ms covers the display until then.
+let audio = null
 
 const playing = ref(false)
 const position = ref(0) // seconds
 const loadedDuration = ref(null)
 
-audio.addEventListener('timeupdate', () => (position.value = audio.currentTime))
-audio.addEventListener('loadedmetadata', () => {
-  if (Number.isFinite(audio.duration)) loadedDuration.value = audio.duration
-})
-audio.addEventListener('ended', () => {
-  playing.value = false
-  position.value = 0
-})
+function ensureAudio() {
+  if (audio) return audio
+  audio = new Audio()
+  audio.src = props.src
+  audio.addEventListener('timeupdate', () => (position.value = audio.currentTime))
+  audio.addEventListener('loadedmetadata', () => {
+    if (Number.isFinite(audio.duration)) loadedDuration.value = audio.duration
+  })
+  audio.addEventListener('ended', () => {
+    playing.value = false
+    position.value = 0
+  })
+  return audio
+}
 
 const total = computed(() => {
   if (loadedDuration.value) return loadedDuration.value
@@ -34,18 +41,20 @@ const total = computed(() => {
 })
 
 function toggle() {
+  const el = ensureAudio()
   if (playing.value) {
-    audio.pause()
+    el.pause()
     playing.value = false
   } else {
-    audio.play().catch(() => {})
+    el.play().catch(() => {})
     playing.value = true
   }
 }
 
 function seek(event) {
   const value = Number(event.target.value)
-  audio.currentTime = value
+  const el = ensureAudio()
+  el.currentTime = value
   position.value = value
 }
 
@@ -55,8 +64,10 @@ function fmt(seconds) {
 }
 
 onBeforeUnmount(() => {
-  audio.pause()
-  audio.src = ''
+  if (audio) {
+    audio.pause()
+    audio.src = ''
+  }
 })
 </script>
 

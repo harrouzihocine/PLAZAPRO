@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
@@ -66,7 +66,15 @@ async function open(id) {
 
 watch(() => props.conversationId, open, { immediate: true })
 
+// Messages that streamed in while the tab/app was hidden aren't auto-marked
+// read (store.receive skips hidden documents) — catch up on return.
+function onVisibleAgain() {
+  if (document.visibilityState === 'visible') store.markRead(props.conversationId)
+}
+onMounted(() => document.addEventListener('visibilitychange', onVisibleAgain))
+
 onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', onVisibleAgain)
   if (retainedId !== null) store.release(retainedId)
   store.closeThread()
 })

@@ -40,15 +40,17 @@ export const useUnitsStore = defineStore('units', {
       // Filters auto-apply (useAutoFilter): tag the request so a slower, older
       // response can never overwrite a newer one.
       const ticket = ++this._fetchTicket
-      try {
-        const params = {}
-        for (const [k, v] of Object.entries(this.filters)) {
-          if (Array.isArray(v)) {
-            if (v.length) params[k] = v // axios serialises arrays as k[]=…
-          } else if (v !== '' && v != null) {
-            params[k] = v
-          }
+      const params = {}
+      for (const [k, v] of Object.entries(this.filters)) {
+        if (Array.isArray(v)) {
+          if (v.length) params[k] = v // axios serialises arrays as k[]=…
+        } else if (v !== '' && v != null) {
+          params[k] = v
         }
+      }
+      // Offline snapshot covers the landing view only (page 1, no filters).
+      const defaultView = this.page === 1 && Object.keys(params).length === 0
+      try {
         const { items, total } = await unitsApi.listPaged({
           ...params,
           page: this.page,
@@ -59,18 +61,18 @@ export const useUnitsStore = defineStore('units', {
         this.items = items
         this.total = total
         this.offlineAt = null
-        // Offline snapshot covers the landing view (page 1, no filters).
-        if (this.page === 1 && Object.keys(params).length === 0) {
-          cacheSnapshot('units:list', { items, total })
-        }
+        if (defaultView) cacheSnapshot('units:list', { items, total })
       } catch (e) {
         if (ticket !== this._fetchTicket) return
-        const served = await serveSnapshot(e, 'units:list', (data, at) => {
-          this.scope = null
-          this.items = data.items
-          this.total = data.total
-          this.offlineAt = at
-        })
+        // Default view only — never default data under active filters.
+        const served =
+          defaultView &&
+          (await serveSnapshot(e, 'units:list', (data, at) => {
+            this.scope = null
+            this.items = data.items
+            this.total = data.total
+            this.offlineAt = at
+          }))
         if (!served) throw e
       } finally {
         if (ticket === this._fetchTicket) this.loading = false

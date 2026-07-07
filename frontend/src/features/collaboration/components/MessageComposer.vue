@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import VoiceRecorder from '@/features/collaboration/components/VoiceRecorder.vue'
 import AttachSheet from '@/components/ui/AttachSheet.vue'
+import { messagePreview } from '@/features/collaboration/preview'
 import { isNativeApp } from '@/utils/nativeApp'
 
 // The message composer: text, an image/file attach, a voice-note recorder and
@@ -59,13 +60,7 @@ function onVoice({ file, durationMs }) {
   emit('send-file', { file, durationMs })
 }
 
-function replyExcerpt(m) {
-  if (!m) return ''
-  if (m.redacted) return 'Message deleted'
-  return (
-    { image: '📷 Photo', voice: '🎤 Voice note', file: '📎 File' }[m.type] ?? (m.body ?? '')
-  )
-}
+const replyExcerpt = messagePreview
 </script>
 
 <template>

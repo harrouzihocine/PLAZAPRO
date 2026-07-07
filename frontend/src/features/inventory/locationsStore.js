@@ -23,21 +23,25 @@ export const useLocationsStore = defineStore('locations', {
       // Filters auto-apply (useAutoFilter): tag the request so a slower, older
       // response can never overwrite a newer one.
       const ticket = ++this._fetchTicket
+      const params = {}
+      if (this.filters.q) params.q = this.filters.q
+      if (this.filters.wilaya_id) params.wilaya_id = this.filters.wilaya_id
+      if (this.filters.commune_id) params.commune_id = this.filters.commune_id
+      if (this.filters.priority) params.priority = this.filters.priority
+      // Offline snapshot covers the unfiltered list only.
+      const defaultView = Object.keys(params).length === 0
       try {
-        const params = {}
-        if (this.filters.q) params.q = this.filters.q
-        if (this.filters.wilaya_id) params.wilaya_id = this.filters.wilaya_id
-        if (this.filters.commune_id) params.commune_id = this.filters.commune_id
-        if (this.filters.priority) params.priority = this.filters.priority
         const items = await locationsApi.list(params)
         if (ticket !== this._fetchTicket) return
         this.items = items
-        if (Object.keys(params).length === 0) cacheSnapshot('locations:list', items)
+        if (defaultView) cacheSnapshot('locations:list', items)
       } catch (e) {
         if (ticket !== this._fetchTicket) return
-        const served = await serveSnapshot(e, 'locations:list', (data) => {
-          this.items = data
-        })
+        const served =
+          defaultView &&
+          (await serveSnapshot(e, 'locations:list', (data) => {
+            this.items = data
+          }))
         if (!served) throw e
       } finally {
         if (ticket === this._fetchTicket) this.loading = false

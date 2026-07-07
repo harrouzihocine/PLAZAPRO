@@ -79,13 +79,17 @@ export const useClientsStore = defineStore('clients', {
         }
       } catch (e) {
         if (ticket !== this._fetchTicket) return
-        const served = await serveSnapshot(e, 'clients:list', (data, at) => {
-          this.items = data.items
-          this.total = data.total
-          this.agents = data.agents ?? []
-          this.followUpAgents = data.followUpAgents ?? []
-          this.offlineAt = at
-        })
+        // Only the default view may serve its snapshot — a filtered/paged view
+        // must never render page-1 data under the wrong filter UI.
+        const served =
+          defaultView &&
+          (await serveSnapshot(e, 'clients:list', (data, at) => {
+            this.items = data.items
+            this.total = data.total
+            this.agents = data.agents ?? []
+            this.followUpAgents = data.followUpAgents ?? []
+            this.offlineAt = at
+          }))
         if (!served) throw e
       } finally {
         if (ticket === this._fetchTicket) this.loading = false

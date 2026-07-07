@@ -7,20 +7,25 @@ import { getCurrentInstance, onMounted, onUnmounted } from 'vue'
 // must always visibly refresh, and the service worker makes reloads cheap.
 const handlers = new Map() // routeName -> Set<fn>
 
-export function useRefreshable(fn) {
-  // Route name is resolved at mount time from the owning component's route.
+// `routeNames`: pass explicitly when one component instance backs SEVERAL
+// route records (ChatView serves both `chat` and `chat.thread` — Vue reuses
+// the instance across them, so mount-time capture alone would only register
+// whichever route mounted first).
+export function useRefreshable(fn, routeNames = null) {
   const instance = getCurrentInstance()
-  let key = null
+  let keys = []
   onMounted(() => {
-    key = instance?.proxy?.$route?.name ?? null
-    if (!key) return
-    if (!handlers.has(key)) handlers.set(key, new Set())
-    handlers.get(key).add(fn)
+    keys = routeNames ?? [instance?.proxy?.$route?.name].filter(Boolean)
+    for (const key of keys) {
+      if (!handlers.has(key)) handlers.set(key, new Set())
+      handlers.get(key).add(fn)
+    }
   })
   onUnmounted(() => {
-    if (!key) return
-    handlers.get(key)?.delete(fn)
-    if (handlers.get(key)?.size === 0) handlers.delete(key)
+    for (const key of keys) {
+      handlers.get(key)?.delete(fn)
+      if (handlers.get(key)?.size === 0) handlers.delete(key)
+    }
   })
 }
 
@@ -36,19 +41,4 @@ export async function runRefresh(routeName) {
 
 export function hasRefreshHandler(routeName) {
   return (handlers.get(routeName)?.size ?? 0) > 0
-}
-
-// ── PTR lock: long-lived gestures (dispatch board drags) suspend PTR ──
-let ptrLocks = 0
-
-export function acquirePtrLock() {
-  ptrLocks++
-}
-
-export function releasePtrLock() {
-  ptrLocks = Math.max(0, ptrLocks - 1)
-}
-
-export function ptrLocked() {
-  return ptrLocks > 0
 }

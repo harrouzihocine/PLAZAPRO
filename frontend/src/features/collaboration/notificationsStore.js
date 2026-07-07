@@ -71,17 +71,25 @@ export const useNotificationsStore = defineStore('notifications', {
       const item = this.items.find((n) => n.id === id)
       if (item && !item.read_at) {
         // Optimistic + offline-queueable (silent): the badge drops at once and
-        // the mark replays on reconnect if we were offline.
+        // the mark replays on reconnect if we were offline. A real server
+        // error rolls the optimistic state back.
+        const prevCount = this.unreadCount
         item.read_at = new Date().toISOString()
         this.unreadCount = Math.max(0, this.unreadCount - 1)
-        const res = await queueable({
-          method: 'post',
-          url: `/notifications/${id}/read`,
-          label: 'Notification read',
-          silent: true,
-          queuedToast: null,
-        })
-        if (!res.queued) this.unreadCount = res.data.unread_count
+        try {
+          const res = await queueable({
+            method: 'post',
+            url: `/notifications/${id}/read`,
+            label: 'Notification read',
+            silent: true,
+            ledger: false, // naturally idempotent — no ledger row per mark
+            queuedToast: null,
+          })
+          if (!res.queued) this.unreadCount = res.data.unread_count
+        } catch {
+          item.read_at = null
+          this.unreadCount = prevCount
+        }
       }
     },
 
@@ -95,18 +103,24 @@ export const useNotificationsStore = defineStore('notifications', {
     },
 
     async markAllRead() {
-      // Optimistic + offline-queueable (silent), like markRead.
+      // Optimistic + offline-queueable (silent), like markRead; a real server
+      // error re-syncs from the source instead of guessing a rollback.
       const now = new Date().toISOString()
       this.items.forEach((n) => (n.read_at = n.read_at ?? now))
       this.unreadCount = 0
-      const res = await queueable({
-        method: 'post',
-        url: '/notifications/read-all',
-        label: 'Notifications read',
-        silent: true,
-        queuedToast: null,
-      })
-      if (!res.queued) this.unreadCount = res.data.unread_count
+      try {
+        const res = await queueable({
+          method: 'post',
+          url: '/notifications/read-all',
+          label: 'Notifications read',
+          silent: true,
+          ledger: false,
+          queuedToast: null,
+        })
+        if (!res.queued) this.unreadCount = res.data.unread_count
+      } catch {
+        this.fetch().catch(() => {})
+      }
     },
 
     // Prepend a notification that arrived live over the websocket.

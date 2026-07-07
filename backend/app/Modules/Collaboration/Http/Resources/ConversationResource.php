@@ -108,15 +108,6 @@ class ConversationResource extends JsonResource
 
     private function preview(Message $message): string
     {
-        if ($message->isCancelled()) {
-            return 'Message deleted';
-        }
-
-        return match ($message->type->value) {
-            'image' => '📷 Photo',
-            'voice' => '🎤 Voice note',
-            'file' => '📎 File',
-            default => (string) ($message->body ?? ''),
-        };
+        return $message->previewLabel();
     }
 }

@@ -5,6 +5,7 @@ import { useNetworkStore } from '@/features/offline/networkStore'
 import { useApi } from '@/composables/useApi'
 import { toastError, toastSuccess } from '@/composables/useConfirm'
 import { hasRefreshHandler, runRefresh } from '@/composables/useRefreshRegistry'
+import { newUuid } from '@/utils/uuid'
 import router from '@/router'
 
 // The offline outbox: writes queued while disconnected, persisted in
@@ -62,7 +63,7 @@ export const useOutboxStore = defineStore('outbox', {
 
     async enqueue({ uuid, method, url, body = null, files = [], label, entityHint = {}, silent = false }) {
       const record = {
-        uuid: uuid ?? globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`,
+        uuid: uuid ?? newUuid(),
         userId: this._userId,
         method,
         url,
@@ -108,10 +109,11 @@ export const useOutboxStore = defineStore('outbox', {
         for (const item of queue) {
           item.status = 'syncing'
           try {
+            const { buildPayload } = await import('@/features/offline/apiOrQueue')
             const { data } = await api.request({
               method: item.method,
               url: item.url,
-              data: this._payloadOf(item),
+              data: buildPayload(item.files, item.body),
               headers: { 'X-Idempotency-Key': item.uuid },
             })
             await this._remove(item.uuid)
@@ -162,18 +164,6 @@ export const useOutboxStore = defineStore('outbox', {
             : `${failedNow} offline changes could not be applied — open Sync to see why.`,
         )
       }
-    },
-
-    _payloadOf(item) {
-      if (!item.files?.length) return item.body
-      const form = new FormData()
-      for (const [k, v] of Object.entries(item.body ?? {})) {
-        if (v !== null && v !== undefined) form.append(k, String(v))
-      }
-      for (const f of item.files) {
-        form.append(f.field, new File([f.blob], f.name || 'attachment', { type: f.type || '' }))
-      }
-      return form
     },
 
     // A queued chat message that landed: swap its pending clock bubble.

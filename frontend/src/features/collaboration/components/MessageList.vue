@@ -102,15 +102,27 @@ function nearBottom() {
   return el.scrollHeight - el.scrollTop - el.clientHeight < 140
 }
 
+let lastTailId = null
 watch(
   () => thread.value.messages.length,
   (len, prev) => {
     if (len === 0) return
     const last = thread.value.messages[len - 1]
+    // History prepends grow the array but keep the same tail — the scroll
+    // anchor in onScroll owns those; only APPENDS may pin to the bottom.
+    const appended = last?.id !== lastTailId
+    lastTailId = last?.id ?? null
+    if (!appended) return
     if (prev === 0 || last?.is_mine || nearBottom()) scrollToBottom()
   },
 )
-watch(() => props.conversationId, scrollToBottom)
+watch(
+  () => props.conversationId,
+  () => {
+    lastTailId = null
+    scrollToBottom()
+  },
+)
 watch(
   () => typing.value.length,
   (n) => n && nearBottom() && scrollToBottom(),
