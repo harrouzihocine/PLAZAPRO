@@ -1,4 +1,5 @@
 import { humanize } from '@/utils/format'
+import { i18n } from '@/i18n'
 
 // One source of truth for how every domain state renders (label, PrimeVue Tag
 // severity, icon). Views never hand-pick badge colours; they pass the raw value
@@ -59,5 +60,9 @@ const META = {
 
 export function statusMeta(value) {
   const meta = META[value] ?? { severity: 'secondary', icon: null }
-  return { label: humanize(value), ...meta }
+  // Known states translate via the status.* dictionary; unknown values (new
+  // enum member before the dictionary catches up) still humanize readably.
+  const key = `status.${value}`
+  const label = i18n.global.te(key) ? i18n.global.t(key) : humanize(value)
+  return { label, ...meta }
 }

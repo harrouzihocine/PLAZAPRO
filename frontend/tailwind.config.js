@@ -29,9 +29,12 @@ export default {
       },
       borderRadius: { token: 'var(--radius)' },
       fontFamily: {
+        // Noto Sans Arabic sits after Inter: Latin text keeps Inter, Arabic
+        // glyphs (UI in ar + Arabic client names in any language) fall through.
         sans: [
           'Inter Variable',
           'Inter',
+          'Noto Sans Arabic Variable',
           'system-ui',
           '-apple-system',
           'Segoe UI',

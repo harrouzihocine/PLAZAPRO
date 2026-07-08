@@ -68,7 +68,7 @@ async function toggleMute() {
       />
       <span
         v-if="isNative && otherOnline"
-        class="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-card bg-green-500"
+        class="absolute bottom-0 end-0 h-3 w-3 rounded-full border-2 border-card bg-green-500"
         aria-label="Online"
       />
     </span>
@@ -77,7 +77,7 @@ async function toggleMute() {
       <h1 class="truncate text-base font-semibold text-ink">
         <i
           v-if="convo?.type === 'project'"
-          class="pi pi-folder mr-1 text-sm text-mute"
+          class="pi pi-folder me-1 text-sm text-mute"
           title="Project chat — participants follow the project's contributors"
           aria-hidden="true"
         />

@@ -2,7 +2,7 @@
 import { RouterLink } from 'vue-router'
 
 // Standard page top: optional back link, title row with badges, subtitle and
-// a right-aligned actions area. Keeps every page opening visually identical.
+// an end-aligned actions area. Keeps every page opening visually identical.
 defineProps({
   title: { type: String, required: true },
   subtitle: { type: String, default: null },
@@ -19,7 +19,7 @@ defineProps({
         class="mb-1 inline-flex items-center gap-1 text-sm text-mute transition-colors hover:text-ink"
       >
         <i class="pi pi-arrow-left text-xs" aria-hidden="true" />
-        <slot name="back-label">Back</slot>
+        <slot name="back-label">{{ $t('common.back') }}</slot>
       </RouterLink>
 
       <div class="flex flex-wrap items-center gap-2.5">

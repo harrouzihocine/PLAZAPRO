@@ -22,6 +22,7 @@ class DynamicListItem extends BaseModel
     protected $fillable = [
         'dynamic_list_id',
         'label',
+        'label_translations',
         'value',
         'sort_order',
         'parent_id',
@@ -35,7 +36,14 @@ class DynamicListItem extends BaseModel
             'is_active' => 'boolean',
             'sort_order' => 'integer',
             'meta' => 'array',
+            'label_translations' => 'array',
         ]);
+    }
+
+    /** The label in the given (or current) locale, falling back to the base label. */
+    public function localizedLabel(?string $locale = null): string
+    {
+        return $this->label_translations[$locale ?? app()->getLocale()] ?? $this->label;
     }
 
     public function list(): BelongsTo

@@ -5,13 +5,19 @@ import Tooltip from 'primevue/tooltip'
 import router from '@/router'
 import App from '@/App.vue'
 import preset from '@/theme/preset'
+import { i18n, initLocale, currentLocale } from '@/i18n'
+import { PRIMEVUE_LOCALES } from '@/i18n/primevue'
 import '@fontsource-variable/inter'
+// Arabic glyphs everywhere (client names are often Arabic even in the French/
+// English UI), not just when the UI language is Arabic.
+import '@fontsource-variable/noto-sans-arabic'
 import 'flag-icons/css/flag-icons.min.css'
 import '@/assets/styles/tailwind.css'
 import 'primeicons/primeicons.css'
 import 'sweetalert2/dist/sweetalert2.min.css'
 import '@/assets/styles/swal.css'
 import '@/assets/styles/native.css'
+import '@/assets/styles/rtl.css'
 import { initNativeMode } from '@/utils/nativeApp'
 import { initAppBack } from '@/utils/appBack'
 import { installAppRecovery } from '@/utils/appRecovery'
@@ -20,6 +26,10 @@ import { installAppRecovery } from '@/utils/appRecovery'
 // the shell's app-grade styling (native.css + `native:` classes) applies from
 // frame one. The web app never gets the class and keeps its design untouched.
 initNativeMode()
+
+// Stamp <html lang dir> for the saved language before the first paint so an
+// Arabic session never flashes left-to-right.
+initLocale()
 
 // Blank-page recovery: reload once when a deploy strands this session on dead
 // chunk URLs, and toast when a view's mount-time fetch dies silently.
@@ -33,8 +43,10 @@ const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
+app.use(i18n)
 app.use(PrimeVue, {
   ripple: true,
+  locale: PRIMEVUE_LOCALES[currentLocale()],
   theme: {
     preset,
     options: {

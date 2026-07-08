@@ -43,6 +43,13 @@ export const authApi = {
     const { data } = await useApi().put('/me/push-prefs', prefs)
     return data.data
   },
+
+  // UI language (en/fr/ar) — saved on the profile so backend-built text
+  // (validation, notifications, push, digest) speaks the user's language.
+  async updateLocale(locale) {
+    const { data } = await useApi().put('/me/locale', { locale })
+    return data.data
+  },
 }
 
 // Scalar app-wide settings (e.g. the interest hold duration in hours).

@@ -211,13 +211,13 @@ function toggleArchived() {
     <div class="flex flex-wrap items-center gap-2 max-sm:px-4 max-sm:py-3">
       <div class="relative w-full sm:w-64">
         <i
-          class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-mute"
+          class="pi pi-search absolute start-3 top-1/2 -translate-y-1/2 text-sm text-mute"
           aria-hidden="true"
         />
         <InputText
           v-model="store.filters.q"
           placeholder="Search name or code…"
-          class="w-full !pl-9"
+          class="w-full !ps-9"
         />
       </div>
       <BaseSelect
@@ -292,11 +292,11 @@ function toggleArchived() {
         >
           <div class="min-w-0 flex-1">
             <span class="font-medium text-ink">{{ loc.name }}</span>
-            <span class="ml-2 text-xs text-mute">
+            <span class="ms-2 text-xs text-mute">
               {{ loc.code }}<template v-if="loc.wilaya"> · {{ loc.wilaya.name }}</template
               ><template v-if="loc.commune"> ({{ loc.commune.name }})</template>
             </span>
-            <span class="ml-2 text-xs uppercase text-mute">archived</span>
+            <span class="ms-2 text-xs uppercase text-mute">archived</span>
           </div>
           <Button
             label="Reactivate"

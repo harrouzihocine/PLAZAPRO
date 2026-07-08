@@ -298,7 +298,7 @@ function select(date) {
           <template v-else>
             <p class="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-mute">
               On <span class="text-ink">{{ dayTitle(selectedCol) }}</span> · {{ selectedCol.count }}
-              <span v-if="selectedCol.overloaded" class="ml-1 text-warning">— heavy day</span>
+              <span v-if="selectedCol.overloaded" class="ms-1 text-warning">— heavy day</span>
             </p>
             <ul class="space-y-1">
               <li

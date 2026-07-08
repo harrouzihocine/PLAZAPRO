@@ -96,13 +96,13 @@ useAutoFilter(() => store.filters, () => store.applyFilters())
       <div v-else class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="text-left text-xs text-mute">
+            <tr class="text-start text-xs text-mute">
               <th class="px-4 py-2.5 font-medium sm:px-5">When</th>
-              <th class="py-2.5 pr-3 font-medium">User</th>
-              <th class="py-2.5 pr-3 font-medium">Role</th>
-              <th class="py-2.5 pr-3 font-medium">Action</th>
-              <th class="py-2.5 pr-3 font-medium">Subject</th>
-              <th class="py-2.5 pr-4"></th>
+              <th class="py-2.5 pe-3 font-medium">User</th>
+              <th class="py-2.5 pe-3 font-medium">Role</th>
+              <th class="py-2.5 pe-3 font-medium">Action</th>
+              <th class="py-2.5 pe-3 font-medium">Subject</th>
+              <th class="py-2.5 pe-4"></th>
             </tr>
           </thead>
           <tbody>
@@ -111,16 +111,16 @@ useAutoFilter(() => store.filters, () => store.applyFilters())
                 <td class="num whitespace-nowrap px-4 py-2.5 sm:px-5">
                   {{ formatDateTime(row.created_at) }}
                 </td>
-                <td class="py-2.5 pr-3">{{ row.user_name ?? row.user_id ?? '—' }}</td>
-                <td class="py-2.5 pr-3 text-mute">{{ row.role_at_time ?? '—' }}</td>
-                <td class="py-2.5 pr-3">
+                <td class="py-2.5 pe-3">{{ row.user_name ?? row.user_id ?? '—' }}</td>
+                <td class="py-2.5 pe-3 text-mute">{{ row.role_at_time ?? '—' }}</td>
+                <td class="py-2.5 pe-3">
                   <Tag :value="row.action" :severity="ACTION_SEVERITY[row.action] ?? 'secondary'" />
                 </td>
-                <td class="py-2.5 pr-3">
+                <td class="py-2.5 pe-3">
                   {{ shortSubject(row.subject_type)
                   }}<span v-if="row.subject_id" class="num text-mute"> #{{ row.subject_id }}</span>
                 </td>
-                <td class="py-2.5 pr-4 text-right">
+                <td class="py-2.5 pe-4 text-end">
                   <Button
                     v-if="row.changes"
                     :label="expanded === row.id ? 'Hide' : 'Diff'"
@@ -138,9 +138,9 @@ useAutoFilter(() => store.filters, () => store.applyFilters())
                 <td colspan="6" class="px-4 py-3 sm:px-5">
                   <table class="w-full text-xs">
                     <thead>
-                      <tr class="text-left text-mute">
-                        <th class="py-1 pr-3 font-medium">Field</th>
-                        <th class="py-1 pr-3 font-medium">Before</th>
+                      <tr class="text-start text-mute">
+                        <th class="py-1 pe-3 font-medium">Field</th>
+                        <th class="py-1 pe-3 font-medium">Before</th>
                         <th class="py-1 font-medium">After</th>
                       </tr>
                     </thead>
@@ -150,8 +150,8 @@ useAutoFilter(() => store.filters, () => store.applyFilters())
                         :key="d.key"
                         class="border-t border-line"
                       >
-                        <td class="py-1.5 pr-3 font-medium text-ink">{{ d.key }}</td>
-                        <td class="num py-1.5 pr-3 text-mute">{{ fmtVal(d.before) }}</td>
+                        <td class="py-1.5 pe-3 font-medium text-ink">{{ d.key }}</td>
+                        <td class="num py-1.5 pe-3 text-mute">{{ fmtVal(d.before) }}</td>
                         <td class="num py-1.5 font-medium text-success">{{ fmtVal(d.after) }}</td>
                       </tr>
                     </tbody>

@@ -246,21 +246,21 @@ async function receipt(v) {
         <div v-if="schedule.length" class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
-              <tr class="text-left text-xs text-mute">
+              <tr class="text-start text-xs text-mute">
                 <th class="py-1.5 font-medium">#</th>
                 <th class="font-medium">Due</th>
-                <th class="text-right font-medium">Amount</th>
-                <th class="text-right font-medium">Paid</th>
-                <th class="text-right font-medium">State</th>
+                <th class="text-end font-medium">Amount</th>
+                <th class="text-end font-medium">Paid</th>
+                <th class="text-end font-medium">State</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="s in schedule" :key="s.id" class="border-t border-line">
                 <td class="num py-2">{{ s.installment_no }}</td>
                 <td>{{ formatDate(s.due_date) }}</td>
-                <td class="num text-right">{{ formatMoney(s.amount) }}</td>
-                <td class="num text-right text-mute">{{ formatMoney(s.paid_amount) }}</td>
-                <td class="py-1 text-right"><StatusTag :value="s.state" /></td>
+                <td class="num text-end">{{ formatMoney(s.amount) }}</td>
+                <td class="num text-end text-mute">{{ formatMoney(s.paid_amount) }}</td>
+                <td class="py-1 text-end"><StatusTag :value="s.state" /></td>
               </tr>
             </tbody>
           </table>
@@ -396,7 +396,7 @@ async function receipt(v) {
               <span v-if="v.reference" class="text-mute">· {{ v.reference }}</span>
               <StatusTag v-if="v.supersedes_id" value="corrected" label="corrected" />
               <StatusTag v-if="v.refunded_at" value="cancelled" label="refunded" />
-              <div class="ml-auto flex gap-1">
+              <div class="ms-auto flex gap-1">
                 <Button
                   :label="v.document_id ? 'Receipt' : 'Generate receipt'"
                   icon="pi pi-file-pdf"

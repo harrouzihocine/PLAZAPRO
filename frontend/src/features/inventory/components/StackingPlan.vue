@@ -145,7 +145,7 @@ watch(
         <h3 class="mb-1.5 text-sm font-semibold text-ink">Block {{ b.block }}</h3>
         <div class="space-y-1">
           <div v-for="f in b.floors" :key="`${b.block}-${f.floor}`" class="flex items-center gap-2">
-            <span class="num w-10 shrink-0 text-right text-xs text-mute">
+            <span class="num w-10 shrink-0 text-end text-xs text-mute">
               {{ f.floor ?? '—' }}
             </span>
             <div class="flex flex-wrap gap-1">
@@ -164,7 +164,7 @@ watch(
                 {{ u.reference }}
                 <span
                   v-if="showHeat && heatFor(u.id) > 0"
-                  class="absolute -right-1.5 -top-1.5 rounded-full bg-primary px-1.5 text-[10px] font-bold leading-4 text-primary-contrast"
+                  class="absolute -end-1.5 -top-1.5 rounded-full bg-primary px-1.5 text-[10px] font-bold leading-4 text-primary-contrast"
                   :title="`${heatFor(u.id)} visits`"
                 >
                   {{ heatFor(u.id) }}

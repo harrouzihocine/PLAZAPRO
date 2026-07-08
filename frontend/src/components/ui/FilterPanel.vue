@@ -13,7 +13,7 @@ import { useIsPhone } from '@/composables/useNativeMode'
 defineProps({
   // Number of filters currently applied (badge on the toggle). null hides it.
   activeCount: { type: Number, default: null },
-  label: { type: String, default: 'Filters' },
+  label: { type: String, default: null }, // null → localized "Filters"
   // Standalone filter bars (not already inside a SectionCard) get card chrome.
   card: { type: Boolean, default: false },
 })
@@ -39,7 +39,7 @@ const open = ref(false)
         @click="open = !open"
       >
         <i class="pi pi-sliders-h text-mute" aria-hidden="true" />
-        {{ label }}
+        {{ label ?? $t('common.filters') }}
         <span
           v-if="activeCount"
           class="num rounded-full bg-primary px-2 py-0.5 text-[11px] font-semibold leading-none text-primary-contrast"
@@ -47,7 +47,7 @@ const open = ref(false)
           {{ activeCount }}
         </span>
         <i
-          class="pi pi-chevron-down ml-auto text-xs text-mute transition-transform"
+          class="pi pi-chevron-down ms-auto text-xs text-mute transition-transform"
           :class="open && 'rotate-180'"
           aria-hidden="true"
         />

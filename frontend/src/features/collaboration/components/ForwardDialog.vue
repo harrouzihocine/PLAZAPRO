@@ -82,7 +82,7 @@ async function send() {
     <ul class="max-h-64 divide-y divide-line overflow-y-auto">
       <li v-for="c in candidates" :key="c.id">
         <label
-          class="flex w-full cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-ink transition-colors hover:bg-surface-100 dark:hover:bg-surface-800"
+          class="flex w-full cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-start text-sm text-ink transition-colors hover:bg-surface-100 dark:hover:bg-surface-800"
         >
           <Checkbox v-model="picks" :value="c.id" />
           <Avatar

@@ -23,7 +23,7 @@ const props = defineProps({
   total: { type: Number, default: null },
   // Empty-state copy (or override the #empty slot entirely).
   emptyIcon: { type: String, default: 'pi pi-inbox' },
-  emptyTitle: { type: String, default: 'Nothing here' },
+  emptyTitle: { type: String, default: null }, // null → localized "Nothing here"
   emptyBody: { type: String, default: '' },
   // Rows navigate somewhere — show the chevron affordance.
   clickable: { type: Boolean, default: false },
@@ -44,7 +44,7 @@ function go(page) {
 <template>
   <div>
     <p v-if="loading && !items.length" class="flex items-center justify-center gap-2 py-10 text-sm text-mute">
-      <i class="pi pi-spinner pi-spin" aria-hidden="true" /> Loading…
+      <i class="pi pi-spinner pi-spin" aria-hidden="true" /> {{ $t('common.loading') }}
     </p>
 
     <template v-else-if="items.length">
@@ -78,7 +78,7 @@ function go(page) {
           rounded
           severity="secondary"
           :disabled="page <= 1 || loading"
-          aria-label="Previous page"
+          :aria-label="$t('common.previousPage')"
           @click="go(page - 1)"
         />
         <span class="num text-sm text-mute">{{ page }} / {{ pages }}</span>
@@ -88,14 +88,14 @@ function go(page) {
           rounded
           severity="secondary"
           :disabled="page >= pages || loading"
-          aria-label="Next page"
+          :aria-label="$t('common.nextPage')"
           @click="go(page + 1)"
         />
       </div>
     </template>
 
     <slot v-else name="empty">
-      <EmptyState :icon="emptyIcon" :title="emptyTitle" :body="emptyBody" />
+      <EmptyState :icon="emptyIcon" :title="emptyTitle ?? $t('common.nothingHere')" :body="emptyBody" />
     </slot>
   </div>
 </template>

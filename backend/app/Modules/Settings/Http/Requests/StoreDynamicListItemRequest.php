@@ -23,6 +23,11 @@ class StoreDynamicListItemRequest extends FormRequest
 
         return [
             'label' => ['required', 'string', 'max:255'],
+            // Optional per-language display labels; the base label is the fallback.
+            'label_translations' => ['sometimes', 'nullable', 'array'],
+            'label_translations.en' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'label_translations.fr' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'label_translations.ar' => ['sometimes', 'nullable', 'string', 'max:255'],
             // Optional: when omitted, the action derives a unique machine value
             // from the label. When supplied it must still be unique in the list.
             'value' => ['sometimes', 'nullable', 'string', 'max:255', Rule::unique('dynamic_list_items', 'value')->where('dynamic_list_id', $listId)],

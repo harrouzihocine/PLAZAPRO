@@ -45,6 +45,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Which notification categories reach the phone as push (tray only —
     // the in-app bell is never filtered).
     Route::put('/me/push-prefs', [ProfileController::class, 'updatePushPrefs']);
+    // UI language (en/fr/ar) — see SetLocale middleware + User::preferredLocale().
+    Route::put('/me/locale', [ProfileController::class, 'updateLocale']);
 
     // Stream a user's avatar (shown app-wide). Any authed user; the file itself
     // stays on the private disk and is only reachable through this endpoint.

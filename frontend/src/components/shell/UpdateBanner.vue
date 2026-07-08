@@ -41,19 +41,19 @@ function goInstall() {
     >
       <i class="pi pi-arrow-circle-up text-[11px] opacity-70" aria-hidden="true" />
       <span class="truncate">
-        A new version{{ latestVersionName ? ` (v${latestVersionName})` : '' }} of the app is out.
+        {{ $t('shell.updateAvailable', { version: latestVersionName ? ` (v${latestVersionName})` : '' }) }}
       </span>
       <button
         type="button"
         class="shrink-0 rounded-md bg-primary px-2.5 py-1 font-semibold text-primary-contrast transition-opacity hover:opacity-90"
         @click="goInstall"
       >
-        Update
+        {{ $t('shell.update') }}
       </button>
       <button
         type="button"
         class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full opacity-60 transition-opacity hover:opacity-100"
-        aria-label="Dismiss update notice"
+        :aria-label="$t('shell.dismissUpdate')"
         @click="dismissUpdate(latestVersionCode())"
       >
         <i class="pi pi-times text-[10px]" aria-hidden="true" />

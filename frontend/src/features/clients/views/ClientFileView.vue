@@ -224,7 +224,7 @@ async function submitNewProject(callPayload) {
               </div>
               <div v-if="store.current.referrer_name || store.current.referrer_phone" class="flex justify-between gap-2">
                 <dt class="text-mute">Referred by</dt>
-                <dd class="text-right text-ink">
+                <dd class="text-end text-ink">
                   {{ store.current.referrer_name ?? '—' }}
                   <span v-if="store.current.referrer_phone" class="num block text-xs text-mute">
                     {{ formatPhone(store.current.referrer_phone) }}
@@ -282,7 +282,7 @@ async function submitNewProject(callPayload) {
                 </div>
                 <div
                   v-if="doc.issued_at || doc.issued_place"
-                  class="mt-0.5 text-right text-xs text-mute"
+                  class="mt-0.5 text-end text-xs text-mute"
                 >
                   <template v-if="doc.issued_at">{{ formatDate(doc.issued_at) }}</template>
                   <template v-if="doc.issued_place"> — {{ doc.issued_place }}</template>
@@ -303,7 +303,7 @@ async function submitNewProject(callPayload) {
               </div>
               <div v-if="store.current.address" class="flex justify-between gap-2">
                 <dt class="text-mute">Address</dt>
-                <dd class="text-right text-ink">{{ store.current.address }}</dd>
+                <dd class="text-end text-ink">{{ store.current.address }}</dd>
               </div>
             </dl>
           </SectionCard>

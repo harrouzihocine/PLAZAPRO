@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { authApi } from '@/features/settings/api'
 import { useDraftsStore } from '@/features/drafts/draftsStore'
+import { currentLocale, setLocale, SUPPORTED_LOCALES } from '@/i18n'
 
 // Authentication + current-user state (Sanctum SPA cookie mode). Holds no token.
 // Network calls live in api.js; this store only holds state and orchestrates them.
@@ -62,7 +63,21 @@ export const useAuthStore = defineStore('auth', {
 
     async login(login, password) {
       this.setUser(await authApi.login(login, password))
+      // The language picked on the login screen is the freshest intent — push
+      // it to the profile so notifications/push and other devices follow
+      // (also seeds the preference for accounts that never chose one).
+      if (this.user && this.user.locale !== currentLocale()) {
+        this.saveLocale(currentLocale())
+      }
       return this.user
+    },
+
+    // Persist the UI language on the user's profile (backend messages, push
+    // notifications and other devices follow). Fire-and-forget: the UI is
+    // already switched locally; a network failure just retries next switch.
+    saveLocale(locale) {
+      if (this.user) this.user = { ...this.user, locale }
+      authApi.updateLocale(locale).catch(() => {})
     },
 
     // Self-service profile edits. Each returns the refreshed user (with role +
@@ -90,6 +105,11 @@ export const useAuthStore = defineStore('auth', {
     async fetchMe() {
       try {
         this.setUser(await authApi.me())
+        // Boot hydrate: the profile's saved language wins over this browser's
+        // leftover choice (it may belong to another user of this device).
+        if (SUPPORTED_LOCALES.includes(this.user?.locale) && this.user.locale !== currentLocale()) {
+          setLocale(this.user.locale)
+        }
       } catch (e) {
         // The server ANSWERED (401 &co) → the session is truly gone. No answer
         // at all → we're offline: hydrate the snapshot so the cached shell

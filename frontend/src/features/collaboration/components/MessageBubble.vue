@@ -149,7 +149,7 @@ function act(action) {
         <div class="fixed inset-0 z-20" aria-hidden="true" @click="menuOpen = false" />
         <div
           class="absolute bottom-full z-30 mb-1.5 flex flex-col gap-1.5"
-          :class="m.is_mine ? 'right-0 items-end' : 'left-0 items-start'"
+          :class="m.is_mine ? 'end-0 items-end' : 'start-0 items-start'"
         >
           <ReactionPicker :current="myReaction" @pick="pickReaction" />
           <div
@@ -193,7 +193,7 @@ function act(action) {
       <!-- Reply arrow revealed by the swipe (fades/grows with the drag) -->
       <span
         v-if="dragX > 0"
-        class="pointer-events-none absolute -left-9 top-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-surface-200 text-mute dark:bg-surface-700"
+        class="pointer-events-none absolute -start-9 top-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-surface-200 text-mute dark:bg-surface-700"
         :style="{
           opacity: Math.min(1, dragX / 40),
           transform: `translateY(-50%) scale(${Math.min(1, 0.5 + dragX / 80)})`,
@@ -211,14 +211,14 @@ function act(action) {
             ? [
                 'bg-chat-own text-chat-own-contrast',
                 !isNative || groupLast
-                  ? 'rounded-br-md native:rounded-br-[0.4rem]'
-                  : 'native:rounded-br-[1.25rem]',
+                  ? 'rounded-ee-md native:rounded-ee-[0.4rem]'
+                  : 'native:rounded-ee-[1.25rem]',
               ]
             : [
                 'border border-line bg-card text-ink',
                 !isNative || groupLast
-                  ? 'rounded-bl-md native:rounded-bl-[0.4rem]'
-                  : 'native:rounded-bl-[1.25rem]',
+                  ? 'rounded-es-md native:rounded-es-[0.4rem]'
+                  : 'native:rounded-es-[1.25rem]',
               ],
           compact && '!px-3 !py-1.5',
         ]"
@@ -245,7 +245,7 @@ function act(action) {
         <button
           v-if="m.reply_to"
           type="button"
-          class="mb-1.5 block w-full rounded-lg border-l-4 px-2.5 py-1.5 text-left text-xs"
+          class="mb-1.5 block w-full rounded-lg border-s-4 px-2.5 py-1.5 text-start text-xs"
           :class="
             m.is_mine
               ? 'border-white/60 bg-white/15 text-chat-own-contrast/90'
@@ -323,7 +323,7 @@ function act(action) {
         <!-- Meta line: time + my ticks (clock → ✓ → ✓✓), once per run. -->
         <p
           v-if="!m.redacted && (groupLast || m.pending || m.failed) && !compact"
-          class="num mt-0.5 flex items-center justify-end gap-1 text-right text-[10px] opacity-70"
+          class="num mt-0.5 flex items-center justify-end gap-1 text-end text-[10px] opacity-70"
         >
           <span v-if="m.edited_at" class="italic">edited</span>
           {{ formatTime(m.created_at) }}
@@ -335,10 +335,10 @@ function act(action) {
               aria-hidden="true"
             />
             <span v-else class="relative inline-block w-4" :title="seen ? 'Seen' : 'Sent'">
-              <i class="pi pi-check absolute left-0 top-1/2 -translate-y-1/2 text-[9px]" aria-hidden="true" />
+              <i class="pi pi-check absolute start-0 top-1/2 -translate-y-1/2 text-[9px]" aria-hidden="true" />
               <i
                 v-if="seen"
-                class="pi pi-check absolute left-[5px] top-1/2 -translate-y-1/2 text-[9px] text-sky-300"
+                class="pi pi-check absolute start-[5px] top-1/2 -translate-y-1/2 text-[9px] text-sky-300"
                 aria-hidden="true"
               />
             </span>
@@ -378,7 +378,7 @@ function act(action) {
       <div
         v-if="!isNative && interactive"
         class="absolute top-1/2 hidden -translate-y-1/2 items-center gap-0.5 group-hover:flex"
-        :class="m.is_mine ? 'right-full mr-1.5' : 'left-full ml-1.5'"
+        :class="m.is_mine ? 'end-full me-1.5' : 'start-full ms-1.5'"
       >
         <button
           type="button"

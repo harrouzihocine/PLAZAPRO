@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { currentLocale } from '@/i18n'
 import { useAuthStore } from '@/features/settings/store'
 import { useNetworkStore } from '@/features/offline/networkStore'
 
@@ -21,6 +22,9 @@ api.interceptors.request.use((config) => {
   if ((config.method ?? 'get').toLowerCase() === 'get' && !config.timeout) {
     config.timeout = 30_000
   }
+  // The backend answers in the UI language (validation errors, messages) —
+  // per request, so it tracks a language switch instantly, login screen included.
+  config.headers['Accept-Language'] = currentLocale()
   return config
 })
 

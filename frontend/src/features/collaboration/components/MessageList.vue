@@ -236,12 +236,12 @@ function openMedia(attachment) {
     <!-- Typing indicator -->
     <div v-if="typing.length" class="flex items-end gap-1.5">
       <div
-        class="flex items-center gap-1.5 rounded-2xl rounded-bl-md border border-line bg-card px-3.5 py-2.5 shadow-card native:shadow-none"
+        class="flex items-center gap-1.5 rounded-2xl rounded-es-md border border-line bg-card px-3.5 py-2.5 shadow-card native:shadow-none"
       >
         <span class="chat-typing-dot" />
         <span class="chat-typing-dot" style="animation-delay: 0.15s" />
         <span class="chat-typing-dot" style="animation-delay: 0.3s" />
-        <span v-if="typing.length === 1" class="ml-1 text-[11px] text-mute">
+        <span v-if="typing.length === 1" class="ms-1 text-[11px] text-mute">
           {{ typing[0].name }}
         </span>
       </div>

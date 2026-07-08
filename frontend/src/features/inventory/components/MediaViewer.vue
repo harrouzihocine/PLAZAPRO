@@ -139,21 +139,21 @@ watch(() => props.media?.id, resetZoom)
       <!-- Prev / next through the tab's media (Android shell only) -->
       <template v-if="canNavigate">
         <button
-          class="absolute left-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white active:bg-black/60"
+          class="absolute start-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white active:bg-black/60"
           aria-label="Previous"
           @click.stop="go(-1)"
         >
           <i class="pi pi-chevron-left" aria-hidden="true" />
         </button>
         <button
-          class="absolute right-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white active:bg-black/60"
+          class="absolute end-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white active:bg-black/60"
           aria-label="Next"
           @click.stop="go(1)"
         >
           <i class="pi pi-chevron-right" aria-hidden="true" />
         </button>
         <span
-          class="num absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/40 px-2.5 py-0.5 text-xs text-white"
+          class="num absolute bottom-2 start-1/2 z-10 -translate-x-1/2 rounded-full bg-black/40 px-2.5 py-0.5 text-xs text-white"
         >
           {{ index + 1 }} / {{ items.length }}
         </span>

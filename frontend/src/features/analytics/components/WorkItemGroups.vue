@@ -41,7 +41,7 @@ function openLabel(item) {
       <p class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-mute">
         <i :class="g.icon" aria-hidden="true" />
         {{ g.label }}
-        <span class="num ml-auto rounded-full bg-surface-100 px-2 py-0.5 text-ink dark:bg-surface-800">
+        <span class="num ms-auto rounded-full bg-surface-100 px-2 py-0.5 text-ink dark:bg-surface-800">
           {{ g.items.length }}
         </span>
       </p>
@@ -66,7 +66,7 @@ function openLabel(item) {
           </RouterLink>
           <button
             type="button"
-            class="mr-1 shrink-0 text-mute transition-colors hover:text-ink"
+            class="me-1 shrink-0 text-mute transition-colors hover:text-ink"
             aria-label="Details"
             @click.stop.prevent="showDetails($event, item, g.icon)"
           >

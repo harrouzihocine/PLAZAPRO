@@ -1,4 +1,5 @@
 import { toastError } from '@/composables/useConfirm'
+import { t } from '@/i18n'
 
 // Blank-page recovery. Two production failure modes end in "the page shows
 // nothing until I refresh":
@@ -63,6 +64,6 @@ export function installAppRecovery() {
     const now = Date.now()
     if (now - lastLoadToastAt < LOAD_TOAST_EVERY_MS) return
     lastLoadToastAt = now
-    toastError("Couldn't load the latest data — pull down or refresh to retry.")
+    toastError(t('shell.loadFailedToast'))
   })
 }

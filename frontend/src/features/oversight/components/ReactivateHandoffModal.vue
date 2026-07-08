@@ -132,7 +132,7 @@ async function submit() {
       <!-- Who is behind it today -->
       <div class="rounded-lg border border-line bg-surface-50 px-4 py-3 dark:bg-surface-900">
         <p class="text-sm text-ink">
-          <i class="pi pi-user mr-1.5 text-mute" aria-hidden="true" />
+          <i class="pi pi-user me-1.5 text-mute" aria-hidden="true" />
           Opened by
           <span class="font-semibold">{{ preview.opened_by?.name ?? '—' }}</span>
         </p>

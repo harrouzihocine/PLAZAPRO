@@ -56,14 +56,14 @@ function onInput(event) {
         :step="step"
         :invalid="Boolean(error)"
         fluid
-        :class="{ '!pr-11': isPassword }"
+        :class="{ '!pe-11': isPassword }"
         @input="onInput"
       />
       <button
         v-if="isPassword"
         type="button"
-        class="absolute inset-y-0 right-0 flex items-center px-3 text-mute hover:text-ink"
-        :aria-label="revealed ? 'Hide password' : 'Show password'"
+        class="absolute inset-y-0 end-0 flex items-center px-3 text-mute hover:text-ink"
+        :aria-label="revealed ? $t('common.hidePassword') : $t('common.showPassword')"
         :aria-pressed="revealed"
         @click="revealed = !revealed"
       >

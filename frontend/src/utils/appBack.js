@@ -1,4 +1,5 @@
 import { isNativeApp } from '@/utils/nativeApp'
+import { t } from '@/i18n'
 
 // Facebook-style hardware back for the Android shell.
 //
@@ -51,7 +52,7 @@ export function initAppBack(router) {
     if (!hint) {
       hint = document.createElement('div')
       hint.className = 'app-exit-hint'
-      hint.textContent = 'Press back again to exit'
+      hint.textContent = t('shell.pressBackToExit')
       document.body.appendChild(hint)
     }
     clearTimeout(hintTimer)

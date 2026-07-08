@@ -62,7 +62,7 @@ async function shareTo(conversationId) {
         <li v-for="c in store.conversations" :key="c.id">
           <button
             type="button"
-            class="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm text-ink transition-colors hover:bg-surface-100 disabled:opacity-50 dark:hover:bg-surface-800"
+            class="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-start text-sm text-ink transition-colors hover:bg-surface-100 disabled:opacity-50 dark:hover:bg-surface-800"
             :disabled="busy"
             @click="shareTo(c.id)"
           >

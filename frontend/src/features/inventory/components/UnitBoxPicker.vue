@@ -91,7 +91,7 @@ function toggle(id) {
           {{ b.reference }}<template v-if="b.price"> · {{ formatMoney(b.price) }}</template>
           <span
             v-if="b.linked"
-            class="ml-1 rounded bg-surface-100 px-1 text-[10px] uppercase tracking-wide dark:bg-surface-700"
+            class="ms-1 rounded bg-surface-100 px-1 text-[10px] uppercase tracking-wide dark:bg-surface-700"
             title="Already linked to this apartment"
           >
             linked

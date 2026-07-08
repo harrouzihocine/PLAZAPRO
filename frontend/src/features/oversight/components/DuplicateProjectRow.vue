@@ -66,7 +66,7 @@ async function toggle() {
         {{ project.location ?? 'Project' }} <span class="num text-mute">#{{ project.id }}</span>
       </span>
 
-      <div class="ml-auto flex flex-wrap gap-2">
+      <div class="ms-auto flex flex-wrap gap-2">
         <Button
           v-if="auth.can('clients.view')"
           label="Open"

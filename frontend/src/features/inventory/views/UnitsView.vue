@@ -277,7 +277,7 @@ async function removeUnit(u) {
           severity="secondary"
           @click="showAdvanced = !showAdvanced"
         />
-        <span class="ml-auto flex gap-2">
+        <span class="ms-auto flex gap-2">
           <Button
             icon="pi pi-filter-slash"
             text

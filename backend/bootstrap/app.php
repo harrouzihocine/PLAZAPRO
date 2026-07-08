@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Middleware\EnsureUserActive;
 use App\Http\Middleware\IdempotencyKey;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\SetLocale;
 use App\Modules\Clients\Console\FlagEmptyClients;
 use App\Modules\Collaboration\Console\BackfillProjectChats;
 use App\Modules\Inventory\Console\ExpireHolds;
@@ -56,7 +57,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Reject requests from users deactivated/cancelled after they signed in
         // (login checks is_active only at sign-in). Appended to the api group so
         // it runs after Sanctum's stateful session is resolved.
-        $middleware->api(append: [EnsureUserActive::class]);
+        // SetLocale then answers in the caller's language (Accept-Language from
+        // the SPA, or the user's saved locale) — validation errors included.
+        $middleware->api(append: [EnsureUserActive::class, SetLocale::class]);
 
         // Global API rate limiting (named limiter defined in RbacServiceProvider).
         $middleware->throttleApi('api');

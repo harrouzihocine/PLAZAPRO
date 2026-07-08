@@ -115,17 +115,17 @@ useRefreshable(() => (tab.value === 'units' ? loadUnits() : loadRoi()))
             <span class="font-medium text-ink">{{ data.source }}</span>
           </template>
         </Column>
-        <Column header="Leads" field="leads" sortable class="text-right">
+        <Column header="Leads" field="leads" sortable class="text-end">
           <template #body="{ data }"
             ><span class="num">{{ data.leads }}</span></template
           >
         </Column>
-        <Column header="Visits" field="visits" sortable class="text-right">
+        <Column header="Visits" field="visits" sortable class="text-end">
           <template #body="{ data }"
             ><span class="num">{{ data.visits }}</span></template
           >
         </Column>
-        <Column header="Won" field="won" sortable class="text-right">
+        <Column header="Won" field="won" sortable class="text-end">
           <template #body="{ data }"
             ><span class="num">{{ data.won }}</span></template
           >
@@ -137,7 +137,7 @@ useRefreshable(() => (tab.value === 'units' ? loadUnits() : loadRoi()))
                 class="relative h-1.5 w-20 overflow-hidden rounded bg-surface-100 dark:bg-surface-800"
               >
                 <span
-                  class="absolute inset-y-0 left-0 rounded bg-primary-600 dark:bg-primary-400"
+                  class="absolute inset-y-0 start-0 rounded bg-primary-600 dark:bg-primary-400"
                   :style="{ width: `${Math.min(100, data.conversion)}%` }"
                   aria-hidden="true"
                 />
@@ -146,7 +146,7 @@ useRefreshable(() => (tab.value === 'units' ? loadUnits() : loadRoi()))
             </span>
           </template>
         </Column>
-        <Column header="Revenue" field="revenue" sortable class="text-right">
+        <Column header="Revenue" field="revenue" sortable class="text-end">
           <template #body="{ data }">
             <span class="num font-medium text-ink">{{ formatMoney(data.revenue) }}</span>
           </template>
@@ -178,27 +178,27 @@ useRefreshable(() => (tab.value === 'units' ? loadUnits() : loadRoi()))
         <Column header="Status">
           <template #body="{ data }"><SaleStatusBadge :status="data.sale_status" /></template>
         </Column>
-        <Column header="Visits" field="visits" sortable class="text-right">
+        <Column header="Visits" field="visits" sortable class="text-end">
           <template #body="{ data }"
             ><span class="num">{{ data.visits }}</span></template
           >
         </Column>
-        <Column header="Holds" field="holds" sortable class="text-right">
+        <Column header="Holds" field="holds" sortable class="text-end">
           <template #body="{ data }"
             ><span class="num">{{ data.holds }}</span></template
           >
         </Column>
-        <Column header="Won" field="won" sortable class="text-right">
+        <Column header="Won" field="won" sortable class="text-end">
           <template #body="{ data }"
             ><span class="num">{{ data.won }}</span></template
           >
         </Column>
-        <Column header="Conversion" field="conversion" sortable class="text-right">
+        <Column header="Conversion" field="conversion" sortable class="text-end">
           <template #body="{ data }"
             ><span class="num">{{ data.conversion }}%</span></template
           >
         </Column>
-        <Column header="Price" field="price" sortable class="text-right">
+        <Column header="Price" field="price" sortable class="text-end">
           <template #body="{ data }">
             <span class="num">{{ formatMoney(data.price) }}</span>
           </template>

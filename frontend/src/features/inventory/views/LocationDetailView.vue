@@ -232,7 +232,7 @@ async function remove(u) {
           }"
         />
         <div class="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
-        <div class="absolute bottom-0 left-0 p-5">
+        <div class="absolute bottom-0 start-0 p-5">
           <h1 class="text-2xl font-bold text-white drop-shadow-sm">{{ locations.current.name }}</h1>
           <p class="num mt-0.5 text-sm text-white/80">
             {{ locations.current.code }}
@@ -308,19 +308,19 @@ async function remove(u) {
       <Tabs value="overview" scrollable lazy>
         <TabList>
           <Tab value="overview"
-            ><i class="pi pi-info-circle mr-2" aria-hidden="true" />Overview</Tab
+            ><i class="pi pi-info-circle me-2" aria-hidden="true" />Overview</Tab
           >
           <Tab value="performance"
-            ><i class="pi pi-chart-line mr-2" aria-hidden="true" />Performance</Tab
+            ><i class="pi pi-chart-line me-2" aria-hidden="true" />Performance</Tab
           >
           <Tab v-if="canSeeFeedback" value="feedback"
-            ><i class="pi pi-comments mr-2" aria-hidden="true" />Voice of Client</Tab
+            ><i class="pi pi-comments me-2" aria-hidden="true" />Voice of Client</Tab
           >
-          <Tab value="stacking"><i class="pi pi-table mr-2" aria-hidden="true" />Stacking plan</Tab>
-          <Tab value="units"><i class="pi pi-th-large mr-2" aria-hidden="true" />Units</Tab>
-          <Tab value="boxes"><i class="pi pi-car mr-2" aria-hidden="true" />Boxes</Tab>
-          <Tab value="media"><i class="pi pi-images mr-2" aria-hidden="true" />Media</Tab>
-          <Tab value="activity"><i class="pi pi-clock mr-2" aria-hidden="true" />Activity</Tab>
+          <Tab value="stacking"><i class="pi pi-table me-2" aria-hidden="true" />Stacking plan</Tab>
+          <Tab value="units"><i class="pi pi-th-large me-2" aria-hidden="true" />Units</Tab>
+          <Tab value="boxes"><i class="pi pi-car me-2" aria-hidden="true" />Boxes</Tab>
+          <Tab value="media"><i class="pi pi-images me-2" aria-hidden="true" />Media</Tab>
+          <Tab value="activity"><i class="pi pi-clock me-2" aria-hidden="true" />Activity</Tab>
         </TabList>
         <TabPanels class="!px-0 !pt-5">
           <!-- ── Overview ── -->
@@ -330,14 +330,14 @@ async function remove(u) {
                 <dl class="space-y-2.5 text-sm">
                   <div class="flex justify-between gap-3">
                     <dt class="text-mute">Address</dt>
-                    <dd class="text-right text-ink">
+                    <dd class="text-end text-ink">
                       {{ locations.current.address || '—' }}
                       <template v-if="mapsUrl">
                         <a
                           :href="mapsUrl"
                           target="_blank"
                           rel="noopener noreferrer"
-                          class="ml-1 text-primary-600 hover:underline dark:text-primary-400"
+                          class="ms-1 text-primary-600 hover:underline dark:text-primary-400"
                         >
                           <i class="pi pi-external-link text-xs" aria-hidden="true" />
                           Maps
@@ -346,7 +346,7 @@ async function remove(u) {
                           type="button"
                           title="Copy Maps link"
                           aria-label="Copy Maps link"
-                          class="ml-1 text-primary-600 hover:underline dark:text-primary-400"
+                          class="ms-1 text-primary-600 hover:underline dark:text-primary-400"
                           @click="copyToClipboard(mapsUrl, 'Maps link copied')"
                         >
                           <i class="pi pi-copy text-xs" aria-hidden="true" />
@@ -358,7 +358,7 @@ async function remove(u) {
                           rel="noopener"
                           title="Send via WhatsApp"
                           aria-label="Send address via WhatsApp"
-                          class="ml-1 text-emerald-600 dark:text-emerald-400"
+                          class="ms-1 text-emerald-600 dark:text-emerald-400"
                         >
                           <i class="pi pi-whatsapp text-xs" aria-hidden="true" />
                         </a>
@@ -377,7 +377,7 @@ async function remove(u) {
                   </div>
                   <div class="flex justify-between gap-3">
                     <dt class="shrink-0 text-mute">Payment methods</dt>
-                    <dd class="text-right text-ink">
+                    <dd class="text-end text-ink">
                       <span
                         v-if="locations.current.payment_methods?.length"
                         class="flex flex-wrap justify-end gap-1"

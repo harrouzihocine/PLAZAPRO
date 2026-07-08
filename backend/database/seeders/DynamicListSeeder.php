@@ -6,6 +6,7 @@ namespace Database\Seeders;
 
 use App\Modules\Settings\Models\DynamicList;
 use App\Modules\Settings\Models\DynamicListItem;
+use App\Modules\Settings\Support\DefaultListTranslations;
 use Illuminate\Database\Seeder;
 
 /**
@@ -27,11 +28,14 @@ class DynamicListSeeder extends Seeder
                 ],
             );
 
+            $translations = DefaultListTranslations::map()[$key] ?? [];
+
             foreach (array_values($config['items']) as $order => $item) {
                 $row = DynamicListItem::firstOrCreate(
                     ['dynamic_list_id' => $list->id, 'value' => $item['value']],
                     [
                         'label' => $item['label'],
+                        'label_translations' => $translations[$item['value']] ?? null,
                         'sort_order' => $order,
                         'is_active' => true,
                         'meta' => $item['meta'] ?? null,
@@ -46,6 +50,13 @@ class DynamicListSeeder extends Seeder
                     if ($merged !== $meta) {
                         $row->update(['meta' => $merged]);
                     }
+                }
+
+                // Same idea for the default en/fr/ar labels: fill only where an
+                // admin never set translations (the migration backfilled live
+                // rows; this covers rows created between then and a reseed).
+                if ($row->label_translations === null && isset($translations[$item['value']])) {
+                    $row->update(['label_translations' => $translations[$item['value']]]);
                 }
             }
         }

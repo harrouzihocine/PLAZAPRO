@@ -24,10 +24,10 @@ onMounted(() => window.addEventListener('keydown', onKey))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 const SOURCES = [
-  { kind: 'camera-photo', label: 'Camera', icon: 'pi pi-camera', bg: 'bg-rose-500' },
-  { kind: 'camera-video', label: 'Video', icon: 'pi pi-video', bg: 'bg-purple-500' },
-  { kind: 'library', label: 'Gallery', icon: 'pi pi-images', bg: 'bg-emerald-500' },
-  { kind: 'document', label: 'Document', icon: 'pi pi-file', bg: 'bg-sky-500' },
+  { kind: 'camera-photo', labelKey: 'attach.camera', icon: 'pi pi-camera', bg: 'bg-rose-500' },
+  { kind: 'camera-video', labelKey: 'attach.video', icon: 'pi pi-video', bg: 'bg-purple-500' },
+  { kind: 'library', labelKey: 'attach.gallery', icon: 'pi pi-images', bg: 'bg-emerald-500' },
+  { kind: 'document', labelKey: 'attach.document', icon: 'pi pi-file', bg: 'bg-sky-500' },
 ]
 const shown = computed(() =>
   props.kinds ? SOURCES.filter((s) => props.kinds.includes(s.kind)) : SOURCES,
@@ -60,7 +60,7 @@ const shown = computed(() =>
             >
               <i :class="s.icon" class="text-xl" aria-hidden="true" />
             </span>
-            <span class="text-xs text-ink">{{ s.label }}</span>
+            <span class="text-xs text-ink">{{ $t(s.labelKey) }}</span>
           </button>
         </div>
       </div>

@@ -131,7 +131,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <button
           v-if="index > 0"
           type="button"
-          class="absolute left-2 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white sm:flex"
+          class="absolute start-2 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white sm:flex"
           aria-label="Previous image"
           @click.stop="go(-1)"
         >
@@ -140,7 +140,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <button
           v-if="index < items.length - 1"
           type="button"
-          class="absolute right-2 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white sm:flex"
+          class="absolute end-2 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white sm:flex"
           aria-label="Next image"
           @click.stop="go(1)"
         >

@@ -58,8 +58,8 @@ function isNum(col) {
     <div v-if="data.items?.length" class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
-          <tr class="text-left text-xs text-mute">
-            <th v-for="c in columns" :key="c.key" class="py-1.5 pr-3 font-medium">{{ c.label }}</th>
+          <tr class="text-start text-xs text-mute">
+            <th v-for="c in columns" :key="c.key" class="py-1.5 pe-3 font-medium">{{ c.label }}</th>
             <th v-if="$slots.action" />
           </tr>
         </thead>
@@ -74,12 +74,12 @@ function isNum(col) {
             <td
               v-for="c in columns"
               :key="c.key"
-              class="py-2 pr-3 text-ink"
+              class="py-2 pe-3 text-ink"
               :class="{ num: isNum(c) }"
             >
               {{ cell(item, c) }}
             </td>
-            <td v-if="$slots.action" class="py-1 text-right" @click.stop>
+            <td v-if="$slots.action" class="py-1 text-end" @click.stop>
               <slot name="action" :item="item" />
             </td>
           </tr>

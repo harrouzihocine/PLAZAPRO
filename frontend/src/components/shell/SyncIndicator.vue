@@ -8,6 +8,7 @@ import { useOutboxStore } from '@/features/offline/outboxStore'
 import { useNetworkStore } from '@/features/offline/networkStore'
 import { confirmAction } from '@/composables/useConfirm'
 import { timeAgo } from '@/utils/format'
+import { t } from '@/i18n'
 
 // The Sync Center: offline changes waiting to sync, and the ones the server
 // rejected on reconnect — each with the server's own reason ("This visit is
@@ -33,9 +34,9 @@ function view(item) {
 async function discard(item) {
   if (
     await confirmAction({
-      title: 'Discard this change?',
-      text: `"${item.label}" will not be sent to the server.`,
-      confirmText: 'Discard',
+      title: t('sync.discardTitle'),
+      text: t('sync.discardText', { label: item.label }),
+      confirmText: t('sync.discard'),
       danger: true,
     })
   ) {
@@ -56,7 +57,7 @@ async function discard(item) {
         text
         rounded
         severity="secondary"
-        :aria-label="`Offline changes (${outbox.badge})`"
+        :aria-label="$t('sync.offlineChangesAria', { n: outbox.badge })"
         @click="panel.toggle($event)"
       />
     </OverlayBadge>
@@ -64,18 +65,14 @@ async function discard(item) {
     <Popover ref="panel" class="w-96 max-w-[92vw]" :pt="{ content: { class: '!p-0' } }">
       <div class="flex items-center justify-between border-b border-line px-4 py-3">
         <div>
-          <span class="text-sm font-semibold text-ink">Sync</span>
+          <span class="text-sm font-semibold text-ink">{{ $t('sync.title') }}</span>
           <p class="mt-0.5 text-xs text-mute">
-            {{
-              network.online
-                ? 'Changes made offline and their sync outcome.'
-                : "You're offline — these will send when you reconnect."
-            }}
+            {{ network.online ? $t('sync.onlineHint') : $t('sync.offlineHint') }}
           </p>
         </div>
         <Button
           v-if="network.online && outbox.pendingCount"
-          label="Sync now"
+          :label="$t('sync.syncNow')"
           icon="pi pi-sync"
           size="small"
           text
@@ -109,7 +106,7 @@ async function discard(item) {
                   class="font-medium text-primary-600 hover:underline dark:text-primary-400"
                   @click="view(item)"
                 >
-                  View record
+                  {{ $t('sync.viewRecord') }}
                 </button>
                 <button
                   v-if="item.status === 'failed'"
@@ -117,14 +114,14 @@ async function discard(item) {
                   class="font-medium text-primary-600 hover:underline dark:text-primary-400"
                   @click="outbox.retry(item.uuid)"
                 >
-                  Retry
+                  {{ $t('common.retry') }}
                 </button>
                 <button
                   type="button"
                   class="font-medium text-mute hover:underline"
                   @click="discard(item)"
                 >
-                  Discard
+                  {{ $t('sync.discard') }}
                 </button>
               </div>
             </div>

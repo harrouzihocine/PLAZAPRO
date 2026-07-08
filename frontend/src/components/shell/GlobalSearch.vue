@@ -5,6 +5,7 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import { useApi } from '@/composables/useApi'
 import { useAuthStore } from '@/features/settings/store'
+import { t } from '@/i18n'
 import { fullName } from '@/utils/names'
 
 // Ctrl+K command palette: one box that finds clients, locations and units.
@@ -40,9 +41,9 @@ onMounted(() => window.addEventListener('keydown', onKeydown))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 const GROUPS = [
-  { key: 'clients', label: 'Clients', icon: 'pi pi-user', permission: 'clients.view' },
-  { key: 'locations', label: 'Locations', icon: 'pi pi-building', permission: 'units.view' },
-  { key: 'units', label: 'Units', icon: 'pi pi-th-large', permission: 'units.view' },
+  { key: 'clients', labelKey: 'nav.clients', icon: 'pi pi-user', permission: 'clients.view' },
+  { key: 'locations', labelKey: 'nav.locations', icon: 'pi pi-building', permission: 'units.view' },
+  { key: 'units', labelKey: 'nav.units', icon: 'pi pi-th-large', permission: 'units.view' },
 ]
 
 async function search(term) {
@@ -103,7 +104,7 @@ function describe(kind, row) {
     }
   }
   return {
-    title: `Unit ${row.reference}`,
+    title: t('search.unitTitle', { ref: row.reference }),
     meta: [row.location?.name, row.type?.label ?? row.type?.value].filter(Boolean).join(' · '),
     to: `/inventory/units/${row.id}`,
   }
@@ -158,7 +159,7 @@ defineExpose({ show })
       <InputText
         ref="input"
         v-model="query"
-        placeholder="Search clients, locations, units…"
+        :placeholder="$t('search.placeholder')"
         class="w-full !border-0 !bg-transparent !py-3.5 !shadow-none focus:!outline-none"
         @keydown.down.prevent="move(1)"
         @keydown.up.prevent="move(-1)"
@@ -172,13 +173,13 @@ defineExpose({ show })
 
     <div class="max-h-[50vh] overflow-y-auto p-2">
       <p v-if="query.trim().length < 2" class="px-3 py-6 text-center text-sm text-mute">
-        Type at least 2 characters — try a client name, phone, unit reference…
+        {{ $t('search.hint') }}
       </p>
       <p v-else-if="searching && !results.length" class="px-3 py-6 text-center text-sm text-mute">
-        Searching…
+        {{ $t('search.searching') }}
       </p>
       <p v-else-if="!results.length" class="px-3 py-6 text-center text-sm text-mute">
-        No match for “{{ query }}”.
+        {{ $t('search.noMatch', { query }) }}
       </p>
 
       <template v-for="item in grouped" :key="item.group.key + '-' + item.row.id">
@@ -186,11 +187,11 @@ defineExpose({ show })
           v-if="item.first"
           class="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-mute"
         >
-          {{ item.group.label }}
+          {{ $t(item.group.labelKey) }}
         </p>
         <button
           type="button"
-          class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left"
+          class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-start"
           :class="
             item.index === active
               ? 'bg-highlight'

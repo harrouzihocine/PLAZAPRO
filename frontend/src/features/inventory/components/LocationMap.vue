@@ -254,7 +254,7 @@ onBeforeUnmount(() => {
         <li v-for="r in results" :key="r.place_id">
           <button
             type="button"
-            class="block w-full px-3 py-2 text-left text-sm text-ink hover:bg-highlight"
+            class="block w-full px-3 py-2 text-start text-sm text-ink hover:bg-highlight"
             @click="pick(r)"
           >
             {{ r.display_name }}
@@ -305,7 +305,7 @@ onBeforeUnmount(() => {
 
       <button
         type="button"
-        class="absolute right-2 top-2 z-[1000] flex items-center justify-center rounded-lg border border-line bg-card p-2 text-ink shadow-card hover:opacity-90"
+        class="absolute end-2 top-2 z-[1000] flex items-center justify-center rounded-lg border border-line bg-card p-2 text-ink shadow-card hover:opacity-90"
         :aria-label="expanded ? 'Close full-screen map' : 'Expand map'"
         :title="expanded ? 'Close' : 'Expand map'"
         @click="toggleExpanded()"

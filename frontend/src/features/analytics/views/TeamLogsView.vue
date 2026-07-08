@@ -189,12 +189,12 @@ useAutoFilter(
       <div v-else class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="text-left text-xs text-mute">
+            <tr class="text-start text-xs text-mute">
               <th class="px-4 py-2.5 font-medium sm:px-5">When</th>
-              <th v-if="canViewAll" class="py-2.5 pr-3 font-medium">User</th>
-              <th class="py-2.5 pr-3 font-medium">Type</th>
-              <th class="py-2.5 pr-3 font-medium">Client</th>
-              <th class="py-2.5 pr-4 font-medium">Detail</th>
+              <th v-if="canViewAll" class="py-2.5 pe-3 font-medium">User</th>
+              <th class="py-2.5 pe-3 font-medium">Type</th>
+              <th class="py-2.5 pe-3 font-medium">Client</th>
+              <th class="py-2.5 pe-4 font-medium">Detail</th>
             </tr>
           </thead>
           <tbody>
@@ -204,8 +204,8 @@ useAutoFilter(
               class="border-t border-line transition-colors hover:bg-surface-50 dark:hover:bg-surface-900"
             >
               <td class="num whitespace-nowrap px-4 py-2.5 sm:px-5">{{ formatDateTime(row.at) }}</td>
-              <td v-if="canViewAll" class="py-2.5 pr-3">{{ row.user ?? '—' }}</td>
-              <td class="py-2.5 pr-3">
+              <td v-if="canViewAll" class="py-2.5 pe-3">{{ row.user ?? '—' }}</td>
+              <td class="py-2.5 pe-3">
                 <span class="inline-flex items-center gap-1.5">
                   <i :class="(KIND[row.kind] ?? {}).icon ?? 'pi pi-circle'" class="text-mute" aria-hidden="true" />
                   {{ (KIND[row.kind] ?? {}).label ?? row.kind }}
@@ -218,7 +218,7 @@ useAutoFilter(
                   </span>
                 </span>
               </td>
-              <td class="py-2.5 pr-3">
+              <td class="py-2.5 pe-3">
                 <RouterLink
                   v-if="row.link"
                   :to="row.link"
@@ -228,7 +228,7 @@ useAutoFilter(
                 </RouterLink>
                 <span v-else>{{ row.client ?? '—' }}</span>
               </td>
-              <td class="py-2.5 pr-4 text-mute">{{ row.detail ?? '—' }}</td>
+              <td class="py-2.5 pe-4 text-mute">{{ row.detail ?? '—' }}</td>
             </tr>
           </tbody>
         </table>

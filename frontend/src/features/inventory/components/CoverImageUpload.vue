@@ -101,12 +101,12 @@ function end() {
 
       <div
         v-if="modelValue"
-        class="pointer-events-none absolute left-2 top-2 rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white"
+        class="pointer-events-none absolute start-2 top-2 rounded bg-black/55 px-1.5 py-0.5 text-[10px] text-white"
       >
         <i class="pi pi-arrows-alt" aria-hidden="true" /> Drag to reposition
       </div>
 
-      <div class="absolute bottom-2 right-2 flex gap-1.5" @pointerdown.stop>
+      <div class="absolute bottom-2 end-2 flex gap-1.5" @pointerdown.stop>
         <Button
           :label="modelValue ? 'Change' : 'Upload'"
           icon="pi pi-upload"

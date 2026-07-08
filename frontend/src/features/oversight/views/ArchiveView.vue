@@ -324,7 +324,7 @@ function ageLabel(days) {
       <div v-else class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="text-left text-xs text-mute">
+            <tr class="text-start text-xs text-mute">
               <th v-if="canReactivate" class="w-8 px-4 py-2.5 sm:px-5">
                 <input
                   type="checkbox"
@@ -333,16 +333,16 @@ function ageLabel(days) {
                   @change="toggleAll"
                 />
               </th>
-              <th class="py-2.5 pr-3 font-medium" :class="canReactivate ? '' : 'px-4 sm:px-5'">
+              <th class="py-2.5 pe-3 font-medium" :class="canReactivate ? '' : 'px-4 sm:px-5'">
                 Client
               </th>
-              <th class="py-2.5 pr-3 font-medium">Project</th>
-              <th class="py-2.5 pr-3 font-medium">Price</th>
-              <th class="py-2.5 pr-3 font-medium">Reason</th>
-              <th class="py-2.5 pr-3 font-medium">Opened by</th>
-              <th class="py-2.5 pr-3 font-medium">Archived</th>
-              <th class="py-2.5 pr-3 font-medium">Age</th>
-              <th class="py-2.5 pr-4"></th>
+              <th class="py-2.5 pe-3 font-medium">Project</th>
+              <th class="py-2.5 pe-3 font-medium">Price</th>
+              <th class="py-2.5 pe-3 font-medium">Reason</th>
+              <th class="py-2.5 pe-3 font-medium">Opened by</th>
+              <th class="py-2.5 pe-3 font-medium">Archived</th>
+              <th class="py-2.5 pe-3 font-medium">Age</th>
+              <th class="py-2.5 pe-4"></th>
             </tr>
           </thead>
           <tbody>
@@ -361,24 +361,24 @@ function ageLabel(days) {
                 />
               </td>
               <td
-                class="py-2.5 pr-3 font-medium text-ink"
+                class="py-2.5 pe-3 font-medium text-ink"
                 :class="canReactivate ? '' : 'px-4 sm:px-5'"
               >
                 {{ row.client ?? '—' }}
               </td>
-              <td class="py-2.5 pr-3 text-mute">
+              <td class="py-2.5 pe-3 text-mute">
                 <span v-if="row.unit" class="num text-ink">{{ row.unit }}</span>
                 <span v-if="row.location"> · {{ row.location }}</span>
                 <span v-if="!row.unit && !row.location">—</span>
               </td>
-              <td class="num py-2.5 pr-3 text-ink">{{ row.price ? formatMoney(row.price) : '—' }}</td>
-              <td class="py-2.5 pr-3 text-mute">{{ row.reason ?? '—' }}</td>
-              <td class="py-2.5 pr-3 text-mute">{{ row.opened_by ?? '—' }}</td>
-              <td class="num py-2.5 pr-3 whitespace-nowrap text-mute">
+              <td class="num py-2.5 pe-3 text-ink">{{ row.price ? formatMoney(row.price) : '—' }}</td>
+              <td class="py-2.5 pe-3 text-mute">{{ row.reason ?? '—' }}</td>
+              <td class="py-2.5 pe-3 text-mute">{{ row.opened_by ?? '—' }}</td>
+              <td class="num py-2.5 pe-3 whitespace-nowrap text-mute">
                 {{ formatDateTime(row.archived_at) }}
               </td>
-              <td class="num py-2.5 pr-3 text-mute">{{ ageLabel(row.age_days) }}</td>
-              <td class="py-1 pr-4 text-right" @click.stop>
+              <td class="num py-2.5 pe-3 text-mute">{{ ageLabel(row.age_days) }}</td>
+              <td class="py-1 pe-4 text-end" @click.stop>
                 <Button
                   v-if="canReactivate"
                   label="Reactivate"

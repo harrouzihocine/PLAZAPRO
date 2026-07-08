@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { useApi } from '@/composables/useApi'
+import { currentLocale } from '@/i18n'
 
 // The single consumer every dropdown reuses. Fetches a dynamic list's active
 // items by key from GET /dynamic-lists/{key} and caches them app-wide, so the
@@ -60,4 +61,22 @@ export function useDynamicList(key) {
 export function invalidateDynamicList(key) {
   const entry = cache.get(key)
   if (entry) entry.promise = null
+}
+
+// The item's display label in the current UI language, falling back to the
+// base label. Every dropdown / card that renders a list item uses this —
+// reading item.label directly would ignore the admin-managed translations.
+export function itemLabel(item) {
+  if (!item) return ''
+  return item.label_translations?.[currentLocale()] ?? item.label ?? ''
+}
+
+// Resolve a stored VALUE (e.g. a unit's property_type) back to its translated
+// label through the cached list. Falls back to the raw value while the list
+// is still loading or for values no longer in the list.
+export function valueLabel(listKey, value) {
+  if (value == null || value === '') return ''
+  const items = cache.get(listKey)?.items?.value ?? []
+  const item = items.find((i) => i.value === value)
+  return item ? itemLabel(item) : String(value)
 }

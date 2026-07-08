@@ -424,7 +424,7 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
       <p v-if="loading" class="py-4 text-center text-sm text-mute">Loading…</p>
       <template v-else>
         <p v-if="!pending.length" class="mb-2 text-sm text-mute">
-          <i class="pi pi-check-circle mr-1 text-success" aria-hidden="true" />
+          <i class="pi pi-check-circle me-1 text-success" aria-hidden="true" />
           No visit waiting for an agent — drop one here to un-assign it.
         </p>
         <draggable
@@ -527,13 +527,13 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
         <table class="w-full border-collapse text-sm" :class="viewDay ? 'min-w-[1100px]' : 'min-w-[900px]'">
           <thead>
             <tr>
-              <th class="sticky left-0 z-10 border-b border-line bg-card px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-mute">
+              <th class="sticky start-0 z-10 border-b border-line bg-card px-3 py-2 text-start text-xs font-semibold uppercase tracking-wide text-mute">
                 Agent
               </th>
               <th
                 v-for="col in columns"
                 :key="col.key"
-                class="border-b border-l border-line px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide"
+                class="border-b border-s border-line px-2 py-2 text-start text-xs font-semibold uppercase tracking-wide"
                 :class="col.isToday ? 'bg-highlight text-primary-700 dark:text-primary-300' : col.isPast ? 'text-mute/50' : 'text-mute'"
               >
                 <!-- A day header zooms into that day's hours; past slots wear
@@ -550,7 +550,7 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
                   <i class="pi pi-search-plus text-[10px] opacity-40 transition-opacity group-hover:opacity-100" aria-hidden="true" />
                 </button>
                 <template v-else>
-                  <i v-if="col.isPast" class="pi pi-ban mr-1 text-[10px] text-danger/60" aria-hidden="true" />
+                  <i v-if="col.isPast" class="pi pi-ban me-1 text-[10px] text-danger/60" aria-hidden="true" />
                   {{ col.label }}
                 </template>
               </th>
@@ -558,7 +558,7 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
           </thead>
           <tbody>
             <tr v-for="agent in agents" :key="agent.id" class="align-top">
-              <th class="sticky left-0 z-10 border-b border-line bg-card px-3 py-2 text-left font-medium text-ink">
+              <th class="sticky start-0 z-10 border-b border-line bg-card px-3 py-2 text-start font-medium text-ink">
                 {{ agent.name }}
                 <span class="num mt-0.5 block text-xs font-normal text-mute">
                   {{ agentCount(agent.id) }} {{ viewDay ? 'this day' : 'this week' }}
@@ -567,7 +567,7 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
               <td
                 v-for="col in columns"
                 :key="col.key"
-                class="border-b border-l border-line p-1.5"
+                class="border-b border-s border-line p-1.5"
                 :class="{
                   'forbidden-zone bg-surface-50 dark:bg-surface-900/40': col.isPast,
                   'bg-surface-50 dark:bg-surface-900/40': col.kind === 'untimed',
@@ -596,7 +596,7 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
                     >
                       <button
                         type="button"
-                        class="flex w-full items-center gap-1.5 text-left"
+                        class="flex w-full items-center gap-1.5 text-start"
                         @click="showDetails($event, element)"
                       >
                         <i :class="TYPE_ICONS[element.type]" aria-hidden="true" />

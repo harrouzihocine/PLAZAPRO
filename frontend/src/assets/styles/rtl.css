@@ -1,0 +1,28 @@
+/* Right-to-left (Arabic) fixes that class utilities can't express.
+   Everything keys off <html dir="rtl">, stamped by @/i18n setLocale(). */
+
+/* Directional glyphs mirror so "back" still points backwards and "forward"
+   still points forwards. Vertical icons (chevron-down…) are unaffected. */
+[dir='rtl'] .pi-chevron-left,
+[dir='rtl'] .pi-chevron-right,
+[dir='rtl'] .pi-arrow-left,
+[dir='rtl'] .pi-arrow-right,
+[dir='rtl'] .pi-angle-left,
+[dir='rtl'] .pi-angle-right,
+[dir='rtl'] .pi-angle-double-left,
+[dir='rtl'] .pi-angle-double-right,
+[dir='rtl'] .pi-caret-left,
+[dir='rtl'] .pi-caret-right,
+[dir='rtl'] .pi-reply,
+[dir='rtl'] .pi-send,
+[dir='rtl'] .pi-sign-out,
+[dir='rtl'] .pi-sign-in {
+  transform: scaleX(-1);
+}
+
+/* Phone numbers, references and other Latin fragments keep their LTR reading
+   order inside Arabic sentences. Apply .ltr-data to spans that hold them. */
+[dir='rtl'] .ltr-data {
+  direction: ltr;
+  unicode-bidi: isolate;
+}

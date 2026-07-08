@@ -471,7 +471,7 @@ async function submitDirectDeal() {
               </div>
               <div v-if="project.unit" class="flex justify-between gap-2">
                 <dt class="text-mute">Unit</dt>
-                <dd class="text-right font-medium text-ink">{{ project.unit.reference }}</dd>
+                <dd class="text-end font-medium text-ink">{{ project.unit.reference }}</dd>
               </div>
               <div v-if="project.unit?.price" class="flex justify-between gap-2">
                 <dt class="text-mute">List price</dt>
@@ -483,7 +483,7 @@ async function submitDirectDeal() {
               </div>
               <div v-if="project.location" class="flex justify-between gap-2">
                 <dt class="text-mute">Location</dt>
-                <dd class="text-right text-ink">{{ project.location.name }}</dd>
+                <dd class="text-end text-ink">{{ project.location.name }}</dd>
               </div>
               <div class="flex justify-between gap-2">
                 <dt class="text-mute">Opened</dt>

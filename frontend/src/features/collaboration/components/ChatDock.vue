@@ -96,7 +96,7 @@ async function startChat(userId) {
 <template>
   <div
     v-if="!dock.suspended && !nativePhone"
-    class="fixed bottom-20 right-3 z-40 flex items-end gap-2.5 pb-[env(safe-area-inset-bottom)] lg:bottom-5 lg:right-5"
+    class="fixed bottom-20 end-3 z-40 flex items-end gap-2.5 pb-[env(safe-area-inset-bottom)] lg:bottom-5 lg:end-5"
   >
     <!-- Popup threads, side by side next to the launcher column -->
     <ChatDockWindow v-for="id in windows" :key="id" :conversation-id="id" />
@@ -145,7 +145,7 @@ async function startChat(userId) {
             <li v-for="c in shownConversations" :key="c.id">
               <button
                 type="button"
-                class="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-50 dark:hover:bg-surface-800"
+                class="flex w-full items-center gap-3 px-3 py-2.5 text-start transition-colors hover:bg-surface-50 dark:hover:bg-surface-800"
                 @click="dock.open(c.id)"
               >
                 <Avatar
@@ -188,7 +188,7 @@ async function startChat(userId) {
               <li v-for="u in shownContacts" :key="u.id">
                 <button
                   type="button"
-                  class="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-50 disabled:opacity-60 dark:hover:bg-surface-800"
+                  class="flex w-full items-center gap-3 px-3 py-2.5 text-start transition-colors hover:bg-surface-50 disabled:opacity-60 dark:hover:bg-surface-800"
                   :disabled="startingId !== null"
                   @click="startChat(u.id)"
                 >
@@ -223,13 +223,13 @@ async function startChat(userId) {
             {{ initials(c.title ?? 'C') }}
           </button>
           <span
-            class="num pointer-events-none absolute -right-1 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-white"
+            class="num pointer-events-none absolute -end-1 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-white"
           >
             {{ c.unread_count > 99 ? '99+' : c.unread_count }}
           </span>
           <button
             type="button"
-            class="absolute -left-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-surface-500 text-white group-hover:flex"
+            class="absolute -start-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-surface-500 text-white group-hover:flex"
             :aria-label="`Dismiss ${c.title ?? 'conversation'}`"
             @click.stop="dock.dismiss(c.id)"
           >
@@ -258,7 +258,7 @@ async function startChat(userId) {
         </button>
         <span
           v-if="dock.totalUnread > 0 && !dock.panelOpen"
-          class="num pointer-events-none absolute -right-1 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-white"
+          class="num pointer-events-none absolute -end-1 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-white"
         >
           {{ dock.totalUnread > 99 ? '99+' : dock.totalUnread }}
         </span>

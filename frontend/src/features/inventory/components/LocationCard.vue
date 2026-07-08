@@ -39,7 +39,7 @@ defineEmits(['edit', 'archive', 'remove'])
       <GtmPriorityBadge
         v-if="loc.gtm_priority"
         :priority="loc.gtm_priority"
-        class="absolute right-2 top-2"
+        class="absolute end-2 top-2"
       />
     </div>
 

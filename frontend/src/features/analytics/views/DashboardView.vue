@@ -164,7 +164,7 @@ useRefreshable(load) // pull-to-refresh (APK)
           empty {{ data.my_empty_clients === 1 ? 'client' : 'clients' }} — captured but not yet
           worked. Follow up so nothing goes cold.
         </span>
-        <i class="pi pi-chevron-right ml-auto text-mute" aria-hidden="true" />
+        <i class="pi pi-chevron-right ms-auto text-mute" aria-hidden="true" />
       </RouterLink>
 
       <!-- This month — my own activity. -->

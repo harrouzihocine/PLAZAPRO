@@ -95,7 +95,7 @@ async function onSheetPick(key) {
     <div class="border-b border-line px-3 pb-2 pt-2 sm:px-4">
       <div class="relative">
         <i
-          class="pi pi-search pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-mute"
+          class="pi pi-search pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-xs text-mute"
           aria-hidden="true"
         />
         <input
@@ -103,7 +103,7 @@ async function onSheetPick(key) {
           type="search"
           placeholder="Search conversations…"
           aria-label="Search conversations"
-          class="w-full rounded-full border border-line bg-ground py-2 pl-9 pr-3.5 text-sm text-ink outline-none transition-colors focus:border-primary native:py-2.5"
+          class="w-full rounded-full border border-line bg-ground py-2 ps-9 pe-3.5 text-sm text-ink outline-none transition-colors focus:border-primary native:py-2.5"
         />
       </div>
       <div v-if="isNative" class="scrollbar-none -mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1">
@@ -140,7 +140,7 @@ async function onSheetPick(key) {
         <li v-for="c in shown" :key="c.id">
           <button
             type="button"
-            class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-50 native:py-3.5 native:active:bg-highlight sm:px-5 dark:hover:bg-surface-800"
+            class="flex w-full items-center gap-3 px-4 py-3 text-start transition-colors hover:bg-surface-50 native:py-3.5 native:active:bg-highlight sm:px-5 dark:hover:bg-surface-800"
             :class="selectedId === c.id && 'bg-highlight hover:!bg-highlight'"
             @click="emit('select', c.id)"
             @touchstart="pressStart(c)"
@@ -158,7 +158,7 @@ async function onSheetPick(key) {
               />
               <span
                 v-if="isNative && otherOf(c) && presence.isOnline(otherOf(c).id)"
-                class="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-card bg-green-500"
+                class="absolute bottom-0 end-0 h-3.5 w-3.5 rounded-full border-2 border-card bg-green-500"
                 aria-label="Online"
               />
             </span>
@@ -170,7 +170,7 @@ async function onSheetPick(key) {
                 >
                   <i
                     v-if="c.type === 'project'"
-                    class="pi pi-folder mr-1 text-xs text-mute"
+                    class="pi pi-folder me-1 text-xs text-mute"
                     title="Project chat"
                     aria-hidden="true"
                   />

@@ -10,6 +10,7 @@ import {
   formatNational,
   toNationalNumber,
 } from '@/data/countryCodes'
+import { t } from '@/i18n'
 
 const props = defineProps({
   label: { type: String, default: '' },
@@ -23,10 +24,11 @@ const emit = defineEmits(['update:modelValue'])
 
 const favorites = COUNTRY_CODES.filter((c) => c.favorite)
 const rest = COUNTRY_CODES.filter((c) => !c.favorite)
-const dialGroups = [
-  { label: 'Favorites', items: favorites },
-  { label: 'All countries', items: rest },
-]
+// computed so the group headers re-render when the UI language changes
+const dialGroups = computed(() => [
+  { label: t('common.favorites'), items: favorites },
+  { label: t('common.allCountries'), items: rest },
+])
 // First entry wins for shared dial codes (e.g. +1) — favorites come first.
 const byDial = Object.fromEntries([...COUNTRY_CODES].reverse().map((c) => [c.dial, c]))
 
@@ -95,7 +97,7 @@ function normalizeField() {
         option-group-children="items"
         filter
         :filter-fields="['name', 'dial']"
-        aria-label="Country dialing code"
+        :aria-label="$t('common.dialCode')"
         class="w-32 shrink-0"
         @update:model-value="emitValue"
       >

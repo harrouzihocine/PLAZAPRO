@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import Select from 'primevue/select'
+import { t } from '@/i18n'
 
 // Searchable, clearable single-select on PrimeVue Select, keeping the historic
 // contract: modelValue '' means none, options are { value, label, disabled? },
@@ -11,7 +12,7 @@ const props = defineProps({
   required: { type: Boolean, default: false },
   modelValue: { type: [String, Number], default: '' },
   options: { type: Array, default: () => [] },
-  placeholder: { type: String, default: 'Select…' },
+  placeholder: { type: String, default: null }, // null → localized "Select…"
   clearable: { type: Boolean, default: true },
   disabled: { type: Boolean, default: false },
   ariaLabel: { type: String, default: '' },
@@ -19,6 +20,8 @@ const props = defineProps({
   searchable: { type: [Boolean, String], default: 'auto' },
 })
 const emit = defineEmits(['update:modelValue', 'change'])
+
+const placeholderText = computed(() => props.placeholder ?? t('common.selectEllipsis'))
 
 const showFilter = computed(() =>
   props.searchable === 'auto' ? props.options.length > 6 : Boolean(props.searchable),
@@ -57,7 +60,7 @@ function onChange(next) {
       option-label="label"
       option-value="value"
       option-disabled="disabled"
-      :placeholder="placeholder"
+      :placeholder="placeholderText"
       :disabled="disabled"
       :show-clear="clearable && value !== null"
       :filter="showFilter"
@@ -81,7 +84,7 @@ function onChange(next) {
           />
           <span>{{ selectedOption.label }}</span>
         </span>
-        <span v-else class="text-mute">{{ v == null ? placeholder : v }}</span>
+        <span v-else class="text-mute">{{ v == null ? placeholderText : v }}</span>
       </template>
     </Select>
   </label>

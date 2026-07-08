@@ -310,7 +310,7 @@ const isExpanded = (e) => expanded.value.has(keyOf(e))
           <!-- Notes get their own quoted block — the heart of the log. -->
           <div v-if="e.data.notes">
             <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-mute">Notes</p>
-            <p class="whitespace-pre-line rounded-lg border-l-2 border-primary-300 bg-surface-50 px-3 py-2 text-ink dark:border-primary-500/40 dark:bg-surface-800/50">
+            <p class="whitespace-pre-line rounded-lg border-s-2 border-primary-300 bg-surface-50 px-3 py-2 text-ink dark:border-primary-500/40 dark:bg-surface-800/50">
               {{ e.data.notes }}
             </p>
           </div>

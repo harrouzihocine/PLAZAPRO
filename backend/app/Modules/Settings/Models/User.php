@@ -11,6 +11,7 @@ use App\Core\Exceptions\RecordDeletionException;
 use App\Modules\Analytics\Models\ActivityLog;
 use App\Modules\Collaboration\Notifications\DomainNotification;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -22,7 +23,7 @@ use Laravel\Sanctum\HasApiTokens;
  * A system user. Exactly one role. Users are deactivated/cancelled, never
  * hard-deleted, and their changes are audited (Cancellable + LogsActivity).
  */
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable implements HasLocalePreference, MustVerifyEmail
 {
     use Cancellable;      // deactivate/cancel instead of delete
     use HasApiTokens;     // Sanctum
@@ -39,6 +40,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'department_id',
         'phone',
         'avatar_path',
+        'locale',
         'is_active',
     ];
 
@@ -58,6 +60,17 @@ class User extends Authenticatable implements MustVerifyEmail
             'push_prefs' => 'array',
             'status' => RecordStatus::class,
         ];
+    }
+
+    /**
+     * The language this user's notifications, push messages and digest render
+     * in (Laravel wraps notification building in this locale automatically).
+     * The per-request UI language is handled separately by the SetLocale
+     * middleware — this is for work that runs outside their requests.
+     */
+    public function preferredLocale(): string
+    {
+        return $this->locale ?? config('app.locale');
     }
 
     public function role(): BelongsTo

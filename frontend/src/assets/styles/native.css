@@ -186,7 +186,7 @@ html.native .app-exit-hint-show {
   html.native .p-button.native-fab {
     /* !important: the ripple directive stamps position:relative inline */
     position: fixed !important;
-    right: 1rem;
+    inset-inline-end: 1rem; /* mirrors to the left edge in RTL (Arabic) */
     bottom: 6rem; /* clears the bottom tab bar — same spot as the chat FAB */
     z-index: 30;
     width: 3.5rem;

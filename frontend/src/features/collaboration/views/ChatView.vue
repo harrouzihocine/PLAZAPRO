@@ -95,7 +95,7 @@ function resetModal() {
     v-if="twoPane"
     class="flex h-[calc(100dvh-11.5rem)] min-h-[24rem] overflow-hidden rounded-xl border border-line bg-card shadow-card lg:h-[calc(100vh-7.5rem)]"
   >
-    <div class="flex w-[21rem] shrink-0 flex-col border-r border-line xl:w-[24rem]">
+    <div class="flex w-[21rem] shrink-0 flex-col border-e border-line xl:w-[24rem]">
       <div class="flex items-center justify-between px-4 pb-1 pt-3">
         <h1 class="text-lg font-bold text-ink">Chats</h1>
         <Button
@@ -160,7 +160,7 @@ function resetModal() {
     <button
       v-if="isNative"
       type="button"
-      class="fixed bottom-24 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-contrast shadow-pop transition-transform active:scale-95 lg:bottom-8"
+      class="fixed bottom-24 end-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-contrast shadow-pop transition-transform active:scale-95 lg:bottom-8"
       aria-label="New conversation"
       @click="modalOpen = true"
     >
@@ -177,7 +177,7 @@ function resetModal() {
     @update:visible="(v) => !v && resetModal()"
   >
     <template #header>
-      <span class="flex w-full items-center justify-between gap-3 pr-2">
+      <span class="flex w-full items-center justify-between gap-3 pe-2">
         <span class="font-semibold text-ink">{{ groupMode ? 'New group' : 'New message' }}</span>
         <Button
           :label="groupMode ? 'Direct message' : 'New group'"
@@ -193,7 +193,7 @@ function resetModal() {
       <BaseInput v-model="groupTitle" label="Group name" required />
       <div class="relative mt-4">
         <i
-          class="pi pi-search pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-mute"
+          class="pi pi-search pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-xs text-mute"
           aria-hidden="true"
         />
         <input
@@ -201,7 +201,7 @@ function resetModal() {
           type="search"
           placeholder="Search people…"
           aria-label="Search people"
-          class="w-full rounded-full border border-line bg-ground py-2 pl-9 pr-3.5 text-sm text-ink outline-none transition-colors focus:border-primary native:py-2.5"
+          class="w-full rounded-full border border-line bg-ground py-2 ps-9 pe-3.5 text-sm text-ink outline-none transition-colors focus:border-primary native:py-2.5"
         />
       </div>
       <div class="my-4 max-h-60 space-y-0.5 overflow-y-auto">
@@ -231,7 +231,7 @@ function resetModal() {
     <template v-else>
       <div class="relative mb-3">
         <i
-          class="pi pi-search pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-mute"
+          class="pi pi-search pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-xs text-mute"
           aria-hidden="true"
         />
         <input
@@ -239,14 +239,14 @@ function resetModal() {
           type="search"
           placeholder="Search people…"
           aria-label="Search people"
-          class="w-full rounded-full border border-line bg-ground py-2 pl-9 pr-3.5 text-sm text-ink outline-none transition-colors focus:border-primary native:py-2.5"
+          class="w-full rounded-full border border-line bg-ground py-2 ps-9 pe-3.5 text-sm text-ink outline-none transition-colors focus:border-primary native:py-2.5"
         />
       </div>
       <ul class="max-h-72 divide-y divide-line overflow-y-auto">
         <li v-for="u in filteredContacts" :key="u.id">
           <button
             type="button"
-            class="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-ink transition-colors hover:bg-surface-100 dark:hover:bg-surface-800"
+            class="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-start text-sm text-ink transition-colors hover:bg-surface-100 dark:hover:bg-surface-800"
             @click="startDirect(u.id)"
           >
             <Avatar

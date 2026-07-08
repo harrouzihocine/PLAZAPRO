@@ -31,21 +31,21 @@ function openDraft(draft) {
         text
         rounded
         severity="secondary"
-        :aria-label="`Unsaved drafts (${drafts.count})`"
+        :aria-label="$t('drafts.unsavedAria', { n: drafts.count })"
         @click="panel.toggle($event)"
       />
     </OverlayBadge>
 
     <Popover ref="panel" class="w-80 max-w-[92vw]" :pt="{ content: { class: '!p-0' } }">
       <div class="border-b border-line px-4 py-3">
-        <span class="text-sm font-semibold text-ink">Unsaved drafts</span>
-        <p class="mt-0.5 text-xs text-mute">Forms you left without saving — click to resume.</p>
+        <span class="text-sm font-semibold text-ink">{{ $t('drafts.title') }}</span>
+        <p class="mt-0.5 text-xs text-mute">{{ $t('drafts.hint') }}</p>
       </div>
       <ul class="max-h-[50vh] divide-y divide-line overflow-y-auto">
         <li v-for="d in drafts.list" :key="d.key">
           <!-- Non-dismissable: a draft stays until it is saved (or an oversight
                admin clears it) — you can only resume it, not discard it. -->
-          <button type="button" class="block w-full px-4 py-2.5 text-left" @click="openDraft(d)">
+          <button type="button" class="block w-full px-4 py-2.5 text-start" @click="openDraft(d)">
             <span class="block truncate text-sm font-medium text-ink">{{ d.label }}</span>
             <span class="block text-xs text-mute">{{ timeAgo(d.savedAt) }}</span>
           </button>

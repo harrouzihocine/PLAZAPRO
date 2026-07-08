@@ -57,7 +57,7 @@ function onScroll(e) {
       />
       <span
         v-if="store.unreadCount > 0"
-        class="pointer-events-none absolute -top-1 -right-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-white"
+        class="pointer-events-none absolute -top-1 -end-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-white"
       >
         {{ store.unreadCount > 99 ? '99+' : store.unreadCount }}
       </span>
@@ -98,7 +98,7 @@ function onScroll(e) {
           <li v-for="n in store.items" :key="n.id" class="relative">
             <button
               type="button"
-              class="flex w-full items-start gap-3 py-3 pl-4 pr-10 text-left transition-colors hover:bg-surface-50 dark:hover:bg-surface-800"
+              class="flex w-full items-start gap-3 py-3 ps-4 pe-10 text-start transition-colors hover:bg-surface-50 dark:hover:bg-surface-800"
               @click="activate(n)"
             >
               <span
@@ -122,7 +122,7 @@ function onScroll(e) {
               v-if="!n.read_at"
               v-tooltip.left="'Mark as read'"
               type="button"
-              class="absolute right-2 top-3 flex h-6 w-6 items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-700"
+              class="absolute end-2 top-3 flex h-6 w-6 items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-700"
               :aria-label="`Mark '${n.title}' as read`"
               @click.stop="store.markRead(n.id)"
             >
@@ -132,7 +132,7 @@ function onScroll(e) {
               v-else
               v-tooltip.left="'Mark as unread'"
               type="button"
-              class="absolute right-2 top-3 flex h-6 w-6 items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-700"
+              class="absolute end-2 top-3 flex h-6 w-6 items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-700"
               :aria-label="`Mark '${n.title}' as unread`"
               @click.stop="store.markUnread(n.id)"
             >

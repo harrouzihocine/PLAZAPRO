@@ -24,6 +24,11 @@ class UpdateDynamicListItemRequest extends FormRequest
 
         return [
             'label' => ['sometimes', 'required', 'string', 'max:255'],
+            // Optional per-language display labels; the base label is the fallback.
+            'label_translations' => ['sometimes', 'nullable', 'array'],
+            'label_translations.en' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'label_translations.fr' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'label_translations.ar' => ['sometimes', 'nullable', 'string', 'max:255'],
             'value' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('dynamic_list_items', 'value')->where('dynamic_list_id', $listId)->ignore($itemId)],
             'parent_id' => ['sometimes', 'nullable', 'integer', Rule::exists('dynamic_list_items', 'id')->where('dynamic_list_id', $listId)],
             'is_active' => ['sometimes', 'boolean'],

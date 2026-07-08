@@ -21,6 +21,7 @@ class CreateDynamicListItem
     {
         return DB::transaction(fn () => $list->items()->create([
             'label' => $data['label'],
+            'label_translations' => $data['label_translations'] ?? null,
             'value' => $data['value'] ?? $this->uniqueValue($list, $data['label']),
             'parent_id' => $data['parent_id'] ?? null,
             'is_active' => $data['is_active'] ?? true,

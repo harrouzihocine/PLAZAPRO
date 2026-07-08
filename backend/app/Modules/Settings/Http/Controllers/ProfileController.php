@@ -52,6 +52,23 @@ class ProfileController extends Controller
         return new UserResource($user->load('role.permissions'));
     }
 
+    /**
+     * UI language (en/fr/ar). Saved on the profile so backend-built text —
+     * validation replies via SetLocale, notifications/push/digest via
+     * preferredLocale() — follows the user everywhere, on every device.
+     */
+    public function updateLocale(Request $request): UserResource
+    {
+        $validated = $request->validate([
+            'locale' => ['required', 'string', 'in:'.implode(',', \App\Http\Middleware\SetLocale::SUPPORTED)],
+        ]);
+
+        $user = $request->user();
+        $user->forceFill(['locale' => $validated['locale']])->save();
+
+        return new UserResource($user->load('role.permissions'));
+    }
+
     public function uploadAvatar(UploadAvatarRequest $request, ProcessAvatar $action): UserResource
     {
         $user = $request->user();

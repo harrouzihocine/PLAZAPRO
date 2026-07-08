@@ -447,7 +447,7 @@ async function saveBoxes() {
               <li
                 v-for="b in boxesOf(deal, u)"
                 :key="'b' + b.item_id"
-                class="flex items-center justify-between gap-2 pl-6 text-xs"
+                class="flex items-center justify-between gap-2 ps-6 text-xs"
               >
                 <span class="flex min-w-0 items-center gap-1.5 text-ink">
                   <i class="pi pi-car shrink-0 text-mute" aria-hidden="true" />

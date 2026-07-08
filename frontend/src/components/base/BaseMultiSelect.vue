@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import MultiSelect from 'primevue/multiselect'
+import { t } from '@/i18n'
 
 // Multi-value filter select on PrimeVue MultiSelect, keeping the historic
 // contract: modelValue is an array of option values, options are
@@ -11,11 +12,13 @@ const props = defineProps({
   required: { type: Boolean, default: false },
   modelValue: { type: Array, default: () => [] },
   options: { type: Array, default: () => [] },
-  placeholder: { type: String, default: 'All' },
+  placeholder: { type: String, default: null }, // null → localized "All"
   // 'auto' shows the search box only once the list is long enough to need it.
   searchable: { type: [Boolean, String], default: 'auto' },
 })
 const emit = defineEmits(['update:modelValue'])
+
+const placeholderText = computed(() => props.placeholder ?? t('common.all'))
 
 const showFilter = computed(() =>
   props.searchable === 'auto' ? props.options.length > 6 : Boolean(props.searchable),
@@ -32,7 +35,7 @@ const showFilter = computed(() =>
       :options="options"
       option-label="label"
       option-value="value"
-      :placeholder="placeholder"
+      :placeholder="placeholderText"
       :filter="showFilter"
       :max-selected-labels="1"
       selected-items-label="{0} selected"

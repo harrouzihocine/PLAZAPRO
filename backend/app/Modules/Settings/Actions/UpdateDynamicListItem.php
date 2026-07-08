@@ -24,7 +24,7 @@ class UpdateDynamicListItem
         }
 
         return DB::transaction(function () use ($item, $data) {
-            $item->update(Arr::only($data, ['label', 'value', 'parent_id', 'is_active', 'meta', 'sort_order']));
+            $item->update(Arr::only($data, ['label', 'label_translations', 'value', 'parent_id', 'is_active', 'meta', 'sort_order']));
 
             return $item->fresh();
         });

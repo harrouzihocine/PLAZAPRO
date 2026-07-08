@@ -1,19 +1,29 @@
 // Shared display formatting. Dates render in a compact, unambiguous
 // "12 Mar 2026, 14:05" style; relative time is used for activity feeds.
+// Everything follows the UI language: 'ar-DZ' notably gives the Algerian
+// month names (جانفي، فيفري…) with Western digits, matching how the company
+// actually writes dates in Arabic.
 
-const dateFmt = new Intl.DateTimeFormat('en-GB', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-})
+import { currentLocale, t } from '@/i18n'
 
-const dateTimeFmt = new Intl.DateTimeFormat('en-GB', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-})
+const INTL_LOCALES = { en: 'en-GB', fr: 'fr-FR', ar: 'ar-DZ' }
+
+export function intlLocale() {
+  return INTL_LOCALES[currentLocale()] ?? 'en-GB'
+}
+
+// Intl formatters are expensive to build — cache one per (kind, locale).
+const fmtCache = new Map()
+
+function fmt(kind, options) {
+  const key = `${kind}:${currentLocale()}`
+  if (!fmtCache.has(key)) fmtCache.set(key, new Intl.DateTimeFormat(intlLocale(), options))
+  return fmtCache.get(key)
+}
+
+const DATE_OPTS = { day: 'numeric', month: 'short', year: 'numeric' }
+const DATE_TIME_OPTS = { ...DATE_OPTS, hour: '2-digit', minute: '2-digit' }
+const TIME_OPTS = { hour: '2-digit', minute: '2-digit' }
 
 // Local "today" as YYYY-MM-DD for native date inputs. `toISOString()` is UTC,
 // which can roll a late-evening "today" to tomorrow (or vice-versa), so we build
@@ -46,16 +56,14 @@ export function timeInputValue(value) {
 export function formatDate(value) {
   if (!value) return '—'
   const d = value instanceof Date ? value : new Date(value)
-  return Number.isNaN(d.getTime()) ? '—' : dateFmt.format(d)
+  return Number.isNaN(d.getTime()) ? '—' : fmt('date', DATE_OPTS).format(d)
 }
 
 export function formatDateTime(value) {
   if (!value) return '—'
   const d = value instanceof Date ? value : new Date(value)
-  return Number.isNaN(d.getTime()) ? '—' : dateTimeFmt.format(d)
+  return Number.isNaN(d.getTime()) ? '—' : fmt('datetime', DATE_TIME_OPTS).format(d)
 }
-
-const timeFmt = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' })
 
 // The backend stores an untimed next action as midnight (see BuildAgentAgenda's
 // "All day"), so 00:00 means "no time chosen" rather than a real due time.
@@ -64,7 +72,7 @@ export function formatTimeIfSet(value) {
   if (!value) return ''
   const d = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(d.getTime())) return ''
-  return d.getHours() === 0 && d.getMinutes() === 0 ? '' : timeFmt.format(d)
+  return d.getHours() === 0 && d.getMinutes() === 0 ? '' : fmt('time', TIME_OPTS).format(d)
 }
 
 // Always-on clock time (chat bubbles) — unlike formatTimeIfSet, midnight is a
@@ -72,10 +80,17 @@ export function formatTimeIfSet(value) {
 export function formatTime(value) {
   if (!value) return ''
   const d = value instanceof Date ? value : new Date(value)
-  return Number.isNaN(d.getTime()) ? '' : timeFmt.format(d)
+  return Number.isNaN(d.getTime()) ? '' : fmt('time', TIME_OPTS).format(d)
 }
 
-const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+function rtf() {
+  const key = `rtf:${currentLocale()}`
+  if (!fmtCache.has(key)) {
+    fmtCache.set(key, new Intl.RelativeTimeFormat(intlLocale(), { numeric: 'auto' }))
+  }
+  return fmtCache.get(key)
+}
+
 const STEPS = [
   ['year', 31536000],
   ['month', 2592000],
@@ -94,9 +109,9 @@ export function timeAgo(value) {
   const abs = Math.abs(diff)
   if (abs > 3024000) return formatDate(d) // > 5 weeks: show the date
   for (const [unit, secs] of STEPS) {
-    if (abs >= secs) return rtf.format(Math.round(diff / secs), unit)
+    if (abs >= secs) return rtf().format(Math.round(diff / secs), unit)
   }
-  return 'just now'
+  return t('common.justNow')
 }
 
 /** Initials for avatars: "Sarah Benali" -> "SB". */
@@ -123,14 +138,14 @@ export function humanize(value) {
 export function roomsLabel(value) {
   if (value === null || value === undefined || value === '') return null
   const n = Number(value)
-  return Number.isFinite(n) ? `${n} room${n === 1 ? '' : 's'}` : String(value)
+  return Number.isFinite(n) ? t('units.rooms', n) : String(value)
 }
 
 export function floorLabel(value) {
   if (value === null || value === undefined || value === '') return null
   const n = Number(value)
   if (!Number.isFinite(n)) return String(value)
-  return n === 0 ? 'Ground floor' : `Floor ${value}`
+  return n === 0 ? t('units.groundFloor') : t('units.floorN', { n: value })
 }
 
 // One human-readable unit summary — "REF-A12 · Apartment · 3 rooms · Floor 2 ·

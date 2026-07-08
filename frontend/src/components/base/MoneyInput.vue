@@ -57,11 +57,11 @@ function onInput(event) {
         :placeholder="placeholder || undefined"
         :invalid="Boolean(error)"
         fluid
-        class="!pr-20"
+        class="!pe-20"
         @input="onInput"
       />
       <span
-        class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-sm text-mute"
+        class="pointer-events-none absolute inset-y-0 end-0 flex items-center px-3 text-sm text-mute"
         >{{ MIL_LABEL }} DZD</span
       >
     </div>

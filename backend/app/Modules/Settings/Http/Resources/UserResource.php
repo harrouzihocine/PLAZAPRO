@@ -41,6 +41,7 @@ class UserResource extends JsonResource
             ),
             'last_login_at' => $this->last_login_at,
             'locked_at' => $this->locked_at,
+            'locale' => $this->locale,
             // Own record only: push toggles are the viewer's business, nobody
             // else's. Null means "never customised" = everything on.
             'push_prefs' => $this->when(

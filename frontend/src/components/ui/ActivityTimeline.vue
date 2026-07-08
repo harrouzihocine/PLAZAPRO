@@ -4,6 +4,7 @@ import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
 import { useApi } from '@/composables/useApi'
 import { formatDateTime, humanize, timeAgo } from '@/utils/format'
+import { t } from '@/i18n'
 import EmptyState from '@/components/ui/EmptyState.vue'
 
 // The audit trail of one record, rendered as a timeline. Backed by the
@@ -40,18 +41,19 @@ const TONES = {
   archive: 'bg-surface-100 text-surface-600 ring-surface-200 dark:bg-surface-800 dark:text-surface-300 dark:ring-surface-700',
 }
 
-// Past-tense labels for the action pill (humanize('cancel')+'d' → "Canceld").
-const ACTION_LABELS = {
-  create: 'Created',
-  update: 'Updated',
-  cancel: 'Cancelled',
-  archive: 'Archived',
-  restore: 'Restored',
-  reactivate: 'Reactivated',
-  duplicate: 'Duplicated',
-  export: 'Exported',
-}
-const actionLabel = (action) => ACTION_LABELS[action] ?? humanize(action)
+// Past-tense labels for the action pill, localized (activity.action.*).
+const ACTION_KEYS = new Set([
+  'create',
+  'update',
+  'cancel',
+  'archive',
+  'restore',
+  'reactivate',
+  'duplicate',
+  'export',
+])
+const actionLabel = (action) =>
+  ACTION_KEYS.has(action) ? t(`activity.action.${action}`) : humanize(action)
 
 // Noise fields nobody needs to read in a diff.
 const HIDDEN_FIELDS = new Set(['updated_at', 'created_at', 'id'])
@@ -124,15 +126,15 @@ watch(
     <EmptyState
       v-else-if="error"
       icon="pi pi-exclamation-triangle"
-      title="Couldn't load the history"
-      body="You may not have permission to read this record's activity."
+      :title="$t('activity.loadErrorTitle')"
+      :body="$t('activity.loadErrorBody')"
     />
 
     <EmptyState
       v-else-if="items.length === 0"
       icon="pi pi-clock"
-      title="No activity yet"
-      body="Changes to this record will appear here."
+      :title="$t('activity.emptyTitle')"
+      :body="$t('activity.emptyBody')"
     />
 
     <ol v-else class="relative">
@@ -140,7 +142,7 @@ watch(
         <!-- connector rail -->
         <span
           v-if="i < visible.length - 1"
-          class="absolute left-[15px] top-9 bottom-0 w-px bg-line"
+          class="absolute start-[15px] top-9 bottom-0 w-px bg-line"
           aria-hidden="true"
         />
         <span
@@ -159,20 +161,20 @@ watch(
             >
               {{ actionLabel(entry.action) }}
             </span>
-            <span class="text-sm font-medium text-ink">{{ entry.user_name ?? 'System' }}</span>
+            <span class="text-sm font-medium text-ink">{{ entry.user_name ?? $t('activity.system') }}</span>
             <span
               v-if="entry.role_at_time"
               class="text-xs text-mute"
             >· {{ entry.role_at_time }}</span>
             <span
               v-tooltip.top="formatDateTime(entry.created_at)"
-              class="ml-auto shrink-0 cursor-default text-xs text-mute"
+              class="ms-auto shrink-0 cursor-default text-xs text-mute"
             >
               {{ timeAgo(entry.created_at) }}
             </span>
           </div>
 
-          <p v-if="reasonOf(entry)" class="mt-2 border-l-2 border-line pl-3 text-sm italic text-mute">
+          <p v-if="reasonOf(entry)" class="mt-2 border-s-2 border-line ps-3 text-sm italic text-mute">
             {{ reasonOf(entry) }}
           </p>
 
@@ -203,7 +205,7 @@ watch(
 
     <div v-if="hasMore" class="pt-1 text-center">
       <Button
-        label="Load older activity"
+        :label="$t('activity.loadOlder')"
         icon="pi pi-chevron-down"
         text
         size="small"

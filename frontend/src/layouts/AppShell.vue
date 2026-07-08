@@ -14,11 +14,13 @@ import { isNativeApp } from '@/utils/nativeApp'
 import { initNativePush } from '@/utils/nativePush'
 import { initAppUpdateCheck } from '@/utils/appUpdate'
 import { useAuthStore } from '@/features/settings/store'
+import { t, isRTL } from '@/i18n'
 import { initials } from '@/utils/format'
 import NotificationBell from '@/features/collaboration/components/NotificationBell.vue'
 import ChatDock from '@/features/collaboration/components/ChatDock.vue'
 import DraftsIndicator from '@/components/shell/DraftsIndicator.vue'
 import GlobalSearch from '@/components/shell/GlobalSearch.vue'
+import LanguageSwitcher from '@/components/shell/LanguageSwitcher.vue'
 import PullToRefresh from '@/components/shell/PullToRefresh.vue'
 import SyncIndicator from '@/components/shell/SyncIndicator.vue'
 import BrandLogo from '@/components/BrandLogo.vue'
@@ -145,94 +147,94 @@ function toggleCollapsed() {
 // Nav is permission-filtered; sections with no visible item disappear.
 const SECTIONS = [
   {
-    label: 'Overview',
-    items: [{ to: '/', label: 'Dashboard', icon: 'pi pi-home' }],
+    key: 'overview',
+    items: [{ to: '/', labelKey: 'nav.dashboard', icon: 'pi pi-home' }],
   },
   {
-    label: 'Sales',
+    key: 'sales',
     items: [
-      { to: '/clients', label: 'Clients', icon: 'pi pi-users', permission: 'clients.view' },
-      { to: '/tasks', label: 'Tasks', icon: 'pi pi-check-square', permission: 'tasks.manage' },
-      { to: '/dispatch', label: 'Dispatch', icon: 'pi pi-send', permission: 'visits.dispatch' },
-      { to: '/chat', label: 'Chat', icon: 'pi pi-comments', permission: 'chat.use' },
+      { to: '/clients', labelKey: 'nav.clients', icon: 'pi pi-users', permission: 'clients.view' },
+      { to: '/tasks', labelKey: 'nav.tasks', icon: 'pi pi-check-square', permission: 'tasks.manage' },
+      { to: '/dispatch', labelKey: 'nav.dispatch', icon: 'pi pi-send', permission: 'visits.dispatch' },
+      { to: '/chat', labelKey: 'nav.chat', icon: 'pi pi-comments', permission: 'chat.use' },
     ],
   },
   {
-    label: 'Inventory',
+    key: 'inventory',
     items: [
       {
         to: '/inventory/locations',
-        label: 'Locations',
+        labelKey: 'nav.locations',
         icon: 'pi pi-building',
         permission: 'units.view',
       },
-      { to: '/inventory/units', label: 'Units', icon: 'pi pi-th-large', permission: 'units.view' },
+      { to: '/inventory/units', labelKey: 'nav.units', icon: 'pi pi-th-large', permission: 'units.view' },
     ],
   },
   {
-    label: 'Finance',
+    key: 'finance',
     items: [
-      { to: '/payments', label: 'Payments', icon: 'pi pi-wallet', permission: 'versements.view' },
+      { to: '/payments', labelKey: 'nav.payments', icon: 'pi pi-wallet', permission: 'versements.view' },
     ],
   },
   {
-    label: 'Insights',
+    key: 'insights',
     items: [
-      { to: '/analytics', label: 'Reports', icon: 'pi pi-chart-line', permission: 'reports.view' },
+      { to: '/analytics', labelKey: 'nav.reports', icon: 'pi pi-chart-line', permission: 'reports.view' },
       // Open to everyone: a user without logs.view_all sees only their own logs
       // (the label reads "My logs" for them, "Team logs" for the company-wide view).
-      { to: '/team-logs', label: 'Team logs', icon: 'pi pi-list-check' },
-      { to: '/audit', label: 'Audit', icon: 'pi pi-shield', permission: 'audit.view' },
+      { to: '/team-logs', labelKey: 'nav.teamLogs', icon: 'pi pi-list-check' },
+      { to: '/audit', labelKey: 'nav.audit', icon: 'pi pi-shield', permission: 'audit.view' },
     ],
   },
   {
-    label: 'Oversight',
+    key: 'oversight',
     items: [
       {
         to: '/oversight/clients',
-        label: 'Client quality',
+        labelKey: 'nav.clientQuality',
         icon: 'pi pi-user-minus',
         permission: 'oversight.clients',
         badgeKey: 'clients',
       },
       {
         to: '/oversight/pipeline',
-        label: 'Pipeline',
+        labelKey: 'nav.pipeline',
         icon: 'pi pi-hourglass',
         permission: 'oversight.pipeline',
         badgeKey: 'pipeline',
       },
       {
         to: '/oversight/deals',
-        label: 'Lost + paid',
+        labelKey: 'nav.lostPaid',
         icon: 'pi pi-wallet',
         permission: 'oversight.deals',
         badgeKey: 'deals',
       },
       {
         to: '/oversight/drafts',
-        label: 'Drafts',
+        labelKey: 'nav.drafts',
         icon: 'pi pi-pencil',
         permission: 'oversight.drafts',
         badgeKey: 'drafts',
       },
       {
         to: '/oversight/duplicates',
-        label: 'Duplicates',
+        labelKey: 'nav.duplicates',
         icon: 'pi pi-clone',
         permission: 'clients.duplicates.resolve',
         badgeKey: 'duplicates',
       },
       {
         to: '/desires/matches',
-        label: 'Matches',
+        labelKey: 'nav.matches',
         icon: 'pi pi-heart',
         permission: 'oversight.matches',
         badgeKey: 'matches',
       },
       {
         to: '/oversight/archive',
-        label: 'Archive',
+        labelKey: 'nav.archive',
         icon: 'pi pi-inbox',
         permission: 'oversight.archive',
         badgeKey: 'archive',
@@ -240,25 +242,31 @@ const SECTIONS = [
     ],
   },
   {
-    label: 'System',
+    key: 'system',
     items: [
-      { to: '/settings', label: 'Settings', icon: 'pi pi-cog', permission: 'settings.manage' },
+      { to: '/settings', labelKey: 'nav.settings', icon: 'pi pi-cog', permission: 'settings.manage' },
       // No permission: every user gets the install-the-app page.
-      { to: '/install', label: 'Mobile App', icon: 'pi pi-mobile' },
+      { to: '/install', labelKey: 'nav.mobileApp', icon: 'pi pi-mobile' },
     ],
   },
 ]
 
+// Section headers translate through nav.section.* (key), items through their
+// labelKey — resolved here so the whole nav re-renders on a language switch.
 const sections = computed(() =>
   SECTIONS.map((s) => ({
     ...s,
+    label: t(`nav.section.${s.key}`),
     items: s.items
       .filter((i) => !i.permission || auth.can(i.permission))
       // Team logs is self-scoped for users without logs.view_all — call it what it
       // is for them so the label never over-promises a company-wide view.
-      .map((i) =>
-        i.to === '/team-logs' && !auth.can('logs.view_all') ? { ...i, label: 'My logs' } : i,
-      ),
+      .map((i) => ({
+        ...i,
+        label: t(
+          i.to === '/team-logs' && !auth.can('logs.view_all') ? 'nav.myLogs' : i.labelKey,
+        ),
+      })),
   })).filter((s) => s.items.length > 0),
 )
 
@@ -274,7 +282,7 @@ const NAV_OPEN_KEY = 'plaza-nav-open'
 const openSections = ref({})
 
 function activeSectionLabel() {
-  return SECTIONS.find((s) => s.items.some((i) => isActive(i.to)))?.label
+  return SECTIONS.find((s) => s.items.some((i) => isActive(i.to)))?.key
 }
 
 ;(() => {
@@ -288,11 +296,11 @@ function activeSectionLabel() {
     openSections.value = saved
   } else {
     // First visit: open the section for the current page (Overview as a fallback).
-    openSections.value[activeSectionLabel() || 'Overview'] = true
+    openSections.value[activeSectionLabel() || 'overview'] = true
   }
 })()
 
-const isOpen = (section) => !!openSections.value[section.label]
+const isOpen = (section) => !!openSections.value[section.key]
 
 function toggleSection(label) {
   openSections.value[label] = !openSections.value[label]
@@ -338,7 +346,7 @@ async function logout() {
   <div class="min-h-screen bg-ground text-ink">
     <!-- ══ Desktop sidebar ══ -->
     <aside
-      class="fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-line bg-card transition-[width] duration-200 lg:flex"
+      class="fixed inset-y-0 start-0 z-30 hidden flex-col border-e border-line bg-card transition-[width] duration-200 lg:flex"
       :class="collapsed ? 'w-[76px]' : 'w-64'"
     >
       <!-- Brand -->
@@ -349,7 +357,7 @@ async function logout() {
       >
         <BrandLogo
           :variant="collapsed ? 'mark' : 'full'"
-          :subtitle="collapsed ? '' : 'Real-estate CRM'"
+          :subtitle="collapsed ? '' : $t('shell.realEstateCrm')"
         />
       </RouterLink>
 
@@ -357,7 +365,7 @@ async function logout() {
       <nav class="flex-1 overflow-y-auto px-3 py-4">
         <div
           v-for="section in sections"
-          :key="section.label"
+          :key="section.key"
           :class="collapsed ? 'mb-4 last:mb-0' : 'mb-0.5'"
         >
           <!-- Section header — click to expand / collapse the group -->
@@ -366,7 +374,7 @@ async function logout() {
             type="button"
             class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800"
             :aria-expanded="isOpen(section)"
-            @click="toggleSection(section.label)"
+            @click="toggleSection(section.key)"
           >
             <span class="truncate">{{ section.label }}</span>
             <span
@@ -376,7 +384,7 @@ async function logout() {
               {{ sectionBadge(section) }}
             </span>
             <i
-              class="pi pi-chevron-down ml-auto text-[10px] transition-transform duration-200"
+              class="pi pi-chevron-down ms-auto text-[10px] transition-transform duration-200"
               :class="isOpen(section) ? '' : '-rotate-90'"
               aria-hidden="true"
             />
@@ -401,7 +409,7 @@ async function logout() {
             >
               <span
                 v-if="isActive(item.to)"
-                class="absolute inset-y-2 left-0 w-[3px] rounded-full bg-primary"
+                class="absolute inset-y-2 start-0 w-[3px] rounded-full bg-primary"
                 aria-hidden="true"
               />
               <i
@@ -415,8 +423,8 @@ async function logout() {
               <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
               <span
                 v-if="item.badgeKey && badges[item.badgeKey]"
-                class="num ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-contrast"
-                :class="collapsed ? 'absolute right-1 top-1 min-w-0 !px-1' : ''"
+                class="num ms-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-contrast"
+                :class="collapsed ? 'absolute end-1 top-1 min-w-0 !px-1' : ''"
               >
                 {{ badges[item.badgeKey] }}
               </span>
@@ -429,12 +437,12 @@ async function logout() {
       <div class="border-t border-line p-3">
         <Button
           :icon="collapsed ? 'pi pi-angle-double-right' : 'pi pi-angle-double-left'"
-          :label="collapsed ? null : 'Collapse'"
+          :label="collapsed ? null : $t('shell.collapse')"
           text
           severity="secondary"
           size="small"
           class="w-full"
-          :aria-label="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+          :aria-label="collapsed ? $t('shell.expandSidebar') : $t('shell.collapseSidebar')"
           @click="toggleCollapsed"
         />
       </div>
@@ -443,7 +451,7 @@ async function logout() {
     <!-- ══ Main column ══ -->
     <div
       class="flex min-h-screen flex-col transition-[padding] duration-200"
-      :class="collapsed ? 'lg:pl-[76px]' : 'lg:pl-64'"
+      :class="collapsed ? 'lg:ps-[76px]' : 'lg:ps-64'"
     >
       <!-- Topbar -->
       <header
@@ -457,23 +465,23 @@ async function logout() {
           rounded
           severity="secondary"
           class="lg:!hidden"
-          aria-label="Open menu"
+:aria-label="$t('shell.openMenu')"
           @click="mobileNav = true"
         />
 
-        <RouterLink to="/" class="flex items-center lg:hidden" aria-label="PLAZA PRO — home">
+        <RouterLink to="/" class="flex items-center lg:hidden" :aria-label="$t('shell.homeAria')">
           <BrandLogo variant="mark" icon-class="h-8 w-auto" />
         </RouterLink>
 
         <!-- Search trigger -->
         <button
           type="button"
-          class="ml-auto flex h-10 w-10 items-center justify-center rounded-lg text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800 sm:ml-2 sm:w-72 sm:justify-start sm:gap-2 sm:border sm:border-line sm:bg-surface-50 sm:px-3 dark:sm:bg-surface-900"
-          aria-label="Search"
+          class="ms-auto flex h-10 w-10 items-center justify-center rounded-lg text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800 sm:ms-2 sm:w-72 sm:justify-start sm:gap-2 sm:border sm:border-line sm:bg-surface-50 sm:px-3 dark:sm:bg-surface-900"
+:aria-label="$t('shell.searchAria')"
           @click="search.show()"
         >
           <i class="pi pi-search text-sm" aria-hidden="true" />
-          <span class="hidden flex-1 text-left text-sm sm:block">Search…</span>
+          <span class="hidden flex-1 text-start text-sm sm:block">{{ $t('common.searchEllipsis') }}</span>
           <kbd
             class="hidden rounded border border-line bg-card px-1.5 py-0.5 text-[10px] text-mute sm:block"
           >
@@ -481,15 +489,16 @@ async function logout() {
           </kbd>
         </button>
 
-        <div class="flex items-center gap-1 sm:ml-2">
+        <div class="flex items-center gap-1 sm:ms-2">
           <Button
             :icon="isNight ? 'pi pi-sun' : 'pi pi-moon'"
             text
             rounded
             severity="secondary"
-            :aria-label="isNight ? 'Switch to day theme' : 'Switch to night theme'"
+            :aria-label="isNight ? $t('shell.switchToDay') : $t('shell.switchToNight')"
             @click="toggle"
           />
+          <LanguageSwitcher />
           <SyncIndicator />
           <DraftsIndicator />
           <NotificationBell v-if="auth.can('notifications.view')" />
@@ -497,8 +506,8 @@ async function logout() {
           <!-- User menu -->
           <button
             type="button"
-            class="ml-1 flex items-center gap-2 rounded-full transition-opacity hover:opacity-80"
-            aria-label="Account menu"
+            class="ms-1 flex items-center gap-2 rounded-full transition-opacity hover:opacity-80"
+            :aria-label="$t('shell.accountMenu')"
             @click="userPanel.toggle($event)"
           >
             <Avatar
@@ -520,7 +529,7 @@ async function logout() {
               />
               <div class="mt-3 space-y-1 border-t border-line pt-2">
                 <Button
-                  label="Edit profile"
+:label="$t('shell.editProfile')"
                   icon="pi pi-user-edit"
                   severity="secondary"
                   text
@@ -529,7 +538,7 @@ async function logout() {
                   @click="openProfile"
                 />
                 <Button
-                  label="Notifications"
+:label="$t('shell.notifications')"
                   icon="pi pi-bell"
                   severity="secondary"
                   text
@@ -538,7 +547,7 @@ async function logout() {
                   @click="openNotifPrefs"
                 />
                 <Button
-                  label="Log out"
+:label="$t('shell.logOut')"
                   icon="pi pi-sign-out"
                   severity="danger"
                   text
@@ -555,10 +564,10 @@ async function logout() {
       <!-- Offline notice (all platforms — the PWA benefits too). Fixed overlay:
            the lg: offsets keep it clear of the sidebar; it must never push the
            page content down (that reflow made the app jump on flaky signal). -->
-      <OfflineBanner :class="collapsed ? 'lg:left-[76px]' : 'lg:left-64'" />
+      <OfflineBanner :class="collapsed ? 'lg:start-[76px]' : 'lg:start-64'" />
 
       <!-- "New APK published" notice (shell only; same overlay rules). -->
-      <UpdateBanner v-if="isNative" :class="collapsed ? 'lg:left-[76px]' : 'lg:left-64'" />
+      <UpdateBanner v-if="isNative" :class="collapsed ? 'lg:start-[76px]' : 'lg:start-64'" />
 
       <!-- Facebook-style pull-to-refresh (APK only; the chat takeover thread
            and any open overlay stand down). -->
@@ -578,12 +587,12 @@ async function logout() {
     </div>
 
     <!-- ══ Mobile drawer (full nav) ══ -->
-    <Drawer v-model:visible="mobileNav" class="!w-72">
+    <Drawer v-model:visible="mobileNav" :position="isRTL() ? 'right' : 'left'" class="!w-72">
       <template #header>
         <BrandLogo icon-class="h-8 w-auto" />
       </template>
       <nav>
-        <div v-for="section in sections" :key="section.label" class="mb-4">
+        <div v-for="section in sections" :key="section.key" class="mb-4">
           <p class="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-mute">
             {{ section.label }}
           </p>
@@ -599,7 +608,7 @@ async function logout() {
             {{ item.label }}
             <span
               v-if="item.badgeKey && badges[item.badgeKey]"
-              class="num ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-contrast"
+              class="num ms-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-contrast"
             >
               {{ badges[item.badgeKey] }}
             </span>
@@ -639,7 +648,7 @@ async function logout() {
         <span class="flex items-center justify-center native:h-8 native:w-14">
           <i class="pi pi-ellipsis-h text-lg" aria-hidden="true" />
         </span>
-        More
+        {{ $t('common.more') }}
       </button>
     </nav>
 

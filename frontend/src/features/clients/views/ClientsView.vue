@@ -130,13 +130,13 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
       <div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
         <div class="relative w-full sm:w-72">
           <i
-            class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-mute"
+            class="pi pi-search absolute start-3 top-1/2 -translate-y-1/2 text-sm text-mute"
             aria-hidden="true"
           />
           <InputText
             v-model="store.filters.search"
             placeholder="Search name or phone…"
-            class="w-full !pl-9"
+            class="w-full !ps-9"
           />
         </div>
         <BaseSelect

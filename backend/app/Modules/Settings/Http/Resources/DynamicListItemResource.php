@@ -18,6 +18,9 @@ class DynamicListItemResource extends JsonResource
         return [
             'id' => $this->id,
             'label' => $this->label,
+            // Full per-locale map (not a resolved string): the SPA switches
+            // language without refetching, so it picks the label client-side.
+            'label_translations' => $this->label_translations,
             'value' => $this->value,
             'sort_order' => $this->sort_order,
             'parent_id' => $this->parent_id,

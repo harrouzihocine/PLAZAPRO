@@ -108,7 +108,7 @@ const replyExcerpt = messagePreview
     <!-- Edit banner -->
     <div
       v-if="editing"
-      class="mb-1.5 flex items-center gap-2 rounded-xl border-l-4 border-primary bg-highlight px-3 py-1.5"
+      class="mb-1.5 flex items-center gap-2 rounded-xl border-s-4 border-primary bg-highlight px-3 py-1.5"
     >
       <div class="min-w-0 flex-1 text-xs">
         <p class="font-semibold text-ink"><i class="pi pi-pencil text-[10px]" aria-hidden="true" /> Edit message</p>
@@ -127,7 +127,7 @@ const replyExcerpt = messagePreview
     <!-- Reply banner (WhatsApp-style quote above the input) -->
     <div
       v-else-if="replyTo"
-      class="mb-1.5 flex items-center gap-2 rounded-xl border-l-4 border-primary bg-highlight px-3 py-1.5"
+      class="mb-1.5 flex items-center gap-2 rounded-xl border-s-4 border-primary bg-highlight px-3 py-1.5"
     >
       <div class="min-w-0 flex-1 text-xs">
         <p class="font-semibold text-ink">

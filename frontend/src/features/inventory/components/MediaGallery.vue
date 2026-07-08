@@ -172,7 +172,7 @@ async function remove(item) {
         {{ c.label }}
         <span
           v-if="countFor(c.key)"
-          class="num ml-1 rounded-full bg-surface-100 px-1.5 text-xs text-mute dark:bg-surface-800"
+          class="num ms-1 rounded-full bg-surface-100 px-1.5 text-xs text-mute dark:bg-surface-800"
         >
           {{ countFor(c.key) }}
         </span>
@@ -188,7 +188,7 @@ async function remove(item) {
       @dragleave.prevent="dragging = false"
       @drop.prevent="onDrop"
     >
-      <i class="pi pi-cloud-upload mr-1" aria-hidden="true" />
+      <i class="pi pi-cloud-upload me-1" aria-hidden="true" />
       Drag files here to add to <span class="font-medium text-ink">{{ activeLabel }}</span>
       <span v-if="media.busy" class="block text-mute">Uploading…</span>
     </div>

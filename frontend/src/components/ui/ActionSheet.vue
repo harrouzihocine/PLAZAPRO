@@ -39,7 +39,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           <li v-for="a in actions" :key="a.key">
             <button
               type="button"
-              class="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-[15px] active:bg-highlight"
+              class="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-start text-[15px] active:bg-highlight"
               :class="a.danger ? 'text-danger' : 'text-ink'"
               @click="emit('pick', a.key)"
             >

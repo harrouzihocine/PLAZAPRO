@@ -1,4 +1,5 @@
 import Swal from 'sweetalert2'
+import { isRTL, t } from '@/i18n'
 
 // App-wide replacement for native alert()/confirm(). Buttons/popup are themed via
 // swal.css using the same CSS tokens as the rest of the app (light/dark aware).
@@ -10,13 +11,17 @@ import Swal from 'sweetalert2'
 export const BASE_SWAL_OPTS = { heightAuto: false }
 
 // Ask the user to confirm an action. Resolves to true only when confirmed.
+// Defaults resolve at call time so they follow the current UI language.
 export function confirmAction({
-  title = 'Are you sure?',
+  title = undefined,
   text = '',
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  confirmText = undefined,
+  cancelText = undefined,
   danger = false,
 } = {}) {
+  title ??= t('common.areYouSure')
+  confirmText ??= t('common.confirm')
+  cancelText ??= t('common.cancel')
   return Swal.fire({
     ...BASE_SWAL_OPTS,
     title,
@@ -41,7 +46,7 @@ export function alertMessage({ title = '', text = '', icon = 'info' } = {}) {
     title,
     text,
     icon,
-    confirmButtonText: 'OK',
+    confirmButtonText: t('common.ok'),
     customClass: { confirmButton: 'plaza-swal-confirm' },
   })
 }
@@ -51,7 +56,6 @@ export function alertMessage({ title = '', text = '', icon = 'info' } = {}) {
 const Toast = Swal.mixin({
   ...BASE_SWAL_OPTS,
   toast: true,
-  position: 'top-end',
   showConfirmButton: false,
   timer: 4000,
   timerProgressBar: true,
@@ -60,7 +64,8 @@ const Toast = Swal.mixin({
 
 export function showToast(text, icon = 'success') {
   if (!text) return
-  return Toast.fire({ icon, title: text })
+  // Swal positions are physical — mirror to the visual "end" corner in RTL.
+  return Toast.fire({ icon, title: text, position: isRTL() ? 'top-start' : 'top-end' })
 }
 
 export function toastSuccess(text) {
@@ -68,7 +73,7 @@ export function toastSuccess(text) {
 }
 
 export function toastError(text) {
-  return showToast(text || 'Something went wrong.', 'error')
+  return showToast(text || t('common.somethingWentWrong'), 'error')
 }
 
 export function toastInfo(text) {
