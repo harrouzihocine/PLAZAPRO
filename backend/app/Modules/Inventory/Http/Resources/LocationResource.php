@@ -31,9 +31,9 @@ class LocationResource extends JsonResource
                 'name' => $this->commune->name,
             ] : null),
             'type_id' => $this->type_id,
-            'type' => $this->whenLoaded('type', fn () => $this->type?->label),
+            'type' => $this->whenLoaded('type', fn () => $this->type?->localizedLabel()),
             'contract_type_id' => $this->contract_type_id,
-            'contract_type' => $this->whenLoaded('contractType', fn () => $this->contractType?->label),
+            'contract_type' => $this->whenLoaded('contractType', fn () => $this->contractType?->localizedLabel()),
             // Offered payment / financing options (project_payment_methods).
             // `_ids` drives the multi-select on the edit form; the objects render
             // the labels on read views.
@@ -43,7 +43,7 @@ class LocationResource extends JsonResource
             ),
             'payment_methods' => $this->whenLoaded(
                 'paymentMethods',
-                fn () => $this->paymentMethods->map(fn ($m) => ['id' => $m->id, 'label' => $m->label])->all(),
+                fn () => $this->paymentMethods->map(fn ($m) => ['id' => $m->id, 'label' => $m->localizedLabel()])->all(),
             ),
             'address' => $this->address,
             'description' => $this->description,

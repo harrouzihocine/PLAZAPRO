@@ -27,7 +27,7 @@ class DesireResource extends JsonResource
             'notes' => $this->notes,
             'floor' => $this->whenLoaded('floor', fn () => $this->floor ? [
                 'id' => $this->floor->id,
-                'label' => $this->floor->label,
+                'label' => $this->floor->localizedLabel(),
             ] : null),
             // The preferred sites (projects) the client would buy into.
             'locations' => $this->whenLoaded('locations', fn () => $this->locations
@@ -43,15 +43,15 @@ class DesireResource extends JsonResource
             ] : null),
             'type' => $this->whenLoaded('type', fn () => $this->type ? [
                 'id' => $this->type->id,
-                'label' => $this->type->label,
+                'label' => $this->type->localizedLabel(),
             ] : null),
             'room_number' => $this->whenLoaded('roomNumber', fn () => $this->roomNumber ? [
                 'id' => $this->roomNumber->id,
-                'label' => $this->roomNumber->label,
+                'label' => $this->roomNumber->localizedLabel(),
             ] : null),
             'contract_type' => $this->whenLoaded('contractType', fn () => $this->contractType ? [
                 'id' => $this->contractType->id,
-                'label' => $this->contractType->label,
+                'label' => $this->contractType->localizedLabel(),
             ] : null),
             // Raw ids too, so the edit form can pre-select without extra lookups.
             'wilaya_id' => $this->wilaya_id,

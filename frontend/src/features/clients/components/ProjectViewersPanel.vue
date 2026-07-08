@@ -7,6 +7,7 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import { projectViewersApi, staffApi } from '@/features/clients/api'
 import { useAuthStore } from '@/features/settings/store'
 import { toastError } from '@/composables/useConfirm'
+import { t } from '@/i18n'
 
 // "Who can see this project": the creator + the colleagues it was shared with.
 // Hiding keeps the row (greyed, re-showable) — access history is never erased.
@@ -41,7 +42,7 @@ async function run(fn) {
   try {
     viewers.value = await fn()
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Action failed.')
+    toastError(e.response?.data?.message ?? t('common.actionFailed'))
   } finally {
     busy.value = false
   }
@@ -58,7 +59,7 @@ const showViewer = (user) => run(() => projectViewersApi.add(props.projectId, us
 </script>
 
 <template>
-  <SectionCard title="Who can see this project" icon="pi pi-eye">
+  <SectionCard :title="$t('viewers.title')" icon="pi pi-eye">
     <ul class="space-y-1.5 text-sm">
       <li
         v-for="v in viewers"
@@ -69,37 +70,37 @@ const showViewer = (user) => run(() => projectViewersApi.add(props.projectId, us
         <span class="flex min-w-0 items-center gap-2">
           <i class="pi pi-user shrink-0 text-mute" aria-hidden="true" />
           <span class="truncate text-ink">{{ v.name }}</span>
-          <Tag v-if="v.is_creator" value="creator" severity="secondary" />
-          <Tag v-else-if="v.hidden" value="hidden" severity="warn" />
+          <Tag v-if="v.is_creator" :value="$t('viewers.creator')" severity="secondary" />
+          <Tag v-else-if="v.hidden" :value="$t('viewers.hidden')" severity="warn" />
         </span>
         <template v-if="canShare && !v.is_creator">
           <Button
             v-if="!v.hidden"
-            v-tooltip.top="'Hide (kept, not removed)'"
+            v-tooltip.top="$t('viewers.hideTooltip')"
             icon="pi pi-eye-slash"
             text
             rounded
             size="small"
             severity="secondary"
             :disabled="busy"
-            aria-label="Hide from this user"
+:aria-label="$t('viewers.hideAria')"
             @click="hideViewer(v)"
           />
           <Button
             v-else
-            v-tooltip.top="'Show again'"
+            v-tooltip.top="$t('viewers.showTooltip')"
             icon="pi pi-eye"
             text
             rounded
             size="small"
             :disabled="busy"
-            aria-label="Show to this user again"
+:aria-label="$t('viewers.showAria')"
             @click="showViewer(v)"
           />
         </template>
       </li>
       <li v-if="!viewers.length" class="px-2 py-1.5 text-mute">
-        Only holders of the view-all-projects permission see it.
+        {{ $t('viewers.onlyViewAll') }}
       </li>
     </ul>
 
@@ -107,14 +108,14 @@ const showViewer = (user) => run(() => projectViewersApi.add(props.projectId, us
     <div v-if="canShare" class="mt-3 flex items-end gap-2 border-t border-line pt-3">
       <BaseSelect
         v-model="adding"
-        label="Add a colleague"
-        placeholder="Pick a user…"
+:label="$t('viewers.addColleague')"
+        :placeholder="$t('viewers.pickUser')"
         class="min-w-0 flex-1"
         :options="candidates.map((u) => ({ value: u.id, label: u.name }))"
       />
       <Button
         icon="pi pi-plus"
-        label="Add"
+:label="$t('common.add')"
         size="small"
         :disabled="busy || !adding"
         @click="addViewer"

@@ -10,6 +10,7 @@ import { queueable } from '@/features/offline/apiOrQueue'
 import { formatMoney } from '@/features/payments/money'
 import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPicker.vue'
 import { useAuthStore } from '@/features/settings/store'
+import { t } from '@/i18n'
 
 // The project's property shortlist — the units (apartments / locals) and boxes
 // the client wants to see. Each row shows the FULL property card and its journey
@@ -73,7 +74,7 @@ function remove(item) {
 async function save() {
   const all = [...items.value, ...additions.value]
   if (!all.length) {
-    toastError('Add at least one property to the shortlist.')
+    toastError(t('shortlist.addAtLeastOne'))
     return
   }
   saving.value = true
@@ -91,7 +92,7 @@ async function save() {
         })),
         office_visit_id: null,
       },
-      label: 'Shortlist update',
+      label: t('shortlist.updateLabel'),
       entityHint: { route: route.fullPath },
     })
     if (res.queued) {
@@ -102,7 +103,7 @@ async function save() {
     await load()
     emit('changed')
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not save the shortlist.')
+    toastError(e.response?.data?.message ?? t('shortlist.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -110,7 +111,7 @@ async function save() {
 </script>
 
 <template>
-  <SectionCard title="Property shortlist" icon="pi pi-list-check">
+  <SectionCard :title="$t('shortlist.title')" icon="pi pi-list-check">
     <ul v-if="items.length" class="mb-3 divide-y divide-line">
       <li
         v-for="it in items"
@@ -134,18 +135,18 @@ async function save() {
           rounded
           size="small"
           severity="danger"
-          aria-label="Remove from shortlist"
+:aria-label="$t('shortlist.removeAria')"
           @click="remove(it)"
         />
       </li>
     </ul>
-    <p v-else class="mb-3 text-sm text-mute">No properties shortlisted yet.</p>
+    <p v-else class="mb-3 text-sm text-mute">{{ $t('shortlist.empty') }}</p>
 
     <div v-if="canEdit()" class="space-y-3">
       <ProjectUnitsPicker v-model="additions" :exclude="excludeKeys" />
       <Button
         type="button"
-        label="Save shortlist"
+:label="$t('shortlist.save')"
         icon="pi pi-check"
         size="small"
         :disabled="saving || (!hasChanges && !items.length)"

@@ -20,6 +20,7 @@ import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { formatPhone } from '@/data/countryCodes'
 import { formatDate, initials } from '@/utils/format'
 import { formatMoney } from '@/features/payments/money'
+import { t } from '@/i18n'
 
 // The "Desire matches" board: waiting clients (on the desire list, no deal yet)
 // whose criteria now fit available inventory — the reconnect signal that
@@ -69,7 +70,7 @@ async function load() {
     }))
     error.value = ''
   } catch (e) {
-    error.value = e.response?.data?.message ?? 'Could not load desire matches.'
+    error.value = e.response?.data?.message ?? t('matches.loadFailed')
   } finally {
     loading.value = false
   }
@@ -93,9 +94,9 @@ async function assign(row, agentId) {
   try {
     const client = await desireMatchesApi.assign(row.client.id, agentId)
     row.client.assigned_agent = client.assigned_agent ?? null
-    toastSuccess(`Assigned to ${client.assigned_agent?.name ?? 'the agent'} — they've been notified.`)
+    toastSuccess(t('matches.assignedToast', { name: client.assigned_agent?.name ?? t('matches.theAgent') }))
   } catch (e) {
-    error.value = e.response?.data?.message ?? 'Could not assign the agent.'
+    error.value = e.response?.data?.message ?? t('matches.assignFailed')
   } finally {
     row.assigning = false
   }
@@ -116,17 +117,18 @@ function rangeText(min, max, fmt = (v) => v) {
 }
 
 function desireFields(d) {
+  const any = t('common.any')
   return [
-    { label: 'Wilaya', value: d.wilaya?.name ?? 'Any' },
-    { label: 'Commune', value: d.commune?.name ?? 'Any' },
-    { label: 'Preferred sites', value: d.locations?.length ? d.locations.map((l) => l.name).join(', ') : 'Any site' },
-    { label: 'Project type', value: d.type?.label ?? 'Any' },
-    { label: 'Room number', value: d.room_number?.label ?? 'Any' },
-    { label: 'Contract type', value: d.contract_type?.label ?? 'Any' },
-    { label: 'Floor', value: d.floor?.label ?? 'Any' },
-    { label: 'Area', value: rangeText(d.area_min, d.area_max, fmtArea) ?? 'Any', numeric: true },
-    { label: 'Rooms (min)', value: d.rooms_min ?? 'Any', numeric: true },
-    { label: 'Budget', value: rangeText(d.budget_min, d.budget_max, formatMoney) ?? 'Any', numeric: true },
+    { label: t('geo.wilaya'), value: d.wilaya?.name ?? any },
+    { label: t('geo.commune'), value: d.commune?.name ?? any },
+    { label: t('desire.preferredSitesShort'), value: d.locations?.length ? d.locations.map((l) => l.name).join(', ') : t('desire.anySite') },
+    { label: t('inventory.projectType'), value: d.type?.label ?? any },
+    { label: t('inventory.roomNumber'), value: d.room_number?.label ?? any },
+    { label: t('inventory.contractType'), value: d.contract_type?.label ?? any },
+    { label: t('inventory.floor'), value: d.floor?.label ?? any },
+    { label: t('desire.area'), value: rangeText(d.area_min, d.area_max, fmtArea) ?? any, numeric: true },
+    { label: t('desire.roomsMinShort'), value: d.rooms_min ?? any, numeric: true },
+    { label: t('desire.budget'), value: rangeText(d.budget_min, d.budget_max, formatMoney) ?? any, numeric: true },
   ]
 }
 
@@ -148,8 +150,8 @@ function unitLabel(u) {
 }
 
 function onHoldNote(u) {
-  if (u.sale_status === 'reserved' && u.reserved_expires_at) return `Reserved until ${formatDate(u.reserved_expires_at)} — open as a backup`
-  if (u.sale_status === 'interested') return 'Another client is interested — still open as a backup'
+  if (u.sale_status === 'reserved' && u.reserved_expires_at) return t('matches.reservedBackup', { date: formatDate(u.reserved_expires_at) })
+  if (u.sale_status === 'interested') return t('matches.interestedBackup')
   return null
 }
 
@@ -181,7 +183,7 @@ async function submitReconnect(payload) {
   await store.logCall(clientId, payload)
   reconnectOpen.value = false
   reconnectRow.value = null
-  toastSuccess('Call logged — the client is qualified.')
+  toastSuccess(t('matches.callLogged'))
   await load() // a resolved match drops off the board (its desire closes)
 }
 </script>
@@ -189,12 +191,12 @@ async function submitReconnect(payload) {
 <template>
   <div>
     <PageHeader
-      title="Desire matches"
-      subtitle="Waiting clients whose wishlist now fits available inventory — assign an agent to reconnect."
+:title="$t('matches.title')"
+      :subtitle="$t('matches.subtitle')"
     >
       <template v-if="canAssign()" #actions>
         <Button
-          :label="unassignedOnly ? 'Showing unassigned' : 'Unassigned only'"
+          :label="unassignedOnly ? $t('matches.showingUnassigned') : $t('matches.unassignedOnly')"
           :icon="unassignedOnly ? 'pi pi-filter-fill' : 'pi pi-filter'"
           size="small"
           severity="secondary"
@@ -215,12 +217,8 @@ async function submitReconnect(payload) {
     <SectionCard v-else-if="!visibleRows.length">
       <EmptyState
         icon="pi pi-heart"
-        :title="unassignedOnly ? 'Nothing waiting to be assigned' : 'No matches right now'"
-        :body="
-          unassignedOnly
-            ? 'Every waiting client with a match already has an agent on it.'
-            : 'When new inventory fits a waiting client\'s wishlist, they show up here.'
-        "
+        :title="unassignedOnly ? $t('matches.emptyUnassigned') : $t('matches.emptyAll')"
+        :body="unassignedOnly ? $t('matches.emptyUnassignedBody') : $t('matches.emptyAllBody')"
       />
     </SectionCard>
 
@@ -251,7 +249,7 @@ async function submitReconnect(payload) {
               class="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
             >
               <i class="pi pi-folder-open text-[10px]" aria-hidden="true" />
-              Originating project<template v-if="row.origin_project.label"> — {{ row.origin_project.label }}</template>
+              {{ $t('matches.originatingProject') }}<template v-if="row.origin_project.label"> — {{ row.origin_project.label }}</template>
             </RouterLink>
 
             <!-- Who owns this lead. The assignee sees it as their own; a manager
@@ -261,14 +259,14 @@ async function submitReconnect(payload) {
               class="inline-flex items-center gap-1.5 rounded-full bg-highlight px-2.5 py-1 text-xs text-ink"
             >
               <i class="pi pi-user text-[10px] text-mute" aria-hidden="true" />
-              <template v-if="isAssignee(row)">Assigned to you</template>
+              <template v-if="isAssignee(row)">{{ $t('matches.assignedToYou') }}</template>
               <template v-else>{{ row.client.assigned_agent.name }}</template>
             </span>
             <span
               v-else
               class="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-2.5 py-1 text-xs text-mute"
             >
-              <i class="pi pi-user-plus text-[10px]" aria-hidden="true" /> Unassigned
+              <i class="pi pi-user-plus text-[10px]" aria-hidden="true" /> {{ $t('clients.unassigned') }}
             </span>
           </div>
         </template>
@@ -277,7 +275,7 @@ async function submitReconnect(payload) {
           <!-- Every field the desire form captures — nothing summarized away.
                A blank field means "no preference", shown as "Any", not omitted. -->
           <div class="rounded-xl border border-line bg-highlight/40 p-3">
-            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-mute">What they're looking for</p>
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-mute">{{ $t('matches.lookingFor') }}</p>
             <dl class="grid grid-cols-2 gap-x-3 gap-y-2 text-xs sm:grid-cols-3 lg:grid-cols-5">
               <div v-for="f in desireFields(row.desire)" :key="f.label">
                 <dt class="text-[10px] uppercase tracking-wide text-mute">{{ f.label }}</dt>
@@ -285,7 +283,7 @@ async function submitReconnect(payload) {
               </div>
             </dl>
             <p v-if="row.desire.notes" class="mt-2 whitespace-pre-line border-t border-line pt-2 text-xs text-ink">
-              <span class="font-semibold text-mute">Notes — </span>{{ row.desire.notes }}
+              <span class="font-semibold text-mute">{{ $t('common.notes') }} — </span>{{ row.desire.notes }}
             </p>
           </div>
 
@@ -310,22 +308,22 @@ async function submitReconnect(payload) {
                   </span>
 
                   <span class="mt-2 flex flex-wrap items-center gap-1.5">
-                    <Tag v-if="u.best_match" severity="contrast" icon="pi pi-star-fill" value="Best match" />
+                    <Tag v-if="u.best_match" severity="contrast" icon="pi pi-star-fill" :value="$t('matches.bestMatch')" />
                     <StatusTag :value="u.sale_status" />
                     <StatusTag v-if="isPushed(u)" :value="u.gtm_priority" />
                   </span>
 
                   <span class="mt-2 grid grid-cols-3 gap-2 border-t border-line pt-2 text-xs">
                     <span>
-                      <span class="block text-[10px] uppercase tracking-wide text-mute">Type</span>
+                      <span class="block text-[10px] uppercase tracking-wide text-mute">{{ $t('inventory.type') }}</span>
                       <span class="text-ink">{{ u.type ?? '—' }}</span>
                     </span>
                     <span>
-                      <span class="block text-[10px] uppercase tracking-wide text-mute">Floor</span>
+                      <span class="block text-[10px] uppercase tracking-wide text-mute">{{ $t('inventory.floor') }}</span>
                       <span class="text-ink">{{ u.floor ?? '—' }}</span>
                     </span>
                     <span>
-                      <span class="block text-[10px] uppercase tracking-wide text-mute">Area</span>
+                      <span class="block text-[10px] uppercase tracking-wide text-mute">{{ $t('desire.area') }}</span>
                       <span class="num text-ink">{{ u.area_sqm ? `${u.area_sqm} m²` : '—' }}</span>
                     </span>
                   </span>
@@ -338,17 +336,17 @@ async function submitReconnect(payload) {
                 :to="{ name: 'inventory.unit', params: { id: u.id } }"
                 class="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
               >
-                View unit <i class="pi pi-arrow-right text-[10px]" aria-hidden="true" />
+                {{ $t('matches.viewUnit') }} <i class="pi pi-arrow-right text-[10px]" aria-hidden="true" />
               </RouterLink>
             </li>
           </ul>
 
           <p v-if="row.more_count" class="text-xs text-mute">
-            +{{ row.more_count }} more {{ row.more_count === 1 ? 'match' : 'matches' }} not shown.
+            {{ $t('matches.moreNotShown', row.more_count) }}
           </p>
 
           <div class="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
-            <span class="text-xs text-mute">{{ selectedCount(row) }} of {{ row.matches.length }} selected</span>
+            <span class="text-xs text-mute">{{ $t('matches.selectedCount', { shown: selectedCount(row), total: row.matches.length }) }}</span>
 
             <div class="flex flex-wrap items-center gap-2">
               <!-- Manager: delegate. Assign (or reassign) a sales agent, who is
@@ -357,7 +355,7 @@ async function submitReconnect(payload) {
                 <BaseSelect
                   :model-value="row.client.assigned_agent?.id ?? ''"
                   :options="agentOptions"
-                  :placeholder="row.client.assigned_agent ? 'Reassign to…' : 'Assign to an agent…'"
+                  :placeholder="row.client.assigned_agent ? $t('matches.reassignTo') : $t('matches.assignTo')"
                   :disabled="row.assigning"
                   @change="(v) => assign(row, v)"
                 />
@@ -367,7 +365,7 @@ async function submitReconnect(payload) {
                    manager can't accidentally become the caller. -->
               <Button
                 v-if="isAssignee(row)"
-                label="Reconnect & qualify"
+:label="$t('matches.reconnectQualify')"
                 icon="pi pi-replay"
                 size="small"
                 :disabled="!selectedCount(row)"
@@ -377,7 +375,7 @@ async function submitReconnect(payload) {
                 v-else-if="!canAssign()"
                 class="text-xs text-mute"
               >
-                Waiting on {{ row.client.assigned_agent?.name ?? 'an agent' }} to reconnect.
+                {{ $t('matches.waitingOn', { name: row.client.assigned_agent?.name ?? $t('matches.anAgent') }) }}
               </span>
             </div>
           </div>
@@ -391,12 +389,11 @@ async function submitReconnect(payload) {
          deal (EnsureActiveClientProject), the same rule as every other call. -->
     <BaseModal
       v-if="reconnectOpen"
-      title="Reconnect — log the call"
+:title="$t('matches.reconnectModalTitle')"
       @close="reconnectOpen = false; reconnectRow = null"
     >
       <p class="mb-4 text-sm text-mute">
-        Logging this call is what reopens the client — the properties picked below ride with it
-        as the shortlist (or an open deal, if it goes that far).
+        {{ $t('matches.reconnectModalBody') }}
       </p>
       <CallLogForm
         :client="reconnectRow?.client"

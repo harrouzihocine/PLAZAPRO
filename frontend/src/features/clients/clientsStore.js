@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { toastError } from '@/composables/useConfirm'
+import { t } from '@/i18n'
 import {
   agentsApi,
   clientsApi,
@@ -142,7 +143,7 @@ export const useClientsStore = defineStore('clients', {
         const result = await fn()
         return result
       } catch (e) {
-        this.error = e.response?.data?.message ?? 'Action failed.'
+        this.error = e.response?.data?.message ?? t('common.actionFailed')
         toastError(this.error)
         throw e
       } finally {
@@ -152,8 +153,8 @@ export const useClientsStore = defineStore('clients', {
 
     // Actions that must NOT queue offline (interactive duplicate resolution,
     // financial closes): toast a clear notice and stop before any request.
-    _requireOnline(what) {
-      if (!useNetworkStore().requireOnline(`You're offline — ${what} needs a connection.`)) {
+    _requireOnline(whatKey) {
+      if (!useNetworkStore().requireOnline(t('offline.needsConnection', { what: t(whatKey) }))) {
         const err = new Error('offline-blocked')
         err.offlineBlocked = true
         throw err
@@ -162,7 +163,7 @@ export const useClientsStore = defineStore('clients', {
 
     async create(payload) {
       // The duplicate-phone check must run live (its resolution is interactive).
-      this._requireOnline('creating a client')
+      this._requireOnline('offline.what.createClient')
       this.saving = true
       this.error = ''
       try {
@@ -179,7 +180,7 @@ export const useClientsStore = defineStore('clients', {
           dup.duplicate = e.response.data
           throw dup
         }
-        this.error = e.response?.data?.message ?? 'Action failed.'
+        this.error = e.response?.data?.message ?? t('common.actionFailed')
         toastError(this.error)
         throw e
       } finally {
@@ -234,7 +235,7 @@ export const useClientsStore = defineStore('clients', {
     // first call onto it, so the caller needs the id).
     async createProject(clientId, payload = {}) {
       // The new project's id anchors the opening call — it needs the server.
-      this._requireOnline('opening a project')
+      this._requireOnline('offline.what.openProject')
       const project = await this.mutate(() => projectsApi.create(clientId, payload))
       await this.loadProjects(clientId)
       return project
@@ -306,7 +307,7 @@ export const useClientsStore = defineStore('clients', {
           method: 'put',
           url: `/clients/${clientId}/desire`,
           body: payload,
-          label: `Client desire — ${this.current?.name ?? 'client'}`,
+          label: t('offline.label.desire', { name: this.current?.name ?? t('nav.clients') }),
           entityHint: { route: `/clients/${clientId}` },
         }),
       )
@@ -334,14 +335,14 @@ export const useClientsStore = defineStore('clients', {
     },
 
     async createDeal(clientId, projectId, payload) {
-      this._requireOnline('opening a deal')
+      this._requireOnline('offline.what.openDeal')
       await this.mutate(() => dealsApi.create(projectId, payload))
       await this.loadDeals(projectId)
       return this.loadProjects(clientId)
     },
 
     async closeDeal(clientId, projectId, dealId, payload) {
-      this._requireOnline('closing a deal')
+      this._requireOnline('offline.what.closeDeal')
       await this.mutate(() => dealsApi.close(dealId, payload))
       await this.loadDeals(projectId)
       return this.loadProjects(clientId)
@@ -349,7 +350,7 @@ export const useClientsStore = defineStore('clients', {
 
     // Close ONE apartment on the deal (won with its own price / lost).
     async closeDealItem(clientId, projectId, dealId, itemId, payload) {
-      this._requireOnline('closing an apartment on the deal')
+      this._requireOnline('offline.what.closeDealUnit')
       await this.mutate(() => dealsApi.closeItem(dealId, itemId, payload))
       await this.loadDeals(projectId)
       return this.loadProjects(clientId)
@@ -357,7 +358,7 @@ export const useClientsStore = defineStore('clients', {
 
     // Release a WON apartment — it returns to the market; payments stay as history.
     async releaseDealItem(clientId, projectId, dealId, itemId, payload) {
-      this._requireOnline('releasing a won apartment')
+      this._requireOnline('offline.what.releaseWonUnit')
       await this.mutate(() => dealsApi.releaseItem(dealId, itemId, payload))
       await this.loadDeals(projectId)
       return this.loadProjects(clientId)
@@ -365,7 +366,7 @@ export const useClientsStore = defineStore('clients', {
 
     // Sell extra boxes onto a WON apartment (agreed price grows).
     async addDealBoxes(clientId, projectId, dealId, itemId, payload) {
-      this._requireOnline('selling extra boxes')
+      this._requireOnline('offline.what.sellBoxes')
       await this.mutate(() => dealsApi.addBoxes(dealId, itemId, payload))
       await this.loadDeals(projectId)
       return this.loadProjects(clientId)
@@ -408,7 +409,7 @@ export const useClientsStore = defineStore('clients', {
           method: 'post',
           url: `/clients/${clientId}/calls`,
           body: payload,
-          label: `Call log — ${this.current?.name ?? 'client'}`,
+          label: t('offline.label.callLog', { name: this.current?.name ?? '' }),
           entityHint: { route: `/clients/${clientId}` },
         }),
       )
@@ -429,7 +430,7 @@ export const useClientsStore = defineStore('clients', {
           method: 'post',
           url: `/visits/${visitId}/complete`,
           body: payload,
-          label: `Visit completion — ${this.current?.name ?? 'client'}`,
+          label: t('offline.label.visitCompletion', { name: this.current?.name ?? '' }),
           entityHint: { route: `/clients/${clientId}` },
         }),
       )
@@ -446,7 +447,7 @@ export const useClientsStore = defineStore('clients', {
           method: 'post',
           url: `/projects/${projectId}/in-site-visits`,
           body: payload,
-          label: `Add unit to visit — ${this.current?.name ?? 'client'}`,
+          label: t('offline.label.addUnitToVisit', { name: this.current?.name ?? '' }),
           entityHint: { route: `/clients/${clientId}/projects/${projectId}` },
         }),
       )
@@ -461,7 +462,7 @@ export const useClientsStore = defineStore('clients', {
           method: 'post',
           url: `/clients/${clientId}/next-actions`,
           body: payload,
-          label: `Next action — ${this.current?.name ?? 'client'}`,
+          label: t('offline.label.nextAction', { name: this.current?.name ?? '' }),
           entityHint: { route: `/clients/${clientId}` },
         }),
       )

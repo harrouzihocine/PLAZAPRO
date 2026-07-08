@@ -35,7 +35,7 @@ class VersementResource extends JsonResource
             ] : null),
             'method' => $this->whenLoaded('method', fn () => $this->method ? [
                 'id' => $this->method->id,
-                'label' => $this->method->label,
+                'label' => $this->method->localizedLabel(),
             ] : null),
             'recorder' => $this->whenLoaded('recorder', fn () => $this->recorder ? [
                 'id' => $this->recorder->id,

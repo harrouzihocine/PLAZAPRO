@@ -4,6 +4,7 @@ import { toastError, toastSuccess } from '@/composables/useConfirm'
 import { pipelineApi } from '@/features/pipeline/api'
 import { useAuthStore } from '@/features/settings/store'
 import { isNativeApp } from '@/utils/nativeApp'
+import { t } from '@/i18n'
 
 // The web-only click-to-call handoff: pushes the client's number to the
 // agent's own phone, where the Android shell pops a "Call …" notification
@@ -27,7 +28,7 @@ async function send() {
   sending.value = true
   try {
     await pipelineApi.sendCallRequest(props.clientId)
-    toastSuccess('Sent to your phone — tap the notification to call.')
+    toastSuccess(t('clients.sentToPhone'))
   } catch (e) {
     toastError(e.response?.data?.message)
   } finally {
@@ -43,8 +44,8 @@ async function send() {
     class="inline-flex shrink-0 items-center justify-center rounded-full text-primary-600 transition-colors hover:bg-primary-50 disabled:opacity-50 dark:text-primary-400 dark:hover:bg-primary-500/10"
     :class="size === 'sm' ? 'h-5 w-5' : 'h-6 w-6'"
     :disabled="sending"
-    aria-label="Call from your phone"
-    title="Call from your phone"
+:aria-label="$t('clients.callFromPhone')"
+    :title="$t('clients.callFromPhone')"
     @click.stop="send"
   >
     <i class="pi pi-phone" :class="size === 'sm' ? 'text-sm' : ''" aria-hidden="true" />

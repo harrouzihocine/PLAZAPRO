@@ -45,8 +45,8 @@ class VisitResource extends JsonResource
                 'id' => $this->unit->id,
                 'reference' => $this->unit->reference,
                 'location_id' => $this->unit->location_id,
-                'property_type' => $this->unit->location?->type?->label,
-                'floor' => $this->unit->floor?->label,
+                'property_type' => $this->unit->location?->type?->localizedLabel(),
+                'floor' => $this->unit->floor?->localizedLabel(),
                 'area_sqm' => $this->unit->area_sqm,
                 'price' => $this->unit->price,
                 // Site coordinates — lets the field agent open the in-site visit
@@ -60,7 +60,7 @@ class VisitResource extends JsonResource
             ] : null),
             'outcome' => $this->whenLoaded('outcome', fn () => $this->outcome ? [
                 'id' => $this->outcome->id,
-                'label' => $this->outcome->label,
+                'label' => $this->outcome->localizedLabel(),
             ] : null),
         ];
     }

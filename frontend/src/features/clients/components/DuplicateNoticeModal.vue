@@ -10,7 +10,7 @@ defineEmits(['close'])
 </script>
 
 <template>
-  <BaseModal title="This phone already exists" size="max-w-md" @close="$emit('close')">
+  <BaseModal :title="$t('clients.phoneExistsTitle')" size="max-w-md" @close="$emit('close')">
     <div class="flex items-start gap-3">
       <span
         class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-warning/10 text-warning"
@@ -20,7 +20,7 @@ defineEmits(['close'])
       <p class="text-sm text-ink">{{ notice.message }}</p>
     </div>
     <div class="mt-5 flex justify-end">
-      <Button label="OK" @click="$emit('close')" />
+      <Button :label="$t('common.ok')" @click="$emit('close')" />
     </div>
   </BaseModal>
 </template>

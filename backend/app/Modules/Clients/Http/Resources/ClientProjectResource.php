@@ -90,8 +90,8 @@ class ClientProjectResource extends JsonResource
                 'id' => $this->unit->id,
                 'reference' => $this->unit->reference,
                 // Project type (a project attribute the unit inherits).
-                'type' => $this->unit->location?->type?->label,
-                'floor' => $this->unit->floor?->label,
+                'type' => $this->unit->location?->type?->localizedLabel(),
+                'floor' => $this->unit->floor?->localizedLabel(),
                 'area_sqm' => $this->unit->area_sqm,
                 'price' => $this->unit->price,
                 'sale_status' => $this->unit->sale_status?->value,

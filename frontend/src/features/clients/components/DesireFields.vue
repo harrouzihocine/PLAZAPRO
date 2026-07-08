@@ -5,7 +5,7 @@ import BaseMultiSelect from '@/components/base/BaseMultiSelect.vue'
 import MoneyInput from '@/components/base/MoneyInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
-import { useDynamicList } from '@/composables/useDynamicList'
+import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { useWilayas, useCommunes } from '@/composables/useGeography'
 import { useLocationsStore } from '@/features/inventory/locationsStore'
 
@@ -52,15 +52,15 @@ watch(
 <template>
   <div class="grid gap-3 sm:grid-cols-2">
     <BaseSelect
-      label="Wilaya"
-      placeholder="Any"
+      :label="$t('geo.wilaya')"
+      :placeholder="$t('common.any')"
       :model-value="modelValue.wilaya_id"
       :options="wilayas.map((w) => ({ value: w.id, label: `${w.code} · ${w.name}` }))"
       @change="updateWilaya"
     />
     <BaseSelect
-      label="Commune"
-      placeholder="Any"
+      :label="$t('geo.commune')"
+      :placeholder="$t('common.any')"
       :disabled="!modelValue.wilaya_id"
       :model-value="modelValue.commune_id"
       :options="communes.map((c) => ({ value: c.id, label: c.name }))"
@@ -68,71 +68,71 @@ watch(
     />
     <BaseMultiSelect
       class="sm:col-span-2"
-      label="Preferred sites (projects)"
-      placeholder="Any site"
+      :label="$t('desire.preferredSites')"
+      :placeholder="$t('desire.anySite')"
       :model-value="modelValue.location_ids ?? []"
       :options="locations.items.map((l) => ({ value: l.id, label: l.name }))"
       @update:model-value="(v) => update('location_ids', v)"
     />
     <BaseSelect
-      label="Project type"
-      placeholder="Any"
+      :label="$t('inventory.projectType')"
+      :placeholder="$t('common.any')"
       :model-value="modelValue.type_id"
-      :options="projectTypes.map((t) => ({ value: t.id, label: t.label }))"
+      :options="projectTypes.map((t) => ({ value: t.id, label: itemLabel(t) }))"
       @change="(v) => update('type_id', v)"
     />
     <BaseSelect
-      label="Room number"
-      placeholder="Any"
+      :label="$t('inventory.roomNumber')"
+      :placeholder="$t('common.any')"
       :model-value="modelValue.room_number_id"
-      :options="roomNumbers.map((r) => ({ value: r.id, label: r.label }))"
+      :options="roomNumbers.map((r) => ({ value: r.id, label: itemLabel(r) }))"
       @change="(v) => update('room_number_id', v)"
     />
     <BaseSelect
-      label="Contract type"
-      placeholder="Any"
+      :label="$t('inventory.contractType')"
+      :placeholder="$t('common.any')"
       :model-value="modelValue.contract_type_id"
-      :options="contractTypes.map((c) => ({ value: c.id, label: c.label }))"
+      :options="contractTypes.map((c) => ({ value: c.id, label: itemLabel(c) }))"
       @change="(v) => update('contract_type_id', v)"
     />
     <BaseSelect
-      label="Floor"
-      placeholder="Any"
+      :label="$t('inventory.floor')"
+      :placeholder="$t('common.any')"
       :model-value="modelValue.floor_id"
-      :options="floors.map((f) => ({ value: f.id, label: f.label }))"
+      :options="floors.map((f) => ({ value: f.id, label: itemLabel(f) }))"
       @change="(v) => update('floor_id', v)"
     />
     <BaseInput
       :model-value="modelValue.area_min"
-      label="Area min (m²)"
+      :label="$t('desire.areaMin')"
       type="number"
       @update:model-value="(v) => update('area_min', v)"
     />
     <BaseInput
       :model-value="modelValue.area_max"
-      label="Area max (m²)"
+      :label="$t('desire.areaMax')"
       type="number"
       @update:model-value="(v) => update('area_max', v)"
     />
     <BaseInput
       :model-value="modelValue.rooms_min"
-      label="Rooms (minimum)"
+      :label="$t('desire.roomsMin')"
       type="number"
       @update:model-value="(v) => update('rooms_min', v)"
     />
     <MoneyInput
       :model-value="modelValue.budget_min"
-      label="Budget min"
+      :label="$t('desire.budgetMin')"
       @update:model-value="(v) => update('budget_min', v)"
     />
     <MoneyInput
       :model-value="modelValue.budget_max"
-      label="Budget max"
+      :label="$t('desire.budgetMax')"
       @update:model-value="(v) => update('budget_max', v)"
     />
     <BaseTextarea
       class="sm:col-span-2"
-      label="Notes — what exactly are they after?"
+      :label="$t('desire.notesLabel')"
       required
       :rows="2"
       :model-value="modelValue.notes"

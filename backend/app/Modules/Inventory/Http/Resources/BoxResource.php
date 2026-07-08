@@ -20,7 +20,7 @@ class BoxResource extends JsonResource
             'location_id' => $this->location_id,
             'reference' => $this->reference,
             'type_id' => $this->type_id,
-            'type' => $this->whenLoaded('type', fn () => $this->type?->label),
+            'type' => $this->whenLoaded('type', fn () => $this->type?->localizedLabel()),
             'price' => $this->price,
             'sale_status' => $this->sale_status?->value,
             'unit_id' => $this->unit_id,

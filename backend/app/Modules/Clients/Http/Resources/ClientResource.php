@@ -50,13 +50,13 @@ class ClientResource extends JsonResource
             'has_calls' => $this->when(isset($this->calls_exists), fn () => (bool) $this->calls_exists),
             'source' => $this->when($canSeeDetails, fn () => $this->whenLoaded('source', fn () => $this->source ? [
                 'id' => $this->source->id,
-                'label' => $this->source->label,
+                'label' => $this->source->localizedLabel(),
                 'value' => $this->source->value,
                 'icon' => $this->source->meta['icon'] ?? null,
             ] : null)),
             'rating' => $this->when($canSeeDetails, fn () => $this->whenLoaded('rating', fn () => $this->rating ? [
                 'id' => $this->rating->id,
-                'label' => $this->rating->label,
+                'label' => $this->rating->localizedLabel(),
                 'value' => $this->rating->value,
                 'meta' => $this->rating->meta,
             ] : null)),

@@ -38,9 +38,9 @@ class ShortlistItemResource extends JsonResource
                 'location_id' => $this->shortlistable->location_id,
                 'location' => $this->shortlistable->location?->name,
                 'property_type' => $this->shortlistable_type === 'unit'
-                    ? $this->shortlistable->roomNumber?->label
-                    : $this->shortlistable->type?->label,
-                'floor' => $this->shortlistable_type === 'unit' ? $this->shortlistable->floor?->label : null,
+                    ? $this->shortlistable->roomNumber?->localizedLabel()
+                    : $this->shortlistable->type?->localizedLabel(),
+                'floor' => $this->shortlistable_type === 'unit' ? $this->shortlistable->floor?->localizedLabel() : null,
                 'area_sqm' => $this->shortlistable_type === 'unit' ? $this->shortlistable->area_sqm : null,
             ] : null),
         ];

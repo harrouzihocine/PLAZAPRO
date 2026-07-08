@@ -15,12 +15,13 @@ import { useClientsStore } from '@/features/clients/clientsStore'
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
 import UnitBoxPicker from '@/features/inventory/components/UnitBoxPicker.vue'
 import { useAuthStore } from '@/features/settings/store'
-import { useDynamicList } from '@/composables/useDynamicList'
+import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { versementsApi } from '@/features/payments/api'
 import { useNetworkStore } from '@/features/offline/networkStore'
 import { BASE_SWAL_OPTS, toastError, toastSuccess } from '@/composables/useConfirm'
 import { formatDate, todayInput } from '@/utils/format'
 import { dzdToMil, formatMoney, milToDzd, MIL_LABEL } from '@/features/payments/money'
+import { t } from '@/i18n'
 
 // THE deal on a project — each APARTMENT tracked alone: its own card, its own
 // boxes (grouped under it), its own close. Winning an apartment asks for ITS
@@ -67,12 +68,12 @@ function openDeposit(unit) {
 
 async function submitDeposit() {
   // Financial writes never queue offline — the reservation lock must be live.
-  if (!useNetworkStore().requireOnline("You're offline — recording a deposit needs a connection.")) {
+  if (!useNetworkStore().requireOnline(t('deal.offlineDeposit'))) {
     return
   }
   const f = depositFlow.value
   if (!f.amount || !f.method_id) {
-    toastError('Enter a deposit amount and a payment method.')
+    toastError(t('deal.depositMissingFields'))
     return
   }
   if (depositSubmitting.value) return
@@ -85,12 +86,12 @@ async function submitDeposit() {
       method_id: f.method_id,
     })
     depositFlow.value.open = false
-    toastSuccess(`Deposit recorded — ${f.unit.reference} is reserved.`)
+    toastSuccess(t('deal.depositRecorded', { ref: f.unit.reference }))
     // Reload the deals so the apartment card shows the deposit + Reserved state.
     await store.loadDeals(props.projectId)
     emit('changed')
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not record the deposit.')
+    toastError(e.response?.data?.message ?? t('deal.depositFailed'))
   } finally {
     depositSubmitting.value = false
   }
@@ -171,7 +172,7 @@ async function winUnit(deal, unit) {
 async function confirmWin() {
   const f = winFlow.value
   if (!f.price || Number(f.price) < 0) {
-    toastError('Enter a valid agreed price.')
+    toastError(t('deal.invalidPrice'))
     return
   }
   await store.closeDealItem(props.clientId, props.projectId, f.deal.id, f.unit.item_id, {
@@ -214,10 +215,10 @@ function releaseUnit(deal, unit) {
 async function confirmRelease(deal, unit) {
   const { isConfirmed } = await Swal.fire({
     ...BASE_SWAL_OPTS,
-    title: `Release ${unit.reference}?`,
-    text: 'The apartment and its boxes return to available inventory. The project continues on what is still open or won.',
+    title: t('deal.releaseTitle', { ref: unit.reference }),
+    text: t('deal.releaseText'),
     showCancelButton: true,
-    confirmButtonText: 'Release',
+    confirmButtonText: t('deal.release'),
     customClass: { confirmButton: 'plaza-swal-confirm', cancelButton: 'plaza-swal-cancel' },
   })
   if (!isConfirmed) return
@@ -244,10 +245,10 @@ function closeLostAll(deal) {
 async function confirmLoseWholeDeal(deal) {
   const { isConfirmed } = await Swal.fire({
     ...BASE_SWAL_OPTS,
-    title: 'Release everything on this deal?',
-    text: 'Every remaining apartment returns to available inventory. The project continues on its other deal(s).',
+    title: t('deal.releaseAllTitle'),
+    text: t('deal.releaseAllText'),
     showCancelButton: true,
-    confirmButtonText: 'Release all',
+    confirmButtonText: t('deal.releaseAll'),
     customClass: { confirmButton: 'plaza-swal-confirm', cancelButton: 'plaza-swal-cancel' },
   })
   if (!isConfirmed) return
@@ -293,10 +294,10 @@ function releaseWon(deal, unit) {
 async function confirmReleaseWon(deal, unit) {
   const { isConfirmed } = await Swal.fire({
     ...BASE_SWAL_OPTS,
-    title: `Release ${unit.reference}?`,
-    text: 'The sale fell through — the apartment and its boxes return to available inventory. Its recorded payments stay as history (refund them from the payments panel).',
+    title: t('deal.releaseTitle', { ref: unit.reference }),
+    text: t('deal.releaseWonText'),
     showCancelButton: true,
-    confirmButtonText: 'Release',
+    confirmButtonText: t('deal.release'),
     customClass: { confirmButton: 'plaza-swal-confirm', cancelButton: 'plaza-swal-cancel' },
   })
   if (!isConfirmed) return
@@ -365,7 +366,7 @@ async function saveBoxes() {
 </script>
 
 <template>
-  <SectionCard v-if="deals.length" title="Deal" icon="pi pi-briefcase">
+  <SectionCard v-if="deals.length" :title="$t('deal.title')" icon="pi pi-briefcase">
     <div class="space-y-3">
       <div
         v-for="deal in deals"
@@ -416,10 +417,10 @@ async function saveBoxes() {
               class="mt-1 flex items-center gap-1.5 text-xs text-mute"
             >
               <i class="pi pi-wallet text-[10px] text-primary-500" aria-hidden="true" />
-              Deposit paid
+              {{ $t('deal.depositPaid') }}
               <span class="num font-semibold text-ink">{{ formatMoney(u.collected) }}</span>
               <span v-if="u.sale_status === 'reserved' && u.reserved_expires_at">
-                · reserved until {{ formatDate(u.reserved_expires_at) }}
+                · {{ $t('deal.reservedUntil', { date: formatDate(u.reserved_expires_at) }) }}
               </span>
             </p>
 
@@ -430,15 +431,15 @@ async function saveBoxes() {
             >
               <span v-if="u.credited.sale.length">
                 <i class="pi pi-megaphone text-[10px] text-primary-500" aria-hidden="true" />
-                Sale: <span class="text-ink">{{ u.credited.sale.join(', ') }}</span>
+                {{ $t('deal.creditSale') }} <span class="text-ink">{{ u.credited.sale.join(', ') }}</span>
               </span>
               <span v-if="u.credited.insite.length">
                 <i class="pi pi-map-marker text-[10px] text-primary-500" aria-hidden="true" />
-                In-site: <span class="text-ink">{{ u.credited.insite.join(', ') }}</span>
+                {{ $t('deal.creditInsite') }} <span class="text-ink">{{ u.credited.insite.join(', ') }}</span>
               </span>
               <span v-if="u.credited.other.length">
                 <i class="pi pi-users text-[10px] text-primary-500" aria-hidden="true" />
-                Others: <span class="text-ink">{{ u.credited.other.join(', ') }}</span>
+                {{ $t('deal.creditOthers') }} <span class="text-ink">{{ u.credited.other.join(', ') }}</span>
               </span>
             </div>
 
@@ -466,7 +467,7 @@ async function saveBoxes() {
               class="mt-2 flex flex-wrap gap-1.5 border-t border-line pt-2"
             >
               <Button
-                label="Add box…"
+:label="$t('deal.addBox')"
                 icon="pi pi-car"
                 size="small"
                 severity="secondary"
@@ -474,7 +475,7 @@ async function saveBoxes() {
                 @click="openAddBoxes(deal, u)"
               />
               <Button
-                label="Release (sale fell through)"
+:label="$t('deal.releaseFellThrough')"
                 icon="pi pi-undo"
                 size="small"
                 severity="danger"
@@ -490,7 +491,7 @@ async function saveBoxes() {
             >
               <Button
                 v-if="canClose()"
-                label="Won"
+:label="$t('status.won')"
                 icon="pi pi-trophy"
                 size="small"
                 severity="success"
@@ -498,7 +499,7 @@ async function saveBoxes() {
               />
               <Button
                 v-if="canClose()"
-                label="Release"
+:label="$t('deal.release')"
                 icon="pi pi-times"
                 size="small"
                 severity="danger"
@@ -507,7 +508,7 @@ async function saveBoxes() {
               />
               <Button
                 v-if="canEditBoxes()"
-                label="Boxes…"
+:label="$t('deal.boxes')"
                 icon="pi pi-car"
                 size="small"
                 severity="secondary"
@@ -516,7 +517,7 @@ async function saveBoxes() {
               />
               <Button
                 v-if="canRecord()"
-                label="Deposit…"
+:label="$t('deal.deposit')"
                 icon="pi pi-wallet"
                 size="small"
                 severity="secondary"
@@ -553,7 +554,7 @@ async function saveBoxes() {
           class="mt-3"
         >
           <Button
-            label="Release everything (lost)"
+:label="$t('deal.releaseEverything')"
             icon="pi pi-times"
             size="small"
             severity="danger"
@@ -564,25 +565,24 @@ async function saveBoxes() {
       </div>
 
       <p v-if="!openDeal && closedDeals.length" class="text-xs text-mute">
-        No open deal — a new one can be created from the logs (call / visit).
+        {{ $t('deal.noOpenDeal') }}
       </p>
     </div>
 
     <!-- Win an apartment: agreed price + who deserves the credit. -->
     <BaseModal
       v-if="winFlow.open"
-      :title="`${winFlow.unit.reference} — won 🎉`"
+      :title="$t('deal.wonModalTitle', { ref: winFlow.unit.reference })"
       size="max-w-lg"
       @close="winFlow.open = false"
     >
       <p class="mb-3 text-sm text-mute">
-        The agreed price for this apartment (its boxes included), and who deserves the credit — the
-        sale &amp; in-site pickers list everyone who worked this project; pick who earned it.
+        {{ $t('deal.wonModalBody') }}
       </p>
       <BaseInput
         v-model="winFlow.price"
         type="number"
-        :label="`Agreed price in ${MIL_LABEL} DZD (boxes included)`"
+        :label="$t('deal.agreedPriceLabel', { mil: MIL_LABEL })"
         required
         min="0"
         step="0.01"
@@ -590,82 +590,79 @@ async function saveBoxes() {
       />
       <BaseMultiSelect
         v-model="winFlow.sale"
-        label="Sale agent(s) — the marketing"
-        placeholder="Who marketed / sold it"
+:label="$t('deal.saleAgents')"
+        :placeholder="$t('deal.saleAgentsPlaceholder')"
         :options="participantOptions"
         class="mb-3"
       />
       <BaseMultiSelect
         v-model="winFlow.insite"
-        label="In-site agent(s) — the site visits"
-        placeholder="Who ran the site visits"
+:label="$t('deal.insiteAgents')"
+        :placeholder="$t('deal.insiteAgentsPlaceholder')"
         :options="participantOptions"
         class="mb-3"
       />
       <BaseMultiSelect
         v-model="winFlow.other"
-        label="Others"
-        placeholder="Anyone else to credit"
+:label="$t('deal.others')"
+        :placeholder="$t('deal.othersPlaceholder')"
         :options="staffOptions"
         class="mb-4"
       />
       <div class="flex gap-2">
         <Button
-          label="Mark won"
+:label="$t('deal.markWon')"
           icon="pi pi-trophy"
           severity="success"
           :loading="store.saving"
           @click="confirmWin"
         />
-        <Button label="Cancel" severity="secondary" outlined @click="winFlow.open = false" />
+        <Button :label="$t('common.cancel')" severity="secondary" outlined @click="winFlow.open = false" />
       </div>
     </BaseModal>
 
     <!-- Holding deposit — records a payment and Reserves the apartment. -->
     <BaseModal
       v-if="depositFlow.open"
-      :title="`Holding deposit — ${depositFlow.unit.reference}`"
+      :title="$t('deal.depositModalTitle', { ref: depositFlow.unit.reference })"
       size="max-w-md"
       @close="depositFlow.open = false"
     >
       <p class="mb-3 text-sm text-mute">
-        Recording a deposit makes this apartment <strong>Reserved</strong> — off the market for
-        everyone else (others may still queue as backups) until it is sold or the hold lapses.
+        {{ $t('deal.depositModalBody') }}
       </p>
       <div class="grid gap-3 sm:grid-cols-2">
-        <MoneyInput v-model="depositFlow.amount" label="Deposit amount" required />
-        <BaseInput v-model="depositFlow.paid_on" type="date" label="Paid on" required />
+        <MoneyInput v-model="depositFlow.amount" :label="$t('deal.depositAmount')" required />
+        <BaseInput v-model="depositFlow.paid_on" type="date" :label="$t('deal.paidOn')" required />
         <BaseSelect
           v-model="depositFlow.method_id"
-          label="Method"
+:label="$t('deal.method')"
           required
-          placeholder="Select…"
-          :options="methods.map((m) => ({ value: m.id, label: m.label }))"
+          :options="methods.map((m) => ({ value: m.id, label: itemLabel(m) }))"
           class="sm:col-span-2"
         />
       </div>
       <div class="mt-4 flex gap-2">
         <Button
-          label="Record deposit"
+:label="$t('deal.recordDeposit')"
           icon="pi pi-check"
           :loading="depositSubmitting"
           :disabled="depositSubmitting"
           @click="submitDeposit"
         />
-        <Button label="Cancel" severity="secondary" outlined @click="depositFlow.open = false" />
+        <Button :label="$t('common.cancel')" severity="secondary" outlined @click="depositFlow.open = false" />
       </div>
     </BaseModal>
 
     <!-- Boxes editor — ONE apartment's boxes (linked + the unlinked pool). -->
     <BaseModal
       v-if="boxEditor.open"
-      :title="`Boxes with ${boxEditor.unit.reference}`"
+      :title="$t('deal.boxesModalTitle', { ref: boxEditor.unit.reference })"
       size="max-w-lg"
       @close="boxEditor.open = false"
     >
       <p class="mb-3 text-sm text-mute">
-        Tap to add / release boxes with this apartment. Only its linked boxes and the project's
-        unlinked ones are offered — picking an unlinked box links it here.
+        {{ $t('deal.boxesModalBody') }}
       </p>
       <UnitBoxPicker
         v-model="boxEditor.selected"
@@ -675,8 +672,8 @@ async function saveBoxes() {
         class="mb-4"
       />
       <div class="flex gap-2">
-        <Button label="Save boxes" icon="pi pi-check" :loading="store.saving" @click="saveBoxes" />
-        <Button label="Cancel" severity="secondary" outlined @click="boxEditor.open = false" />
+        <Button :label="$t('deal.saveBoxes')" icon="pi pi-check" :loading="store.saving" @click="saveBoxes" />
+        <Button :label="$t('common.cancel')" severity="secondary" outlined @click="boxEditor.open = false" />
       </div>
     </BaseModal>
 
@@ -684,13 +681,12 @@ async function saveBoxes() {
          agreed price grows by the (negotiated) addition. -->
     <BaseModal
       v-if="addBoxFlow.open"
-      :title="`Sell a box with ${addBoxFlow.unit.reference}`"
+      :title="$t('deal.sellBoxModalTitle', { ref: addBoxFlow.unit.reference })"
       size="max-w-lg"
       @close="addBoxFlow.open = false"
     >
       <p class="mb-3 text-sm text-mute">
-        The picked boxes are sold and linked to this apartment right away, and its agreed price
-        grows by the addition. Re-adjust the instalment plan afterwards if one exists.
+        {{ $t('deal.sellBoxModalBody') }}
       </p>
       <UnitBoxPicker
         v-model="addBoxFlow.selected"
@@ -701,19 +697,19 @@ async function saveBoxes() {
       <BaseInput
         v-model="addBoxFlow.price"
         type="number"
-        :label="`Added price in ${MIL_LABEL} DZD (defaults to the boxes' list prices)`"
+        :label="$t('deal.addedPriceLabel', { mil: MIL_LABEL })"
         min="0"
         step="0.01"
         class="mb-4"
       />
       <div class="flex gap-2">
         <Button
-          label="Sell boxes"
+:label="$t('deal.sellBoxes')"
           icon="pi pi-check"
           :disabled="!addBoxFlow.selected.length || store.saving"
           @click="submitAddBoxes"
         />
-        <Button label="Cancel" severity="secondary" outlined @click="addBoxFlow.open = false" />
+        <Button :label="$t('common.cancel')" severity="secondary" outlined @click="addBoxFlow.open = false" />
       </div>
     </BaseModal>
 
@@ -721,14 +717,12 @@ async function saveBoxes() {
          reopen (back to the pipeline) or an archive — payments stay as history. -->
     <BaseModal
       v-if="releaseWonFlow.open"
-      title="Won apartment released — what happens next?"
+:title="$t('deal.releaseWonModalTitle')"
       size="max-w-md"
       @close="releaseWonFlow.open = false"
     >
       <p class="mb-3 text-sm text-mute">
-        Releasing {{ releaseWonFlow.unit?.reference }} un-wins the project — nothing sold remains on
-        it. Its recorded payments stay as history (refund them from the payments panel). How should
-        this project continue?
+        {{ $t('deal.releaseWonModalBody', { ref: releaseWonFlow.unit?.reference }) }}
       </p>
       <div class="space-y-2">
         <label
@@ -746,10 +740,9 @@ async function saveBoxes() {
             class="mt-0.5 accent-primary"
           />
           <span>
-            <span class="font-medium text-ink">Reopen the pipeline</span>
+            <span class="font-medium text-ink">{{ $t('deal.reopenPipeline') }}</span>
             <span class="mt-0.5 block text-xs text-mute">
-              Step back so the logs resume and a fresh deal can start. The released win is kept as
-              history.
+              {{ $t('deal.reopenReleasedHint') }}
             </span>
           </span>
         </label>
@@ -768,9 +761,9 @@ async function saveBoxes() {
             class="mt-0.5 accent-primary"
           />
           <span>
-            <span class="font-medium text-ink">Archive the project</span>
+            <span class="font-medium text-ink">{{ $t('deal.archiveProject') }}</span>
             <span class="mt-0.5 block text-xs text-mute">
-              Close it. Recorded payments are kept as history — add a note (e.g. refund handling).
+              {{ $t('deal.archiveHint') }}
             </span>
           </span>
         </label>
@@ -778,37 +771,37 @@ async function saveBoxes() {
       <BaseTextarea
         v-if="releaseWonFlow.resolution === 'archive'"
         v-model="releaseWonFlow.note"
-        label="Note"
+:label="$t('common.note')"
         required
         :rows="2"
         class="mt-3"
       />
       <div class="mt-4 flex gap-2">
         <Button
-          label="Release"
+:label="$t('deal.release')"
           icon="pi pi-undo"
           severity="danger"
           :disabled="!releaseWonReady || store.saving"
           @click="confirmReleaseWonResolved"
         />
-        <Button label="Cancel" severity="secondary" outlined @click="releaseWonFlow.open = false" />
+        <Button :label="$t('common.cancel')" severity="secondary" outlined @click="releaseWonFlow.open = false" />
       </div>
     </BaseModal>
 
     <!-- The deal ends lost: resolve into a reopen or an archive -->
     <BaseModal
       v-if="lostFlow.open"
-      title="Deal lost — what happens next?"
+:title="$t('deal.lostModalTitle')"
       size="max-w-md"
       @close="lostFlow.open = false"
     >
       <p class="mb-3 text-sm text-mute">
         {{
           lostFlow.unit
-            ? `Releasing ${lostFlow.unit.reference} ends the deal — nothing was won on it.`
-            : 'Every remaining apartment is released back to available inventory.'
+            ? $t('deal.lostModalBodyUnit', { ref: lostFlow.unit.reference })
+            : $t('deal.lostModalBodyAll')
         }}
-        How should this project continue?
+        {{ $t('deal.howContinue') }}
       </p>
       <div class="space-y-2">
         <label
@@ -826,10 +819,9 @@ async function saveBoxes() {
             class="mt-0.5 accent-primary"
           />
           <span>
-            <span class="font-medium text-ink">Reopen the pipeline</span>
+            <span class="font-medium text-ink">{{ $t('deal.reopenPipeline') }}</span>
             <span class="mt-0.5 block text-xs text-mute">
-              Step back to negotiating so the logs reopen and a fresh deal can start. The lost deal
-              is kept as history.
+              {{ $t('deal.reopenLostHint') }}
             </span>
           </span>
         </label>
@@ -848,10 +840,9 @@ async function saveBoxes() {
             class="mt-0.5 accent-primary"
           />
           <span>
-            <span class="font-medium text-ink">Archive the project</span>
+            <span class="font-medium text-ink">{{ $t('deal.archiveProject') }}</span>
             <span class="mt-0.5 block text-xs text-mute">
-              Close it. Any recorded payments are kept as history — add a note (e.g. refund
-              handling).
+              {{ $t('deal.archiveHint') }}
             </span>
           </span>
         </label>
@@ -859,20 +850,20 @@ async function saveBoxes() {
       <BaseTextarea
         v-if="lostFlow.resolution === 'archive'"
         v-model="lostFlow.note"
-        label="Note"
+:label="$t('common.note')"
         required
         :rows="2"
         class="mt-3"
       />
       <div class="mt-4 flex gap-2">
         <Button
-          label="Mark lost"
+:label="$t('deal.markLost')"
           icon="pi pi-check"
           severity="danger"
           :disabled="!lostReady || store.saving"
           @click="confirmLost"
         />
-        <Button label="Cancel" severity="secondary" outlined @click="lostFlow.open = false" />
+        <Button :label="$t('common.cancel')" severity="secondary" outlined @click="lostFlow.open = false" />
       </div>
     </BaseModal>
   </SectionCard>

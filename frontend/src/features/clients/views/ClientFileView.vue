@@ -22,6 +22,7 @@ import { useAuthStore } from '@/features/settings/store'
 import { formatPhone } from '@/data/countryCodes'
 import { formatDate, formatDateTime, humanize, initials, unitLine as formatUnitLine } from '@/utils/format'
 import { formatMoney } from '@/features/payments/money'
+import { t } from '@/i18n'
 import ShareToChat from '@/features/collaboration/components/ShareToChat.vue'
 
 // The client file, project-centric: the profile on one side and the PROJECTS the
@@ -63,11 +64,12 @@ const unitLine = formatUnitLine
 // Opens WhatsApp (app or web) with the client's number — digits only, E.164.
 const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, '')}`
 
-const ID_DOCUMENT_LABELS = {
-  national_id: 'National ID card',
-  driving_license: 'Driving licence',
-  passport: 'Passport',
+const ID_DOCUMENT_KEYS = {
+  national_id: 'clients.docNationalId',
+  driving_license: 'clients.docDrivingLicence',
+  passport: 'clients.docPassport',
 }
+const idDocumentLabel = (type) => (ID_DOCUMENT_KEYS[type] ? t(ID_DOCUMENT_KEYS[type]) : humanize(type))
 
 // A workflow move can flip step badges — refetch everything shown.
 async function refresh() {
@@ -94,7 +96,7 @@ onMounted(async () => {
     if (!store.projects.length && canCreateProject()) {
       newProjectOpen.value = true
     } else if (store.projects.length > 1) {
-      toastInfo('Pick the project to log this call on.')
+      toastInfo(t('clients.pickProjectForCall'))
     }
   }
 })
@@ -134,13 +136,13 @@ async function submitNewProject(callPayload) {
     <EmptyState
       v-else-if="!store.current"
       icon="pi pi-user"
-      title="Client not found"
-      body="The record may have been removed."
+      :title="$t('clients.notFoundTitle')"
+      :body="$t('clients.notFoundBody')"
     />
 
     <template v-else>
       <PageHeader :title="store.current.full_name" :back="{ name: 'clients' }">
-        <template #back-label>All clients</template>
+        <template #back-label>{{ $t('clients.allClients') }}</template>
         <template #badges>
           <StatusTag v-if="store.current.status === 'cancelled'" value="cancelled" />
         </template>
@@ -153,8 +155,8 @@ async function submitNewProject(callPayload) {
               target="_blank"
               rel="noopener"
               class="inline-flex h-6 w-6 items-center justify-center rounded-full text-emerald-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
-              aria-label="Message on WhatsApp"
-              title="Message on WhatsApp"
+:aria-label="$t('clients.whatsappTitle')"
+              :title="$t('clients.whatsappTitle')"
             >
               <i class="pi pi-whatsapp" aria-hidden="true" />
             </a>
@@ -164,7 +166,7 @@ async function submitNewProject(callPayload) {
         <template #actions>
           <Button
             v-if="canManage()"
-            label="Edit"
+:label="$t('common.edit')"
             icon="pi pi-pencil"
             size="small"
             severity="secondary"
@@ -175,7 +177,7 @@ async function submitNewProject(callPayload) {
             v-if="auth.can('chat.use')"
             subject-type="client"
             :subject-id="store.current.id"
-            label="Share to chat"
+:label="$t('clients.shareToChat')"
           />
         </template>
       </PageHeader>
@@ -183,7 +185,7 @@ async function submitNewProject(callPayload) {
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <!-- Profile -->
         <div class="space-y-5 self-start lg:sticky lg:top-20">
-          <SectionCard title="Profile" icon="pi pi-id-card">
+          <SectionCard :title="$t('clients.profile')" icon="pi pi-id-card">
             <div class="mb-4 flex items-center gap-3">
               <Avatar
                 :label="initials(store.current.full_name)"
@@ -201,8 +203,8 @@ async function submitNewProject(callPayload) {
                     target="_blank"
                     rel="noopener"
                     class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-emerald-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
-                    aria-label="Message on WhatsApp"
-                    title="Message on WhatsApp"
+:aria-label="$t('clients.whatsappTitle')"
+                    :title="$t('clients.whatsappTitle')"
                   >
                     <i class="pi pi-whatsapp text-sm" aria-hidden="true" />
                   </a>
@@ -211,7 +213,7 @@ async function submitNewProject(callPayload) {
             </div>
             <dl v-if="canSeeDetails()" class="space-y-2.5 text-sm">
               <div class="flex justify-between gap-2">
-                <dt class="text-mute">Source</dt>
+                <dt class="text-mute">{{ $t('clients.source') }}</dt>
                 <dd class="flex items-center gap-1.5 text-ink">
                   <i
                     v-if="store.current.source?.icon"
@@ -223,7 +225,7 @@ async function submitNewProject(callPayload) {
                 </dd>
               </div>
               <div v-if="store.current.referrer_name || store.current.referrer_phone" class="flex justify-between gap-2">
-                <dt class="text-mute">Referred by</dt>
+                <dt class="text-mute">{{ $t('clients.referredBy') }}</dt>
                 <dd class="text-end text-ink">
                   {{ store.current.referrer_name ?? '—' }}
                   <span v-if="store.current.referrer_phone" class="num block text-xs text-mute">
@@ -232,19 +234,19 @@ async function submitNewProject(callPayload) {
                 </dd>
               </div>
               <div class="flex justify-between gap-2">
-                <dt class="text-mute">Rating</dt>
+                <dt class="text-mute">{{ $t('clients.rating') }}</dt>
                 <dd class="text-ink">{{ store.current.rating?.label ?? '—' }}</dd>
               </div>
               <div v-if="canSeeOwnership()" class="flex justify-between gap-2">
-                <dt class="text-mute">Assigned agent</dt>
-                <dd class="text-ink">{{ store.current.assigned_agent?.name ?? 'Unassigned' }}</dd>
+                <dt class="text-mute">{{ $t('clients.assignedAgent') }}</dt>
+                <dd class="text-ink">{{ store.current.assigned_agent?.name ?? $t('clients.unassigned') }}</dd>
               </div>
               <div v-if="canSeeOwnership()" class="flex justify-between gap-2">
-                <dt class="text-mute">Created by</dt>
+                <dt class="text-mute">{{ $t('clients.createdBy') }}</dt>
                 <dd class="text-ink">{{ store.current.created_by?.name ?? '—' }}</dd>
               </div>
               <div v-if="canSeeOwnership()" class="flex justify-between gap-2">
-                <dt class="text-mute">Created</dt>
+                <dt class="text-mute">{{ $t('clients.created') }}</dt>
                 <dd class="text-ink">{{ formatDateTime(store.current.created_at) }}</dd>
               </div>
             </dl>
@@ -266,7 +268,7 @@ async function submitNewProject(callPayload) {
                 store.current.birth_place ||
                 store.current.address)
             "
-            title="Identity & contract"
+:title="$t('clients.identityCard')"
             icon="pi pi-id-card"
           >
             <dl class="space-y-2.5 text-sm">
@@ -277,7 +279,7 @@ async function submitNewProject(callPayload) {
                 class="border-b border-line pb-2.5 last:border-0 last:pb-0"
               >
                 <div class="flex justify-between gap-2">
-                  <dt class="text-mute">{{ ID_DOCUMENT_LABELS[doc.type] ?? humanize(doc.type) }}</dt>
+                  <dt class="text-mute">{{ idDocumentLabel(doc.type) }}</dt>
                   <dd class="num text-ink">{{ doc.number || '—' }}</dd>
                 </div>
                 <div
@@ -289,11 +291,11 @@ async function submitNewProject(callPayload) {
                 </div>
               </div>
               <div v-if="store.current.id_number" class="flex justify-between gap-2">
-                <dt class="text-mute">ID number (NIN)</dt>
+                <dt class="text-mute">{{ $t('clients.idNumber') }}</dt>
                 <dd class="num text-ink">{{ store.current.id_number }}</dd>
               </div>
               <div v-if="store.current.birth_date" class="flex justify-between gap-2">
-                <dt class="text-mute">Born</dt>
+                <dt class="text-mute">{{ $t('clients.born') }}</dt>
                 <dd class="text-ink">
                   {{ formatDate(store.current.birth_date) }}
                   <template v-if="store.current.birth_place">
@@ -302,16 +304,16 @@ async function submitNewProject(callPayload) {
                 </dd>
               </div>
               <div v-if="store.current.address" class="flex justify-between gap-2">
-                <dt class="text-mute">Address</dt>
+                <dt class="text-mute">{{ $t('common.address') }}</dt>
                 <dd class="text-end text-ink">{{ store.current.address }}</dd>
               </div>
             </dl>
           </SectionCard>
 
-          <SectionCard v-if="canSeeOwnership()" title="Record history" icon="pi pi-clock" flush>
+          <SectionCard v-if="canSeeOwnership()" :title="$t('clients.recordHistory')" icon="pi pi-clock" flush>
             <div class="px-4 py-3 sm:px-5">
               <Button
-                :label="showHistory ? 'Hide history' : 'Show history'"
+                :label="showHistory ? $t('clients.hideHistory') : $t('clients.showHistory')"
                 :icon="showHistory ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
                 text
                 size="small"
@@ -325,11 +327,11 @@ async function submitNewProject(callPayload) {
 
         <div class="space-y-5 lg:col-span-2">
           <!-- The projects the client is engaging with -->
-          <SectionCard title="Projects" icon="pi pi-folder">
+          <SectionCard :title="$t('clients.projects')" icon="pi pi-folder">
             <template #actions>
               <Button
                 v-if="canCreateProject()"
-                label="New project"
+:label="$t('clients.newProject')"
                 icon="pi pi-plus"
                 size="small"
                 text
@@ -358,7 +360,7 @@ async function submitNewProject(callPayload) {
                     <span class="truncate text-sm font-semibold text-ink">
                       <template v-if="p.unit">{{ unitLine(p.unit) }}</template>
                       <template v-else-if="p.location">{{ p.location.name }}</template>
-                      <template v-else>Project #{{ p.id }}</template>
+                      <template v-else>{{ $t('clients.projectN', { n: p.id }) }}</template>
                     </span>
                     <StatusTag :value="p.step" />
                     <!-- Oversight-only: this is a duplicate-resolution "separate
@@ -366,10 +368,10 @@ async function submitNewProject(callPayload) {
                          than a fresh first-contact. Only view_all sees the link. -->
                     <span
                       v-if="p.continued_from"
-                      v-tooltip.top="`Continues project #${p.continued_from.id} — a separate engagement started for another agent on this client`"
+                      v-tooltip.top="$t('clients.continuationTooltip', { n: p.continued_from.id })"
                       class="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-[11px] text-mute"
                     >
-                      <i class="pi pi-link text-[10px]" aria-hidden="true" /> Continuation
+                      <i class="pi pi-link text-[10px]" aria-hidden="true" /> {{ $t('clients.continuation') }}
                     </span>
                   </span>
                   <span class="mt-0.5 block truncate text-xs text-mute">
@@ -379,13 +381,13 @@ async function submitNewProject(callPayload) {
                     <template v-if="p.total_price">
                       <span class="num font-medium">{{ formatMoney(p.total_price) }}</span> ·
                     </template>
-                    opened {{ formatDateTime(p.created_at) }}
-                    <template v-if="p.created_by?.name"> by {{ p.created_by.name }}</template>
+                    {{ $t('clients.openedAt', { date: formatDateTime(p.created_at) }) }}
+                    <template v-if="p.created_by?.name"> {{ $t('clients.byName', { name: p.created_by.name }) }}</template>
                   </span>
                 </span>
                 <Badge
                   v-if="p.pending_closure_count"
-                  v-tooltip.top="'Liked properties awaiting won / lost'"
+                  v-tooltip.top="$t('clients.pendingClosureTooltip')"
                   :value="p.pending_closure_count"
                   severity="warn"
                 />
@@ -398,15 +400,15 @@ async function submitNewProject(callPayload) {
               <EmptyState
                 v-if="!activeProjects.length"
                 icon="pi pi-folder-open"
-                title="No open project"
-                body="A new project starts with its first call log."
+:title="$t('clients.noOpenProject')"
+                :body="$t('clients.noOpenProjectBody')"
               />
             </div>
 
             <!-- Closed projects (archived / on the desire list), reactivatable. -->
             <div class="mt-4 border-t border-line pt-3">
               <Button
-                :label="`${showClosed ? 'Hide' : 'Show'} closed (${closedProjects.length})`"
+                :label="showClosed ? $t('clients.hideClosed', { n: closedProjects.length }) : $t('clients.showClosed', { n: closedProjects.length })"
                 :icon="showClosed ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
                 text
                 size="small"
@@ -436,21 +438,21 @@ async function submitNewProject(callPayload) {
                       <span class="truncate text-sm font-medium text-ink">
                         <template v-if="p.unit">{{ unitLine(p.unit) }}</template>
                         <template v-else-if="p.location">{{ p.location.name }}</template>
-                        <template v-else>Project #{{ p.id }}</template>
+                        <template v-else>{{ $t('clients.projectN', { n: p.id }) }}</template>
                       </span>
                       <StatusTag :value="p.step" />
                     </span>
                     <span class="mt-0.5 block truncate text-xs text-mute">
-                      {{ p.closure_reason ?? 'Closed' }}
+                      {{ p.closure_reason ?? $t('clients.closed') }}
                       <template v-if="p.closed_to_desire">
-                        — waiting for a desire match; a new call reopens it
+                        — {{ $t('clients.waitingDesireMatch') }}
                       </template>
                     </span>
                   </span>
                   <i class="pi pi-arrow-right text-sm text-mute" aria-hidden="true" />
                 </RouterLink>
                 <p v-if="!closedProjects.length" class="py-1 text-sm text-mute">
-                  No closed projects.
+                  {{ $t('clients.noClosedProjects') }}
                 </p>
               </div>
             </div>
@@ -463,12 +465,11 @@ async function submitNewProject(callPayload) {
       <!-- New project — step one is logging the call that opens it. -->
       <BaseModal
         v-if="newProjectOpen"
-        title="New project — log the opening call"
+:title="$t('clients.newProjectModalTitle')"
         @close="newProjectOpen = false"
       >
         <p class="mb-4 text-sm text-mute">
-          A project starts with a phone call: log it here and the project opens with the call (and
-          any qualification) attached.
+          {{ $t('clients.newProjectModalBody') }}
         </p>
         <CallLogForm
           :client="store.current"

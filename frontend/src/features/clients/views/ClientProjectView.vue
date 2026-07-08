@@ -26,10 +26,11 @@ import ShareToChat from '@/features/collaboration/components/ShareToChat.vue'
 import { chatApi } from '@/features/collaboration/api'
 import { useClientsStore } from '@/features/clients/clientsStore'
 import { useAuthStore } from '@/features/settings/store'
-import { useDynamicList } from '@/composables/useDynamicList'
+import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { BASE_SWAL_OPTS, confirmAction, toastError } from '@/composables/useConfirm'
 import { formatDateTime, unitLine as formatUnitLine } from '@/utils/format'
 import { formatMoney } from '@/features/payments/money'
+import { t } from '@/i18n'
 
 // ONE project engagement, on its own page: the full story — deal, shortlist,
 // payments, interaction timeline and audit history — with the lifecycle actions
@@ -93,7 +94,7 @@ const paymentUnits = computed(() => {
     return [...byUnit.values()].map((u) => ({
       id: u.id,
       released: u.state !== 'won',
-      label: u.reference + (u.state !== 'won' ? ' (released)' : ''),
+      label: u.reference + (u.state !== 'won' ? ` (${t('project.released')})` : ''),
       price: u.agreed_price,
     }))
   }
@@ -135,7 +136,7 @@ const shiftForm = ref(makeDesireForm())
 // draft follows the open flag instead of the component lifecycle.
 const shiftDraft = useModalDraft({
   key: () => `shift-desire:${props.projectId}`,
-  label: 'Shift to desire',
+  label: t('project.shiftToDesire'),
   active: () => shiftOpen.value,
   getForm: () => shiftForm.value,
   setForm: (d) => (shiftForm.value = { ...makeDesireForm(), ...d }),
@@ -169,14 +170,14 @@ function cancelShift() {
 async function archiveProject() {
   const { value, isConfirmed } = await Swal.fire({
     ...BASE_SWAL_OPTS,
-    title: 'Close this project?',
-    text: 'Pick a reason. Nothing more can be logged on it until it is reactivated.',
+    title: t('project.archiveTitle'),
+    text: t('project.archiveText'),
     input: 'select',
-    inputOptions: Object.fromEntries(archiveReasons.value.map((r) => [r.id, r.label])),
-    inputPlaceholder: 'Select a reason…',
+    inputOptions: Object.fromEntries(archiveReasons.value.map((r) => [r.id, itemLabel(r)])),
+    inputPlaceholder: t('project.selectReason'),
     showCancelButton: true,
-    confirmButtonText: 'Archive',
-    inputValidator: (v) => (!v ? 'A reason is required.' : undefined),
+    confirmButtonText: t('project.archive'),
+    inputValidator: (v) => (!v ? t('project.reasonRequired') : undefined),
     customClass: { confirmButton: 'plaza-swal-confirm', cancelButton: 'plaza-swal-cancel' },
   })
   if (isConfirmed && value) {
@@ -195,10 +196,10 @@ async function reactivateProject() {
 async function freezeProject() {
   const { isConfirmed } = await Swal.fire({
     ...BASE_SWAL_OPTS,
-    title: 'Freeze this project?',
-    text: 'No new activity can be added (calls, visits, deals, chat) until it is unfrozen. Payments and documents continue.',
+    title: t('project.freezeTitle'),
+    text: t('project.freezeText'),
     showCancelButton: true,
-    confirmButtonText: 'Freeze',
+    confirmButtonText: t('project.freeze'),
     customClass: { confirmButton: 'plaza-swal-confirm', cancelButton: 'plaza-swal-cancel' },
   })
   if (!isConfirmed) return
@@ -214,9 +215,9 @@ async function unfreezeProject() {
 async function removeProject() {
   if (
     await confirmAction({
-      title: 'Remove this empty project?',
-      text: 'The record is kept but marked cancelled.',
-      confirmText: 'Remove',
+      title: t('project.removeTitle'),
+      text: t('project.removeText'),
+      confirmText: t('common.remove'),
       danger: true,
     })
   ) {
@@ -231,7 +232,7 @@ const directDealNotes = ref('')
 
 const directDealDraft = useModalDraft({
   key: () => `direct-deal:${props.projectId}`,
-  label: 'Direct deal',
+  label: t('project.directDeal'),
   active: () => directDealOpen.value,
   getForm: () => ({ units: directDealUnits.value, notes: directDealNotes.value }),
   setForm: (d) => {
@@ -258,7 +259,7 @@ async function submitDirectDeal() {
     .filter((p) => p.shortlistable_type === 'unit')
     .map((p) => ({ unit_id: p.shortlistable_id, box_ids: p.box_ids ?? [] }))
   if (!units.length) {
-    toastError('Pick at least one apartment / local for the deal.')
+    toastError(t('project.pickAtLeastOneUnit'))
     return
   }
   try {
@@ -286,8 +287,8 @@ async function submitDirectDeal() {
     <EmptyState
       v-else-if="!project"
       icon="pi pi-folder-open"
-      title="Project not found"
-      body="It may have been removed, or belongs to another client."
+      :title="$t('project.notFoundTitle')"
+      :body="$t('project.notFoundBody')"
     />
 
     <template v-else>
@@ -295,26 +296,26 @@ async function submitDirectDeal() {
         :title="
           project.unit
             ? unitLine(project.unit)
-            : (project.location?.name ?? `Project #${project.id}`)
+            : (project.location?.name ?? $t('clients.projectN', { n: project.id }))
         "
         :back="{ name: 'clients.file', params: { id } }"
       >
-        <template #back-label>{{ store.current?.full_name ?? 'Client file' }}</template>
+        <template #back-label>{{ store.current?.full_name ?? $t('project.clientFile') }}</template>
         <template #badges>
           <StatusTag :value="project.step" />
           <StatusTag v-if="isClosed && project.status !== 'archived'" :value="project.status" />
         </template>
         <template #subtitle>
           <span class="flex flex-wrap items-center gap-x-2">
-            <span>Project #{{ project.id }}</span>
+            <span>{{ $t('clients.projectN', { n: project.id }) }}</span>
             <span v-if="project.location?.name && project.unit">· {{ project.location.name }}</span>
             <span v-if="project.total_price" class="num font-medium text-ink">
               · {{ formatMoney(project.total_price) }}
             </span>
             <span v-if="isClosed" class="text-mute">
-              · Closed{{ project.closure_reason ? ` — ${project.closure_reason}` : '' }}
+              · {{ $t('clients.closed') }}{{ project.closure_reason ? ` — ${project.closure_reason}` : '' }}
               <template v-if="project.closed_to_desire">
-                (waiting for a desire match; a new call reopens it)
+                ({{ $t('clients.waitingDesireMatch') }})
               </template>
             </span>
           </span>
@@ -324,7 +325,7 @@ async function submitDirectDeal() {
             <!-- Freeze = deliberate close-down to new activity (payments flow). -->
             <Button
               v-if="canFreeze() && !project.frozen_at"
-              label="Freeze"
+:label="$t('project.freeze')"
               icon="pi pi-lock"
               size="small"
               severity="secondary"
@@ -333,7 +334,7 @@ async function submitDirectDeal() {
             />
             <Button
               v-else-if="canFreeze() && project.frozen_at"
-              label="Unfreeze"
+:label="$t('project.unfreeze')"
               icon="pi pi-lock-open"
               size="small"
               @click="unfreezeProject"
@@ -341,8 +342,8 @@ async function submitDirectDeal() {
             <!-- Several deals may be open at once — one per committed apartment. -->
             <Button
               v-if="canDirectDeal()"
-              v-tooltip.bottom="project.frozen ? 'This project is frozen' : null"
-              label="Direct deal"
+              v-tooltip.bottom="project.frozen ? $t('project.frozenTooltip') : null"
+:label="$t('project.directDeal')"
               icon="pi pi-briefcase"
               size="small"
               :disabled="!!project.frozen"
@@ -352,8 +353,8 @@ async function submitDirectDeal() {
                  before the project can leave the pipeline. -->
             <Button
               v-if="canManage()"
-              v-tooltip.bottom="project.active_deal ? 'Close the deal (won / lost) first' : null"
-              label="Shift to desire"
+              v-tooltip.bottom="project.active_deal ? $t('project.closeDealFirst') : null"
+:label="$t('project.shiftToDesire')"
               icon="pi pi-heart"
               size="small"
               severity="secondary"
@@ -363,8 +364,8 @@ async function submitDirectDeal() {
             />
             <Button
               v-if="canManage()"
-              v-tooltip.bottom="project.active_deal ? 'Close the deal (won / lost) first' : null"
-              label="Archive"
+              v-tooltip.bottom="project.active_deal ? $t('project.closeDealFirst') : null"
+:label="$t('project.archive')"
               icon="pi pi-inbox"
               size="small"
               severity="secondary"
@@ -374,8 +375,8 @@ async function submitDirectDeal() {
             />
             <Button
               v-if="canManage() && project.is_empty"
-              v-tooltip.bottom="'Only an empty project can be removed'"
-              label="Remove"
+              v-tooltip.bottom="$t('project.onlyEmptyRemove')"
+:label="$t('common.remove')"
               icon="pi pi-trash"
               size="small"
               severity="danger"
@@ -385,14 +386,14 @@ async function submitDirectDeal() {
           </template>
           <Button
             v-else-if="canManage() && project.status === 'archived'"
-            label="Reactivate"
+:label="$t('project.reactivate')"
             icon="pi pi-undo"
             size="small"
             @click="reactivateProject"
           />
           <Button
             v-if="auth.can('chat.use') && project.can_view_collaborators"
-            label="Project chat"
+:label="$t('project.projectChat')"
             icon="pi pi-comments"
             size="small"
             severity="secondary"
@@ -404,7 +405,7 @@ async function submitDirectDeal() {
             v-if="auth.can('chat.use')"
             subject-type="client_project"
             :subject-id="Number(projectId)"
-            label="Share"
+:label="$t('project.share')"
           />
         </template>
       </PageHeader>
@@ -415,8 +416,7 @@ async function submitDirectDeal() {
         class="mb-4 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-ink dark:border-amber-500/40 dark:bg-amber-500/10"
       >
         <i class="pi pi-lock text-amber-600 dark:text-amber-400" aria-hidden="true" />
-        This project is frozen — no new activity can be added (calls, visits, deals, chat).
-        Payments and documents still flow.
+        {{ $t('project.frozenBanner') }}
       </p>
 
       <!-- Awaiting dispatch: the in-site plan is in the pool with no field agent
@@ -426,8 +426,7 @@ async function submitDirectDeal() {
         class="mb-4 flex items-center gap-2 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2.5 text-sm text-ink dark:border-sky-500/40 dark:bg-sky-500/10"
       >
         <i class="pi pi-user-plus text-sky-600 dark:text-sky-400" aria-hidden="true" />
-        Waiting for the dispatcher to assign the in-site agent for this project — the
-        field visit is queued on the dispatch board.
+        {{ $t('project.awaitingDispatchBanner') }}
       </p>
 
       <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
@@ -463,34 +462,34 @@ async function submitDirectDeal() {
 
         <!-- Side column: facts + audit history -->
         <div class="space-y-5">
-          <SectionCard title="Details" icon="pi pi-info-circle">
+          <SectionCard :title="$t('project.details')" icon="pi pi-info-circle">
             <dl class="space-y-2.5 text-sm">
               <div class="flex justify-between gap-2">
-                <dt class="text-mute">Stage</dt>
+                <dt class="text-mute">{{ $t('project.stage') }}</dt>
                 <dd><StatusTag :value="project.stage" /></dd>
               </div>
               <div v-if="project.unit" class="flex justify-between gap-2">
-                <dt class="text-mute">Unit</dt>
+                <dt class="text-mute">{{ $t('project.unit') }}</dt>
                 <dd class="text-end font-medium text-ink">{{ project.unit.reference }}</dd>
               </div>
               <div v-if="project.unit?.price" class="flex justify-between gap-2">
-                <dt class="text-mute">List price</dt>
+                <dt class="text-mute">{{ $t('project.listPrice') }}</dt>
                 <dd class="num text-ink">{{ formatMoney(project.unit.price) }}</dd>
               </div>
               <div v-if="project.total_price" class="flex justify-between gap-2">
-                <dt class="text-mute">Agreed price</dt>
+                <dt class="text-mute">{{ $t('project.agreedPrice') }}</dt>
                 <dd class="num font-semibold text-ink">{{ formatMoney(project.total_price) }}</dd>
               </div>
               <div v-if="project.location" class="flex justify-between gap-2">
-                <dt class="text-mute">Location</dt>
+                <dt class="text-mute">{{ $t('project.location') }}</dt>
                 <dd class="text-end text-ink">{{ project.location.name }}</dd>
               </div>
               <div class="flex justify-between gap-2">
-                <dt class="text-mute">Opened</dt>
+                <dt class="text-mute">{{ $t('project.opened') }}</dt>
                 <dd class="text-ink">{{ formatDateTime(project.created_at) }}</dd>
               </div>
               <div v-if="project.created_by" class="flex justify-between gap-2">
-                <dt class="text-mute">Opened by</dt>
+                <dt class="text-mute">{{ $t('project.openedBy') }}</dt>
                 <dd class="text-ink">{{ project.created_by.name }}</dd>
               </div>
             </dl>
@@ -504,7 +503,7 @@ async function submitDirectDeal() {
             :project-id="Number(projectId)"
           />
 
-          <SectionCard title="History" icon="pi pi-clock">
+          <SectionCard :title="$t('project.history')" icon="pi pi-clock">
             <ActivityTimeline :id="Number(projectId)" type="client_project" />
           </SectionCard>
         </div>
@@ -512,10 +511,9 @@ async function submitDirectDeal() {
     </template>
 
     <!-- Shift to desire: archive + re-capture what the client wants (full form). -->
-    <BaseModal v-if="shiftOpen" title="Shift to the desire list" @close="shiftOpen = false">
+    <BaseModal v-if="shiftOpen" :title="$t('project.shiftModalTitle')" @close="shiftOpen = false">
       <p class="mb-4 text-sm text-mute">
-        The client changed their mind — this closes the project and saves what they want, so it
-        re-matches (and reopens) when new inventory arrives.
+        {{ $t('project.shiftModalBody') }}
       </p>
       <form class="space-y-4" @submit.prevent="submitShift">
         <DraftBanner :visible="shiftDraft.restored.value" />
@@ -523,12 +521,12 @@ async function submitDirectDeal() {
         <div class="flex gap-2">
           <Button
             type="submit"
-            label="Shift to desire"
+:label="$t('project.shiftToDesire')"
             icon="pi pi-heart"
             :loading="store.saving"
             :disabled="!shiftReady"
           />
-          <Button type="button" label="Cancel" severity="secondary" outlined @click="cancelShift" />
+          <Button type="button" :label="$t('common.cancel')" severity="secondary" outlined @click="cancelShift" />
         </div>
       </form>
     </BaseModal>
@@ -536,29 +534,28 @@ async function submitDirectDeal() {
     <!-- Direct deal (deals.direct): pick the properties + the box decision. -->
     <BaseModal
       v-if="directDealOpen"
-      title="Open a deal directly"
+:title="$t('project.directDealModalTitle')"
       size="max-w-4xl"
       @close="directDealOpen = false"
     >
       <p class="mb-4 text-sm text-mute">
-        Deals normally come from a visit log — this direct path marks the selected properties Interested
-        immediately.
+        {{ $t('project.directDealModalBody') }}
       </p>
       <form class="space-y-4" @submit.prevent="submitDirectDeal">
         <DraftBanner :visible="directDealDraft.restored.value" />
         <!-- Deal context: apartments only — a box always rides WITH an apartment. -->
         <ProjectUnitsPicker v-model="directDealUnits" units-only with-boxes />
-        <BaseTextarea v-model="directDealNotes" label="Notes" :rows="2" />
+        <BaseTextarea v-model="directDealNotes" :label="$t('common.notes')" :rows="2" />
         <div class="flex gap-2">
           <Button
             type="submit"
-            label="Open deal"
+:label="$t('project.openDeal')"
             icon="pi pi-lock"
             :loading="store.saving"
           />
           <Button
             type="button"
-            label="Cancel"
+:label="$t('common.cancel')"
             severity="secondary"
             outlined
             @click="cancelDirectDeal"

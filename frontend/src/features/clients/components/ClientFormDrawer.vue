@@ -7,9 +7,10 @@ import BasePhoneInput from '@/components/base/BasePhoneInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import DuplicateNoticeModal from '@/features/clients/components/DuplicateNoticeModal.vue'
-import { useDynamicList } from '@/composables/useDynamicList'
+import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { useClientsStore } from '@/features/clients/clientsStore'
 import { useAuthStore } from '@/features/settings/store'
+import { t, isRTL } from '@/i18n'
 
 // The client create/edit form, shared by the clients list and the client file.
 // Names are optional (phone is the one required field); when the lead source is
@@ -29,11 +30,11 @@ const { items: ratings } = useDynamicList('client_ratings')
 // Assigning a follow-up agent is back-office-only (clients.manage).
 const canSeeOwnership = computed(() => auth.can('clients.manage'))
 
-const ID_DOCUMENT_TYPES = [
-  { value: 'national_id', label: 'National ID card' },
-  { value: 'driving_license', label: 'Driving licence' },
-  { value: 'passport', label: 'Passport' },
-]
+const ID_DOCUMENT_TYPES = computed(() => [
+  { value: 'national_id', label: t('clients.docNationalId') },
+  { value: 'driving_license', label: t('clients.docDrivingLicence') },
+  { value: 'passport', label: t('clients.docPassport') },
+])
 
 const emptyForm = () => ({
   first_name: '',
@@ -179,24 +180,24 @@ const duplicateNotice = ref(null)
 <template>
   <Drawer
     :visible="visible"
-    position="right"
+    :position="isRTL() ? 'left' : 'right'"
     class="!w-full sm:!w-[480px]"
-    :header="client ? 'Edit client' : 'New client'"
+    :header="client ? $t('clients.editClient') : $t('clients.newClient')"
     @update:visible="emit('update:visible', $event)"
   >
     <form class="space-y-4" @submit.prevent="save">
       <div class="grid grid-cols-2 gap-3">
-        <BaseInput v-model="form.last_name" label="Last name" capitalize :error="fieldError('last_name')" />
-        <BaseInput v-model="form.first_name" label="First name" capitalize :error="fieldError('first_name')" />
+        <BaseInput v-model="form.last_name" :label="$t('clients.lastName')" capitalize :error="fieldError('last_name')" />
+        <BaseInput v-model="form.first_name" :label="$t('clients.firstName')" capitalize :error="fieldError('first_name')" />
       </div>
-      <BasePhoneInput v-model="form.phone" label="Phone" required :error="fieldError('phone')" />
-      <BaseInput v-model="form.email" label="Email" type="email" :error="fieldError('email')" />
+      <BasePhoneInput v-model="form.phone" :label="$t('common.phone')" required :error="fieldError('phone')" />
+      <BaseInput v-model="form.email" :label="$t('common.email')" type="email" :error="fieldError('email')" />
 
       <BaseSelect
         v-model="form.source_id"
-        label="Source"
-        placeholder="None"
-        :options="sources.map((s) => ({ value: s.id, label: s.label, icon: s.meta?.icon }))"
+        :label="$t('clients.source')"
+        :placeholder="$t('common.none')"
+        :options="sources.map((s) => ({ value: s.id, label: itemLabel(s), icon: s.meta?.icon }))"
       />
 
       <!-- Who told the client about the project — shown for referral leads. -->
@@ -206,28 +207,28 @@ const duplicateNotice = ref(null)
       >
         <p class="text-xs font-semibold uppercase tracking-wide text-mute">
           <i class="pi pi-share-alt text-[10px]" aria-hidden="true" />
-          Referred by
+          {{ $t('clients.referredBy') }}
         </p>
-        <BaseInput v-model="form.referrer_name" label="Referrer name" capitalize :error="fieldError('referrer_name')" />
-        <BasePhoneInput v-model="form.referrer_phone" label="Referrer phone" :error="fieldError('referrer_phone')" />
+        <BaseInput v-model="form.referrer_name" :label="$t('clients.referrerName')" capitalize :error="fieldError('referrer_name')" />
+        <BasePhoneInput v-model="form.referrer_phone" :label="$t('clients.referrerPhone')" :error="fieldError('referrer_phone')" />
       </div>
 
       <BaseSelect
         v-model="form.rating_id"
-        label="Rating"
-        placeholder="None"
-        :options="ratings.map((r) => ({ value: r.id, label: r.label }))"
+        :label="$t('clients.rating')"
+        :placeholder="$t('common.none')"
+        :options="ratings.map((r) => ({ value: r.id, label: itemLabel(r) }))"
       />
 
       <BaseSelect
         v-if="canSeeOwnership"
         v-model="form.assigned_agent_id"
-        label="Assigned agent"
-        placeholder="Unassigned"
+        :label="$t('clients.assignedAgent')"
+        :placeholder="$t('clients.unassigned')"
         :options="store.followUpAgents.map((a) => ({ value: a.id, label: a.name }))"
       />
 
-      <BaseTextarea v-model="form.notes" label="Notes" :rows="3" :error="fieldError('notes')" />
+      <BaseTextarea v-model="form.notes" :label="$t('common.notes')" :rows="3" :error="fieldError('notes')" />
 
       <!-- Identity / contract details — needed by the time a deal closes. -->
       <div class="rounded-xl border border-line">
@@ -238,7 +239,7 @@ const duplicateNotice = ref(null)
         >
           <span class="flex items-center gap-2">
             <i class="pi pi-id-card text-mute" aria-hidden="true" />
-            Identity &amp; contract details
+            {{ $t('clients.identitySection') }}
           </span>
           <i :class="showIdentity ? 'pi pi-chevron-up' : 'pi pi-chevron-down'" class="text-xs text-mute" aria-hidden="true" />
         </button>
@@ -253,7 +254,7 @@ const duplicateNotice = ref(null)
             >
               <div class="flex items-center justify-between">
                 <span class="text-xs font-semibold uppercase tracking-wide text-mute">
-                  ID document {{ i + 1 }}
+                  {{ $t('clients.idDocumentN', { n: i + 1 }) }}
                 </span>
                 <Button
                   type="button"
@@ -262,27 +263,27 @@ const duplicateNotice = ref(null)
                   rounded
                   size="small"
                   severity="danger"
-                  aria-label="Remove document"
+:aria-label="$t('clients.removeDocument')"
                   @click="removeDocument(i)"
                 />
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <BaseSelect
                   v-model="doc.type"
-                  label="ID document"
-                  placeholder="None"
+:label="$t('clients.idDocument')"
+                  :placeholder="$t('common.none')"
                   :options="ID_DOCUMENT_TYPES"
                 />
-                <BaseInput v-model="doc.number" label="Document number" :error="fieldError(`id_documents.${i}.number`)" />
+                <BaseInput v-model="doc.number" :label="$t('clients.documentNumber')" :error="fieldError(`id_documents.${i}.number`)" />
               </div>
               <div class="grid grid-cols-2 gap-3">
-                <BaseInput v-model="doc.issued_at" label="Issue date" type="date" :error="fieldError(`id_documents.${i}.issued_at`)" />
-                <BaseInput v-model="doc.issued_place" label="Issue place" capitalize :error="fieldError(`id_documents.${i}.issued_place`)" />
+                <BaseInput v-model="doc.issued_at" :label="$t('clients.issueDate')" type="date" :error="fieldError(`id_documents.${i}.issued_at`)" />
+                <BaseInput v-model="doc.issued_place" :label="$t('clients.issuePlace')" capitalize :error="fieldError(`id_documents.${i}.issued_place`)" />
               </div>
             </div>
             <Button
               type="button"
-              label="Add ID document"
+:label="$t('clients.addIdDocument')"
               icon="pi pi-plus"
               text
               size="small"
@@ -291,23 +292,23 @@ const duplicateNotice = ref(null)
           </div>
           <BaseInput
             v-model="form.id_number"
-            label="ID number (NIN)"
-            placeholder="National identification number"
+:label="$t('clients.idNumber')"
+            :placeholder="$t('clients.idNumberPlaceholder')"
             :error="fieldError('id_number')"
           />
           <div class="grid grid-cols-2 gap-3">
-            <BaseInput v-model="form.birth_date" label="Birth date" type="date" :error="fieldError('birth_date')" />
-            <BaseInput v-model="form.birth_place" label="Birth place" capitalize :error="fieldError('birth_place')" />
+            <BaseInput v-model="form.birth_date" :label="$t('clients.birthDate')" type="date" :error="fieldError('birth_date')" />
+            <BaseInput v-model="form.birth_place" :label="$t('clients.birthPlace')" capitalize :error="fieldError('birth_place')" />
           </div>
-          <BaseInput v-model="form.address" label="Address" :error="fieldError('address')" />
+          <BaseInput v-model="form.address" :label="$t('common.address')" :error="fieldError('address')" />
         </div>
       </div>
 
       <div class="flex gap-2 pt-2">
-        <Button type="submit" label="Save" icon="pi pi-check" :loading="store.saving" />
+        <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="store.saving" />
         <Button
           type="button"
-          label="Cancel"
+:label="$t('common.cancel')"
           severity="secondary"
           outlined
           @click="emit('update:visible', false)"

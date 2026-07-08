@@ -25,6 +25,7 @@ import { useClientsStore } from '@/features/clients/clientsStore'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction } from '@/composables/useConfirm'
 import { formatDateTime, initials, countActiveFilters } from '@/utils/format'
+import { t } from '@/i18n'
 
 const store = useClientsStore()
 const auth = useAuthStore()
@@ -83,9 +84,9 @@ function onSaved(client) {
 async function removeClient(client) {
   if (
     await confirmAction({
-      title: `Cancel client "${client.full_name}"?`,
-      text: 'The record and its history are kept.',
-      confirmText: 'Cancel client',
+      title: t('clients.cancelTitle', { name: client.full_name }),
+      text: t('clients.cancelText'),
+      confirmText: t('clients.cancelConfirm'),
       danger: true,
     })
   ) {
@@ -111,11 +112,11 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
 <template>
   <div>
     <OfflineStamp :at="store.offlineAt" />
-    <PageHeader title="Clients" subtitle="Leads and buyers — searchable by name or phone.">
+    <PageHeader :title="$t('nav.clients')" :subtitle="$t('clients.subtitle')">
       <template #actions>
         <Button
           v-if="canCreate"
-          label="New client"
+:label="$t('clients.newClient')"
           icon="pi pi-plus"
           class="native-fab"
           data-testid="new-client"
@@ -135,31 +136,31 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
           />
           <InputText
             v-model="store.filters.search"
-            placeholder="Search name or phone…"
+:placeholder="$t('clients.searchPlaceholder')"
             class="w-full !ps-9"
           />
         </div>
         <BaseSelect
           v-if="canSeeOwnership"
           v-model="store.filters.assigned_agent_id"
-          placeholder="All agents"
-          aria-label="Filter by agent"
+:placeholder="$t('clients.allAgents')"
+          :aria-label="$t('clients.filterByAgent')"
           class="w-full sm:w-44"
           :options="store.followUpAgents.map((a) => ({ value: a.id, label: a.name }))"
         />
         <BaseSelect
           v-if="canSeeDetails"
           v-model="store.filters.source_id"
-          placeholder="All sources"
-          aria-label="Filter by source"
+:placeholder="$t('clients.allSources')"
+          :aria-label="$t('clients.filterBySource')"
           class="w-full sm:w-44"
           :options="sources.map((s) => ({ value: s.id, label: s.label, icon: s.meta?.icon }))"
         />
         <BaseSelect
           v-if="canSeeDetails"
           v-model="store.filters.rating_id"
-          placeholder="All ratings"
-          aria-label="Filter by rating"
+:placeholder="$t('clients.allRatings')"
+          :aria-label="$t('clients.filterByRating')"
           class="w-full sm:w-40"
           :options="ratings.map((r) => ({ value: r.id, label: r.label }))"
         />
@@ -168,7 +169,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
           icon="pi pi-filter-slash"
           text
           severity="secondary"
-          aria-label="Reset filters"
+:aria-label="$t('common.resetFilters')"
           @click="resetFilters"
         />
       </div>
@@ -184,8 +185,8 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
         :total="store.total"
         clickable
         empty-icon="pi pi-users"
-        empty-title="No clients match"
-        empty-body="Adjust the filters or add a new client."
+:empty-title="$t('clients.emptyTitle')"
+        :empty-body="$t('clients.emptyBody')"
         @page="onPage"
         @item-click="(c) => openFile({ data: c })"
       >
@@ -216,7 +217,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
               </p>
               <p v-if="canSeeOwnership" class="mt-1 truncate text-xs text-mute">
                 <i class="pi pi-user text-[10px]" aria-hidden="true" />
-                {{ item.assigned_agent?.name ?? 'Unassigned' }}
+                {{ item.assigned_agent?.name ?? $t('clients.unassigned') }}
               </p>
             </div>
             <!-- One-tap call / WhatsApp — the reason this list exists on a phone. -->
@@ -224,7 +225,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
               <a
                 :href="`tel:${item.phone}`"
                 class="flex h-11 w-11 items-center justify-center rounded-full bg-highlight text-primary-600 active:opacity-70 dark:text-primary-400"
-                :aria-label="`Call ${item.full_name}`"
+                :aria-label="$t('clients.callAria', { name: item.full_name })"
                 @click.stop
               >
                 <i class="pi pi-phone" aria-hidden="true" />
@@ -234,7 +235,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
                 target="_blank"
                 rel="noopener"
                 class="flex h-11 w-11 items-center justify-center rounded-full bg-green-500/10 text-green-600 active:opacity-70 dark:text-green-400"
-                :aria-label="`WhatsApp ${item.full_name}`"
+                :aria-label="$t('clients.whatsappAria', { name: item.full_name })"
                 @click.stop
               >
                 <i class="pi pi-whatsapp" aria-hidden="true" />
@@ -262,12 +263,12 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
         <template #empty>
           <EmptyState
             icon="pi pi-users"
-            title="No clients match"
-            body="Adjust the filters or add a new client."
+:title="$t('clients.emptyTitle')"
+            :body="$t('clients.emptyBody')"
           />
         </template>
 
-        <Column header="Client">
+        <Column :header="$t('clients.client')">
           <template #body="{ data }">
             <span class="flex items-center gap-3">
               <Avatar
@@ -285,7 +286,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
           </template>
         </Column>
 
-        <Column v-if="canSeeDetails" header="Phone">
+        <Column v-if="canSeeDetails" :header="$t('common.phone')">
           <template #body="{ data }">
             <span class="flex items-center gap-1.5 whitespace-nowrap">
               <span class="num">{{ formatPhone(data.phone) }}</span>
@@ -296,8 +297,8 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
                   target="_blank"
                   rel="noopener"
                   class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-emerald-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
-                  :aria-label="`WhatsApp ${data.full_name}`"
-                  title="Message on WhatsApp"
+                  :aria-label="$t('clients.whatsappAria', { name: data.full_name })"
+                  :title="$t('clients.whatsappTitle')"
                   @click.stop
                 >
                   <i class="pi pi-whatsapp text-sm" aria-hidden="true" />
@@ -307,7 +308,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
           </template>
         </Column>
 
-        <Column v-if="canSeeDetails" header="Source">
+        <Column v-if="canSeeDetails" :header="$t('clients.source')">
           <template #body="{ data }">
             <Tag
               v-if="data.source"
@@ -319,20 +320,20 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
           </template>
         </Column>
 
-        <Column v-if="canSeeDetails" header="Rating">
+        <Column v-if="canSeeDetails" :header="$t('clients.rating')">
           <template #body="{ data }">
             <span v-if="data.rating" class="text-ink">{{ data.rating.label }}</span>
             <span v-else class="text-mute">—</span>
           </template>
         </Column>
 
-        <Column v-if="canSeeOwnership" header="Agent">
+        <Column v-if="canSeeOwnership" :header="$t('clients.agent')">
           <template #body="{ data }">
             {{ data.assigned_agent?.name ?? '—' }}
           </template>
         </Column>
 
-        <Column v-if="canSeeOwnership" header="Created">
+        <Column v-if="canSeeOwnership" :header="$t('clients.created')">
           <template #body="{ data }">
             <span class="block text-sm">{{ data.created_by?.name ?? '—' }}</span>
             <span class="block text-xs text-mute">{{ formatDateTime(data.created_at) }}</span>
@@ -348,7 +349,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
                 rounded
                 severity="secondary"
                 size="small"
-                aria-label="Edit client"
+:aria-label="$t('clients.editAria')"
                 @click.stop="openEdit(data)"
               />
               <Button
@@ -357,7 +358,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
                 rounded
                 severity="danger"
                 size="small"
-                aria-label="Cancel client"
+:aria-label="$t('clients.cancelConfirm')"
                 @click.stop="removeClient(data)"
               />
             </span>

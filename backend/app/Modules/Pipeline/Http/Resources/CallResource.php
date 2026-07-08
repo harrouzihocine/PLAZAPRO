@@ -39,7 +39,7 @@ class CallResource extends JsonResource
             ] : null),
             'outcome' => $this->whenLoaded('outcome', fn () => $this->outcome ? [
                 'id' => $this->outcome->id,
-                'label' => $this->outcome->label,
+                'label' => $this->outcome->localizedLabel(),
             ] : null),
         ];
     }
