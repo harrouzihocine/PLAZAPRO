@@ -35,9 +35,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/boxes', [BoxController::class, 'index']);
 
-        // The reservation follow-up board: reserved/held units + ordered queues.
-        Route::get('/reservations/queues', [ReservationController::class, 'queues']);
-
         // Media: list + permission-gated streaming of the private files.
         Route::get('/{mediableType}/{mediableId}/media', [MediaController::class, 'index'])
             ->whereIn('mediableType', ['locations', 'units'])->whereNumber('mediableId');
@@ -76,6 +73,13 @@ Route::middleware('auth:sanctum')->group(function () {
             ->whereIn('mediableType', ['locations', 'units'])->whereNumber('mediableId');
         Route::post('/media/{media}/replace', [MediaController::class, 'replace']);
         Route::delete('/media/{media}', [MediaController::class, 'destroy']);
+    });
+
+    // The reservation follow-up board: reserved/held units + ordered queues.
+    // Its own grant (reservations.view) — reservations.view_all, checked in the
+    // action, widens the board from "my own book" to company-wide.
+    Route::middleware('can:reservations.view')->group(function () {
+        Route::get('/reservations/queues', [ReservationController::class, 'queues']);
     });
 
     // Interest-hold lifecycle (the 48h hold). Requires units.interest.

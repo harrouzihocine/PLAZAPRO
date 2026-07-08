@@ -115,11 +115,12 @@ const routes = [
       },
       {
         // The reservation follow-up board: reserved/held units and the ordered
-        // queue on each ("you are 2nd in line").
+        // queue on each ("you are 2nd in line"). reservations.view_all (checked
+        // server-side) widens it from "my own book" to company-wide.
         path: 'reservations',
         name: 'reservations',
         component: () => import('@/features/inventory/views/ReservationsView.vue'),
-        meta: { permission: 'units.view' },
+        meta: { permission: 'reservations.view' },
       },
       {
         path: 'analytics',

@@ -170,7 +170,7 @@ const SECTIONS = [
       },
       { to: '/inventory/units', labelKey: 'nav.units', icon: 'pi pi-th-large', permission: 'units.view' },
       // The reservation follow-up board — who queues on which unit, in order.
-      { to: '/reservations', labelKey: 'nav.reservations', icon: 'pi pi-bookmark', permission: 'units.view' },
+      { to: '/reservations', labelKey: 'nav.reservations', icon: 'pi pi-bookmark', permission: 'reservations.view' },
     ],
   },
   {

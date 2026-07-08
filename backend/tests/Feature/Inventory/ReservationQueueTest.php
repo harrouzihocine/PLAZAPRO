@@ -240,16 +240,65 @@ class ReservationQueueTest extends TestCase
         Notification::assertNothingSent();
     }
 
-    public function test_the_queues_endpoint_requires_units_view(): void
+    public function test_the_queues_endpoint_requires_reservations_view(): void
     {
-        Sanctum::actingAs($this->userWithPermissions(['clients.view']));
+        // units.view (the board's old gate) is no longer enough — the page has
+        // its own grant now.
+        Sanctum::actingAs($this->userWithPermissions(['units.view']));
 
         $this->getJson('/api/v1/reservations/queues')->assertForbidden();
     }
 
+    public function test_without_view_all_the_board_scopes_to_the_callers_own_book(): void
+    {
+        $me = $this->userWithPermissions(['reservations.view']);
+        $overseer = $this->userWithPermissions(['reservations.view', 'reservations.view_all']);
+        $other = User::factory()->create();
+
+        // Mine by project creation.
+        $unitMine = Unit::factory()->create(['sale_status' => 'available']);
+        $mine = ClientProject::factory()->create(['created_by' => $me->id]);
+        $this->reserve($unitMine, $mine, $me);
+
+        // Mine because the CLIENT is mine — a colleague opened the project.
+        // (created_by is deliberately not mass-assignable → forceFill.)
+        $unitClientOwned = Unit::factory()->create(['sale_status' => 'available']);
+        $myClientsProject = ClientProject::factory()->create(['created_by' => $other->id]);
+        $myClientsProject->client->forceFill(['created_by' => $me->id])->save();
+        $this->reserve($unitClientOwned, $myClientsProject, $other);
+
+        // Mine as a contributor — shared with me on the access list.
+        $unitShared = Unit::factory()->create(['sale_status' => 'available']);
+        $shared = ClientProject::factory()->create(['created_by' => $other->id]);
+        $shared->viewers()->attach($me->id);
+        $this->reserve($unitShared, $shared, $other);
+
+        // Not mine at all.
+        $unitOther = Unit::factory()->create(['sale_status' => 'available']);
+        $theirs = ClientProject::factory()->create(['created_by' => $other->id]);
+        $this->reserve($unitOther, $theirs, $other);
+
+        Sanctum::actingAs($me);
+        $ids = collect($this->getJson('/api/v1/reservations/queues')->assertOk()->json('data'))
+            ->pluck('id');
+        $this->assertTrue($ids->contains($unitMine->id));
+        $this->assertTrue($ids->contains($unitClientOwned->id));
+        $this->assertTrue($ids->contains($unitShared->id));
+        $this->assertFalse($ids->contains($unitOther->id));
+
+        // The company-wide grant sees every queue.
+        Sanctum::actingAs($overseer);
+        $ids = collect($this->getJson('/api/v1/reservations/queues')->assertOk()->json('data'))
+            ->pluck('id');
+        $this->assertTrue($ids->contains($unitOther->id));
+        $this->assertTrue($ids->contains($unitMine->id));
+    }
+
     public function test_the_queues_board_orders_the_queue_and_masks_invisible_projects(): void
     {
-        $me = $this->userWithPermissions(['units.view']);
+        // No view_all: the unit makes MY board because my project queues on it
+        // — and the full queue still shows, other clients masked.
+        $me = $this->userWithPermissions(['reservations.view']);
         $other = User::factory()->create();
         $unit = Unit::factory()->create(['sale_status' => 'available']);
 

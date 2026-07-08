@@ -15,6 +15,12 @@ use App\Modules\Settings\Models\User;
  * holder first, then backups oldest-first) — the page an agent opens to tell a
  * client "you are 2nd in line; if the 1st doesn't buy, it goes to you".
  *
+ * Two-tier access: reservations.view opens the board; without
+ * reservations.view_all it only lists units where the caller's OWN book holds
+ * a live queue entry (a project they created or contribute to, or a client
+ * they own — ClientProject::ownedOrSharedWith). With view_all the whole
+ * company's queues show.
+ *
  * Queue ORDER is never hidden, but client identity is only revealed for
  * projects the caller can actually see (ClientProject::isVisibleTo — the same
  * rule as the unit page's project logs); every other entry stays position +
@@ -37,6 +43,10 @@ class BuildReservationQueues
             ->where(fn ($q) => $q
                 ->where('sale_status', SaleStatus::Reserved->value)
                 ->orWhereHas('activeReservations', fn ($r) => $r->whereNotNull('client_project_id')))
+            // Without the company-wide grant, only units where the caller's own
+            // book holds a live queue entry make the board.
+            ->when(! $user->can('reservations.view_all'), fn ($q) => $q
+                ->whereHas('activeReservations.clientProject', fn ($p) => $p->ownedOrSharedWith($user)))
             ->when(! empty($filters['location_id']), fn ($q) => $q->where('location_id', $filters['location_id']))
             ->when(
                 in_array($filters['status'] ?? null, [SaleStatus::Reserved->value, SaleStatus::Interested->value], true),

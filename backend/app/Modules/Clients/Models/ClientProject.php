@@ -68,14 +68,29 @@ class ClientProject extends BaseModel
         }
 
         return $query->where(fn (Builder $q) => $q
+            ->ownedOrSharedWith($user)
+            ->orWhereHas('visits', fn (Builder $v) => $v
+                ->active()
+                ->where('type', VisitType::InSite->value)
+                ->where('agent_id', $user->id)));
+    }
+
+    /**
+     * The user's OWN book: projects they created, were shared on as a
+     * (non-hidden) viewer, or that belong to a client they own (its creator or
+     * assigned agent) — minus owner-siloed duplicates (hidden_from_owner).
+     * This is scopeVisibleTo WITHOUT the projects.view_all bypass and without
+     * the dispatched-field-agent remit: reuse it when a feature must scope to
+     * "mine" regardless of how much the user may otherwise read (the
+     * reservations follow-up board without reservations.view_all).
+     */
+    public function scopeOwnedOrSharedWith(Builder $query, User $user): Builder
+    {
+        return $query->where(fn (Builder $q) => $q
             ->where('created_by', $user->id)
             ->orWhereHas('viewers', fn (Builder $v) => $v
                 ->whereKey($user->id)
                 ->whereNull('client_project_viewers.hidden_at'))
-            ->orWhereHas('visits', fn (Builder $v) => $v
-                ->active()
-                ->where('type', VisitType::InSite->value)
-                ->where('agent_id', $user->id))
             ->orWhere(fn (Builder $owner) => $owner
                 ->where('hidden_from_owner', false)
                 ->whereHas('client', fn (Builder $c) => $c

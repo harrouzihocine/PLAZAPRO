@@ -45,6 +45,10 @@ class RbacSeeder extends Seeder
         'users.manage', 'users.unlock', 'users.transfer', 'roles.manage', 'settings.manage', 'audit.view', 'audit.export',
         // Inventory
         'locations.manage', 'units.view', 'units.interest', 'units.manage', 'media.manage',
+        // The reservations follow-up board, two tiers: open the page at all /
+        // see every queue company-wide (without view_all it self-scopes to the
+        // user's own clients and projects).
+        'reservations.view', 'reservations.view_all',
         // Clients — the client record itself. clients.manage covers ONLY the
         // client (edit / reassign / archive); projects have their own grants.
         'clients.view', 'clients.create', 'clients.manage',
@@ -129,6 +133,8 @@ class RbacSeeder extends Seeder
         'units.interest' => 'Mark a unit as Interested for a client (places a hold).',
         'units.manage' => 'Add, edit and change the status of units.',
         'media.manage' => 'Upload and manage photos and files on units and projects.',
+        'reservations.view' => 'Open the Reservations follow-up board — the waiting line on each reserved or held unit. Without "see all", it shows only queues involving your own clients and projects.',
+        'reservations.view_all' => 'See every reservation queue company-wide on the Reservations board, not just the ones involving your own clients and projects.',
         // Clients
         'clients.view' => 'Open the clients area.',
         'clients.create' => 'Add new clients and capture what they are looking for.',
@@ -230,6 +236,11 @@ class RbacSeeder extends Seeder
         // Split from users.manage: the offboarding desk (workload review +
         // hand-over) without full account administration.
         'users.transfer' => 'users.manage',
+        // The Reservations board used to ride units.view; every role that saw
+        // it keeps the page. The company-wide width follows the "sees every
+        // project" grant — untick it per role to self-scope agents.
+        'reservations.view' => 'units.view',
+        'reservations.view_all' => 'projects.view_all',
     ];
 
     /**
@@ -313,23 +324,27 @@ class RbacSeeder extends Seeder
         // name-only) are built by unticking these in the role matrix.
         $fullVisibility = ['clients.view_all', 'clients.view_details', 'projects.view_all'];
 
-        // Outside/apartment visit rapports (the field agent).
+        // Outside/apartment visit rapports (the field agent). Reservations:
+        // page yes, self-scoped — the two-tier design keeps agents on their own
+        // queues by default.
         $siteAgent = [
             ...$this->baseline, ...$fullVisibility,
-            'clients.view', 'units.view', 'visits.conduct', 'visits.propose',
+            'clients.view', 'units.view', 'reservations.view', 'visits.conduct', 'visits.propose',
         ];
 
         // Calls + office-visit rapports. Opening a project is part of the lead
         // workflow (the "New project" flow starts with its opening call).
         $salesAgent = [
             ...$this->baseline, ...$fullVisibility,
-            'clients.view', 'clients.create', 'projects.create',
+            'clients.view', 'clients.create', 'projects.create', 'reservations.view',
             'calls.log', 'next_actions.plan', 'visits.conduct', 'visits.propose',
         ];
 
-        // The payment desk: record versements, manage schedules, generate documents.
+        // The payment desk: record versements, manage schedules, generate
+        // documents — and follow every deposit queue (reservations board, wide).
         $financer = [
             ...$this->baseline, ...$fullVisibility, 'clients.view',
+            'reservations.view', 'reservations.view_all',
             'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
         ];
 
@@ -347,6 +362,7 @@ class RbacSeeder extends Seeder
             'calls.log', 'next_actions.plan',
             'visits.assign', 'visits.dispatch', 'visits.conduct', 'visits.propose', 'tasks.manage',
             'units.view', 'units.interest', 'units.manage', 'media.manage',
+            'reservations.view', 'reservations.view_all',
             'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
         ];
 
