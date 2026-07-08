@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import Popover from 'primevue/popover'
 import { formatDateTime, humanize } from '@/utils/format'
 import { copyToClipboard } from '@/composables/useClipboard'
+import { t } from '@/i18n'
 
 // Renders personal work (calls / office visits / in-site visits / tasks) as one
 // card per type — never mixed — reused by "My upcoming" and "My open & overdue
@@ -16,7 +17,7 @@ import { copyToClipboard } from '@/composables/useClipboard'
 //   client?, title?, unit?, location?, maps_url?, link? }
 defineProps({
   groups: { type: Array, required: true },
-  emptyText: { type: String, default: 'Nothing here.' },
+  emptyText: { type: String, default: null }, // null → localized
 })
 
 const detailsRef = ref(null)
@@ -30,8 +31,8 @@ function showDetails(event, item, icon) {
 
 // A bare client link (no project yet) opens the client file, not a project.
 function openLabel(item) {
-  if (item.kind === 'task') return 'Open task'
-  return item.link?.includes('/projects/') ? 'Open project' : 'Open client'
+  if (item.kind === 'task') return t('workItems.openTask')
+  return item.link?.includes('/projects/') ? t('dispatch.openProject') : t('workItems.openClient')
 }
 </script>
 
@@ -45,7 +46,7 @@ function openLabel(item) {
           {{ g.items.length }}
         </span>
       </p>
-      <p v-if="!g.items.length" class="py-2 text-sm text-mute">{{ emptyText }}</p>
+      <p v-if="!g.items.length" class="py-2 text-sm text-mute">{{ emptyText ?? $t('common.nothingHere') }}</p>
       <ul v-else class="space-y-1.5">
         <li
           v-for="item in g.items.slice(0, 5)"
@@ -67,7 +68,7 @@ function openLabel(item) {
           <button
             type="button"
             class="me-1 shrink-0 text-mute transition-colors hover:text-ink"
-            aria-label="Details"
+:aria-label="$t('pipeline.details')"
             @click.stop.prevent="showDetails($event, item, g.icon)"
           >
             <i class="pi pi-info-circle" aria-hidden="true" />
@@ -129,10 +130,10 @@ function openLabel(item) {
           <button
             v-if="detailsItem.maps_url"
             type="button"
-            title="Copy Maps link"
-            aria-label="Copy Maps link"
+:title="$t('pipeline.copyMapsLink')"
+            :aria-label="$t('pipeline.copyMapsLink')"
             class="inline-flex items-center text-primary-600 hover:underline dark:text-primary-400"
-            @click="copyToClipboard(detailsItem.maps_url, 'Maps link copied')"
+            @click="copyToClipboard(detailsItem.maps_url, $t('pipeline.mapsLinkCopied'))"
           >
             <i class="pi pi-copy" aria-hidden="true" />
           </button>

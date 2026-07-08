@@ -1,10 +1,11 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
 import Tag from 'primevue/tag'
+import BaseInput from '@/components/base/BaseInput.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
@@ -16,6 +17,7 @@ import { useClientsStore } from '@/features/clients/clientsStore'
 import { useAuthStore } from '@/features/settings/store'
 import { agentsApi, desireMatchesApi, followUpAgentsApi } from '@/features/clients/api'
 import { toastSuccess } from '@/composables/useConfirm'
+import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { formatPhone } from '@/data/countryCodes'
 import { formatDate, initials } from '@/utils/format'
@@ -37,6 +39,10 @@ import { t } from '@/i18n'
 //    "create project" step: the call itself opens the project when it qualifies
 //    or closes into a deal. Only the assignee sees Reconnect, so a manager can
 //    never accidentally become the caller — they assign instead.
+//
+// The list can carry thousands of waiting clients, so it lazy-loads: the server
+// paginates (search / unassigned filter server-side too) and the page appends as
+// the user scrolls — never the whole company in one paint.
 const store = useClientsStore()
 const auth = useAuthStore()
 
@@ -45,9 +51,14 @@ const canAssign = () => auth.can('clients.manage')
 const isAssignee = (row) => !!row.client.assigned_agent && row.client.assigned_agent.id === auth.user?.id
 
 const rows = ref([])
+const meta = ref({ current_page: 1, last_page: 1, total: 0 })
 const loading = ref(true)
+const loadingMore = ref(false)
 const error = ref('')
+const search = ref('')
 const unassignedOnly = ref(false)
+
+const hasMore = computed(() => meta.value.current_page < meta.value.last_page)
 
 // Sales agents a manager can delegate to (calls.log holders — the same
 // population as the client "assigned agent" picker).
@@ -56,18 +67,30 @@ const agentOptions = computed(() =>
   followUpAgents.value.map((a) => ({ value: a.id, label: a.name })),
 )
 
+function listParams(page) {
+  const params = { page }
+  if (search.value.trim()) params.search = search.value.trim()
+  if (unassignedOnly.value) params.unassigned = 1
+  return params
+}
+
+// Pre-select every match by default — shortlisting is soft (easy to drop
+// inside the qualify modal or later); the point is to remove clicks, not
+// to ask the agent to re-pick what the matcher already found.
+function presentRow(row) {
+  return {
+    ...row,
+    matches: row.matches.map((u) => ({ ...u, selected: true })),
+    assigning: false,
+  }
+}
+
 async function load() {
   loading.value = true
   try {
-    const data = await desireMatchesApi.list()
-    // Pre-select every match by default — shortlisting is soft (easy to drop
-    // inside the qualify modal or later); the point is to remove clicks, not
-    // to ask the agent to re-pick what the matcher already found.
-    rows.value = data.map((row) => ({
-      ...row,
-      matches: row.matches.map((u) => ({ ...u, selected: true })),
-      assigning: false,
-    }))
+    const data = await desireMatchesApi.list(listParams(1))
+    rows.value = data.items.map(presentRow)
+    meta.value = data.meta
     error.value = ''
   } catch (e) {
     error.value = e.response?.data?.message ?? t('matches.loadFailed')
@@ -76,9 +99,40 @@ async function load() {
   }
 }
 
-const visibleRows = computed(() =>
-  unassignedOnly.value ? rows.value.filter((r) => !r.client.assigned_agent) : rows.value,
-)
+async function loadMore() {
+  if (loading.value || loadingMore.value || !hasMore.value) return
+  loadingMore.value = true
+  try {
+    const data = await desireMatchesApi.list(listParams(meta.value.current_page + 1))
+    // Rows resolved elsewhere shift the pages under us — append only clients we
+    // don't already show, so a boundary drift never duplicates a card.
+    const seen = new Set(rows.value.map((r) => r.client.id))
+    rows.value.push(...data.items.filter((r) => !seen.has(r.client.id)).map(presentRow))
+    meta.value = data.meta
+    error.value = ''
+  } catch (e) {
+    error.value = e.response?.data?.message ?? t('matches.loadFailed')
+  } finally {
+    loadingMore.value = false
+  }
+}
+
+// Scrolling near the bottom pulls the next page in; the button stays as the
+// explicit / no-IntersectionObserver fallback.
+const { sentinel } = useInfiniteScroll(loadMore)
+
+// Search is server-side (the board spans the whole company) — debounced so a
+// pause in typing queries once, not every keystroke.
+let searchTimer = null
+watch(search, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(load, 400)
+})
+
+function toggleUnassigned() {
+  unassignedOnly.value = !unassignedOnly.value
+  load()
+}
 
 onMounted(async () => {
   if (!store.agents.length) store.agents = await agentsApi.list()
@@ -95,6 +149,11 @@ async function assign(row, agentId) {
     const client = await desireMatchesApi.assign(row.client.id, agentId)
     row.client.assigned_agent = client.assigned_agent ?? null
     toastSuccess(t('matches.assignedToast', { name: client.assigned_agent?.name ?? t('matches.theAgent') }))
+    // On the unassigned-only view the row no longer belongs to the filter.
+    if (unassignedOnly.value && row.client.assigned_agent) {
+      rows.value = rows.value.filter((r) => r.client.id !== row.client.id)
+      meta.value.total = Math.max(0, meta.value.total - 1)
+    }
   } catch (e) {
     error.value = e.response?.data?.message ?? t('matches.assignFailed')
   } finally {
@@ -194,19 +253,25 @@ async function submitReconnect(payload) {
 :title="$t('matches.title')"
       :subtitle="$t('matches.subtitle')"
     >
-      <template v-if="canAssign()" #actions>
-        <Button
-          :label="unassignedOnly ? $t('matches.showingUnassigned') : $t('matches.unassignedOnly')"
-          :icon="unassignedOnly ? 'pi pi-filter-fill' : 'pi pi-filter'"
-          size="small"
-          severity="secondary"
-          :outlined="!unassignedOnly"
-          @click="unassignedOnly = !unassignedOnly"
-        />
+      <template #actions>
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="w-56">
+            <BaseInput v-model="search" :placeholder="$t('matches.searchPlaceholder')" />
+          </div>
+          <Button
+            v-if="canAssign()"
+            :label="unassignedOnly ? $t('matches.showingUnassigned') : $t('matches.unassignedOnly')"
+            :icon="unassignedOnly ? 'pi pi-filter-fill' : 'pi pi-filter'"
+            size="small"
+            severity="secondary"
+            :outlined="!unassignedOnly"
+            @click="toggleUnassigned"
+          />
+        </div>
       </template>
     </PageHeader>
 
-    <SectionCard v-if="error">
+    <SectionCard v-if="error && !rows.length">
       <EmptyState icon="pi pi-exclamation-triangle" :title="error" />
     </SectionCard>
 
@@ -214,16 +279,16 @@ async function submitReconnect(payload) {
       <Skeleton v-for="i in 3" :key="i" height="7rem" />
     </div>
 
-    <SectionCard v-else-if="!visibleRows.length">
+    <SectionCard v-else-if="!rows.length">
       <EmptyState
         icon="pi pi-heart"
-        :title="unassignedOnly ? $t('matches.emptyUnassigned') : $t('matches.emptyAll')"
+        :title="search ? $t('matches.emptySearch') : unassignedOnly ? $t('matches.emptyUnassigned') : $t('matches.emptyAll')"
         :body="unassignedOnly ? $t('matches.emptyUnassignedBody') : $t('matches.emptyAllBody')"
       />
     </SectionCard>
 
     <div v-else class="space-y-4">
-      <SectionCard v-for="row in visibleRows" :key="row.client.id" flush>
+      <SectionCard v-for="row in rows" :key="row.client.id" flush class="match-card">
         <template #header>
           <RouterLink
             :to="{ name: 'clients.file', params: { id: row.client.id } }"
@@ -381,6 +446,25 @@ async function submitReconnect(payload) {
           </div>
         </div>
       </SectionCard>
+
+      <!-- Lazy-load footer: the sentinel pre-fetches as it nears the viewport;
+           the button is the explicit fallback. -->
+      <div ref="sentinel" class="flex flex-col items-center gap-2 py-2">
+        <p v-if="error" class="text-xs text-danger">{{ error }}</p>
+        <p class="num text-xs text-mute">
+          {{ $t('matches.showingOf', { shown: rows.length, total: meta.total }) }}
+        </p>
+        <Button
+          v-if="hasMore"
+          :label="$t('matches.loadMore')"
+          icon="pi pi-arrow-down"
+          size="small"
+          severity="secondary"
+          outlined
+          :loading="loadingMore"
+          @click="loadMore"
+        />
+      </div>
     </div>
 
     <!-- Reconnect & qualify — the standard call-log qualification, pre-loaded
@@ -408,3 +492,13 @@ async function submitReconnect(payload) {
     </BaseModal>
   </div>
 </template>
+
+<style scoped>
+/* Off-screen cards skip layout/paint entirely — with dozens of rich cards
+   loaded, scrolling stays smooth on phones. The intrinsic size keeps the
+   scrollbar stable while skipped cards are unrendered. */
+.match-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 480px;
+}
+</style>

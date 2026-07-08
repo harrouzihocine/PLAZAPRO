@@ -9,6 +9,7 @@ import BaseSelect from '@/components/base/BaseSelect.vue'
 import Button from 'primevue/button'
 import { staffApi } from '@/features/clients/api'
 import FilterPanel from '@/components/ui/FilterPanel.vue'
+import { t } from '@/i18n'
 
 const props = defineProps({
   from: { type: String, default: '' },
@@ -26,7 +27,7 @@ onMounted(async () => {
   }
 })
 const userOptions = computed(() => [
-  { value: '', label: 'All users' },
+  { value: '', label: t('oversight.allUsers') },
   ...staff.value.map((u) => ({ value: u.id, label: u.name })),
 ])
 
@@ -46,27 +47,27 @@ function clear() {
     <BaseInput
       :model-value="from"
       type="date"
-      label="From"
+:label="$t('oversight.from')"
       class="w-40"
       @update:model-value="emit('update:from', $event)"
     />
     <BaseInput
       :model-value="to"
       type="date"
-      label="To"
+:label="$t('oversight.to')"
       class="w-40"
       @update:model-value="emit('update:to', $event)"
     />
     <BaseSelect
       :model-value="userId"
-      label="User"
+:label="$t('oversight.user')"
       class="w-48"
       :options="userOptions"
       searchable="auto"
       @update:model-value="emit('update:userId', $event)"
     />
     <Button label="Apply" icon="pi pi-filter" size="small" @click="emit('apply')" />
-    <Button v-if="from || to || userId" label="Clear" size="small" text severity="secondary" @click="clear" />
+    <Button v-if="from || to || userId" :label="$t('common.clear')" size="small" text severity="secondary" @click="clear" />
   </div>
   </FilterPanel>
 </template>

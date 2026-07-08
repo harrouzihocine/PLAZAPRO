@@ -13,6 +13,7 @@ import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
 import OfflineStamp from '@/components/ui/OfflineStamp.vue'
 import { isNativeApp } from '@/utils/nativeApp'
+import { t } from '@/i18n'
 
 const auth = useAuthStore()
 
@@ -27,12 +28,12 @@ const error = ref('')
 
 const greeting = computed(() => {
   const h = new Date().getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 18) return 'Good afternoon'
-  return 'Good evening'
+  if (h < 12) return t('dashboard.goodMorning')
+  if (h < 18) return t('dashboard.goodAfternoon')
+  return t('dashboard.goodEvening')
 })
 
-const firstName = computed(() => (auth.user?.name ?? '').split(' ')[0] || 'there')
+const firstName = computed(() => (auth.user?.name ?? '').split(' ')[0] || '')
 
 // Icon per work kind — shared by "My upcoming" and "My overdue".
 const KIND_ICON = {
@@ -44,19 +45,19 @@ const KIND_ICON = {
 
 // Shared per-type breakdown — calls, office visits, in-site visits and tasks
 // are never mixed together. Feeds both "My upcoming" and "My open & overdue".
-const WORK_GROUPS = [
-  { key: 'calls', label: 'Calls', icon: KIND_ICON.call },
-  { key: 'office_visits', label: 'Office visits', icon: KIND_ICON.office_visit },
-  { key: 'in_site_visits', label: 'In-site visits', icon: KIND_ICON.in_site_visit },
-  { key: 'tasks', label: 'Tasks', icon: KIND_ICON.task },
+const workGroups = () => [
+  { key: 'calls', label: t('pipeline.tabCalls'), icon: KIND_ICON.call },
+  { key: 'office_visits', label: t('pipeline.tabOfficeVisits'), icon: KIND_ICON.office_visit },
+  { key: 'in_site_visits', label: t('pipeline.tabInSiteVisits'), icon: KIND_ICON.in_site_visit },
+  { key: 'tasks', label: t('nav.tasks'), icon: KIND_ICON.task },
 ]
 const myUpcoming = computed(() =>
-  WORK_GROUPS.map((g) => ({ ...g, items: data.value?.my_upcoming?.[g.key] ?? [] })),
+  workGroups().map((g) => ({ ...g, items: data.value?.my_upcoming?.[g.key] ?? [] })),
 )
 const hasUpcoming = computed(() => myUpcoming.value.some((g) => g.items.length))
 
 const myOverdue = computed(() =>
-  WORK_GROUPS.map((g) => ({ ...g, items: data.value?.my_overdue?.[g.key] ?? [] })),
+  workGroups().map((g) => ({ ...g, items: data.value?.my_overdue?.[g.key] ?? [] })),
 )
 const hasOverdue = computed(() => myOverdue.value.some((g) => g.items.length))
 
@@ -64,11 +65,11 @@ const hasOverdue = computed(() => myOverdue.value.some((g) => g.items.length))
 const monthTiles = computed(() => {
   const s = data.value?.month_stats ?? {}
   return [
-    { label: 'Calls', value: s.calls, icon: KIND_ICON.call, tone: 'info' },
-    { label: 'Office visits', value: s.office_visits, icon: KIND_ICON.office_visit, tone: 'default' },
-    { label: 'In-site visits', value: s.in_site_visits, icon: KIND_ICON.in_site_visit, tone: 'default' },
-    { label: 'Won', value: s.won, icon: 'pi pi-check-circle', tone: 'success' },
-    { label: 'Lost', value: s.lost, icon: 'pi pi-times-circle', tone: 'danger' },
+    { label: t('pipeline.tabCalls'), value: s.calls, icon: KIND_ICON.call, tone: 'info' },
+    { label: t('pipeline.tabOfficeVisits'), value: s.office_visits, icon: KIND_ICON.office_visit, tone: 'default' },
+    { label: t('pipeline.tabInSiteVisits'), value: s.in_site_visits, icon: KIND_ICON.in_site_visit, tone: 'default' },
+    { label: t('status.won'), value: s.won, icon: 'pi pi-check-circle', tone: 'success' },
+    { label: t('status.lost'), value: s.lost, icon: 'pi pi-times-circle', tone: 'danger' },
   ]
 })
 
@@ -87,7 +88,7 @@ async function load() {
     })
     if (!served) {
       if (e.response?.status === 403) denied.value = true
-      else error.value = 'Could not load the dashboard. Please try again.'
+      else error.value = t('dashboard.loadFailed')
     }
   } finally {
     loading.value = false
@@ -99,8 +100,8 @@ useRefreshable(load) // pull-to-refresh (APK)
 
 <template>
   <div>
-    <PageHeader :title="`${greeting}, ${firstName}`">
-      <template #subtitle>Here's your own book at a glance today.</template>
+    <PageHeader :title="firstName ? `${greeting}, ${firstName}` : greeting">
+      <template #subtitle>{{ $t('dashboard.subtitle') }}</template>
     </PageHeader>
     <OfflineStamp :at="offlineAt" />
 
@@ -110,8 +111,8 @@ useRefreshable(load) // pull-to-refresh (APK)
     <SectionCard v-if="denied">
       <EmptyState
         icon="pi pi-lock"
-        title="No dashboard access"
-        body="Your role doesn't include dashboard metrics. Contact your administrator."
+:title="$t('dashboard.noAccessTitle')"
+        :body="$t('dashboard.noAccessBody')"
       />
     </SectionCard>
 
@@ -123,31 +124,31 @@ useRefreshable(load) // pull-to-refresh (APK)
       <!-- KPI row — personal to me -->
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="My active clients"
+:label="$t('dashboard.myActiveClients')"
           :value="data?.kpis.clients ?? '—'"
           icon="pi pi-users"
           :loading="loading"
         />
         <StatCard
-          label="My active projects"
+:label="$t('dashboard.myActiveProjects')"
           :value="data?.kpis.active_projects ?? '—'"
           icon="pi pi-sitemap"
           tone="info"
           :loading="loading"
         />
         <StatCard
-          label="My open deals"
+:label="$t('dashboard.myOpenDeals')"
           :value="data?.kpis.open_deals ?? '—'"
           icon="pi pi-key"
           tone="info"
           :loading="loading"
         />
         <StatCard
-          label="My overdue actions"
+:label="$t('dashboard.myOverdueActions')"
           :value="data?.kpis.overdue_actions ?? '—'"
           icon="pi pi-exclamation-circle"
           :tone="(data?.kpis.overdue_actions ?? 0) > 0 ? 'danger' : 'success'"
-          :hint="(data?.kpis.overdue_actions ?? 0) > 0 ? 'Needs attention now' : 'All caught up'"
+          :hint="(data?.kpis.overdue_actions ?? 0) > 0 ? $t('dashboard.needsAttention') : $t('dashboard.allCaughtUp')"
           :loading="loading"
         />
       </div>
@@ -168,7 +169,7 @@ useRefreshable(load) // pull-to-refresh (APK)
       </RouterLink>
 
       <!-- This month — my own activity. -->
-      <SectionCard :title="`This month · ${data?.month_stats?.label ?? ''}`" icon="pi pi-chart-bar">
+      <SectionCard :title="`${$t('dashboard.thisMonth')} · ${data?.month_stats?.label ?? ''}`" icon="pi pi-chart-bar">
         <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
           <StatCard
             v-for="tile in monthTiles"
@@ -183,16 +184,16 @@ useRefreshable(load) // pull-to-refresh (APK)
       </SectionCard>
 
       <!-- My upcoming — personal, per type, soonest first. -->
-      <SectionCard v-if="hasUpcoming" title="My upcoming (7 days)" icon="pi pi-calendar">
+      <SectionCard v-if="hasUpcoming" :title="$t('dashboard.myUpcoming')" icon="pi pi-calendar">
         <WorkItemGroups :groups="myUpcoming" empty-text="Nothing planned." />
       </SectionCard>
 
       <!-- My open & overdue actions — mine only, never other users', per type. -->
-      <SectionCard title="My open &amp; overdue actions" icon="pi pi-exclamation-circle">
+      <SectionCard :title="$t('dashboard.myOpenOverdue')" icon="pi pi-exclamation-circle">
         <EmptyState
           v-if="!loading && !hasOverdue"
           icon="pi pi-check-circle"
-          title="All caught up"
+:title="$t('dashboard.allCaughtUp')"
           body="Nothing of yours is past its due date."
         />
         <WorkItemGroups v-else :groups="myOverdue" empty-text="Nothing overdue." />

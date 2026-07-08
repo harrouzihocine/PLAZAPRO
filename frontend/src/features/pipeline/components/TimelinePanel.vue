@@ -43,21 +43,29 @@ const props = defineProps({
   // The project's conclusion already exists (open or won deal) — completing a
   // visit needs no conclusion of its own (it may still open another deal).
   dealSettled: { type: Boolean, default: false },
+  // The signed-in user is only DISPATCHED here (a field agent holding the
+  // project's in-site visit, not a contributor / the client's own agent):
+  // their remit is that visit — hide the project's other log affordances
+  // (log call / plan / complete office visit), which the server rejects
+  // anyway. Set from the project's is_dispatch_only flag.
+  dispatchOnly: { type: Boolean, default: false },
 })
 const emit = defineEmits(['changed'])
 const store = useClientsStore()
 const auth = useAuthStore()
 const { items: changeReasons } = useDynamicList('next_action_change_reasons')
 
-const canLogCall = () => auth.can('calls.log')
+const canLogCall = () => auth.can('calls.log') && !props.dispatchOnly
 // Planning a standalone next action has its own grant (split from calls.log)
 // so the button can be handed out person-by-person — mirrors the server rule.
-const canPlanNextAction = computed(() => auth.can('next_actions.plan'))
+const canPlanNextAction = computed(() => auth.can('next_actions.plan') && !props.dispatchOnly)
 // An in-site log is completed by its assigned agent (or a visit admin); office
-// visits by any conducting user — mirrors the server rule.
+// visits by any conducting user EXCEPT one only dispatched to the project —
+// mirrors the server rules (CompleteVisitRequest).
 const canComplete = (visit) =>
   auth.can('visits.conduct') &&
-  (visit.type !== 'in_site' || visit.agent?.id === auth.user?.id || auth.can('visits.assign'))
+  (visit.type !== 'in_site' || visit.agent?.id === auth.user?.id || auth.can('visits.assign')) &&
+  (visit.type !== 'office' || !props.dispatchOnly)
 
 // Adding apartment(s) to visit is offered on a project story only, on an open
 // project, under its own grant (split from visits.conduct) — hand it out
@@ -424,11 +432,11 @@ async function submitEditNa() {
     <!-- One tab per log type; "All" keeps the merged story. -->
     <Tabs v-model:value="tab" scrollable :pt="{ root: { class: 'mb-1' } }">
       <TabList>
-        <Tab v-for="t in TABS" :key="t.value" :value="t.value" class="!py-2.5">
+        <Tab v-for="tabDef in TABS" :key="tabDef.value" :value="tabDef.value" class="!py-2.5">
           <span class="flex items-center gap-1.5 text-sm">
-            <i :class="t.icon" aria-hidden="true" />
-            {{ t.label }}
-            <Badge v-if="t.entries.length" :value="t.entries.length" severity="secondary" size="small" />
+            <i :class="tabDef.icon" aria-hidden="true" />
+            {{ tabDef.label }}
+            <Badge v-if="tabDef.entries.length" :value="tabDef.entries.length" severity="secondary" size="small" />
           </span>
         </Tab>
       </TabList>

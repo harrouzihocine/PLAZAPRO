@@ -7,6 +7,7 @@ import { toastError, toastSuccess } from '@/composables/useConfirm'
 import { hasRefreshHandler, runRefresh } from '@/composables/useRefreshRegistry'
 import { newUuid } from '@/utils/uuid'
 import router from '@/router'
+import { t } from '@/i18n'
 
 // The offline outbox: writes queued while disconnected, persisted in
 // IndexedDB (they survive an app kill), replayed strict-FIFO on reconnect.
@@ -69,7 +70,7 @@ export const useOutboxStore = defineStore('outbox', {
         url,
         body,
         files, // [{ field, name, type, blob }] — Blobs persist fine in IDB
-        label: label ?? 'Offline change',
+        label: label ?? t('offline.offlineChange'),
         entityHint,
         silent,
         createdAt: new Date().toISOString(),
@@ -130,7 +131,7 @@ export const useOutboxStore = defineStore('outbox', {
               item.status = 'pending'
               await this._persist(item)
               this.paused = 'auth' // resumed by the login watcher (AppShell)
-              toastError('Your session expired — sign in again to finish syncing.')
+              toastError(t('offline.sessionExpiredSync'))
               break
             }
             // The server judged it: the action is no longer available (or was
@@ -139,7 +140,7 @@ export const useOutboxStore = defineStore('outbox', {
             item.status = 'failed'
             item.lastError = {
               status: e.response.status,
-              message: e.response.data?.message ?? 'Rejected by the server.',
+              message: e.response.data?.message ?? t('offline.rejectedByServer'),
             }
             await this._persist(item)
             this._noteFailure(item)
@@ -160,7 +161,7 @@ export const useOutboxStore = defineStore('outbox', {
       if (failedNow) {
         toastError(
           failedNow === 1
-            ? 'One offline change could not be applied — open Sync to see why.'
+            ? t('offline.oneChangeFailed')
             : `${failedNow} offline changes could not be applied — open Sync to see why.`,
         )
       }

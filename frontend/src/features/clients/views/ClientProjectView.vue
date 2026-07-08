@@ -455,6 +455,7 @@ async function submitDirectDeal() {
               :project-id="project.id"
               :frozen="project.frozen"
               :deal-settled="project.stage === 'won' || !!project.active_deal"
+              :dispatch-only="!!project.is_dispatch_only"
               @changed="refresh"
             />
           </SectionCard>

@@ -22,6 +22,7 @@ import { duplicateRequestsApi } from '@/features/clients/api'
 import { confirmAction, toastError, toastSuccess } from '@/composables/useConfirm'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { formatDateTime } from '@/utils/format'
+import { t } from '@/i18n'
 
 const items = ref([])
 const loading = ref(false)
@@ -32,7 +33,7 @@ async function load() {
   try {
     items.value = await duplicateRequestsApi.list()
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not load duplicate requests.')
+    toastError(e.response?.data?.message ?? t('dup.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -47,57 +48,57 @@ async function resolve(req, payload, successMsg) {
     toastSuccess(successMsg)
     await load()
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not resolve the request.')
+    toastError(e.response?.data?.message ?? t('dup.resolveFailed'))
   } finally {
     busy.value = null
   }
 }
 
 async function share(req, project) {
-  const finder = req.requested_by?.name ?? 'The finder'
+  const finder = req.requested_by?.name ?? t('dup.theFinder')
   const ok = await confirmAction({
-    title: 'Share this project?',
-    text: `${finder} will join this project as a contributor — seeing the client's details and who is working it. One shared workspace.`,
-    confirmText: 'Share project',
+    title: t('dup.shareTitle'),
+    text: t('dup.shareText', { finder }),
+    confirmText: t('dup.shareConfirm'),
   })
-  if (ok) resolve(req, { action: 'share_project', project_id: project.id, share_details: true }, 'Project shared.')
+  if (ok) resolve(req, { action: 'share_project', project_id: project.id, share_details: true }, t('dup.shared'))
 }
 
 async function fork(req, project) {
-  const finder = req.requested_by?.name ?? 'The finder'
+  const finder = req.requested_by?.name ?? t('dup.theFinder')
   const ok = await confirmAction({
-    title: 'Start a separate project?',
-    text: `${finder} gets their OWN new project on this client, continuing this one but siloed from it: they won't see this project or who is behind it, and the client's own agent won't see theirs.`,
-    confirmText: 'Start separate project',
+    title: t('dup.forkTitle'),
+    text: t('dup.forkText', { finder }),
+    confirmText: t('dup.forkConfirm'),
   })
-  if (ok) resolve(req, { action: 'fork_project', project_id: project.id }, 'Separate project created.')
+  if (ok) resolve(req, { action: 'fork_project', project_id: project.id }, t('dup.forked'))
 }
 
 async function deny(req) {
   const ok = await confirmAction({
-    title: 'Deny this request?',
-    text: 'The finder gets nothing — no client or project is shared with them.',
+    title: t('dup.denyTitle'),
+    text: t('dup.denyText'),
     danger: true,
-    confirmText: 'Deny',
+    confirmText: t('dup.deny'),
   })
-  if (ok) resolve(req, { action: 'deny' }, 'Request denied.')
+  if (ok) resolve(req, { action: 'deny' }, t('dup.denied'))
 }
 </script>
 
 <template>
   <div>
     <PageHeader
-      title="Duplicate clients"
-      subtitle="Resolve blocked create attempts — inspect a project, then deny, share it, or start a separate one."
+:title="$t('dup.title')"
+      :subtitle="$t('dup.subtitle')"
     />
 
-    <p v-if="loading" class="py-6 text-center text-sm text-mute">Loading…</p>
+    <p v-if="loading" class="py-6 text-center text-sm text-mute">{{ $t('common.loading') }}</p>
 
     <SectionCard v-else-if="!items.length">
       <EmptyState
         icon="pi pi-users"
-        title="No pending duplicates"
-        body="When a user tries to add a client whose phone already exists, it appears here."
+:title="$t('dup.emptyTitle')"
+        :body="$t('dup.emptyBody')"
       />
     </SectionCard>
 
@@ -107,18 +108,18 @@ async function deny(req) {
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div class="min-w-0">
             <p class="text-sm text-ink">
-              <span class="font-semibold">{{ req.requested_by?.name ?? 'A user' }}</span>
-              tried to add a client that already exists.
+              <span class="font-semibold">{{ req.requested_by?.name ?? $t('dup.aUser') }}</span>
+              {{ $t('dup.triedToAdd') }}
             </p>
             <p class="mt-1 text-sm text-mute">
-              Existing client:
+              {{ $t('dup.existingClient') }}
               <span class="font-medium text-ink">{{ req.existing_client?.name }}</span>
               <span v-if="req.existing_client?.phone" class="num"> · {{ req.existing_client.phone }}</span>
             </p>
             <p class="mt-0.5 text-xs text-mute">{{ formatDateTime(req.created_at) }}</p>
           </div>
           <Button
-            label="Deny"
+:label="$t('dup.deny')"
             icon="pi pi-times"
             size="small"
             severity="danger"
@@ -131,7 +132,7 @@ async function deny(req) {
         <!-- The existing client's projects: inspect one, then choose how to resolve. -->
         <div class="mt-3 border-t border-line pt-3">
           <p v-if="!req.existing_client?.projects?.length" class="text-sm text-mute">
-            This client has no projects to share.
+            {{ $t('dup.noProjects') }}
           </p>
           <ul v-else class="space-y-2">
             <DuplicateProjectRow

@@ -120,6 +120,13 @@ export const stackingApi = {
 
 // The 48-hour interest-hold lifecycle.
 export const reservationsApi = {
+  // The follow-up board: reserved/held units with their ordered queues
+  // ("you are Nth in line"). Client identity comes masked per visibility.
+  async queues(params = {}) {
+    const { data } = await useApi().get('/reservations/queues', { params })
+    return data.data
+  },
+
   async markInterest(unitId, payload = {}) {
     const { data } = await useApi().post(`/units/${unitId}/interest`, payload)
     return data.data

@@ -58,7 +58,7 @@ useAutoFilter(() => store.filters, () => store.applyFilters())
 
 <template>
   <div>
-    <PageHeader title="Audit trail" subtitle="The append-only log of every change in the system.">
+    <PageHeader :title="$t('audit.title')" :subtitle="$t('audit.subtitle')">
       <template #actions>
         <Button
           v-if="auth.can('audit.export')"
@@ -78,30 +78,30 @@ useAutoFilter(() => store.filters, () => store.applyFilters())
       <div
         class="grid grid-cols-2 items-end gap-2 border-b border-line px-4 py-3 sm:grid-cols-3 sm:px-5 lg:grid-cols-6"
       >
-        <BaseInput v-model="store.filters.action" label="Action" />
-        <BaseInput v-model="store.filters.subject_type" label="Subject type" />
-        <BaseInput v-model="store.filters.user_id" label="User ID" type="number" />
-        <BaseInput v-model="store.filters.from" label="From" type="date" />
-        <BaseInput v-model="store.filters.to" label="To" type="date" />
+        <BaseInput v-model="store.filters.action" :label="$t('oversight.action')" />
+        <BaseInput v-model="store.filters.subject_type" :label="$t('audit.subjectType')" />
+        <BaseInput v-model="store.filters.user_id" :label="$t('audit.userId')" type="number" />
+        <BaseInput v-model="store.filters.from" :label="$t('oversight.from')" type="date" />
+        <BaseInput v-model="store.filters.to" :label="$t('oversight.to')" type="date" />
       </div>
       </FilterPanel>
 
-      <p v-if="store.loading" class="py-8 text-center text-sm text-mute">Loading…</p>
+      <p v-if="store.loading" class="py-8 text-center text-sm text-mute">{{ $t('common.loading') }}</p>
       <EmptyState
         v-else-if="!store.items.length"
         icon="pi pi-shield"
-        title="No audit entries match these filters"
+:title="$t('audit.emptyTitle')"
       />
 
       <div v-else class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
             <tr class="text-start text-xs text-mute">
-              <th class="px-4 py-2.5 font-medium sm:px-5">When</th>
-              <th class="py-2.5 pe-3 font-medium">User</th>
-              <th class="py-2.5 pe-3 font-medium">Role</th>
-              <th class="py-2.5 pe-3 font-medium">Action</th>
-              <th class="py-2.5 pe-3 font-medium">Subject</th>
+              <th class="px-4 py-2.5 font-medium sm:px-5">{{ $t('dispatch.when') }}</th>
+              <th class="py-2.5 pe-3 font-medium">{{ $t('oversight.user') }}</th>
+              <th class="py-2.5 pe-3 font-medium">{{ $t('users.role') }}</th>
+              <th class="py-2.5 pe-3 font-medium">{{ $t('oversight.action') }}</th>
+              <th class="py-2.5 pe-3 font-medium">{{ $t('audit.subject') }}</th>
               <th class="py-2.5 pe-4"></th>
             </tr>
           </thead>
@@ -139,9 +139,9 @@ useAutoFilter(() => store.filters, () => store.applyFilters())
                   <table class="w-full text-xs">
                     <thead>
                       <tr class="text-start text-mute">
-                        <th class="py-1 pe-3 font-medium">Field</th>
-                        <th class="py-1 pe-3 font-medium">Before</th>
-                        <th class="py-1 font-medium">After</th>
+                        <th class="py-1 pe-3 font-medium">{{ $t('audit.field') }}</th>
+                        <th class="py-1 pe-3 font-medium">{{ $t('audit.before') }}</th>
+                        <th class="py-1 font-medium">{{ $t('audit.after') }}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -168,7 +168,7 @@ useAutoFilter(() => store.filters, () => store.applyFilters())
           class="flex items-center justify-between border-t border-line px-4 py-3 text-sm sm:px-5"
         >
           <Button
-            label="Previous"
+:label="$t('common.back')"
             icon="pi pi-chevron-left"
             text
             size="small"
@@ -179,7 +179,7 @@ useAutoFilter(() => store.filters, () => store.applyFilters())
             Page {{ store.meta.current_page }} / {{ store.meta.last_page }}
           </span>
           <Button
-            label="Next"
+:label="$t('common.next')"
             icon="pi pi-chevron-right"
             icon-pos="right"
             text

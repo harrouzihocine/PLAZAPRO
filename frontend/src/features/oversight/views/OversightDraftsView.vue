@@ -8,6 +8,7 @@ import { oversightApi } from '@/features/oversight/api'
 import { defaultOversightRange } from '@/features/oversight/dateRange'
 import { confirmAction, toastError, toastSuccess } from '@/composables/useConfirm'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
+import { t } from '@/i18n'
 
 const data = ref({})
 const loading = ref(true)
@@ -19,7 +20,7 @@ async function load() {
   try {
     data.value = await oversightApi.drafts({ ...filters })
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not load draft oversight.')
+    toastError(e.response?.data?.message ?? t('oversight.draftsLoadFailed'))
   } finally {
     loading.value = false
   }
@@ -30,9 +31,9 @@ useRefreshable(load) // pull-to-refresh + reconnect self-heal
 async function remove(item) {
   if (
     !(await confirmAction({
-      title: 'Clear this draft?',
+      title: t('oversight.clearDraftTitle'),
       text: `${item.user}’s unsaved draft will be removed on their next visit.`,
-      confirmText: 'Clear draft',
+      confirmText: t('oversight.clearDraft'),
       danger: true,
     }))
   ) {
@@ -41,10 +42,10 @@ async function remove(item) {
   busy.value = item.id
   try {
     await oversightApi.removeDraft(item.id)
-    toastSuccess('Draft cleared.')
+    toastSuccess(t('oversight.draftCleared'))
     await load()
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not clear the draft.')
+    toastError(e.response?.data?.message ?? t('oversight.clearDraftFailed'))
   } finally {
     busy.value = null
   }
@@ -63,8 +64,8 @@ const cols = [
 <template>
   <div>
     <PageHeader
-      title="Abandoned drafts"
-      subtitle="Unsaved forms left open, by user — clear the stuck ones."
+:title="$t('oversight.draftsTitle')"
+      :subtitle="$t('oversight.draftsSubtitle')"
     />
     <OversightFilters
       v-model:from="filters.from"
@@ -75,7 +76,7 @@ const cols = [
     <p v-if="loading" class="py-6 text-center text-sm text-mute">Loading…</p>
     <OversightList
       v-else
-      title="Outstanding drafts"
+:title="$t('oversight.outstandingDrafts')"
       icon="pi pi-pencil"
       :data="data"
       :columns="cols"
@@ -89,7 +90,7 @@ const cols = [
           rounded
           size="small"
           severity="danger"
-          aria-label="Clear draft"
+:aria-label="$t('oversight.clearDraft')"
           :loading="busy === item.id"
           @click="remove(item)"
         />

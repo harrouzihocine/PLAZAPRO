@@ -11,6 +11,6 @@ defineProps({ visible: { type: Boolean, default: false } })
     class="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm dark:border-amber-500/40 dark:bg-amber-500/10"
   >
     <i class="pi pi-history text-amber-600 dark:text-amber-400" aria-hidden="true" />
-    <span class="text-ink">Draft restored — you left this form unsaved. It stays until you save it.</span>
+    <span class="text-ink">{{ $t('drafts.restored') }}</span>
   </div>
 </template>

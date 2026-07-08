@@ -31,9 +31,14 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const { items: floors } = useDynamicList('floors')
+const { items: roomNumbers } = useDynamicList('room_numbers')
+const { items: projectTypes } = useDynamicList('project_types')
 
 const locations = ref([])
 const locationId = ref('')
+// Narrows the PROJECT dropdown (a location attribute — every unit of a project
+// shares it), unlike the unit-level refinements below.
+const projectTypeId = ref('')
 const units = ref([])
 const boxes = ref([])
 const loading = ref(false)
@@ -41,6 +46,7 @@ const showFilters = ref(false)
 
 // Inventory-style refinements, applied server-side like UnitsView.
 const filters = reactive({
+  room_number_id: [],
   floor_id: [],
   min_price: '',
   max_price: '',
@@ -50,6 +56,22 @@ const filters = reactive({
 
 onMounted(async () => {
   locations.value = await locationsApi.list()
+})
+
+const locationOptions = computed(() =>
+  locations.value
+    .filter((l) => !projectTypeId.value || l.type_id === projectTypeId.value)
+    .map((l) => ({ value: l.id, label: `${l.code} · ${l.name}` })),
+)
+
+// Changing the project type can orphan the picked project — clear it so the
+// candidate list never shows units of a project the dropdown no longer offers.
+watch(projectTypeId, () => {
+  if (locationId.value && !locationOptions.value.some((o) => o.value === locationId.value)) {
+    locationId.value = ''
+    units.value = []
+    boxes.value = []
+  }
 })
 
 async function loadCandidates() {
@@ -99,10 +121,15 @@ const selectedKeys = computed(
 )
 const excludedKeys = computed(() => new Set(props.exclude))
 
-// One rich, human-readable card per property — all its info, not only the code.
+const locationName = (id) => locations.value.find((l) => l.id === id)?.name ?? null
+
+// One rich, human-readable card per property — all its info, not only the
+// code. The project (location) name rides in the label so a selection kept
+// across project switches stays unambiguous.
 function unitLabel(u) {
   return [
     u.reference,
+    u.location?.name ?? locationName(u.location_id),
     u.floor,
     u.area_sqm ? `${u.area_sqm} m²` : null,
     u.price ? formatMoney(u.price) : null,
@@ -111,7 +138,9 @@ function unitLabel(u) {
     .join(' · ')
 }
 function boxLabel(b) {
-  return [b.reference, b.type, b.price ? formatMoney(b.price) : null].filter(Boolean).join(' · ')
+  return [b.reference, locationName(b.location_id), b.type, b.price ? formatMoney(b.price) : null]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 const candidates = computed(() => {
@@ -121,6 +150,11 @@ const candidates = computed(() => {
       id: u.id,
       label: unitLabel(u),
       locationId: u.location_id,
+      // Reserved / interested still show (backups are the point) but wear the
+      // status + how many reservations already queue — so the agent can tell
+      // the client "you would be Nth in line".
+      saleStatus: ['reserved', 'interested'].includes(u.sale_status) ? u.sale_status : null,
+      queueCount: u.interested_count ?? 0,
     })),
     ...boxes.value.map((b) => ({
       type: 'box',
@@ -213,6 +247,14 @@ function setBoxIds(index, boxIds) {
     </div>
 
     <div class="flex items-end gap-2">
+      <!-- Project type narrows the PROJECT list (a location attribute). -->
+      <BaseSelect
+        v-model="projectTypeId"
+        class="w-32 min-w-0 sm:w-40"
+        :label="$t('inventory.projectType')"
+        :placeholder="$t('common.all')"
+        :options="projectTypes.map((t) => ({ value: t.id, label: itemLabel(t) }))"
+      />
       <!-- min-w-0: without it the flex item takes the placeholder's intrinsic
            width and pushes the whole layout wider than a phone screen. -->
       <BaseSelect
@@ -220,7 +262,7 @@ function setBoxIds(index, boxIds) {
         class="min-w-0 flex-1"
 :label="$t('inventory.project')"
         :placeholder="$t('inventory.pickProject')"
-        :options="locations.map((l) => ({ value: l.id, label: `${l.code} · ${l.name}` }))"
+        :options="locationOptions"
       />
       <button
         v-if="locationId"
@@ -238,6 +280,12 @@ function setBoxIds(index, boxIds) {
       v-if="showFilters && locationId"
       class="grid gap-3 rounded-xl border border-line p-3 sm:grid-cols-3"
     >
+      <BaseMultiSelect
+        v-model="filters.room_number_id"
+        :label="$t('inventory.rooms')"
+        :options="roomNumbers.map((r) => ({ value: r.id, label: itemLabel(r) }))"
+        @update:model-value="loadCandidates()"
+      />
       <BaseMultiSelect
         v-model="filters.floor_id"
 :label="$t('inventory.floor')"
@@ -292,6 +340,24 @@ function setBoxIds(index, boxIds) {
           aria-hidden="true"
         />
         {{ c.label }}
+        <!-- Sale status, only when it matters (reserved / interested), with the
+             live reservation count — "Reserved · 2" reads "you'd be 3rd". -->
+        <span
+          v-if="c.saleStatus"
+          class="ms-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+          :class="
+            c.saleStatus === 'reserved'
+              ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+              : 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300'
+          "
+        >
+          <i
+            :class="c.saleStatus === 'reserved' ? 'pi pi-lock' : 'pi pi-thumbs-up'"
+            class="text-[9px]"
+            aria-hidden="true"
+          />
+          {{ $t(`status.${c.saleStatus}`) }}<template v-if="c.queueCount"> · {{ c.queueCount }}</template>
+        </span>
       </button>
       <p v-if="!candidates.length" class="text-xs text-mute">
         {{ $t('inventory.noPropertiesMatch') }}

@@ -19,6 +19,7 @@ import { dealsApi } from '@/features/clients/api'
 import { dzdToMil, formatMoney, milToDzd, MIL_LABEL } from '@/features/payments/money'
 import { useAuthStore } from '@/features/settings/store'
 import { formatDate } from '@/utils/format'
+import { t } from '@/i18n'
 
 // The payment follow-up hub. Three lists in one place: units Reserved (deposit
 // paid, with a live expiry countdown), units with interested clients (the
@@ -40,7 +41,7 @@ async function load() {
   try {
     data.value = await paymentsOverviewApi.get()
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not load the payments overview.')
+    toastError(e.response?.data?.message ?? t('payments.overviewFailed'))
   } finally {
     loading.value = false
   }
@@ -56,7 +57,7 @@ onUnmounted(() => clearInterval(ticker))
 function remaining(iso) {
   if (!iso) return null
   const ms = new Date(iso).getTime() - now.value
-  if (ms <= 0) return 'expiring…'
+  if (ms <= 0) return t('payments.expiring')
   const h = Math.floor(ms / 3.6e6)
   const m = Math.floor((ms % 3.6e6) / 6e4)
   return `${h}h ${String(m).padStart(2, '0')}m`
@@ -64,19 +65,19 @@ function remaining(iso) {
 
 async function declareSold(h) {
   if (!h.deal_id || !h.item_id) {
-    toastError('No open deal on this unit to close — open the project to sell it.')
+    toastError(t('payments.noOpenDealUnit'))
     return
   }
   const { value, isConfirmed } = await Swal.fire({
     ...BASE_SWAL_OPTS,
-    title: `${h.reference} — declare sold 🎉`,
-    text: `Agreed price in ${MIL_LABEL} DZD (its boxes included).`,
+    title: t('payments.declareSoldTitle', { ref: h.reference }),
+    text: t('deal.agreedPriceLabel', { mil: MIL_LABEL }),
     input: 'number',
     inputValue: h.price ? dzdToMil(h.price) : undefined,
     inputAttributes: { min: '0', step: '0.01' },
     showCancelButton: true,
-    confirmButtonText: 'Mark sold',
-    inputValidator: (v) => (!v || Number(v) < 0 ? 'Enter a valid price.' : undefined),
+    confirmButtonText: t('payments.markSold'),
+    inputValidator: (v) => (!v || Number(v) < 0 ? t('deal.invalidPrice') : undefined),
     customClass: { confirmButton: 'plaza-swal-confirm', cancelButton: 'plaza-swal-cancel' },
   })
   if (!isConfirmed) return
@@ -87,29 +88,29 @@ async function declareSold(h) {
     })
     await load()
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not declare the sale.')
+    toastError(e.response?.data?.message ?? t('payments.declareFailed'))
   }
 }
 
-const t = computed(() => data.value.totals ?? {})
+const totals = computed(() => data.value.totals ?? {})
 </script>
 
 <template>
   <div>
     <PageHeader
-      title="Payments"
-      subtitle="Follow up reserved units, interested clients and the instalments to chase — across every project."
+:title="$t('nav.payments')"
+      :subtitle="$t('payments.subtitle')"
     />
 
     <div class="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-      <StatCard label="Reserved" :value="t.reserved ?? 0" icon="pi pi-lock" tone="warning" />
-      <StatCard label="Interested" :value="t.interested ?? 0" icon="pi pi-thumbs-up" />
-      <StatCard label="Overdue instalments" :value="t.overdue ?? 0" icon="pi pi-exclamation-circle" tone="danger" />
-      <StatCard label="Overdue amount" :value="formatMoney(t.overdue_amount ?? 0)" icon="pi pi-money-bill" tone="danger" />
+      <StatCard :label="$t('status.reserved')" :value="totals.reserved ?? 0" icon="pi pi-lock" tone="warning" />
+      <StatCard :label="$t('status.interested')" :value="totals.interested ?? 0" icon="pi pi-thumbs-up" />
+      <StatCard :label="$t('payments.overdueInstalments')" :value="totals.overdue ?? 0" icon="pi pi-exclamation-circle" tone="danger" />
+      <StatCard :label="$t('payments.overdueAmount')" :value="formatMoney(totals.overdue_amount ?? 0)" icon="pi pi-money-bill" tone="danger" />
     </div>
 
     <!-- Reserved: units off the market on a deposit -->
-    <SectionCard title="Reserved (holding deposits)" icon="pi pi-lock" class="mb-5" flush>
+    <SectionCard :title="$t('payments.reservedTitle')" icon="pi pi-lock" class="mb-5" flush>
       <NativeList v-if="nativePhone" :items="data.reserved" :loading="loading">
         <template #item="{ item: h }">
           <div class="flex items-center justify-between gap-2">
@@ -126,7 +127,7 @@ const t = computed(() => data.value.totals ?? {})
           </div>
           <p v-if="h.location" class="truncate text-xs text-mute">{{ h.location }}</p>
           <p class="num mt-1 text-sm text-ink">
-            {{ formatMoney(h.deposit) }} <span class="text-mute">deposit</span>
+            {{ formatMoney(h.deposit) }} <span class="text-mute">{{ $t('payments.deposit') }}</span>
             <span class="text-mute"> · {{ formatMoney(h.price) }}</span>
           </p>
           <div class="mt-2.5 flex gap-2">
@@ -135,11 +136,11 @@ const t = computed(() => data.value.totals ?? {})
               :to="{ name: 'clients.project', params: { id: h.client_id, projectId: h.project_id } }"
               class="flex-1"
             >
-              <Button label="Project" icon="pi pi-external-link" size="small" outlined severity="secondary" class="w-full" />
+              <Button :label="$t('inventory.project')" icon="pi pi-external-link" size="small" outlined severity="secondary" class="w-full" />
             </RouterLink>
             <Button
               v-if="canDeclare && h.deal_id"
-              label="Declare sold"
+:label="$t('payments.declareSold')"
               icon="pi pi-trophy"
               size="small"
               severity="success"
@@ -149,15 +150,15 @@ const t = computed(() => data.value.totals ?? {})
           </div>
         </template>
         <template #empty>
-          <EmptyState icon="pi pi-lock" title="Nothing reserved" body="No unit is currently reserved on a deposit." />
+          <EmptyState icon="pi pi-lock" :title="$t('payments.nothingReserved')" :body="$t('payments.nothingReservedBody')" />
         </template>
       </NativeList>
 
       <DataTable v-else :value="data.reserved" :loading="loading" data-key="id" class="text-sm">
         <template #empty>
-          <EmptyState icon="pi pi-lock" title="Nothing reserved" body="No unit is currently reserved on a deposit." />
+          <EmptyState icon="pi pi-lock" :title="$t('payments.nothingReserved')" :body="$t('payments.nothingReservedBody')" />
         </template>
-        <Column header="Unit">
+        <Column :header="$t('project.unit')">
           <template #body="{ data: h }">
             <RouterLink
               :to="{ name: 'inventory.unit', params: { id: h.id } }"
@@ -168,13 +169,13 @@ const t = computed(() => data.value.totals ?? {})
             <span v-if="h.location" class="block text-xs text-mute">{{ h.location }}</span>
           </template>
         </Column>
-        <Column header="Deposit">
+        <Column :header="$t('payments.deposit')">
           <template #body="{ data: h }"><span class="num">{{ formatMoney(h.deposit) }}</span></template>
         </Column>
-        <Column header="Price">
+        <Column :header="$t('inventory.price')">
           <template #body="{ data: h }"><span class="num text-mute">{{ formatMoney(h.price) }}</span></template>
         </Column>
-        <Column header="Expires in">
+        <Column :header="$t('payments.expiresIn')">
           <template #body="{ data: h }">
             <span class="num font-semibold text-warning">{{ remaining(h.reserved_expires_at) ?? '—' }}</span>
           </template>
@@ -186,11 +187,11 @@ const t = computed(() => data.value.totals ?? {})
                 v-if="h.client_id && h.project_id"
                 :to="{ name: 'clients.project', params: { id: h.client_id, projectId: h.project_id } }"
               >
-                <Button label="Project" icon="pi pi-external-link" size="small" text severity="secondary" />
+                <Button :label="$t('inventory.project')" icon="pi pi-external-link" size="small" text severity="secondary" />
               </RouterLink>
               <Button
                 v-if="canDeclare && h.deal_id"
-                label="Declare sold"
+  :label="$t('payments.declareSold')"
                 icon="pi pi-trophy"
                 size="small"
                 severity="success"
@@ -203,7 +204,7 @@ const t = computed(() => data.value.totals ?? {})
     </SectionCard>
 
     <!-- Interested: the "Interested N" pool -->
-    <SectionCard title="Interested" icon="pi pi-thumbs-up" class="mb-5" flush>
+    <SectionCard :title="$t('status.interested')" icon="pi pi-thumbs-up" class="mb-5" flush>
       <NativeList v-if="nativePhone" :items="data.interested" :loading="loading">
         <template #item="{ item: r }">
           <div class="flex items-center justify-between gap-2">
@@ -215,22 +216,22 @@ const t = computed(() => data.value.totals ?? {})
             </RouterLink>
             <StatusTag
               value="interested"
-              :label="`${r.interested_count} project${r.interested_count === 1 ? '' : 's'}`"
+              :label="$t('inventory.nProjects', { n: r.interested_count })"
             />
           </div>
           <p v-if="r.location" class="truncate text-xs text-mute">{{ r.location }}</p>
           <p class="num mt-1 text-sm text-mute">{{ formatMoney(r.price) }}</p>
         </template>
         <template #empty>
-          <EmptyState icon="pi pi-thumbs-up" title="No interested clients" body="No unit currently has an interested client." />
+          <EmptyState icon="pi pi-thumbs-up" :title="$t('payments.noInterested')" :body="$t('payments.noInterestedBody')" />
         </template>
       </NativeList>
 
       <DataTable v-else :value="data.interested" :loading="loading" data-key="id" class="text-sm">
         <template #empty>
-          <EmptyState icon="pi pi-thumbs-up" title="No interested clients" body="No unit currently has an interested client." />
+          <EmptyState icon="pi pi-thumbs-up" :title="$t('payments.noInterested')" :body="$t('payments.noInterestedBody')" />
         </template>
-        <Column header="Unit">
+        <Column :header="$t('project.unit')">
           <template #body="{ data: r }">
             <RouterLink
               :to="{ name: 'inventory.unit', params: { id: r.id } }"
@@ -241,19 +242,19 @@ const t = computed(() => data.value.totals ?? {})
             <span v-if="r.location" class="block text-xs text-mute">{{ r.location }}</span>
           </template>
         </Column>
-        <Column header="Held by">
+        <Column :header="$t('payments.heldBy')">
           <template #body="{ data: r }">
-            <StatusTag value="interested" :label="`${r.interested_count} project${r.interested_count === 1 ? '' : 's'}`" />
+            <StatusTag value="interested" :label="$t('inventory.nProjects', { n: r.interested_count })" />
           </template>
         </Column>
-        <Column header="Price">
+        <Column :header="$t('inventory.price')">
           <template #body="{ data: r }"><span class="num text-mute">{{ formatMoney(r.price) }}</span></template>
         </Column>
       </DataTable>
     </SectionCard>
 
     <!-- Instalments to chase -->
-    <SectionCard title="Instalments to chase" icon="pi pi-calendar-times" flush>
+    <SectionCard :title="$t('payments.instalmentsToChase')" icon="pi pi-calendar-times" flush>
       <NativeList
         v-if="nativePhone"
         :items="data.due"
@@ -266,40 +267,40 @@ const t = computed(() => data.value.totals ?? {})
             <span class="truncate text-sm font-medium text-ink">{{ s.unit || '—' }}</span>
             <StatusTag :value="s.state" />
           </div>
-          <p class="mt-0.5 text-xs text-mute">Due {{ formatDate(s.due_date) }}</p>
+          <p class="mt-0.5 text-xs text-mute">{{ $t('pipeline.due', { date: formatDate(s.due_date) }) }}</p>
           <p class="num mt-1 text-sm text-ink">
             <span class="font-semibold">{{ formatMoney(s.balance) }}</span>
-            <span class="text-mute"> of {{ formatMoney(s.amount) }}</span>
+            <span class="text-mute"> / {{ formatMoney(s.amount) }}</span>
           </p>
         </template>
         <template #empty>
-          <EmptyState icon="pi pi-check-circle" title="Nothing due" body="No overdue or upcoming instalments on your projects." />
+          <EmptyState icon="pi pi-check-circle" :title="$t('payments.nothingDue')" :body="$t('payments.nothingDueBody')" />
         </template>
       </NativeList>
 
       <DataTable v-else :value="data.due" :loading="loading" data-key="id" paginator :rows="15" class="text-sm">
         <template #empty>
-          <EmptyState icon="pi pi-check-circle" title="Nothing due" body="No overdue or upcoming instalments on your projects." />
+          <EmptyState icon="pi pi-check-circle" :title="$t('payments.nothingDue')" :body="$t('payments.nothingDueBody')" />
         </template>
-        <Column header="Due">
+        <Column :header="$t('pipeline.dueLabel')">
           <template #body="{ data: s }">{{ formatDate(s.due_date) }}</template>
         </Column>
-        <Column header="Unit">
+        <Column :header="$t('project.unit')">
           <template #body="{ data: s }">{{ s.unit || '—' }}</template>
         </Column>
-        <Column header="Amount">
+        <Column :header="$t('payments.amount')">
           <template #body="{ data: s }"><span class="num">{{ formatMoney(s.amount) }}</span></template>
         </Column>
-        <Column header="Balance">
+        <Column :header="$t('inventory.balance')">
           <template #body="{ data: s }"><span class="num font-semibold text-ink">{{ formatMoney(s.balance) }}</span></template>
         </Column>
-        <Column header="State">
+        <Column :header="$t('common.status')">
           <template #body="{ data: s }"><StatusTag :value="s.state" /></template>
         </Column>
         <Column header="">
           <template #body="{ data: s }">
             <RouterLink v-if="s.link" :to="s.link">
-              <Button label="Open" icon="pi pi-external-link" size="small" text severity="secondary" />
+              <Button :label="$t('common.open')" icon="pi pi-external-link" size="small" text severity="secondary" />
             </RouterLink>
           </template>
         </Column>

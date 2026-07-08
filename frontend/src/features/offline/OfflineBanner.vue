@@ -28,11 +28,11 @@ const outbox = useOutboxStore()
     >
       <i class="pi pi-wifi text-[11px] opacity-70" aria-hidden="true" />
       <span>
-        You're offline — showing saved data.
+        {{ $t('offline.bannerTitle') }}
         {{
           outbox.pendingCount > 0
-            ? `${outbox.pendingCount} change${outbox.pendingCount > 1 ? 's' : ''} waiting to sync.`
-            : 'Changes will sync when you reconnect.'
+            ? $t('offline.pendingCount', outbox.pendingCount)
+            : $t('offline.willSync')
         }}
       </span>
     </div>

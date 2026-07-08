@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import NativeList from '@/components/ui/NativeList.vue'
+import { i18n } from '@/i18n'
 
 const items = [
   { id: 1, name: 'One' },
@@ -9,6 +10,7 @@ const items = [
 
 const factory = (props = {}) =>
   mount(NativeList, {
+    global: { plugins: [i18n] },
     props: { items, ...props },
     slots: { item: `<template #item="{ item }"><span>{{ item.name }}</span></template>` },
   })
@@ -40,7 +42,7 @@ describe('NativeList', () => {
   })
 
   it('shows the empty state when there are no items', () => {
-    const wrapper = mount(NativeList, { props: { items: [], emptyTitle: 'Nothing here' } })
+    const wrapper = mount(NativeList, { global: { plugins: [i18n] }, props: { items: [], emptyTitle: 'Nothing here' } })
     expect(wrapper.text()).toContain('Nothing here')
   })
 })

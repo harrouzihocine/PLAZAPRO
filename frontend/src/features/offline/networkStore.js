@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { toastError } from '@/composables/useConfirm'
+import { t } from '@/i18n'
 
 // Single source of truth for "are we online?". navigator.onLine is unreliable
 // (LAN without internet, WebView quirks) so it is never trusted directly:
@@ -75,9 +76,9 @@ export const useNetworkStore = defineStore('network', {
     },
 
     // Guard for actions that must not queue (payments, client creation, admin).
-    requireOnline(message = "You're offline — this action needs a connection.") {
+    requireOnline(message = null) {
       if (this.online) return true
-      toastError(message)
+      toastError(message ?? t('offline.actionNeedsConnection'))
       return false
     },
   },

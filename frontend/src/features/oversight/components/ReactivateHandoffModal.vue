@@ -11,6 +11,7 @@ import BaseMultiSelect from '@/components/base/BaseMultiSelect.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import { projectsApi, projectHandlersApi } from '@/features/clients/api'
 import { toastError, toastSuccess } from '@/composables/useConfirm'
+import { t } from '@/i18n'
 
 const props = defineProps({
   // The archive row: { id, client_id, client }.
@@ -39,7 +40,7 @@ onMounted(async () => {
     handlers.value = hs
     selected.value = currentViewerIds.value
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not load the project team.')
+    toastError(e.response?.data?.message ?? t('handoff.teamLoadFailed'))
     emit('close')
   } finally {
     loading.value = false
@@ -91,8 +92,8 @@ const effectivePrimary = computed(() => {
 })
 
 const submitLabel = computed(() => {
-  if (!changed.value) return 'Reactivate'
-  return mode.value === 'separate' ? 'Create separate project' : 'Reactivate & reassign'
+  if (!changed.value) return t('project.reactivate')
+  return mode.value === 'separate' ? t('handoff.createSeparate') : t('handoff.reactivateReassign')
 })
 
 async function submit() {
@@ -108,12 +109,12 @@ async function submit() {
     await projectsApi.reactivate(props.project.id, payload)
     toastSuccess(
       changed.value && mode.value === 'separate'
-        ? 'Separate project created for the team.'
-        : 'Project reactivated.',
+        ? t('handoff.separateCreated')
+        : t('handoff.reactivated'),
     )
     emit('done')
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not reactivate the project.')
+    toastError(e.response?.data?.message ?? t('handoff.reactivateFailed'))
   } finally {
     busy.value = false
   }
@@ -121,38 +122,38 @@ async function submit() {
 </script>
 
 <template>
-  <BaseModal title="Reactivate project" size="max-w-xl" @close="emit('close')">
+  <BaseModal :title="$t('handoff.title')" size="max-w-xl" @close="emit('close')">
     <p v-if="project.client" class="-mt-1 mb-4 text-sm text-mute">
-      Client: <span class="font-medium text-ink">{{ project.client }}</span>
+      {{ $t('clients.client') }}: <span class="font-medium text-ink">{{ project.client }}</span>
     </p>
 
-    <p v-if="loading" class="py-6 text-center text-sm text-mute">Loading…</p>
+    <p v-if="loading" class="py-6 text-center text-sm text-mute">{{ $t('common.loading') }}</p>
 
     <div v-else class="space-y-4">
       <!-- Who is behind it today -->
       <div class="rounded-lg border border-line bg-surface-50 px-4 py-3 dark:bg-surface-900">
         <p class="text-sm text-ink">
           <i class="pi pi-user me-1.5 text-mute" aria-hidden="true" />
-          Opened by
+          {{ $t('project.openedBy') }}
           <span class="font-semibold">{{ preview.opened_by?.name ?? '—' }}</span>
         </p>
-        <p class="mt-0.5 text-xs text-mute">The opener always keeps access to what they created.</p>
+        <p class="mt-0.5 text-xs text-mute">{{ $t('handoff.openerKeepsAccess') }}</p>
 
         <div v-if="preview.contributors.length" class="mt-3">
-          <p class="mb-1 text-xs font-medium text-mute">Contributors now</p>
+          <p class="mb-1 text-xs font-medium text-mute">{{ $t('handoff.contributorsNow') }}</p>
           <div class="flex flex-wrap gap-1.5">
             <span
               v-for="c in preview.contributors"
               :key="c.id"
               class="rounded-full bg-highlight px-2.5 py-1 text-xs text-ink"
             >
-              {{ c.name }}<span v-if="c.is_creator" class="text-mute"> · opener</span>
+              {{ c.name }}<span v-if="c.is_creator" class="text-mute"> · {{ $t('handoff.opener') }}</span>
             </span>
           </div>
         </div>
 
         <div v-if="preview.in_site_agents.length" class="mt-3">
-          <p class="mb-1 text-xs font-medium text-mute">In-site agents</p>
+          <p class="mb-1 text-xs font-medium text-mute">{{ $t('handoff.inSiteAgents') }}</p>
           <div class="flex flex-wrap gap-1.5">
             <span
               v-for="a in preview.in_site_agents"
@@ -168,26 +169,26 @@ async function submit() {
       <!-- Who should handle it now -->
       <BaseMultiSelect
         v-model="selected"
-        label="Hand it to"
-        placeholder="Keep the current team"
+:label="$t('handoff.handItTo')"
+        :placeholder="$t('handoff.keepTeam')"
         :options="handlerOptions"
       />
       <p class="-mt-2 text-xs text-mute">
-        Only users allowed to open a client project are listed. Leave unchanged to simply reactivate.
+        {{ $t('handoff.eligibleHint') }}
       </p>
 
       <!-- How to hand it over — only when the team changed -->
       <div v-if="changed" class="space-y-2">
-        <p class="text-sm font-medium text-ink">How should they get it?</p>
+        <p class="text-sm font-medium text-ink">{{ $t('handoff.howGetIt') }}</p>
         <label
           class="flex cursor-pointer gap-3 rounded-lg border px-3 py-2.5 text-sm"
           :class="mode === 'in_place' ? 'border-primary bg-highlight' : 'border-line'"
         >
           <input v-model="mode" type="radio" value="in_place" class="mt-1" />
           <span>
-            <span class="font-medium text-ink">Reactivate as-is</span>
+            <span class="font-medium text-ink">{{ $t('handoff.asIs') }}</span>
             <span class="block text-xs text-mute">
-              Same project — the selected people replace the current contributors (the opener stays).
+              {{ $t('handoff.asIsHint') }}
             </span>
           </span>
         </label>
@@ -197,9 +198,9 @@ async function submit() {
         >
           <input v-model="mode" type="radio" value="separate" class="mt-1" />
           <span>
-            <span class="font-medium text-ink">Create a separate project</span>
+            <span class="font-medium text-ink">{{ $t('handoff.separate') }}</span>
             <span class="block text-xs text-mute">
-              A new siloed project for the team on this client. This one stays archived as history.
+              {{ $t('handoff.separateHint') }}
             </span>
           </span>
         </label>
@@ -207,14 +208,14 @@ async function submit() {
         <BaseSelect
           v-if="mode === 'separate'"
           v-model="primaryId"
-          label="Primary owner of the new project"
+:label="$t('handoff.primaryOwner')"
           :options="primaryOptions"
           :placeholder="primaryOptions.find((o) => o.value === effectivePrimary)?.label"
         />
       </div>
 
       <div class="flex justify-end gap-2 pt-2">
-        <Button label="Cancel" text severity="secondary" :disabled="busy" @click="emit('close')" />
+        <Button :label="$t('common.cancel')" text severity="secondary" :disabled="busy" @click="emit('close')" />
         <Button :label="submitLabel" icon="pi pi-undo" :loading="busy" @click="submit" />
       </div>
     </div>

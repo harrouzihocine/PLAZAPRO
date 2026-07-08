@@ -258,18 +258,18 @@ function submit() {
       <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">{{ $t('calls.discussed') }}</legend>
       <div class="flex flex-wrap gap-1.5">
         <button
-          v-for="t in callTopics"
-          :key="t.id"
+          v-for="topic in callTopics"
+          :key="topic.id"
           type="button"
           class="rounded-full border px-3 py-1.5 text-xs transition-colors"
           :class="
-            topics.includes(t.id)
+            topics.includes(topic.id)
               ? 'border-primary bg-highlight font-medium text-ink'
               : 'border-line text-mute hover:border-primary hover:text-ink'
           "
-          @click="toggleTopic(t.id)"
+          @click="toggleTopic(topic.id)"
         >
-          {{ itemLabel(t) }}
+          {{ itemLabel(topic) }}
         </button>
       </div>
     </fieldset>

@@ -7,12 +7,13 @@ import BaseSelect from '@/components/base/BaseSelect.vue'
 import MoneyInput from '@/components/base/MoneyInput.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
-import { useDynamicList } from '@/composables/useDynamicList'
+import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { documentsApi, scheduleApi, versementsApi } from '@/features/payments/api'
 import { formatMoney } from '@/features/payments/money'
 import { useAuthStore } from '@/features/settings/store'
 import { BASE_SWAL_OPTS, toastError } from '@/composables/useConfirm'
 import { formatDate, todayInput } from '@/utils/format'
+import { t } from '@/i18n'
 
 // Payments for ONE apartment on the project (unitId scopes the schedule, the
 // versements and the balance to it — each apartment is tracked alone; null
@@ -52,7 +53,7 @@ async function load() {
     versements.value = vers.items
     meta.value = vers.meta
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Failed to load payments.')
+    toastError(e.response?.data?.message ?? t('payments.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -86,7 +87,7 @@ async function saveSchedule() {
     builder.open = false
     await load()
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not save the schedule.')
+    toastError(e.response?.data?.message ?? t('payments.scheduleSaveFailed'))
   } finally {
     submitting.schedule = false
   }
@@ -127,7 +128,7 @@ async function recordPayment() {
     resetRecord()
     await load()
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not record the payment.')
+    toastError(e.response?.data?.message ?? t('payments.recordFailed'))
   } finally {
     submitting.record = false
   }
@@ -166,7 +167,7 @@ async function submitCorrect() {
     correctForm.id = null
     await load()
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not correct the payment.')
+    toastError(e.response?.data?.message ?? t('payments.correctFailed'))
   } finally {
     submitting.correct = false
   }
@@ -176,13 +177,13 @@ async function submitCorrect() {
 async function refund(v) {
   const { value, isConfirmed } = await Swal.fire({
     ...BASE_SWAL_OPTS,
-    title: `Refund ${formatMoney(v.amount)}?`,
-    text: 'The money went back to the client. The payment stays in history flagged refunded and no longer counts toward the balance.',
+    title: t('payments.refundTitle', { amount: formatMoney(v.amount) }),
+    text: t('payments.refundText'),
     input: 'text',
-    inputPlaceholder: 'Reason *',
+    inputPlaceholder: t('payments.reasonRequired'),
     showCancelButton: true,
-    confirmButtonText: 'Refund',
-    inputValidator: (val) => (!val?.trim() ? 'A reason is required.' : undefined),
+    confirmButtonText: t('payments.refund'),
+    inputValidator: (val) => (!val?.trim() ? t('project.reasonRequired') : undefined),
     customClass: { confirmButton: 'plaza-swal-confirm', cancelButton: 'plaza-swal-cancel' },
   })
   if (!isConfirmed) return
@@ -190,7 +191,7 @@ async function refund(v) {
     await versementsApi.refund(v.id, { reason: value.trim() })
     await load()
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not refund the payment.')
+    toastError(e.response?.data?.message ?? t('payments.refundFailed'))
   }
 }
 
@@ -207,35 +208,34 @@ async function receipt(v) {
     if (!docId) return
     const doc = await documentsApi.get(docId)
     if (doc.download_url) window.open(doc.download_url, '_blank')
-    else toastError('The receipt is still being generated — try again shortly.')
+    else toastError(t('payments.receiptPending'))
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not open the receipt.')
+    toastError(e.response?.data?.message ?? t('payments.receiptFailed'))
   }
 }
 </script>
 
 <template>
-  <SectionCard :title="unitLabel ? `Payments — ${unitLabel}` : 'Payments'" icon="pi pi-wallet">
+  <SectionCard :title="unitLabel ? `${$t('nav.payments')} — ${unitLabel}` : $t('nav.payments')" icon="pi pi-wallet">
     <template #actions>
       <span
         v-if="meta.balance !== null && meta.balance !== undefined"
         class="num text-xs text-mute"
       >
-        Balance <span class="font-semibold text-ink">{{ formatMoney(meta.balance) }}</span> of
-        {{ formatMoney(meta.total_price) }}
+        {{ $t('inventory.balance') }} <span class="font-semibold text-ink">{{ formatMoney(meta.balance) }}</span> / {{ formatMoney(meta.total_price) }}
       </span>
     </template>
 
-    <p v-if="loading" class="py-2 text-sm text-mute">Loading…</p>
+    <p v-if="loading" class="py-2 text-sm text-mute">{{ $t('common.loading') }}</p>
 
     <template v-else>
       <!-- Schedule -->
       <div class="mb-4">
         <div class="mb-2 flex items-center justify-between">
-          <span class="text-sm font-medium text-ink">Instalment plan</span>
+          <span class="text-sm font-medium text-ink">{{ $t('payments.instalmentPlan') }}</span>
           <Button
             v-if="canRecord"
-            :label="schedule.length ? 'Adjust' : 'Set schedule'"
+            :label="schedule.length ? $t('payments.adjust') : $t('payments.setSchedule')"
             icon="pi pi-calendar-plus"
             size="small"
             text
@@ -248,10 +248,10 @@ async function receipt(v) {
             <thead>
               <tr class="text-start text-xs text-mute">
                 <th class="py-1.5 font-medium">#</th>
-                <th class="font-medium">Due</th>
-                <th class="text-end font-medium">Amount</th>
-                <th class="text-end font-medium">Paid</th>
-                <th class="text-end font-medium">State</th>
+                <th class="font-medium">{{ $t('pipeline.dueLabel') }}</th>
+                <th class="text-end font-medium">{{ $t('payments.amount') }}</th>
+                <th class="text-end font-medium">{{ $t('status.paid') }}</th>
+                <th class="text-end font-medium">{{ $t('common.status') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -265,7 +265,7 @@ async function receipt(v) {
             </tbody>
           </table>
         </div>
-        <p v-else class="py-1 text-sm text-mute">No schedule set.</p>
+        <p v-else class="py-1 text-sm text-mute">{{ $t('payments.noSchedule') }}</p>
 
         <!-- Schedule builder -->
         <div v-if="builder.open" class="mt-3 space-y-3 rounded-xl border border-line p-3">
@@ -273,36 +273,36 @@ async function receipt(v) {
             <BaseInput
               v-model="row.due_date"
               type="date"
-              label="Due"
+:label="$t('pipeline.dueLabel')"
               required
               :min="todayInput()"
               class="flex-1"
             />
-            <MoneyInput v-model="row.amount" label="Amount" required class="w-40" />
+            <MoneyInput v-model="row.amount" :label="$t('payments.amount')" required class="w-40" />
             <Button
               icon="pi pi-times"
               text
               rounded
               severity="danger"
               size="small"
-              aria-label="Remove instalment"
+:aria-label="$t('payments.removeInstalment')"
               @click="removeRow(i)"
             />
           </div>
           <div class="flex items-center justify-between text-xs">
-            <Button label="Instalment" icon="pi pi-plus" size="small" text @click="addRow" />
+            <Button :label="$t('payments.instalment')" icon="pi pi-plus" size="small" text @click="addRow" />
             <span
               class="num"
               :class="
                 plannedTotal === Number(totalPrice ?? 0).toFixed(2) ? 'text-success' : 'text-danger'
               "
             >
-              Planned {{ formatMoney(plannedTotal) }} / total {{ formatMoney(totalPrice) }}
+              {{ $t('payments.plannedOf', { planned: formatMoney(plannedTotal), total: formatMoney(totalPrice) }) }}
             </span>
           </div>
           <div class="flex gap-2">
             <Button
-              label="Save schedule"
+:label="$t('payments.saveSchedule')"
               icon="pi pi-check"
               size="small"
               :loading="submitting.schedule"
@@ -310,7 +310,7 @@ async function receipt(v) {
               @click="saveSchedule"
             />
             <Button
-              label="Cancel"
+:label="$t('common.cancel')"
               size="small"
               severity="secondary"
               outlined
@@ -323,10 +323,10 @@ async function receipt(v) {
       <!-- Versements -->
       <div>
         <div class="mb-2 flex items-center justify-between">
-          <span class="text-sm font-medium text-ink">Payments received</span>
+          <span class="text-sm font-medium text-ink">{{ $t('payments.received') }}</span>
           <Button
             v-if="canRecord"
-            label="Record payment"
+:label="$t('payments.recordPayment')"
             icon="pi pi-plus"
             size="small"
             @click="recordForm.open = !recordForm.open"
@@ -338,19 +338,18 @@ async function receipt(v) {
           v-if="recordForm.open"
           class="mb-3 grid gap-3 rounded-xl border border-line p-3 sm:grid-cols-2"
         >
-          <MoneyInput v-model="recordForm.amount" label="Amount" required />
-          <BaseInput v-model="recordForm.paid_on" type="date" label="Paid on" required />
+          <MoneyInput v-model="recordForm.amount" :label="$t('payments.amount')" required />
+          <BaseInput v-model="recordForm.paid_on" type="date" :label="$t('deal.paidOn')" required />
           <BaseSelect
             v-model="recordForm.method_id"
-            label="Method"
+:label="$t('deal.method')"
             required
-            placeholder="Select…"
-            :options="methods.map((m) => ({ value: m.id, label: m.label }))"
+            :options="methods.map((m) => ({ value: m.id, label: itemLabel(m) }))"
           />
           <BaseSelect
             v-model="recordForm.schedule_item_id"
-            label="Instalment"
-            placeholder="Unallocated"
+:label="$t('payments.instalment')"
+            :placeholder="$t('payments.unallocated')"
             :options="
               schedule.map((s) => ({
                 value: s.id,
@@ -358,10 +357,10 @@ async function receipt(v) {
               }))
             "
           />
-          <BaseInput v-model="recordForm.reference" label="Reference" class="sm:col-span-2" />
+          <BaseInput v-model="recordForm.reference" :label="$t('inventory.reference')" class="sm:col-span-2" />
           <div class="flex gap-2 sm:col-span-2">
             <Button
-              label="Record"
+:label="$t('payments.record')"
               icon="pi pi-check"
               size="small"
               :loading="submitting.record"
@@ -369,7 +368,7 @@ async function receipt(v) {
               @click="recordPayment"
             />
             <Button
-              label="Cancel"
+:label="$t('common.cancel')"
               size="small"
               severity="secondary"
               outlined
@@ -394,11 +393,11 @@ async function receipt(v) {
               <span class="text-mute">{{ formatDate(v.paid_on) }}</span>
               <span v-if="v.method" class="text-mute">· {{ v.method.label }}</span>
               <span v-if="v.reference" class="text-mute">· {{ v.reference }}</span>
-              <StatusTag v-if="v.supersedes_id" value="corrected" label="corrected" />
-              <StatusTag v-if="v.refunded_at" value="cancelled" label="refunded" />
+              <StatusTag v-if="v.supersedes_id" value="corrected" :label="$t('payments.corrected')" />
+              <StatusTag v-if="v.refunded_at" value="cancelled" :label="$t('payments.refunded')" />
               <div class="ms-auto flex gap-1">
                 <Button
-                  :label="v.document_id ? 'Receipt' : 'Generate receipt'"
+                  :label="v.document_id ? $t('payments.receipt') : $t('payments.generateReceipt')"
                   icon="pi pi-file-pdf"
                   size="small"
                   text
@@ -406,7 +405,7 @@ async function receipt(v) {
                 />
                 <Button
                   v-if="canCorrect && !v.refunded_at"
-                  label="Correct"
+:label="$t('payments.correct')"
                   icon="pi pi-history"
                   size="small"
                   text
@@ -415,7 +414,7 @@ async function receipt(v) {
                 />
                 <Button
                   v-if="canCorrect && !v.refunded_at"
-                  label="Refund"
+:label="$t('payments.refund')"
                   icon="pi pi-replay"
                   size="small"
                   text
@@ -426,8 +425,8 @@ async function receipt(v) {
             </div>
 
             <p v-if="v.refunded_at" class="mt-1 text-xs text-mute">
-              Refunded {{ formatDate(v.refunded_at)
-              }}<template v-if="v.refunded_by?.name"> by {{ v.refunded_by.name }}</template
+              {{ $t('payments.refundedOn', { date: formatDate(v.refunded_at) })
+              }}<template v-if="v.refunded_by?.name"> {{ $t('clients.byName', { name: v.refunded_by.name }) }}</template
               ><template v-if="v.refund_reason"> — {{ v.refund_reason }}</template>
             </p>
 
@@ -436,25 +435,25 @@ async function receipt(v) {
               v-if="correctForm.id === v.id"
               class="mt-3 grid gap-3 border-t border-line pt-3 sm:grid-cols-2"
             >
-              <MoneyInput v-model="correctForm.amount" label="Corrected amount" required />
-              <BaseInput v-model="correctForm.paid_on" type="date" label="Paid on" required />
+              <MoneyInput v-model="correctForm.amount" :label="$t('payments.correctedAmount')" required />
+              <BaseInput v-model="correctForm.paid_on" type="date" :label="$t('deal.paidOn')" required />
               <BaseSelect
                 v-model="correctForm.method_id"
-                label="Method"
+:label="$t('deal.method')"
                 required
                 :clearable="false"
-                :options="methods.map((m) => ({ value: m.id, label: m.label }))"
+                :options="methods.map((m) => ({ value: m.id, label: itemLabel(m) }))"
               />
-              <BaseInput v-model="correctForm.reference" label="Reference" />
+              <BaseInput v-model="correctForm.reference" :label="$t('inventory.reference')" />
               <BaseInput
                 v-model="correctForm.reason"
-                label="Reason"
+:label="$t('calls.reason')"
                 required
                 class="sm:col-span-2"
               />
               <div class="flex gap-2 sm:col-span-2">
                 <Button
-                  label="Save correction"
+:label="$t('payments.saveCorrection')"
                   icon="pi pi-check"
                   size="small"
                   :loading="submitting.correct"
@@ -462,7 +461,7 @@ async function receipt(v) {
                   @click="submitCorrect"
                 />
                 <Button
-                  label="Cancel"
+                  :label="$t('common.cancel')"
                   size="small"
                   severity="secondary"
                   outlined
@@ -472,7 +471,7 @@ async function receipt(v) {
             </div>
           </div>
         </div>
-        <p v-else class="py-1 text-sm text-mute">No payments recorded.</p>
+        <p v-else class="py-1 text-sm text-mute">{{ $t('payments.noneRecorded') }}</p>
       </div>
     </template>
   </SectionCard>

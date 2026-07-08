@@ -12,6 +12,7 @@ import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue
 import { analyticsApi } from '@/features/analytics/api'
 import { formatMoney } from '@/features/payments/money'
 import { formatDate, todayInput } from '@/utils/format'
+import { t } from '@/i18n'
 
 // The "Voice of Client" panel — reused on the Location page (whole development)
 // and on a Unit page (drill-down). It reads BuildLocationFeedback and renders the
@@ -28,11 +29,11 @@ const loading = ref(false)
 const error = ref(false)
 const range = ref('90') // '30' | '90' | 'all'
 
-const RANGES = [
-  { value: '30', label: '30 days' },
-  { value: '90', label: '90 days' },
-  { value: 'all', label: 'All time' },
-]
+const RANGES = computed(() => [
+  { value: '30', label: t('feedback.days30') },
+  { value: '90', label: t('feedback.days90') },
+  { value: 'all', label: t('feedback.allTime') },
+])
 
 function windowParams() {
   if (range.value === 'all') return {}
@@ -69,13 +70,13 @@ const isLocation = computed(() => data.value?.scope === 'location')
 const funnelStages = computed(() => {
   const f = data.value?.funnel ?? {}
   const all = [
-    { key: 'calls', label: 'Calls', value: f.calls, icon: 'pi pi-phone', locationOnly: true },
-    { key: 'office_visits', label: 'Office visits', value: f.office_visits, icon: 'pi pi-building', locationOnly: true },
-    { key: 'in_site_visits', label: 'Site visits', value: f.in_site_visits, icon: 'pi pi-map-marker' },
-    { key: 'shortlisted', label: 'Shortlisted', value: f.shortlisted, icon: 'pi pi-star', tone: 'info' },
-    { key: 'interested', label: 'Interested', value: f.interested, icon: 'pi pi-heart', tone: 'success' },
-    { key: 'deals', label: 'In deal', value: f.deals, icon: 'pi pi-file-edit', tone: 'warning' },
-    { key: 'won', label: 'Won', value: f.won, icon: 'pi pi-trophy', tone: 'success' },
+    { key: 'calls', label: t('pipeline.tabCalls'), value: f.calls, icon: 'pi pi-phone', locationOnly: true },
+    { key: 'office_visits', label: t('pipeline.tabOfficeVisits'), value: f.office_visits, icon: 'pi pi-building', locationOnly: true },
+    { key: 'in_site_visits', label: t('pipeline.tabInSiteVisits'), value: f.in_site_visits, icon: 'pi pi-map-marker' },
+    { key: 'shortlisted', label: t('status.shortlisted'), value: f.shortlisted, icon: 'pi pi-star', tone: 'info' },
+    { key: 'interested', label: t('status.interested'), value: f.interested, icon: 'pi pi-heart', tone: 'success' },
+    { key: 'deals', label: t('feedback.inDeal'), value: f.deals, icon: 'pi pi-file-edit', tone: 'warning' },
+    { key: 'won', label: t('status.won'), value: f.won, icon: 'pi pi-trophy', tone: 'success' },
   ]
   return all.filter((s) => isLocation.value || !s.locationOnly)
 })
@@ -94,11 +95,11 @@ const RECO_TONES = {
 }
 const RECO_ICONS = { high: 'pi pi-exclamation-triangle text-danger', medium: 'pi pi-lightbulb text-warning', info: 'pi pi-info-circle text-info' }
 
-const VERBATIM_KINDS = {
-  call: { label: 'Call', icon: 'pi pi-phone' },
-  office_visit: { label: 'Office visit', icon: 'pi pi-building' },
-  in_site_visit: { label: 'Site visit', icon: 'pi pi-map-marker' },
-}
+const VERBATIM_KINDS = computed(() => ({
+  call: { label: t('pipeline.typeCall'), icon: 'pi pi-phone' },
+  office_visit: { label: t('status.office_visit'), icon: 'pi pi-building' },
+  in_site_visit: { label: t('status.in_site_visit'), icon: 'pi pi-map-marker' },
+}))
 
 // ── Charts ────────────────────────────────────────────────────────────────
 // Chart.js needs concrete colors; resolve the app's theme tokens fresh each build
@@ -164,7 +165,7 @@ const sentimentChart = computed(() => {
   const c = tokens()
   return {
     data: {
-      labels: ['Interested', 'Neutral', 'Not interested'],
+      labels: [t('status.interested'), t('feedback.neutral'), t('feedback.notInterested')],
       datasets: [
         {
           data: [s.positive, s.neutral, s.negative],
@@ -191,9 +192,9 @@ const trendChart = computed(() => {
   const label = (w) => formatDate(w).replace(/,.*/, '')
   const datasets = []
   if (isLocation.value) {
-    datasets.push({ label: 'Calls', data: t.map((w) => w.calls), borderColor: c.primary, backgroundColor: c.primary, tension: 0.35, borderWidth: 2, pointRadius: 3 })
+    datasets.push({ label: t('pipeline.tabCalls'), data: t.map((w) => w.calls), borderColor: c.primary, backgroundColor: c.primary, tension: 0.35, borderWidth: 2, pointRadius: 3 })
   }
-  datasets.push({ label: 'Visits', data: t.map((w) => w.visits), borderColor: c.info, backgroundColor: c.info, tension: 0.35, borderWidth: 2, pointRadius: 3 })
+  datasets.push({ label: t('reports.visits'), data: t.map((w) => w.visits), borderColor: c.info, backgroundColor: c.info, tension: 0.35, borderWidth: 2, pointRadius: 3 })
   return {
     data: { labels: t.map((w) => label(w.week)), datasets },
     options: {
@@ -242,22 +243,22 @@ const hasAnyData = computed(() => {
     <EmptyState
       v-else-if="error"
       icon="pi pi-exclamation-circle"
-      title="Couldn't load feedback"
-      body="The Voice-of-Client analytics failed to load. Try again."
+:title="$t('feedback.loadFailedTitle')"
+      :body="$t('feedback.loadFailedBody')"
     />
 
     <EmptyState
       v-else-if="!hasAnyData"
       icon="pi pi-comments"
-      title="No client feedback yet"
-      body="Once agents log calls and visits (with objections and outcomes) here, this page turns them into insights."
+:title="$t('feedback.emptyTitle')"
+      :body="$t('feedback.emptyBody')"
     />
 
     <div v-else-if="data" class="space-y-5">
       <!-- Recommended actions — the "what to do next". -->
       <SectionCard
         v-if="data.recommendations.length"
-        title="Recommended actions"
+:title="$t('feedback.recommendedActions')"
         icon="pi pi-compass"
       >
         <ul class="grid gap-3 sm:grid-cols-2">
@@ -277,10 +278,10 @@ const hasAnyData = computed(() => {
       </SectionCard>
 
       <!-- Engagement funnel. -->
-      <SectionCard title="Engagement funnel" icon="pi pi-filter">
+      <SectionCard :title="$t('feedback.engagementFunnel')" icon="pi pi-filter">
         <template #actions>
           <span v-if="conversion !== null" class="text-xs text-mute">
-            <span class="font-semibold text-ink">{{ conversion }}%</span> shortlisted → won
+            <span class="font-semibold text-ink">{{ conversion }}%</span> {{ $t('feedback.shortlistedToWon') }}
           </span>
         </template>
         <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -297,49 +298,49 @@ const hasAnyData = computed(() => {
 
       <!-- Voice of Customer: objections + sentiment. -->
       <div class="grid gap-5 lg:grid-cols-2">
-        <SectionCard title="Top objections" icon="pi pi-exclamation-circle">
+        <SectionCard :title="$t('feedback.topObjections')" icon="pi pi-exclamation-circle">
           <div v-if="objectionsChart" class="h-64">
             <Chart type="bar" :data="objectionsChart.data" :options="objectionsChart.options" class="h-full" />
           </div>
           <EmptyState
             v-else
             icon="pi pi-check-circle"
-            title="No objections logged"
-            body="Ask agents to tick client concerns on calls and visits."
+:title="$t('feedback.noObjections')"
+            :body="$t('feedback.noObjectionsBody')"
           />
         </SectionCard>
 
-        <SectionCard title="Client sentiment" icon="pi pi-heart">
+        <SectionCard :title="$t('feedback.clientSentiment')" icon="pi pi-heart">
           <div v-if="sentimentChart" class="h-64">
             <Chart type="doughnut" :data="sentimentChart.data" :options="sentimentChart.options" class="h-full" />
           </div>
-          <EmptyState v-else icon="pi pi-heart" title="No visit outcomes yet" />
+          <EmptyState v-else icon="pi pi-heart" :title="$t('feedback.noOutcomes')" />
         </SectionCard>
       </div>
 
       <!-- Discussion topics + why-lost. -->
       <div class="grid gap-5 lg:grid-cols-2">
-        <SectionCard title="Discussion topics" icon="pi pi-comments">
+        <SectionCard :title="$t('feedback.discussionTopics')" icon="pi pi-comments">
           <div v-if="topicsChart" class="h-64">
             <Chart type="bar" :data="topicsChart.data" :options="topicsChart.options" class="h-full" />
           </div>
-          <EmptyState v-else icon="pi pi-comments" title="Nothing logged yet" />
+          <EmptyState v-else icon="pi pi-comments" :title="$t('feedback.nothingLogged')" />
         </SectionCard>
 
-        <SectionCard v-if="isLocation" title="Why deals were lost" icon="pi pi-times-circle">
+        <SectionCard v-if="isLocation" :title="$t('archive.whyLost')" icon="pi pi-times-circle">
           <div v-if="lostChart" class="h-64">
             <Chart type="bar" :data="lostChart.data" :options="lostChart.options" class="h-full" />
           </div>
-          <EmptyState v-else icon="pi pi-check-circle" title="No lost deals in this window" />
+          <EmptyState v-else icon="pi pi-check-circle" :title="$t('feedback.noLostDeals')" />
         </SectionCard>
       </div>
 
       <!-- Activity trend over time. -->
-      <SectionCard title="Activity trend" icon="pi pi-chart-line">
+      <SectionCard :title="$t('feedback.activityTrend')" icon="pi pi-chart-line">
         <div v-if="trendChart" class="h-64">
           <Chart type="line" :data="trendChart.data" :options="trendChart.options" class="h-full" />
         </div>
-        <EmptyState v-else icon="pi pi-chart-line" title="No recent activity" />
+        <EmptyState v-else icon="pi pi-chart-line" :title="$t('feedback.noRecentActivity')" />
       </SectionCard>
 
       <!-- Most-demanded units leaderboard (development view only). -->
@@ -382,7 +383,7 @@ const hasAnyData = computed(() => {
           <Column field="won" header="Won" sortable>
             <template #body="{ data: u }"><span class="num">{{ u.won }}</span></template>
           </Column>
-          <Column header="Status">
+          <Column :header="$t('common.status')">
             <template #body="{ data: u }"><SaleStatusBadge :status="u.sale_status" /></template>
           </Column>
         </DataTable>
@@ -391,7 +392,7 @@ const hasAnyData = computed(() => {
       <!-- Units seen but rejected — a pricing / finish red flag. -->
       <SectionCard
         v-if="isLocation && data.at_risk_units.length"
-        title="Units at risk (seen but rejected)"
+:title="$t('feedback.unitsAtRisk')"
         icon="pi pi-flag"
       >
         <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -407,7 +408,7 @@ const hasAnyData = computed(() => {
               {{ u.reference }}
             </RouterLink>
             <p class="mt-1 text-xs text-mute">
-              {{ u.rejected }}/{{ u.seen }} rejected ·
+              {{ $t('feedback.rejectedOf', { rejected: u.rejected, seen: u.seen }) }} ·
               <span class="font-semibold text-danger">{{ Math.round(u.rejection_ratio * 100) }}%</span>
               · {{ formatMoney(u.price) }}
             </p>
@@ -416,7 +417,7 @@ const hasAnyData = computed(() => {
       </SectionCard>
 
       <!-- Verbatims — the qualitative voice behind the numbers. -->
-      <SectionCard v-if="data.verbatims.length" title="Recent client comments" icon="pi pi-quote-right">
+      <SectionCard v-if="data.verbatims.length" :title="$t('feedback.recentComments')" icon="pi pi-quote-right">
         <ul class="space-y-3">
           <li
             v-for="(v, i) in data.verbatims"

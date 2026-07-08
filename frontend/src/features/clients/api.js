@@ -200,8 +200,9 @@ export const projectsApi = {
 // The dedicated "Desire matches" board — waiting clients whose criteria now fit
 // available inventory (agent-scoped on the server).
 export const desireMatchesApi = {
-  async list() {
-    const { data } = await useApi().get('/desires/matches')
+  // Paginated: returns { items, meta }. params: { page, per_page, search, unassigned }.
+  async list(params = {}) {
+    const { data } = await useApi().get('/desires/matches', { params })
     return data.data
   },
 

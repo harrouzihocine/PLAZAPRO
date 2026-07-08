@@ -3,6 +3,12 @@
 // table of the offending records. Fed the standard { total, by_user, items }
 // shape from BuildOversight. Column types drive date/money formatting; a named
 // `action` slot renders a per-row control (e.g. "Remove draft").
+//
+// The server caps items (200) but a page stacks several monitors, so rows are
+// revealed in chunks: the first 30 render instantly and "Show more" grows the
+// table — a phone never pays for hundreds of rows it hasn't scrolled to.
+import { computed, ref, watch } from 'vue'
+import Button from 'primevue/button'
 import { useRouter } from 'vue-router'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -14,13 +20,27 @@ const props = defineProps({
   icon: { type: String, default: 'pi pi-flag' },
   data: { type: Object, default: () => ({ total: 0, by_user: [], items: [] }) },
   columns: { type: Array, default: () => [] }, // [{ key, label, type? }]
-  emptyText: { type: String, default: 'Nothing to follow up here.' },
+  emptyText: { type: String, default: null }, // null → localized default
   // (item) => a router target (object/path) for the row, or null. When it
   // returns a target the row becomes clickable and opens where the problem is.
   rowTo: { type: Function, default: null },
 })
 
 const router = useRouter()
+
+const INITIAL_ROWS = 30
+const STEP = 50
+
+const shown = ref(INITIAL_ROWS)
+watch(
+  () => props.data.items,
+  () => (shown.value = INITIAL_ROWS), // fresh data (filters applied) restarts the window
+)
+
+const visibleItems = computed(() => (props.data.items ?? []).slice(0, shown.value))
+const hiddenCount = computed(() => Math.max(0, (props.data.items?.length ?? 0) - shown.value))
+// The server ships at most its cap; anything beyond it is reachable by filtering.
+const cappedCount = computed(() => Math.max(0, (props.data.total ?? 0) - (props.data.items?.length ?? 0)))
 
 function openRow(item) {
   const to = props.rowTo?.(item)
@@ -65,7 +85,7 @@ function isNum(col) {
         </thead>
         <tbody>
           <tr
-            v-for="item in data.items"
+            v-for="item in visibleItems"
             :key="item.id"
             class="border-t border-line"
             :class="rowTo && rowTo(item) ? 'cursor-pointer hover:bg-highlight' : ''"
@@ -85,7 +105,24 @@ function isNum(col) {
           </tr>
         </tbody>
       </table>
+
+      <div
+        v-if="hiddenCount || cappedCount"
+        class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t border-line pt-3"
+      >
+        <Button
+          v-if="hiddenCount"
+          :label="`Show more (${hiddenCount} hidden)`"
+          icon="pi pi-arrow-down"
+          size="small"
+          text
+          @click="shown += STEP"
+        />
+        <span v-else-if="cappedCount" class="text-xs text-mute">
+          Showing the latest {{ data.items.length }} of {{ data.total }} — narrow with the filters to see the rest.
+        </span>
+      </div>
     </div>
-    <EmptyState v-else icon="pi pi-check-circle" title="All clear" :body="emptyText" />
+    <EmptyState v-else icon="pi pi-check-circle" :title="$t('oversight.allClear')" :body="emptyText ?? $t('oversight.nothingToFollow')" />
   </SectionCard>
 </template>

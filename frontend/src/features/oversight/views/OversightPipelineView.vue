@@ -7,6 +7,7 @@ import { oversightApi } from '@/features/oversight/api'
 import { defaultOversightRange } from '@/features/oversight/dateRange'
 import { toastError } from '@/composables/useConfirm'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
+import { t } from '@/i18n'
 
 const data = ref({ stuck: {}, overdue: {}, upcoming_office_visits: {} })
 const loading = ref(true)
@@ -17,7 +18,7 @@ async function load() {
   try {
     data.value = await oversightApi.pipeline({ ...filters })
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not load pipeline oversight.')
+    toastError(e.response?.data?.message ?? t('oversight.pipelineLoadFailed'))
   } finally {
     loading.value = false
   }
@@ -35,30 +36,30 @@ function subjectLink(item) {
 }
 
 const stuckCols = [
-  { key: 'client', label: 'Client' },
-  { key: 'location', label: 'Project' },
+  { key: 'client', label: t('clients.client') },
+  { key: 'location', label: t('inventory.project') },
   { key: 'step', label: 'Step' },
   { key: 'created_by', label: 'Owner' },
-  { key: 'created_at', label: 'Opened', type: 'date' },
+  { key: 'created_at', label: t('project.opened'), type: 'date' },
 ]
 const overdueCols = [
-  { key: 'client', label: 'Client' },
-  { key: 'type', label: 'Action' },
-  { key: 'due_at', label: 'Was due', type: 'date' },
-  { key: 'assigned_to', label: 'Assigned to' },
+  { key: 'client', label: t('clients.client') },
+  { key: 'type', label: t('oversight.action') },
+  { key: 'due_at', label: t('oversight.wasDue'), type: 'date' },
+  { key: 'assigned_to', label: t('pipeline.assignedTo') },
 ]
 const officeVisitCols = [
-  { key: 'client', label: 'Client' },
+  { key: 'client', label: t('clients.client') },
   { key: 'agent', label: 'Agent' },
-  { key: 'scheduled_at', label: 'Scheduled', type: 'date' },
+  { key: 'scheduled_at', label: t('status.scheduled'), type: 'date' },
 ]
 </script>
 
 <template>
   <div>
     <PageHeader
-      title="Pipeline oversight"
-      subtitle="Cold projects, unrespected next actions and upcoming office visits, by user."
+:title="$t('oversight.pipelineTitle')"
+      :subtitle="$t('oversight.pipelineSubtitle')"
     />
     <OversightFilters
       v-model:from="filters.from"
@@ -69,7 +70,7 @@ const officeVisitCols = [
     <p v-if="loading" class="py-6 text-center text-sm text-mute">Loading…</p>
     <div v-else class="space-y-4">
       <OversightList
-        title="Stuck projects (no next action)"
+:title="$t('oversight.stuckProjects')"
         icon="pi pi-hourglass"
         :data="data.stuck"
         :columns="stuckCols"
@@ -77,7 +78,7 @@ const officeVisitCols = [
         empty-text="Every active project has a planned next step."
       />
       <OversightList
-        title="Overdue / unrespected next actions"
+:title="$t('oversight.overdueActions')"
         icon="pi pi-exclamation-circle"
         :data="data.overdue"
         :columns="overdueCols"
@@ -85,7 +86,7 @@ const officeVisitCols = [
         empty-text="No next action is past its due date."
       />
       <OversightList
-        title="Upcoming office visits"
+:title="$t('oversight.upcomingOffice')"
         icon="pi pi-building"
         :data="data.upcoming_office_visits"
         :columns="officeVisitCols"

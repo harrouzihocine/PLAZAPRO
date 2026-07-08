@@ -7,6 +7,7 @@ import { oversightApi } from '@/features/oversight/api'
 import { defaultOversightRange } from '@/features/oversight/dateRange'
 import { toastError } from '@/composables/useConfirm'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
+import { t } from '@/i18n'
 
 const data = ref({ empty: {}, no_name: {} })
 const loading = ref(true)
@@ -17,7 +18,7 @@ async function load() {
   try {
     data.value = await oversightApi.clients({ ...filters })
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not load client oversight.')
+    toastError(e.response?.data?.message ?? t('oversight.clientsLoadFailed'))
   } finally {
     loading.value = false
   }
@@ -28,16 +29,16 @@ useRefreshable(load) // pull-to-refresh + reconnect self-heal
 const clientLink = (item) => ({ name: 'clients.file', params: { id: item.link.client_id } })
 
 const cols = [
-  { key: 'name', label: 'Client' },
+  { key: 'name', label: t('clients.client') },
   { key: 'phone', label: 'Phone', type: 'num' },
-  { key: 'created_by', label: 'Created by' },
-  { key: 'created_at', label: 'Created', type: 'date' },
+  { key: 'created_by', label: t('clients.createdBy') },
+  { key: 'created_at', label: t('clients.created'), type: 'date' },
 ]
 </script>
 
 <template>
   <div>
-    <PageHeader title="Client quality" subtitle="Abandoned and incomplete client records, by user." />
+    <PageHeader :title="$t('nav.clientQuality')" :subtitle="$t('oversight.clientsSubtitle')" />
     <OversightFilters
       v-model:from="filters.from"
       v-model:to="filters.to"
@@ -47,7 +48,7 @@ const cols = [
     <p v-if="loading" class="py-6 text-center text-sm text-mute">Loading…</p>
     <div v-else class="space-y-4">
       <OversightList
-        title="Empty clients"
+:title="$t('oversight.emptyClients')"
         icon="pi pi-user-minus"
         :data="data.empty"
         :columns="cols"
@@ -55,7 +56,7 @@ const cols = [
         empty-text="No empty clients — every captured lead has activity."
       />
       <OversightList
-        title="No-name clients"
+:title="$t('oversight.noNameClients')"
         icon="pi pi-id-card"
         :data="data.no_name"
         :columns="cols"

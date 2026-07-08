@@ -10,6 +10,7 @@ import Button from 'primevue/button'
 import { duplicateRequestsApi } from '@/features/clients/api'
 import { useAuthStore } from '@/features/settings/store'
 import { formatDateTime, humanize } from '@/utils/format'
+import { t } from '@/i18n'
 
 const props = defineProps({
   reqId: { type: Number, required: true },
@@ -48,7 +49,7 @@ async function toggle() {
     try {
       data.value = await duplicateRequestsApi.previewProject(props.reqId, props.project.id)
     } catch (e) {
-      error.value = e.response?.data?.message ?? 'Could not load project details.'
+      error.value = e.response?.data?.message ?? t('oversight.projectDetailsFailed')
     } finally {
       loading.value = false
     }
@@ -69,7 +70,7 @@ async function toggle() {
       <div class="ms-auto flex flex-wrap gap-2">
         <Button
           v-if="auth.can('clients.view')"
-          label="Open"
+:label="$t('common.open')"
           icon="pi pi-external-link"
           size="small"
           severity="secondary"
@@ -84,14 +85,14 @@ async function toggle() {
           @click="toggle"
         />
         <Button
-          label="Share"
+:label="$t('project.share')"
           icon="pi pi-share-alt"
           size="small"
           :loading="busy"
           @click="$emit('share')"
         />
         <Button
-          label="Start separate"
+:label="$t('oversight.startSeparate')"
           icon="pi pi-clone"
           size="small"
           severity="secondary"

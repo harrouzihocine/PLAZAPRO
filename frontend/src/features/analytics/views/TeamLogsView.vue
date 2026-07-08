@@ -15,6 +15,7 @@ import { useAutoFilter } from '@/composables/useAutoFilter'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { useAuthStore } from '@/features/settings/store'
 import { formatDateTime, todayInput } from '@/utils/format'
+import { t } from '@/i18n'
 
 const KIND = {
   call: { label: 'Call', icon: 'pi pi-phone' },
@@ -27,11 +28,11 @@ const auth = useAuthStore()
 // (the server enforces this too — here it just drives the selector, the User column
 // and the page copy so the view never over-promises a company-wide feed).
 const canViewAll = computed(() => auth.can('logs.view_all'))
-const pageTitle = computed(() => (canViewAll.value ? 'Team logs' : 'My logs'))
+const pageTitle = computed(() => (canViewAll.value ? t('nav.teamLogs') : t('nav.myLogs')))
 const pageSubtitle = computed(() =>
   canViewAll.value
-    ? "Every user's rapports (calls, office & in-site visits) and planned work — company-wide."
-    : 'Your rapports (calls, office & in-site visits) and planned work.',
+    ? t('teamLogs.subtitleAll')
+    : t('teamLogs.subtitleOwn'),
 )
 
 // Default view = the agent's plan: upcoming work (scheduled visits + pending
@@ -55,27 +56,27 @@ const loadError = ref(false)
 const staff = ref([])
 
 const userOptions = computed(() => [
-  { value: '', label: 'All users' },
+  { value: '', label: t('oversight.allUsers') },
   ...staff.value.map((u) => ({ value: u.id, label: u.name })),
 ])
-const typeOptions = [
-  { value: '', label: 'All types' },
-  { value: 'call', label: 'Calls' },
-  { value: 'office_visit', label: 'Office visits' },
-  { value: 'in_site_visit', label: 'In-site visits' },
-]
-const modeOptions = [
-  { value: 'all', label: 'Logged + planned' },
-  { value: 'logged', label: 'Logged (past)' },
-  { value: 'upcoming', label: 'Upcoming (planned)' },
-]
+const typeOptions = computed(() => [
+  { value: '', label: t('teamLogs.allTypes') },
+  { value: 'call', label: t('pipeline.tabCalls') },
+  { value: 'office_visit', label: t('pipeline.tabOfficeVisits') },
+  { value: 'in_site_visit', label: t('pipeline.tabInSiteVisits') },
+])
+const modeOptions = computed(() => [
+  { value: 'all', label: t('teamLogs.modeAll') },
+  { value: 'logged', label: t('teamLogs.modeLogged') },
+  { value: 'upcoming', label: t('teamLogs.modeUpcoming') },
+])
 
 const summaryTiles = computed(() => [
-  { label: 'Calls', value: summary.value.calls ?? 0, icon: KIND.call.icon, tone: 'info' },
-  { label: 'Office visits', value: summary.value.office_visits ?? 0, icon: KIND.office_visit.icon, tone: 'default' },
-  { label: 'In-site visits', value: summary.value.in_site_visits ?? 0, icon: KIND.in_site_visit.icon, tone: 'default' },
-  { label: 'Won', value: summary.value.won ?? 0, icon: 'pi pi-check-circle', tone: 'success' },
-  { label: 'Lost', value: summary.value.lost ?? 0, icon: 'pi pi-times-circle', tone: 'danger' },
+  { label: t('pipeline.tabCalls'), value: summary.value.calls ?? 0, icon: KIND.call.icon, tone: 'info' },
+  { label: t('pipeline.tabOfficeVisits'), value: summary.value.office_visits ?? 0, icon: KIND.office_visit.icon, tone: 'default' },
+  { label: t('pipeline.tabInSiteVisits'), value: summary.value.in_site_visits ?? 0, icon: KIND.in_site_visit.icon, tone: 'default' },
+  { label: t('status.won'), value: summary.value.won ?? 0, icon: 'pi pi-check-circle', tone: 'success' },
+  { label: t('status.lost'), value: summary.value.lost ?? 0, icon: 'pi pi-times-circle', tone: 'danger' },
 ])
 
 // Stale-response guard: filters auto-apply, so a slow older answer must never
@@ -154,14 +155,14 @@ useAutoFilter(
         <BaseSelect
           v-if="canViewAll"
           v-model="filters.user_id"
-          label="User"
+:label="$t('oversight.user')"
           :options="userOptions"
           searchable="auto"
         />
-        <BaseSelect v-model="filters.type" label="Type" :options="typeOptions" />
-        <BaseSelect v-model="filters.mode" label="Show" :options="modeOptions" />
-        <BaseInput v-model="filters.from" label="From" type="date" />
-        <BaseInput v-model="filters.to" label="To" type="date" />
+        <BaseSelect v-model="filters.type" :label="$t('inventory.type')" :options="typeOptions" />
+        <BaseSelect v-model="filters.mode" :label="$t('teamLogs.show')" :options="modeOptions" />
+        <BaseInput v-model="filters.from" :label="$t('oversight.from')" type="date" />
+        <BaseInput v-model="filters.to" :label="$t('oversight.to')" type="date" />
       </div>
       </FilterPanel>
 
@@ -169,20 +170,20 @@ useAutoFilter(
       <EmptyState
         v-else-if="loadError"
         icon="pi pi-exclamation-triangle"
-        title="Couldn't load the logs"
+:title="$t('teamLogs.loadFailed')"
         body="Check the connection, then retry."
       >
-        <Button label="Retry" icon="pi pi-refresh" size="small" outlined @click="fetch" />
+        <Button :label="$t('common.retry')" icon="pi pi-refresh" size="small" outlined @click="fetch" />
       </EmptyState>
       <EmptyState
         v-else-if="!items.length"
         icon="pi pi-list-check"
         :title="
           filters.mode === 'upcoming'
-            ? 'Nothing planned for these filters'
+            ? $t('teamLogs.emptyPlanned')
             : filters.mode === 'all'
-              ? 'Nothing logged or planned for these filters'
-              : 'No logs match these filters'
+              ? $t('teamLogs.emptyAll')
+              : $t('teamLogs.emptyLogged')
         "
       />
 
@@ -239,7 +240,7 @@ useAutoFilter(
           class="flex items-center justify-between border-t border-line px-4 py-3 text-sm sm:px-5"
         >
           <Button
-            label="Previous"
+:label="$t('common.back')"
             icon="pi pi-chevron-left"
             text
             size="small"
@@ -248,7 +249,7 @@ useAutoFilter(
           />
           <span class="num text-mute">Page {{ meta.current_page }} / {{ meta.last_page }}</span>
           <Button
-            label="Next"
+:label="$t('common.next')"
             icon="pi pi-chevron-right"
             icon-pos="right"
             text

@@ -3,6 +3,7 @@ import { useNetworkStore } from '@/features/offline/networkStore'
 import { useOutboxStore } from '@/features/offline/outboxStore'
 import { toastInfo } from '@/composables/useConfirm'
 import { newUuid } from '@/utils/uuid'
+import { t } from '@/i18n'
 
 // The write path for offline-queueable actions (the field-agent set).
 //
@@ -28,11 +29,11 @@ export async function queueable({
   silent = false,
   ledger = true,
   uuid = newUuid(),
-  queuedToast = 'Saved offline — it will sync when you reconnect.',
+  queuedToast = null, // null → localized default
 }) {
   const enqueue = async () => {
     await useOutboxStore().enqueue({ uuid, method, url, body, files, label, entityHint, silent })
-    if (!silent && queuedToast) toastInfo(queuedToast)
+    if (!silent) toastInfo(queuedToast ?? t('offline.savedOffline'))
     return { queued: true, uuid }
   }
 

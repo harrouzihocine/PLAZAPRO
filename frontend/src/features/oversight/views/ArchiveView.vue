@@ -16,25 +16,33 @@ import ReactivateHandoffModal from '@/features/oversight/components/ReactivateHa
 import { oversightApi } from '@/features/oversight/api'
 import { projectsApi, staffApi } from '@/features/clients/api'
 import { locationsApi } from '@/features/inventory/api'
-import { useDynamicList } from '@/composables/useDynamicList'
+import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
+import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction, toastSuccess, toastError } from '@/composables/useConfirm'
 import { formatMoney } from '@/features/payments/money'
 import { formatDateTime, todayInput, countActiveFilters } from '@/utils/format'
+import { t } from '@/i18n'
 
 const auth = useAuthStore()
 const router = useRouter()
 const canReactivate = computed(() => auth.can('projects.manage'))
 
+// The archive holds years of history (thousands of rows) — it lazy-loads in
+// pages of 50, appended as the manager scrolls, instead of one giant table.
+const PER_PAGE = 50
+
 const items = ref([])
 const meta = ref({})
 const summary = ref({ total: 0, total_value: '0.00', by_reason: [], by_agent: [] })
 const loading = ref(true)
+const loadingMore = ref(false)
 const busy = ref(false)
 const exporting = ref(false)
-const page = ref(1)
 const selected = ref([])
+
+const hasMore = computed(() => (meta.value.current_page ?? 1) < (meta.value.last_page ?? 1))
 
 const filters = reactive({
   search: '',
@@ -51,8 +59,8 @@ const filters = reactive({
 // Filter pickers.
 const { items: reasons } = useDynamicList('archive_reasons')
 const reasonOptions = computed(() => [
-  { value: '', label: 'Any reason' },
-  ...reasons.value.map((r) => ({ value: r.label, label: r.label })),
+  { value: '', label: t('archive.anyReason') },
+  ...reasons.value.map((r) => ({ value: r.label, label: itemLabel(r) })),
 ])
 
 const locations = ref([])
@@ -70,17 +78,17 @@ onMounted(async () => {
   }
 })
 const locationOptions = computed(() => [
-  { value: '', label: 'Any project' },
+  { value: '', label: t('archive.anyProject') },
   ...locations.value.map((l) => ({ value: l.id, label: l.name })),
 ])
 const agentOptions = computed(() => [
-  { value: '', label: 'Anyone' },
+  { value: '', label: t('archive.anyone') },
   ...staff.value.map((u) => ({ value: u.id, label: u.name })),
 ])
-const sortOptions = [
-  { value: 'recent', label: 'Newest first' },
-  { value: 'oldest', label: 'Oldest first' },
-]
+const sortOptions = computed(() => [
+  { value: 'recent', label: t('archive.newestFirst') },
+  { value: 'oldest', label: t('archive.oldestFirst') },
+])
 
 const activeFilterCount = computed(() => countActiveFilters(filters, ['sort']))
 const hasFilters = computed(() =>
@@ -100,12 +108,12 @@ async function load() {
   loading.value = true
   selected.value = []
   try {
-    const data = await oversightApi.archive({ ...activeParams(), page: page.value })
+    const data = await oversightApi.archive({ ...activeParams(), page: 1, per_page: PER_PAGE })
     items.value = data.items ?? []
     meta.value = data.meta ?? {}
     summary.value = data.summary ?? { total: 0, total_value: '0.00', by_reason: [], by_agent: [] }
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not load the archive.')
+    toastError(e.response?.data?.message ?? t('archive.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -113,8 +121,32 @@ async function load() {
 onMounted(load)
 useRefreshable(load) // pull-to-refresh + reconnect self-heal
 
+async function loadMore() {
+  if (loading.value || loadingMore.value || !hasMore.value) return
+  loadingMore.value = true
+  try {
+    const data = await oversightApi.archive({
+      ...activeParams(),
+      page: (meta.value.current_page ?? 1) + 1,
+      per_page: PER_PAGE,
+    })
+    // Reactivations shift the pages under us — append only rows we don't
+    // already show, so a boundary drift never duplicates one.
+    const seen = new Set(items.value.map((i) => i.id))
+    items.value.push(...(data.items ?? []).filter((i) => !seen.has(i.id)))
+    meta.value = data.meta ?? {}
+  } catch (e) {
+    toastError(e.response?.data?.message ?? t('archive.loadMoreFailed'))
+  } finally {
+    loadingMore.value = false
+  }
+}
+
+// Scrolling near the table's end pulls the next page in; the button below the
+// table stays as the explicit / no-IntersectionObserver fallback.
+const { sentinel } = useInfiniteScroll(loadMore)
+
 function apply() {
-  page.value = 1
   load()
 }
 function clear() {
@@ -131,16 +163,12 @@ function clear() {
   })
   apply()
 }
-function goToPage(p) {
-  page.value = p
-  load()
-}
 
 function openProject(row) {
   router.push({ name: 'clients.project', params: { id: row.client_id, projectId: row.id } })
 }
 
-// ── Selection (current page) ──────────────────────────────────────────
+// ── Selection (all loaded rows) ───────────────────────────────────────
 const allSelected = computed(
   () => items.value.length > 0 && selected.value.length === items.value.length,
 )
@@ -169,9 +197,9 @@ async function onHandoffDone() {
 async function reactivateSelected() {
   const ids = [...selected.value]
   const ok = await confirmAction({
-    title: `Reactivate ${ids.length} project${ids.length > 1 ? 's' : ''}?`,
-    text: 'Each will return to the active pipeline with its payment plan restored.',
-    confirmText: 'Reactivate all',
+    title: t('archive.reactivateNTitle', { n: ids.length }),
+    text: t('archive.reactivateNText'),
+    confirmText: t('archive.reactivateAll'),
   })
   if (!ok) return
   busy.value = true
@@ -184,8 +212,8 @@ async function reactivateSelected() {
     }
   }
   busy.value = false
-  if (failed) toastError(`${failed} of ${ids.length} could not be reactivated.`)
-  else toastSuccess(`${ids.length} project${ids.length > 1 ? 's' : ''} reactivated.`)
+  if (failed) toastError(t('archive.reactivateFailedCount', { failed, total: ids.length }))
+  else toastSuccess(t('archive.reactivatedCount', { n: ids.length }))
   await load()
 }
 
@@ -203,7 +231,7 @@ async function exportCsv() {
     link.remove()
     URL.revokeObjectURL(url)
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not export the archive.')
+    toastError(e.response?.data?.message ?? t('archive.exportFailed'))
   } finally {
     exporting.value = false
   }
@@ -219,12 +247,12 @@ function ageLabel(days) {
 <template>
   <div>
     <PageHeader
-      title="Archive"
-      subtitle="Lost & closed deals kept for the record. Reactivate the recoverable ones; the rest stay as searchable history."
+:title="$t('nav.archive')"
+      :subtitle="$t('archive.subtitle')"
     >
       <template #actions>
         <Button
-          :label="exporting ? 'Exporting…' : 'Export CSV'"
+          :label="exporting ? $t('archive.exporting') : $t('archive.exportCsv')"
           icon="pi pi-download"
           severity="secondary"
           outlined
@@ -237,15 +265,15 @@ function ageLabel(days) {
     <!-- Summary strip -->
     <div class="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
       <SectionCard flush class="px-4 py-3">
-        <p class="text-xs text-mute">Archived deals</p>
+        <p class="text-xs text-mute">{{ $t('archive.archivedDeals') }}</p>
         <p class="num mt-0.5 text-2xl font-semibold text-ink">{{ summary.total }}</p>
       </SectionCard>
       <SectionCard flush class="px-4 py-3">
-        <p class="text-xs text-mute">Total value archived</p>
+        <p class="text-xs text-mute">{{ $t('archive.totalValue') }}</p>
         <p class="num mt-0.5 text-2xl font-semibold text-ink">{{ formatMoney(summary.total_value) }}</p>
       </SectionCard>
       <SectionCard flush class="col-span-2 px-4 py-3">
-        <p class="mb-1.5 text-xs text-mute">Why deals were lost</p>
+        <p class="mb-1.5 text-xs text-mute">{{ $t('archive.whyLost') }}</p>
         <div v-if="summary.by_reason?.length" class="flex flex-wrap gap-1.5">
           <span
             v-for="r in summary.by_reason"
@@ -264,31 +292,31 @@ function ageLabel(days) {
       <FilterPanel :active-count="activeFilterCount">
       <div class="border-b border-line px-4 py-3 sm:px-5">
         <div class="grid grid-cols-2 items-end gap-2 sm:grid-cols-3 lg:grid-cols-4">
-          <BaseInput v-model="filters.search" label="Search client / phone" @keyup.enter="apply" />
-          <BaseSelect v-model="filters.reason" label="Reason" :options="reasonOptions" searchable="auto" />
+          <BaseInput v-model="filters.search" :label="$t('archive.searchClientPhone')" @keyup.enter="apply" />
+          <BaseSelect v-model="filters.reason" :label="$t('calls.reason')" :options="reasonOptions" searchable="auto" />
           <BaseSelect
             v-model="filters.location_id"
-            label="Project"
+:label="$t('inventory.project')"
             :options="locationOptions"
             searchable="auto"
           />
           <BaseSelect
             v-model="filters.agent_id"
-            label="Opened by"
+:label="$t('project.openedBy')"
             :options="agentOptions"
             searchable="auto"
           />
-          <BaseInput v-model="filters.from" label="Archived from" type="date" />
-          <BaseInput v-model="filters.to" label="Archived to" type="date" />
-          <BaseInput v-model="filters.min_price" label="Min price" type="number" />
-          <BaseInput v-model="filters.max_price" label="Max price" type="number" />
-          <BaseSelect v-model="filters.sort" label="Sort" :options="sortOptions" />
+          <BaseInput v-model="filters.from" :label="$t('archive.archivedFrom')" type="date" />
+          <BaseInput v-model="filters.to" :label="$t('archive.archivedTo')" type="date" />
+          <BaseInput v-model="filters.min_price" :label="$t('inventory.minPrice')" type="number" />
+          <BaseInput v-model="filters.max_price" :label="$t('inventory.maxPrice')" type="number" />
+          <BaseSelect v-model="filters.sort" :label="$t('archive.sort')" :options="sortOptions" />
         </div>
         <div class="mt-2 flex items-center gap-2">
-          <Button label="Apply" icon="pi pi-filter" size="small" @click="apply" />
+          <Button :label="$t('common.apply')" icon="pi pi-filter" size="small" @click="apply" />
           <Button
             v-if="hasFilters"
-            label="Clear"
+:label="$t('common.clear')"
             size="small"
             text
             severity="secondary"
@@ -305,7 +333,7 @@ function ageLabel(days) {
       >
         <span class="text-ink">{{ selected.length }} selected</span>
         <Button
-          label="Reactivate selected"
+:label="$t('archive.reactivateSelected')"
           icon="pi pi-undo"
           size="small"
           :loading="busy"
@@ -313,11 +341,11 @@ function ageLabel(days) {
         />
       </div>
 
-      <p v-if="loading" class="py-8 text-center text-sm text-mute">Loading…</p>
+      <p v-if="loading" class="py-8 text-center text-sm text-mute">{{ $t('common.loading') }}</p>
       <EmptyState
         v-else-if="!items.length"
         icon="pi pi-inbox"
-        title="No archived deals match these filters"
+:title="$t('archive.emptyTitle')"
         body="When a deal is archived as lost or closed, it lands here."
       />
 
@@ -329,19 +357,19 @@ function ageLabel(days) {
                 <input
                   type="checkbox"
                   :checked="allSelected"
-                  aria-label="Select all on this page"
+:aria-label="$t('archive.selectAllLoaded')"
                   @change="toggleAll"
                 />
               </th>
               <th class="py-2.5 pe-3 font-medium" :class="canReactivate ? '' : 'px-4 sm:px-5'">
                 Client
               </th>
-              <th class="py-2.5 pe-3 font-medium">Project</th>
-              <th class="py-2.5 pe-3 font-medium">Price</th>
-              <th class="py-2.5 pe-3 font-medium">Reason</th>
-              <th class="py-2.5 pe-3 font-medium">Opened by</th>
-              <th class="py-2.5 pe-3 font-medium">Archived</th>
-              <th class="py-2.5 pe-3 font-medium">Age</th>
+              <th class="py-2.5 pe-3 font-medium">{{ $t('inventory.project') }}</th>
+              <th class="py-2.5 pe-3 font-medium">{{ $t('inventory.price') }}</th>
+              <th class="py-2.5 pe-3 font-medium">{{ $t('calls.reason') }}</th>
+              <th class="py-2.5 pe-3 font-medium">{{ $t('project.openedBy') }}</th>
+              <th class="py-2.5 pe-3 font-medium">{{ $t('status.archived') }}</th>
+              <th class="py-2.5 pe-3 font-medium">{{ $t('archive.age') }}</th>
               <th class="py-2.5 pe-4"></th>
             </tr>
           </thead>
@@ -381,7 +409,7 @@ function ageLabel(days) {
               <td class="py-1 pe-4 text-end" @click.stop>
                 <Button
                   v-if="canReactivate"
-                  label="Reactivate"
+:label="$t('project.reactivate')"
                   icon="pi pi-undo"
                   text
                   size="small"
@@ -393,28 +421,22 @@ function ageLabel(days) {
           </tbody>
         </table>
 
-        <!-- Pagination -->
+        <!-- Lazy-load footer: the sentinel pre-fetches the next page as it
+             nears the viewport; the button is the explicit fallback. -->
         <div
-          v-if="meta.last_page > 1"
-          class="flex items-center justify-between border-t border-line px-4 py-3 text-sm sm:px-5"
+          ref="sentinel"
+          class="flex flex-col items-center gap-2 border-t border-line px-4 py-3 text-sm sm:px-5"
         >
+          <span class="num text-xs text-mute">Showing {{ items.length }} of {{ meta.total ?? items.length }}</span>
           <Button
-            label="Previous"
-            icon="pi pi-chevron-left"
-            text
+            v-if="hasMore"
+:label="$t('matches.loadMore')"
+            icon="pi pi-arrow-down"
             size="small"
-            :disabled="page <= 1"
-            @click="goToPage(page - 1)"
-          />
-          <span class="num text-mute">Page {{ meta.current_page }} / {{ meta.last_page }}</span>
-          <Button
-            label="Next"
-            icon="pi pi-chevron-right"
-            icon-pos="right"
-            text
-            size="small"
-            :disabled="page >= meta.last_page"
-            @click="goToPage(page + 1)"
+            severity="secondary"
+            outlined
+            :loading="loadingMore"
+            @click="loadMore"
           />
         </div>
       </div>

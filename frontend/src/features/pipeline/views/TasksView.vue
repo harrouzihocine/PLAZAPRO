@@ -195,38 +195,38 @@ function formatDue(value) {
           />
           <ul v-else class="divide-y divide-line">
             <li
-              v-for="t in openTasks"
-              :key="t.id"
+              v-for="task in openTasks"
+              :key="task.id"
               class="flex items-center gap-3 px-4 py-3 sm:px-5"
             >
               <span
                 class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
                 :class="
-                  isOverdue(t)
+                  isOverdue(task)
                     ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300'
                     : 'bg-surface-100 text-mute dark:bg-surface-800'
                 "
               >
                 <i
-                  :class="isOverdue(t) ? 'pi pi-exclamation-circle' : 'pi pi-circle'"
+                  :class="isOverdue(task) ? 'pi pi-exclamation-circle' : 'pi pi-circle'"
                   aria-hidden="true"
                 />
               </span>
               <div class="min-w-0 flex-1">
                 <p class="flex flex-wrap items-center gap-2">
-                  <span class="truncate text-sm font-medium text-ink">{{ t.title }}</span>
+                  <span class="truncate text-sm font-medium text-ink">{{ task.title }}</span>
                   <Tag
-                    v-if="t.priority !== 'normal'"
-:value="$t(`status.${t.priority}`) || t.priority"
-                    :severity="prioritySeverity[t.priority]"
+                    v-if="task.priority !== 'normal'"
+:value="$t(`status.${task.priority}`)"
+                    :severity="prioritySeverity[task.priority]"
                   />
                 </p>
                 <p class="mt-0.5 text-xs text-mute">
-                  <span :class="{ 'font-medium text-danger': isOverdue(t) }">
-                    {{ $t('pipeline.due', { date: formatDue(t.due_at) }) }}
+                  <span :class="{ 'font-medium text-danger': isOverdue(task) }">
+                    {{ $t('pipeline.due', { date: formatDue(task.due_at) }) }}
                   </span>
-                  · {{ t.assigned_to?.name ?? $t('clients.unassigned') }}
-                  <span v-if="t.subject_label"> · {{ t.subject_label }}</span>
+                  · {{ task.assigned_to?.name ?? $t('clients.unassigned') }}
+                  <span v-if="task.subject_label"> · {{ task.subject_label }}</span>
                 </p>
               </div>
               <Button
@@ -235,7 +235,7 @@ function formatDue(value) {
                 size="small"
                 outlined
                 severity="success"
-                @click="store.complete(t.id)"
+                @click="store.complete(task.id)"
               />
               <Button
                 icon="pi pi-ban"
@@ -244,7 +244,7 @@ function formatDue(value) {
                 size="small"
                 severity="danger"
 :aria-label="$t('tasks.cancelConfirm')"
-                @click="cancelTask(t)"
+                @click="cancelTask(task)"
               />
             </li>
           </ul>
@@ -258,12 +258,12 @@ function formatDue(value) {
           </h2>
           <ul class="divide-y divide-line">
             <li
-              v-for="t in doneTasks"
-              :key="t.id"
+              v-for="task in doneTasks"
+              :key="task.id"
               class="flex items-center gap-3 px-4 py-2.5 sm:px-5"
             >
               <i class="pi pi-check-circle text-success" aria-hidden="true" />
-              <p class="truncate text-sm text-mute line-through">{{ t.title }}</p>
+              <p class="truncate text-sm text-mute line-through">{{ task.title }}</p>
             </li>
           </ul>
         </section>
