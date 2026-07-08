@@ -21,7 +21,9 @@ use Illuminate\Support\Collection;
  *
  * A "log" is a completed rapport: a logged call, or a conducted office / in-site
  * visit. `mode=upcoming` flips the feed to planned work instead (scheduled
- * visits + pending next-actions). Read-only: it never mutates domain data.
+ * visits + pending next-actions); `mode=all` merges both into one agenda-style
+ * feed (each row carries a `planned` flag) — the phone default, where an agent
+ * opens on "today + what's ahead". Read-only: it never mutates domain data.
  */
 class BuildTeamLogs
 {
@@ -38,16 +40,22 @@ class BuildTeamLogs
     {
         $userId = isset($filters['user_id']) && $filters['user_id'] !== '' ? (int) $filters['user_id'] : null;
         $type = $filters['type'] ?? null;
-        $mode = ($filters['mode'] ?? 'logged') === 'upcoming' ? 'upcoming' : 'logged';
+        $mode = in_array($filters['mode'] ?? null, ['upcoming', 'all'], true) ? $filters['mode'] : 'logged';
         $from = ! empty($filters['from']) ? Carbon::parse($filters['from'])->startOfDay() : null;
         $to = ! empty($filters['to']) ? Carbon::parse($filters['to'])->endOfDay() : null;
         $page = max(1, (int) ($filters['page'] ?? 1));
 
-        $rows = $mode === 'upcoming'
-            ? $this->upcoming($userId, $type, $from, $to)
-            : $this->logged($userId, $type, $from, $to);
+        $rows = match ($mode) {
+            'upcoming' => $this->upcoming($userId, $type, $from, $to),
+            'all' => $this->logged($userId, $type, $from, $to)
+                ->concat($this->upcoming($userId, $type, $from, $to)),
+            default => $this->logged($userId, $type, $from, $to),
+        };
 
-        $rows = $rows->sortBy('at', SORT_REGULAR, $mode === 'upcoming')->values();
+        // Chronological in every mode: a bounded window reads morning → evening,
+        // and planned work reads soonest-first (it used to come farthest-first,
+        // which buried today's due item pages deep).
+        $rows = $rows->sortBy('at')->values();
 
         $total = $rows->count();
 
@@ -86,6 +94,7 @@ class BuildTeamLogs
                     'client' => $c->client?->full_name,
                     'detail' => ucfirst($c->direction->value),
                     'link' => $this->projectLink($c->client_id, $c->client_project_id),
+                    'planned' => false,
                 ]);
         }
 
@@ -119,8 +128,11 @@ class BuildTeamLogs
                 'at' => $a->due_at,
                 'user' => $a->assignedTo?->name,
                 'client' => $this->clientNameOf($a->subject),
-                'detail' => 'Planned',
+                // No free text on a NextAction — `planned` (the chip) and the
+                // kind already say everything this row knows.
+                'detail' => null,
                 'link' => $this->subjectLink($a->subject),
+                'planned' => true,
             ]);
 
         return $visits->concat($actions);
@@ -161,6 +173,7 @@ class BuildTeamLogs
                 'client' => $v->client?->full_name,
                 'detail' => $v->unit?->reference,
                 'link' => $this->projectLink($v->client_id, $v->client_project_id),
+                'planned' => ! $onlyCompleted,
             ]);
     }
 

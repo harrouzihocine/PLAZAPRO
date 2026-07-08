@@ -111,4 +111,40 @@ class TeamLogsTest extends TestCase
             ->assertOk()
             ->assertJsonCount(0, 'data');
     }
+
+    public function test_upcoming_mode_lists_soonest_planned_work_first(): void
+    {
+        $alice = $this->user(['dashboard.view']);
+
+        Visit::factory()->create(['agent_id' => $alice->id, 'scheduled_at' => now()->addDays(5), 'completed_at' => null]);
+        Visit::factory()->create(['agent_id' => $alice->id, 'scheduled_at' => now()->addHours(2), 'completed_at' => null]);
+
+        Sanctum::actingAs($alice);
+
+        $res = $this->getJson('/api/v1/team-logs?mode=upcoming')->assertOk()->json();
+
+        // Soonest first — the item due in two hours must never hide behind next week's.
+        $this->assertTrue($res['data'][0]['at'] < $res['data'][1]['at']);
+    }
+
+    public function test_all_mode_merges_logged_and_planned_chronologically(): void
+    {
+        $alice = $this->user(['dashboard.view']);
+
+        // This morning's logged rapports + a visit planned for later today.
+        Call::factory()->create(['agent_id' => $alice->id, 'called_at' => now()->subHours(3)]);
+        Visit::factory()->completed()->create(['agent_id' => $alice->id, 'completed_at' => now()->subHour()]);
+        Visit::factory()->create(['agent_id' => $alice->id, 'scheduled_at' => now()->addHours(4), 'completed_at' => null]);
+
+        Sanctum::actingAs($alice);
+
+        $res = $this->getJson('/api/v1/team-logs?mode=all&from='.now()->toDateString())
+            ->assertOk()
+            ->assertJsonCount(3, 'data')
+            ->json();
+
+        // Agenda order (morning → evening), done work flagged apart from planned.
+        $this->assertSame(['call', 'office_visit', 'office_visit'], array_column($res['data'], 'kind'));
+        $this->assertSame([false, false, true], array_column($res['data'], 'planned'));
+    }
 }

@@ -300,11 +300,13 @@ watch(
 )
 
 // Mobile bottom bar: the four most-used destinations + "More". In the Android
-// shell, Chat earns a permanent slot — it's the most app-like destination.
+// shell, Chat earns a permanent slot — it's the most app-like destination —
+// and Team/My logs replaces Units: an agent's day starts from "what's planned
+// for me", not the inventory grid (which stays one tap away under More).
 const bottomNav = computed(() => {
   const flat = sections.value.flatMap((s) => s.items)
   const order = isNative
-    ? ['/', '/clients', '/chat', '/inventory/units']
+    ? ['/', '/clients', '/chat', '/team-logs']
     : ['/', '/clients', '/inventory/locations', '/tasks']
   return order.map((to) => flat.find((i) => i.to === to)).filter(Boolean)
 })

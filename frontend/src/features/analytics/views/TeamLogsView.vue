@@ -14,7 +14,7 @@ import { staffApi } from '@/features/clients/api'
 import { useAutoFilter } from '@/composables/useAutoFilter'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { useAuthStore } from '@/features/settings/store'
-import { formatDateTime, countActiveFilters } from '@/utils/format'
+import { formatDateTime, todayInput } from '@/utils/format'
 
 const KIND = {
   call: { label: 'Call', icon: 'pi pi-phone' },
@@ -34,8 +34,18 @@ const pageSubtitle = computed(() =>
     : 'Your rapports (calls, office & in-site visits) and planned work.',
 )
 
-const filters = ref({ user_id: '', type: '', mode: 'logged', from: '', to: '' })
-const activeFilterCount = computed(() => countActiveFilters(filters.value, ['mode']))
+// Default view = the agent's day: everything logged today plus all planned
+// work from today onward, in agenda order. `from` uses the LOCAL date helper
+// (Africa/Algiers rule — never toISOString). Clearing/editing filters reaches
+// any past range.
+const DEFAULTS = { user_id: '', type: '', mode: 'all', from: todayInput(), to: '' }
+const filters = ref({ ...DEFAULTS })
+// Badge counts what differs from the DEFAULT view (a stock "today + planned"
+// prefill isn't a user-applied filter; mode is a presentation switch).
+const activeFilterCount = computed(
+  () =>
+    Object.keys(DEFAULTS).filter((k) => k !== 'mode' && filters.value[k] !== DEFAULTS[k]).length,
+)
 const page = ref(1)
 const items = ref([])
 const summary = ref({})
@@ -54,6 +64,7 @@ const typeOptions = [
   { value: 'in_site_visit', label: 'In-site visits' },
 ]
 const modeOptions = [
+  { value: 'all', label: 'Logged + planned' },
   { value: 'logged', label: 'Logged (past)' },
   { value: 'upcoming', label: 'Upcoming (planned)' },
 ]
@@ -144,7 +155,13 @@ useAutoFilter(
       <EmptyState
         v-else-if="!items.length"
         icon="pi pi-list-check"
-        :title="filters.mode === 'upcoming' ? 'Nothing planned for these filters' : 'No logs match these filters'"
+        :title="
+          filters.mode === 'upcoming'
+            ? 'Nothing planned for these filters'
+            : filters.mode === 'all'
+              ? 'Nothing logged or planned for these filters'
+              : 'No logs match these filters'
+        "
       />
 
       <div v-else class="overflow-x-auto">
@@ -170,6 +187,13 @@ useAutoFilter(
                 <span class="inline-flex items-center gap-1.5">
                   <i :class="(KIND[row.kind] ?? {}).icon ?? 'pi pi-circle'" class="text-mute" aria-hidden="true" />
                   {{ (KIND[row.kind] ?? {}).label ?? row.kind }}
+                  <!-- Only meaningful in the merged view — in "Upcoming" every row is planned. -->
+                  <span
+                    v-if="row.planned && filters.mode === 'all'"
+                    class="rounded-full bg-highlight px-1.5 py-0.5 text-[10px] font-semibold text-primary-700 dark:text-primary-300"
+                  >
+                    Planned
+                  </span>
                 </span>
               </td>
               <td class="py-2.5 pr-3">
