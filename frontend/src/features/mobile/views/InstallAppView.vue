@@ -1,9 +1,10 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import { useInstallPrompt } from '@/composables/useInstallPrompt'
+import { installedAppVersion } from '@/utils/appUpdate'
 import { isNativeApp } from '@/utils/nativeApp'
 
 // The "Mobile App" page every user can open from the navbar. Android staff get
@@ -23,18 +24,41 @@ const appUrl = window.location.origin
 // version.json hasn't loaded. Both files published by scripts/build-android.sh.
 const apkUrl = ref('/downloads/plaza-pro.apk')
 const apkVersion = ref(null)
+const latestCode = ref(null)
 onMounted(async () => {
   try {
     const res = await fetch('/downloads/version.json', { cache: 'no-store' })
     if (res.ok) {
-      const v = (await res.json()).versionName || null
+      const meta = await res.json()
+      const v = meta.versionName || null
       apkVersion.value = v
       if (v) apkUrl.value = `/downloads/plaza-pro-v${v}.apk`
+      if (Number.isInteger(meta.versionCode)) latestCode.value = meta.versionCode
     }
   } catch {
     apkVersion.value = null
   }
 })
+
+// Inside the APK: compare this build against the published one so the page can
+// offer the update right here (the UpdateBanner's button lands on this page).
+const currentBuild = isNative ? installedAppVersion() : null
+const updateReady = computed(
+  () => isNative && latestCode.value !== null && latestCode.value > currentBuild.versionCode
+)
+const upToDate = computed(
+  () => isNative && latestCode.value !== null && latestCode.value <= currentBuild.versionCode
+)
+
+// The WebView has no DownloadListener, so an in-page APK link would be
+// swallowed. Navigating to the http:// flavor of the URL instead makes the
+// scheme differ from the shell's https app URL, so Capacitor's launchIntent
+// hands it to the system browser (ACTION_VIEW) — which follows the server's
+// 301 back to https (Cloudflare and LAN nginx both redirect) and downloads
+// the APK. Works on every shell already in the field, no bridge method needed.
+function downloadUpdate() {
+  window.location.href = `http://${window.location.host}${apkUrl.value}`
+}
 </script>
 
 <template>
@@ -63,11 +87,35 @@ onMounted(async () => {
         </div>
       </SectionCard>
 
-      <!-- Inside the Android app: nothing to install -->
-      <SectionCard v-if="isNative" title="Installed" icon="pi pi-check-circle">
+      <!-- Inside the Android app: a newer APK is published — update from here -->
+      <SectionCard v-if="isNative && updateReady" title="Update available" icon="pi pi-arrow-circle-up">
+        <p class="mb-1 text-sm text-ink">
+          Version {{ apkVersion }} of the app is out<template v-if="currentBuild?.versionName">
+            — you have {{ currentBuild.versionName }}</template
+          >.
+        </p>
+        <p class="mb-4 text-sm text-mute">
+          The download opens in your browser. Your account and data stay in place —
+          installing on top just updates the app.
+        </p>
+        <BaseButton icon="pi pi-download" label="Download update (.apk)" @click="downloadUpdate" />
+        <ol class="mt-4 list-inside list-decimal space-y-2 text-sm text-ink">
+          <li>Open the finished download (tap it in the browser's download bar).</li>
+          <li>
+            If asked about unknown apps: tap <span class="font-medium">Settings</span> →
+            <span class="font-medium">"Allow from this source"</span>, then go back.
+          </li>
+          <li>Tap <span class="font-medium">Update</span>, then reopen PLAZA PRO.</li>
+        </ol>
+      </SectionCard>
+
+      <!-- Inside the Android app, already current: nothing to install -->
+      <SectionCard v-else-if="isNative" title="Installed" icon="pi pi-check-circle">
         <p class="text-sm text-ink">
-          You are using the PLAZA PRO Android app — nothing more to do. New features
-          arrive automatically with every update of the web app.
+          You are using the PLAZA PRO Android app<template v-if="currentBuild?.versionName">
+            (version {{ currentBuild.versionName }})</template
+          ><template v-if="upToDate"> — you are on the latest version</template
+          >. New features arrive automatically with every update of the web app.
         </p>
       </SectionCard>
 

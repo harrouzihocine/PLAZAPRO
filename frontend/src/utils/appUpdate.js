@@ -40,15 +40,23 @@ export function dismissUpdate(code) {
   updateAvailable.value = false
 }
 
-function installedVersionCode() {
+// This build's identity, also used by the Mobile App page to compare against
+// the published version.json and offer the in-app update download.
+export function installedAppVersion() {
   try {
     const raw = window.PlazaNative?.getAppVersion?.()
-    const code = raw ? JSON.parse(raw)?.versionCode : null
-    if (Number.isInteger(code)) return code
+    const meta = raw ? JSON.parse(raw) : null
+    if (Number.isInteger(meta?.versionCode)) {
+      return { versionCode: meta.versionCode, versionName: meta.versionName || '' }
+    }
   } catch {
     /* malformed bridge answer — treat as legacy below */
   }
-  return LEGACY_VERSION_CODE
+  return { versionCode: LEGACY_VERSION_CODE, versionName: '' }
+}
+
+function installedVersionCode() {
+  return installedAppVersion().versionCode
 }
 
 let latestCode = null
