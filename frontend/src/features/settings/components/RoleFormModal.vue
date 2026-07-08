@@ -55,16 +55,16 @@ function submit() {
 </script>
 
 <template>
-  <BaseModal :title="isEdit ? 'Edit role' : 'New role'" size="max-w-3xl" @close="emit('close')">
+  <BaseModal :title="isEdit ? $t('roles.editRole') : $t('roles.newRole')" size="max-w-3xl" @close="emit('close')">
     <form class="space-y-5" @submit.prevent="submit">
       <div class="grid gap-4 sm:grid-cols-2">
-        <BaseInput v-model="form.name" label="Role name" required placeholder="e.g. Senior Agent" />
+        <BaseInput v-model="form.name" :label="$t('roles.roleName')" required :placeholder="$t('roles.roleNamePlaceholder')" />
         <label
           class="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-line px-3.5 py-2.5"
         >
           <span class="text-sm">
-            <span class="block font-medium text-ink">Agent role</span>
-            <span class="block text-xs text-mute">Eligible to be assigned visits</span>
+            <span class="block font-medium text-ink">{{ $t('roles.agentRole') }}</span>
+            <span class="block text-xs text-mute">{{ $t('roles.agentRoleHint') }}</span>
           </span>
           <ToggleSwitch v-model="form.is_agent" />
         </label>
@@ -72,18 +72,18 @@ function submit() {
 
       <BaseTextarea
         v-model="form.description"
-        label="Description"
+:label="$t('common.description')"
         :rows="2"
-        placeholder="Plain-language summary of what this role is for."
+        :placeholder="$t('roles.descriptionPlaceholder')"
       />
 
       <div>
         <div class="mb-2 flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-ink">Permissions</h3>
-          <span class="text-xs text-mute">{{ form.permissions.length }} selected</span>
+          <h3 class="text-sm font-semibold text-ink">{{ $t('roles.permissions') }}</h3>
+          <span class="text-xs text-mute">{{ $t('roles.nSelected', { n: form.permissions.length }) }}</span>
         </div>
 
-        <div class="max-h-[46vh] space-y-3 overflow-y-auto pr-1">
+        <div class="max-h-[46vh] space-y-3 overflow-y-auto pe-1">
           <fieldset
             v-for="group in groups"
             :key="group.label"
@@ -100,7 +100,7 @@ function submit() {
                   binary
                   @update:model-value="toggleGroup(group.items, $event)"
                 />
-                Select all
+                {{ $t('roles.selectAll') }}
               </label>
             </div>
             <div class="divide-y divide-line">
@@ -121,10 +121,10 @@ function submit() {
       </div>
 
       <div class="flex justify-end gap-2 border-t border-line pt-4">
-        <Button type="button" label="Cancel" severity="secondary" outlined @click="emit('close')" />
+        <Button type="button" :label="$t('common.cancel')" severity="secondary" outlined @click="emit('close')" />
         <Button
           type="submit"
-          :label="isEdit ? 'Save changes' : 'Create role'"
+          :label="isEdit ? $t('chat.saveChanges') : $t('roles.createRole')"
           icon="pi pi-check"
           :loading="saving"
           :disabled="!form.name.trim()"

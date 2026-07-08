@@ -9,6 +9,7 @@ import ImageCropperModal from '@/features/settings/components/ImageCropperModal.
 import { useAuthStore } from '@/features/settings/store'
 import { toastError, toastSuccess } from '@/composables/useConfirm'
 import { initials } from '@/utils/format'
+import { t } from '@/i18n'
 
 // The signed-in user editing their OWN account: details, password and photo.
 // The username is fixed here — only an admin can change it (Settings → Users).
@@ -57,10 +58,10 @@ async function save() {
   saving.value = true
   try {
     await auth.updateProfile(payload)
-    toastSuccess('Profile updated.')
+    toastSuccess(t('profile.updated'))
     emit('close')
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not save your profile.')
+    toastError(e.response?.data?.message ?? t('profile.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -76,7 +77,7 @@ function onFile(event) {
   if (!file) return
 
   if (!file.type.startsWith('image/')) {
-    toastError('Please choose an image file.')
+    toastError(t('profile.chooseImage'))
     return
   }
 
@@ -89,9 +90,9 @@ async function onCropped(croppedFile) {
   avatarBusy.value = true
   try {
     await auth.uploadAvatar(croppedFile)
-    toastSuccess('Photo updated.')
+    toastSuccess(t('profile.photoUpdated'))
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not upload that photo.')
+    toastError(e.response?.data?.message ?? t('profile.photoUploadFailed'))
   } finally {
     avatarBusy.value = false
   }
@@ -101,9 +102,9 @@ async function removePhoto() {
   avatarBusy.value = true
   try {
     await auth.removeAvatar()
-    toastSuccess('Photo removed.')
+    toastSuccess(t('profile.photoRemoved'))
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not remove your photo.')
+    toastError(e.response?.data?.message ?? t('profile.photoRemoveFailed'))
   } finally {
     avatarBusy.value = false
   }
@@ -111,7 +112,7 @@ async function removePhoto() {
 </script>
 
 <template>
-  <BaseModal title="Edit profile" size="max-w-lg" @close="emit('close')">
+  <BaseModal :title="$t('shell.editProfile')" size="max-w-lg" @close="emit('close')">
     <form class="space-y-5" @submit.prevent="save">
       <!-- Photo -->
       <div class="flex items-center gap-4">
@@ -126,7 +127,7 @@ async function removePhoto() {
           <div class="flex gap-2">
             <Button
               type="button"
-              label="Change photo"
+:label="$t('profile.changePhoto')"
               icon="pi pi-camera"
               size="small"
               outlined
@@ -136,7 +137,7 @@ async function removePhoto() {
             <Button
               v-if="auth.user?.avatar_url"
               type="button"
-              label="Remove"
+:label="$t('common.remove')"
               icon="pi pi-trash"
               severity="danger"
               text
@@ -164,38 +165,38 @@ async function removePhoto() {
       </div>
 
       <div class="grid gap-4 sm:grid-cols-2">
-        <BaseInput v-model="form.name" label="Name" capitalize required />
-        <BaseInput v-model="form.email" label="Email" type="email" required />
+        <BaseInput v-model="form.name" :label="$t('common.name')" capitalize required />
+        <BaseInput v-model="form.email" :label="$t('common.email')" type="email" required />
       </div>
 
-      <BasePhoneInput v-model="form.phone" label="Phone" />
+      <BasePhoneInput v-model="form.phone" :label="$t('common.phone')" />
 
       <!-- Password change (optional) -->
       <div class="space-y-4 rounded-lg border border-line p-4">
-        <p class="text-sm font-medium text-ink">Change password</p>
-        <p class="-mt-2 text-xs text-mute">Leave these blank to keep your current password.</p>
+        <p class="text-sm font-medium text-ink">{{ $t('profile.changePassword') }}</p>
+        <p class="-mt-2 text-xs text-mute">{{ $t('profile.blankKeep') }}</p>
         <BaseInput
           v-model="form.current_password"
-          label="Current password"
+:label="$t('profile.currentPassword')"
           type="password"
           :required="wantsPasswordChange"
         />
         <div class="grid gap-4 sm:grid-cols-2">
-          <BaseInput v-model="form.password" label="New password" type="password" />
+          <BaseInput v-model="form.password" :label="$t('profile.newPassword')" type="password" />
           <BaseInput
             v-model="form.password_confirmation"
-            label="Confirm new password"
+:label="$t('profile.confirmPassword')"
             type="password"
-            :error="passwordMismatch ? 'Passwords do not match' : ''"
+            :error="passwordMismatch ? $t('profile.passwordsMismatch') : ''"
           />
         </div>
       </div>
 
       <div class="flex justify-end gap-2 pt-1">
-        <Button type="button" label="Cancel" severity="secondary" outlined @click="emit('close')" />
+        <Button type="button" :label="$t('common.cancel')" severity="secondary" outlined @click="emit('close')" />
         <Button
           type="submit"
-          label="Save changes"
+:label="$t('chat.saveChanges')"
           icon="pi pi-check"
           :loading="saving"
           :disabled="!valid"

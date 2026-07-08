@@ -5,6 +5,7 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import BaseModal from '@/components/base/BaseModal.vue'
 import { useAuthStore } from '@/features/settings/store'
 import { toastError, toastSuccess } from '@/composables/useConfirm'
+import { t } from '@/i18n'
 
 // Which notification categories reach the phone as a system-tray push. The
 // matrix mirrors DomainNotification::PUSH_CATEGORIES on the backend — push
@@ -17,38 +18,38 @@ const CATEGORIES = [
   {
     key: 'chat',
     icon: 'pi pi-comments',
-    label: 'Chat messages',
-    hint: 'New messages in your conversations and project chats',
+    labelKey: 'pushPrefs.chat',
+    hintKey: 'pushPrefs.chatHint',
   },
   {
     key: 'visits',
     icon: 'pi pi-send',
-    label: 'Visits & dispatch',
-    hint: 'Visit assignments, office visits, dispatch requests',
+    labelKey: 'pushPrefs.visits',
+    hintKey: 'pushPrefs.visitsHint',
   },
   {
     key: 'payments',
     icon: 'pi pi-wallet',
-    label: 'Payments & holds',
-    hint: 'Recorded payments and lapsed reservations',
+    labelKey: 'pushPrefs.payments',
+    hintKey: 'pushPrefs.paymentsHint',
   },
   {
     key: 'reminders',
     icon: 'pi pi-clock',
-    label: 'Reminders & digest',
-    hint: 'Due next-actions and the daily agenda digest',
+    labelKey: 'pushPrefs.reminders',
+    hintKey: 'pushPrefs.remindersHint',
   },
   {
     key: 'listings',
     icon: 'pi pi-th-large',
-    label: 'Listing announcements',
-    hint: 'New, updated or sold units and boxes, desire matches',
+    labelKey: 'pushPrefs.listings',
+    hintKey: 'pushPrefs.listingsHint',
   },
   {
     key: 'workflow',
     icon: 'pi pi-users',
-    label: 'Clients & projects',
-    hint: 'Assignments, handoffs and duplicate resolutions',
+    labelKey: 'pushPrefs.workflow',
+    hintKey: 'pushPrefs.workflowHint',
   },
 ]
 
@@ -64,10 +65,10 @@ async function save() {
   saving.value = true
   try {
     await auth.updatePushPrefs({ ...prefs })
-    toastSuccess('Notification settings saved.')
+    toastSuccess(t('pushPrefs.saved'))
     emit('close')
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not save your notification settings.')
+    toastError(e.response?.data?.message ?? t('pushPrefs.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -75,7 +76,7 @@ async function save() {
 </script>
 
 <template>
-  <BaseModal title="Push notifications" size="max-w-lg" @close="emit('close')">
+  <BaseModal :title="$t('pushPrefs.title')" size="max-w-lg" @close="emit('close')">
     <form class="space-y-5" @submit.prevent="save">
       <p class="text-sm text-mute">
         Choose what reaches your phone as a push notification. Everything still
@@ -90,8 +91,8 @@ async function save() {
         >
           <i :class="c.icon" class="w-5 text-center text-mute" aria-hidden="true" />
           <span class="min-w-0 flex-1">
-            <span class="block text-sm font-medium text-ink">{{ c.label }}</span>
-            <span class="block text-xs text-mute">{{ c.hint }}</span>
+            <span class="block text-sm font-medium text-ink">{{ $t(c.labelKey) }}</span>
+            <span class="block text-xs text-mute">{{ $t(c.hintKey) }}</span>
           </span>
           <ToggleSwitch v-model="prefs[c.key]" />
         </label>
@@ -102,7 +103,7 @@ async function save() {
       </p>
 
       <div class="flex justify-end gap-2 pt-1">
-        <Button type="button" label="Cancel" severity="secondary" outlined @click="emit('close')" />
+        <Button type="button" :label="$t('common.cancel')" severity="secondary" outlined @click="emit('close')" />
         <Button type="submit" label="Save" icon="pi pi-check" :loading="saving" />
       </div>
     </form>

@@ -1,5 +1,6 @@
 <script setup>
 import Button from 'primevue/button'
+import { itemLabel } from '@/composables/useDynamicList'
 import ToggleSwitch from 'primevue/toggleswitch'
 
 // One row in the Lists item manager: a read-only display of the option (label +
@@ -27,7 +28,7 @@ const emit = defineEmits(['edit', 'toggle', 'move'])
         severity="secondary"
         class="!h-6 !w-6"
         :disabled="isFirst"
-        aria-label="Move up"
+        :aria-label="$t('media.moveUp')"
         @click="emit('move', -1)"
       />
       <Button
@@ -38,7 +39,7 @@ const emit = defineEmits(['edit', 'toggle', 'move'])
         severity="secondary"
         class="!h-6 !w-6"
         :disabled="isLast"
-        aria-label="Move down"
+        :aria-label="$t('media.moveDown')"
         @click="emit('move', 1)"
       />
     </div>
@@ -51,13 +52,21 @@ const emit = defineEmits(['edit', 'toggle', 'move'])
     />
 
     <div class="min-w-0 flex-1">
-      <p class="truncate text-sm font-medium text-ink">{{ item.label }}</p>
+      <p class="truncate text-sm font-medium text-ink">
+        {{ itemLabel(item) }}
+        <i
+          v-if="item.label_translations && Object.keys(item.label_translations).length"
+          v-tooltip.top="$t('settings.hasTranslations')"
+          class="pi pi-globe ms-1 text-xs text-mute"
+          aria-hidden="true"
+        />
+      </p>
       <code class="text-xs text-mute">{{ item.value }}</code>
     </div>
 
     <ToggleSwitch
       :model-value="Boolean(item.is_active)"
-      :aria-label="item.is_active ? 'Deactivate item' : 'Activate item'"
+      :aria-label="item.is_active ? $t('settings.deactivateItem') : $t('settings.activateItem')"
       @update:model-value="emit('toggle')"
     />
     <Button
@@ -66,7 +75,7 @@ const emit = defineEmits(['edit', 'toggle', 'move'])
       rounded
       size="small"
       severity="secondary"
-      aria-label="Edit item"
+      :aria-label="$t('settings.editItem')"
       @click="emit('edit')"
     />
   </div>

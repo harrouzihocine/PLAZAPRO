@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { toastError } from '@/composables/useConfirm'
 import { dynamicListsApi } from '@/features/settings/api'
 import { invalidateDynamicList } from '@/composables/useDynamicList'
+import { t } from '@/i18n'
 
 // State for the Lists admin screen. Network lives in api.js; after any change we
 // invalidate the shared dropdown cache so consumers app-wide pick up the edit.
@@ -50,7 +51,7 @@ export const useDynamicListsStore = defineStore('dynamicLists', {
         await fn()
         await this.refresh()
       } catch (e) {
-        this.error = e.response?.data?.message ?? 'Action failed.'
+        this.error = e.response?.data?.message ?? t('common.actionFailed')
         toastError(this.error)
         throw e
       } finally {

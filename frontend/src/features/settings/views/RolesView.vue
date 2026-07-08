@@ -9,6 +9,7 @@ import RoleFormModal from '@/features/settings/components/RoleFormModal.vue'
 import { useRolesStore } from '@/features/settings/rolesStore'
 import { confirmAction } from '@/composables/useConfirm'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
+import { t } from '@/i18n'
 
 const store = useRolesStore()
 
@@ -65,9 +66,9 @@ async function cancelRole(role) {
   if (!role) return
   if (
     await confirmAction({
-      title: `Cancel role "${role.name}"?`,
-      text: 'The record is kept but marked cancelled.',
-      confirmText: 'Cancel role',
+      title: t('roles.cancelTitle', { name: role.name }),
+      text: t('project.removeText'),
+      confirmText: t('roles.cancelRole'),
       danger: true,
     })
   ) {
@@ -80,23 +81,23 @@ async function cancelRole(role) {
 <template>
   <div>
     <PageHeader
-      title="Roles &amp; permissions"
-      subtitle="One role per user. Each permission below explains exactly what it unlocks."
+:title="$t('roles.title')"
+      :subtitle="$t('roles.subtitle')"
     >
       <template #actions>
-        <Button label="New role" icon="pi pi-plus" class="native-fab" @click="openCreate" />
+        <Button :label="$t('roles.newRole')" icon="pi pi-plus" class="native-fab" @click="openCreate" />
       </template>
     </PageHeader>
 
     <div class="grid grid-cols-1 gap-5 lg:grid-cols-[17rem_minmax(0,1fr)]">
       <!-- Role list -->
-      <SectionCard title="Roles" icon="pi pi-shield" flush class="self-start">
+      <SectionCard :title="$t('settings.roles')" icon="pi pi-shield" flush class="self-start">
         <nav class="flex flex-col gap-0.5 p-2">
           <button
             v-for="role in store.roles"
             :key="role.id"
             type="button"
-            class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors"
+            class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-start text-sm transition-colors"
             :class="
               role.id === selectedId
                 ? 'bg-highlight font-semibold text-ink'
@@ -106,7 +107,7 @@ async function cancelRole(role) {
           >
             <span class="truncate">{{ role.name }}</span>
             <span class="flex shrink-0 items-center gap-1.5 text-xs">
-              <Tag v-if="role.is_agent" value="agent" severity="info" />
+              <Tag v-if="role.is_agent" :value="$t('users.agent')" severity="info" />
               <span class="num text-mute">{{ role.users_count ?? 0 }}</span>
             </span>
           </button>
@@ -119,15 +120,15 @@ async function cancelRole(role) {
           <div class="min-w-0">
             <h2 class="flex items-center gap-2 text-sm font-semibold text-ink">
               {{ selectedRole.name }}
-              <Tag v-if="selectedRole.is_agent" value="agent" severity="info" />
+              <Tag v-if="selectedRole.is_agent" :value="$t('users.agent')" severity="info" />
             </h2>
-            <p class="mt-0.5 text-xs text-mute">{{ selectedRole.users_count ?? 0 }} users</p>
+            <p class="mt-0.5 text-xs text-mute">{{ $t('roles.usersCount', { n: selectedRole.users_count ?? 0 }) }}</p>
           </div>
         </template>
         <template #actions>
           <Button
             icon="pi pi-pencil"
-            label="Edit"
+:label="$t('common.edit')"
             size="small"
             severity="secondary"
             outlined
@@ -135,7 +136,7 @@ async function cancelRole(role) {
           />
           <Button
             icon="pi pi-ban"
-            label="Cancel role"
+:label="$t('roles.cancelRole')"
             size="small"
             severity="danger"
             outlined
@@ -146,18 +147,18 @@ async function cancelRole(role) {
         <p v-if="selectedRole.description" class="text-sm text-ink">
           {{ selectedRole.description }}
         </p>
-        <p v-else class="text-sm italic text-mute">No description yet.</p>
+        <p v-else class="text-sm italic text-mute">{{ $t('roles.noDescription') }}</p>
 
         <div class="mt-5">
           <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-mute">
-            What this role can do
+            {{ $t('roles.whatCanDo') }}
           </h3>
 
           <EmptyState
             v-if="!capabilities.length"
             icon="pi pi-lock"
-            title="No permissions granted"
-            body="This role can sign in but can't do anything yet. Use Edit to grant permissions."
+:title="$t('roles.noPermsTitle')"
+            :body="$t('roles.noPermsBody')"
           />
 
           <div v-else class="space-y-4">
@@ -180,8 +181,8 @@ async function cancelRole(role) {
       <SectionCard v-else>
         <EmptyState
           icon="pi pi-shield"
-          title="Select a role"
-          body="Pick one on the left to see what it can do, or create a new role."
+:title="$t('roles.selectTitle')"
+          :body="$t('roles.selectBody')"
         />
       </SectionCard>
     </div>

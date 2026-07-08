@@ -8,10 +8,18 @@ import DynamicListItemRow from '@/features/settings/components/DynamicListItemRo
 import ListItemFormModal from '@/features/settings/components/ListItemFormModal.vue'
 import { useDynamicListsStore } from '@/features/settings/dynamicListsStore'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
+import { i18n, t } from '@/i18n'
 
 const store = useDynamicListsStore()
 
 const selected = computed(() => store.selected)
+
+// System list names translate via the dictionary (settings.listNames.<key>);
+// custom lists an admin created keep their stored name.
+function listName(list) {
+  const key = `settings.listNames.${list.key}`
+  return i18n.global.te(key) ? t(key) : list.name
+}
 
 // Modal state: closed, or open on a specific item (null item = creating).
 const modalOpen = ref(false)
@@ -57,17 +65,17 @@ function move(index, dir) {
 
 <template>
   <div>
-    <PageHeader title="Lists" subtitle="Manage the dropdown options used across the app." />
+    <PageHeader :title="$t('settings.lists')" :subtitle="$t('settings.listsSubtitle')" />
 
     <div class="grid grid-cols-1 gap-5 lg:grid-cols-[15rem_minmax(0,1fr)]">
       <!-- List picker -->
-      <SectionCard title="Lists" icon="pi pi-list" flush class="self-start">
+      <SectionCard :title="$t('settings.lists')" icon="pi pi-list" flush class="self-start">
         <nav class="flex flex-col gap-0.5 p-2">
           <button
             v-for="list in store.lists"
             :key="list.key"
             type="button"
-            class="flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors"
+            class="flex items-center justify-between rounded-lg px-3 py-2 text-start text-sm transition-colors"
             :class="
               list.key === store.selectedKey
                 ? 'bg-highlight font-semibold text-ink'
@@ -75,11 +83,11 @@ function move(index, dir) {
             "
             @click="store.select(list.key)"
           >
-            <span class="truncate">{{ list.name }}</span>
+            <span class="truncate">{{ listName(list) }}</span>
             <i
               v-if="list.is_system"
               class="pi pi-lock shrink-0 text-xs text-mute"
-              title="System list"
+:title="$t('settings.systemList')"
               aria-hidden="true"
             />
           </button>
@@ -90,7 +98,7 @@ function move(index, dir) {
       <SectionCard v-if="selected">
         <template #header>
           <div class="min-w-0">
-            <h2 class="text-sm font-semibold text-ink">{{ selected.name }}</h2>
+            <h2 class="text-sm font-semibold text-ink">{{ listName(selected) }}</h2>
             <p class="mt-0.5 truncate text-xs text-mute">
               <code class="rounded bg-surface-100 px-1 dark:bg-surface-800">{{ selected.key }}</code>
               <span v-if="selected.description"> — {{ selected.description }}</span>
@@ -98,7 +106,7 @@ function move(index, dir) {
           </div>
         </template>
         <template #actions>
-          <Button label="Add item" icon="pi pi-plus" size="small" @click="openCreate" />
+          <Button :label="$t('settings.addItem')" icon="pi pi-plus" size="small" @click="openCreate" />
         </template>
 
         <div class="space-y-2">
@@ -115,8 +123,8 @@ function move(index, dir) {
           <EmptyState
             v-if="!store.items.length"
             icon="pi pi-list"
-            title="No items yet"
-            body="Add the first option for this list."
+:title="$t('settings.noItemsTitle')"
+            :body="$t('settings.noItemsBody')"
           />
         </div>
       </SectionCard>

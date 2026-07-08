@@ -8,6 +8,7 @@ import DepartmentFormModal from '@/features/settings/components/DepartmentFormMo
 import { useDepartmentsStore } from '@/features/settings/departmentsStore'
 import { confirmAction } from '@/composables/useConfirm'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
+import { t } from '@/i18n'
 
 const store = useDepartmentsStore()
 
@@ -40,9 +41,9 @@ async function onSave(payload) {
 async function remove(dept) {
   if (
     await confirmAction({
-      title: `Cancel department "${dept.name}"?`,
-      text: 'The record is kept but marked cancelled.',
-      confirmText: 'Cancel department',
+      title: t('departments.cancelTitle', { name: dept.name }),
+      text: t('project.removeText'),
+      confirmText: t('departments.cancelDepartment'),
       danger: true,
     })
   ) {
@@ -53,9 +54,9 @@ async function remove(dept) {
 
 <template>
   <div>
-    <PageHeader title="Departments" subtitle="Organisational units you can assign users to.">
+    <PageHeader :title="$t('settings.departments')" :subtitle="$t('departments.subtitle')">
       <template #actions>
-        <Button label="Add department" icon="pi pi-plus" class="native-fab" @click="openCreate" />
+        <Button :label="$t('departments.addDepartment')" icon="pi pi-plus" class="native-fab" @click="openCreate" />
       </template>
     </PageHeader>
 
@@ -63,7 +64,7 @@ async function remove(dept) {
       <EmptyState
         v-if="!store.items.length"
         icon="pi pi-sitemap"
-        title="No departments yet"
+:title="$t('departments.emptyTitle')"
         body="Add your first organisational unit."
       />
       <ul v-else class="divide-y divide-line">
@@ -89,7 +90,7 @@ async function remove(dept) {
             rounded
             size="small"
             severity="secondary"
-            aria-label="Edit department"
+:aria-label="$t('departments.editDepartment')"
             @click="openEdit(dept)"
           />
           <Button
@@ -98,7 +99,7 @@ async function remove(dept) {
             rounded
             size="small"
             severity="danger"
-            aria-label="Cancel department"
+:aria-label="$t('departments.cancelDepartment')"
             @click="remove(dept)"
           />
         </li>

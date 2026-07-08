@@ -26,19 +26,19 @@ function submit() {
 
 <template>
   <BaseModal
-    :title="isEdit ? 'Edit commune' : 'Add commune'"
+    :title="isEdit ? $t('geoAdmin.editCommune') : $t('geoAdmin.addCommune')"
     size="max-w-md"
     @close="emit('close')"
   >
     <form class="space-y-4" @submit.prevent="submit">
       <p v-if="wilayaName" class="text-xs text-mute">In {{ wilayaName }}</p>
-      <BaseInput v-model="form.name" label="Commune" required placeholder="e.g. Bab El Oued" />
-      <BaseInput v-model="form.daira_name" label="Daïra" />
+      <BaseInput v-model="form.name" :label="$t('geo.commune')" required placeholder="Bab El Oued" />
+      <BaseInput v-model="form.daira_name" :label="$t('geoAdmin.daira')" />
       <div class="flex justify-end gap-2 pt-2">
-        <Button type="button" label="Cancel" severity="secondary" outlined @click="emit('close')" />
+        <Button type="button" :label="$t('common.cancel')" severity="secondary" outlined @click="emit('close')" />
         <Button
           type="submit"
-          :label="isEdit ? 'Save changes' : 'Add commune'"
+          :label="isEdit ? $t('chat.saveChanges') : $t('geoAdmin.addCommune')"
           icon="pi pi-check"
           :loading="saving"
           :disabled="!form.name.trim()"

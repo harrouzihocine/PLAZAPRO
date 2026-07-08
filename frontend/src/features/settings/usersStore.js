@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { toastError } from '@/composables/useConfirm'
 import { departmentsApi, rolesApi, usersApi } from '@/features/settings/api'
+import { t } from '@/i18n'
 
 // State for the Users admin screen. Loads users plus the role and department
 // catalogues (for the create/edit pickers). Filters are sent to the server;
@@ -45,7 +46,7 @@ export const useUsersStore = defineStore('users', {
         await this.fetch()
         return result
       } catch (e) {
-        this.error = e.response?.data?.message ?? 'Action failed.'
+        this.error = e.response?.data?.message ?? t('common.actionFailed')
         toastError(this.error)
         throw e
       } finally {

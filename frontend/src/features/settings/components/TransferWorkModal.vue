@@ -10,6 +10,7 @@ import { usersApi } from '@/features/settings/api'
 import { useAuthStore } from '@/features/settings/store'
 import { toastError } from '@/composables/useConfirm'
 import { formatDateTime, humanize } from '@/utils/format'
+import { t } from '@/i18n'
 
 // Offboarding wizard: what the user did (career — stays under their name
 // forever) and what they still own (the open book), then the hand-over: pick
@@ -34,7 +35,7 @@ onMounted(async () => {
   try {
     workload.value = await usersApi.workload(props.user.id)
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not load the workload.')
+    toastError(e.response?.data?.message ?? t('transfer.loadFailed'))
     emit('close')
   } finally {
     loading.value = false
@@ -69,23 +70,23 @@ const careerStats = computed(() => {
   const c = workload.value?.career
   if (!c) return []
   return [
-    { label: 'Clients created', value: c.clients_created },
-    { label: 'Projects opened', value: c.projects_opened },
-    { label: 'Calls logged', value: c.calls_logged },
-    { label: 'Visits conducted', value: c.visits_conducted },
-    { label: 'Deals won', value: `${c.deals_won} / ${c.deals_opened}` },
-    { label: 'Payments recorded', value: c.payments_recorded },
+    { label: t('transfer.clientsCreated'), value: c.clients_created },
+    { label: t('transfer.projectsOpened'), value: c.projects_opened },
+    { label: t('transfer.callsLogged'), value: c.calls_logged },
+    { label: t('transfer.visitsConducted'), value: c.visits_conducted },
+    { label: t('transfer.dealsWon'), value: `${c.deals_won} / ${c.deals_opened}` },
+    { label: t('transfer.paymentsRecorded'), value: c.payments_recorded },
   ]
 })
 
 const sections = computed(() => {
   if (!open.value) return []
   return [
-    { key: 'clients', title: 'Clients to follow up', data: open.value.clients },
-    { key: 'projects', title: 'Live project seats', data: open.value.projects },
-    { key: 'next_actions', title: 'Planned next actions', data: open.value.next_actions },
-    { key: 'visits', title: 'Scheduled visits', data: open.value.visits },
-    { key: 'tasks', title: 'Open tasks', data: open.value.tasks },
+    { key: 'clients', title: t('transfer.clientsToFollow'), data: open.value.clients },
+    { key: 'projects', title: t('transfer.projectSeats'), data: open.value.projects },
+    { key: 'next_actions', title: t('pipeline.tabNextActions'), data: open.value.next_actions },
+    { key: 'visits', title: t('transfer.scheduledVisits'), data: open.value.visits },
+    { key: 'tasks', title: t('transfer.openTasks'), data: open.value.tasks },
   ].filter((s) => s.data.total > 0)
 })
 
@@ -121,16 +122,16 @@ function submit() {
 </script>
 
 <template>
-  <BaseModal :title="`Transfer work — ${user.name}`" size="max-w-2xl" @close="emit('close')">
+  <BaseModal :title="$t('transfer.modalTitle', { name: user.name })" size="max-w-2xl" @close="emit('close')">
     <div v-if="loading" class="flex items-center justify-center py-12">
-      <i class="pi pi-spinner pi-spin text-2xl text-mute" aria-label="Loading workload" />
+      <i class="pi pi-spinner pi-spin text-2xl text-mute" :aria-label="$t('common.loading')" />
     </div>
 
     <div v-else-if="workload" class="space-y-5">
       <!-- Career: the record that stays under their name forever. -->
       <div>
         <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-mute">
-          Career record (stays under {{ user.name }}'s name)
+          {{ $t('transfer.careerRecord', { name: user.name }) }}
         </h3>
         <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <div
@@ -148,14 +149,14 @@ function submit() {
       <EmptyState
         v-if="!openTotal"
         icon="pi pi-check-circle"
-        title="No open work"
+:title="$t('transfer.noOpenWork')"
         body="Nothing is left on this user — the account can simply be deactivated."
       />
 
       <template v-else>
         <div>
           <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-mute">
-            Open work to hand over ({{ openTotal }})
+            {{ $t('transfer.openWorkToHand', { n: openTotal }) }}
           </h3>
           <div class="space-y-3">
             <div
@@ -197,9 +198,9 @@ function submit() {
         <div class="space-y-3">
           <BaseSelect
             v-model="successorId"
-            label="Hand everything to"
+:label="$t('transfer.handTo')"
             required
-            placeholder="Choose the successor"
+:placeholder="$t('transfer.chooseSuccessor')"
             :clearable="false"
             :options="
               candidates.map((u) => ({
@@ -233,10 +234,10 @@ function submit() {
       </label>
 
       <div class="flex justify-end gap-2 pt-2">
-        <Button label="Close" severity="secondary" outlined @click="emit('close')" />
+        <Button :label="$t('common.close')" severity="secondary" outlined @click="emit('close')" />
         <Button
           v-if="openTotal"
-          label="Transfer everything"
+:label="$t('transfer.transferEverything')"
           icon="pi pi-arrow-right-arrow-left"
           :disabled="!successor || saving"
           :loading="saving"

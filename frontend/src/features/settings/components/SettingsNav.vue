@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/features/settings/store'
+import { t } from '@/i18n'
 
 const auth = useAuthStore()
 
@@ -12,19 +13,19 @@ const auth = useAuthStore()
 const groups = computed(() =>
   [
     {
-      label: 'Workspace',
+      label: t('settings.groupWorkspace'),
       items: [
-        { to: { name: 'settings.general' }, label: 'General', icon: 'pi pi-cog', permission: 'settings.manage' },
-        { to: { name: 'settings.lists' }, label: 'Lists', icon: 'pi pi-list', permission: 'settings.manage' },
-        { to: { name: 'settings.wilayas' }, label: 'Geography', icon: 'pi pi-map', permission: 'settings.manage' },
-        { to: { name: 'settings.departments' }, label: 'Departments', icon: 'pi pi-sitemap', permission: 'settings.manage' },
+        { to: { name: 'settings.general' }, label: t('settings.general'), icon: 'pi pi-cog', permission: 'settings.manage' },
+        { to: { name: 'settings.lists' }, label: t('settings.lists'), icon: 'pi pi-list', permission: 'settings.manage' },
+        { to: { name: 'settings.wilayas' }, label: t('settings.geography'), icon: 'pi pi-map', permission: 'settings.manage' },
+        { to: { name: 'settings.departments' }, label: t('settings.departments'), icon: 'pi pi-sitemap', permission: 'settings.manage' },
       ],
     },
     {
-      label: 'Access',
+      label: t('settings.groupAccess'),
       items: [
-        { to: { name: 'settings.roles' }, label: 'Roles', icon: 'pi pi-shield', permission: 'roles.manage' },
-        { to: { name: 'settings.users' }, label: 'Users', icon: 'pi pi-users', permission: 'users.manage' },
+        { to: { name: 'settings.roles' }, label: t('settings.roles'), icon: 'pi pi-shield', permission: 'roles.manage' },
+        { to: { name: 'settings.users' }, label: t('settings.users'), icon: 'pi pi-users', permission: 'users.manage' },
       ],
     },
   ]
@@ -36,7 +37,7 @@ const groups = computed(() =>
 <template>
   <nav
     class="flex gap-1 overflow-x-auto rounded-xl border border-line bg-card p-2 shadow-card md:flex-col md:gap-0.5"
-    aria-label="Settings sections"
+    :aria-label="$t('nav.settings')"
   >
     <template v-for="(group, gi) in groups" :key="group.label">
       <p

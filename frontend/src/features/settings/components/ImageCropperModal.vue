@@ -128,7 +128,7 @@ function apply() {
 </script>
 
 <template>
-  <BaseModal title="Adjust your photo" size="max-w-md" @close="emit('cancel')">
+  <BaseModal :title="$t('profile.adjustPhoto')" size="max-w-md" @close="emit('cancel')">
     <div class="flex flex-col items-center gap-5">
       <!-- Stage: square, with a circular cut-out showing the exact crop. -->
       <div
@@ -146,7 +146,7 @@ function apply() {
           :src="objectUrl"
           alt=""
           draggable="false"
-          class="pointer-events-none absolute left-0 top-0 max-w-none"
+          class="pointer-events-none absolute start-0 top-0 max-w-none"
           :style="imageStyle"
         />
         <!-- Circular mask + framing ring -->
@@ -173,7 +173,7 @@ function apply() {
           :max="4"
           :step="0.01"
           class="flex-1"
-          aria-label="Zoom"
+          :aria-label="$t('media.zoomIn')"
           @update:model-value="onZoomInput"
         />
         <i class="pi pi-image text-base text-mute" aria-hidden="true" />
@@ -182,8 +182,8 @@ function apply() {
       <p class="text-center text-xs text-mute">Drag to reposition · scroll or use the slider to zoom.</p>
 
       <div class="flex w-full justify-end gap-2">
-        <Button type="button" label="Cancel" severity="secondary" outlined @click="emit('cancel')" />
-        <Button type="button" label="Apply" icon="pi pi-check" :disabled="!loaded" @click="apply" />
+        <Button type="button" :label="$t('common.cancel')" severity="secondary" outlined @click="emit('cancel')" />
+        <Button type="button" :label="$t('common.apply')" icon="pi pi-check" :disabled="!loaded" @click="apply" />
       </div>
     </div>
   </BaseModal>

@@ -7,6 +7,8 @@ import Password from 'primevue/password'
 import { useAuthStore } from '@/features/settings/store'
 import { toastError } from '@/composables/useConfirm'
 import { useTheme } from '@/composables/useTheme'
+import { t } from '@/i18n'
+import LanguageSwitcher from '@/components/shell/LanguageSwitcher.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -22,7 +24,7 @@ async function submit() {
     await auth.login(login.value.trim(), password.value)
     router.push({ name: 'dashboard' })
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Login failed. Check your credentials.')
+    toastError(e.response?.data?.message ?? t('auth.loginFailed'))
   } finally {
     loading.value = false
   }
@@ -36,11 +38,11 @@ async function submit() {
       class="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-surface-950 p-12 lg:flex dark:bg-surface-900"
     >
       <div
-        class="pointer-events-none absolute -right-40 -top-40 h-[480px] w-[480px] rounded-full bg-primary-500/20 blur-3xl"
+        class="pointer-events-none absolute -end-40 -top-40 h-[480px] w-[480px] rounded-full bg-primary-500/20 blur-3xl"
         aria-hidden="true"
       />
       <div
-        class="pointer-events-none absolute -bottom-48 -left-24 h-[420px] w-[420px] rounded-full bg-primary-500/10 blur-3xl"
+        class="pointer-events-none absolute -bottom-48 -start-24 h-[420px] w-[420px] rounded-full bg-primary-500/10 blur-3xl"
         aria-hidden="true"
       />
 
@@ -56,30 +58,31 @@ async function submit() {
 
       <div class="relative max-w-md">
         <h2 class="text-3xl font-semibold leading-snug text-white">
-          Every client, every unit, every deal — one workspace.
+          {{ $t('auth.heroTitle') }}
         </h2>
         <p class="mt-4 text-sm leading-relaxed text-surface-300">
-          Pipeline, inventory, payments and reporting for your sales team, with a full audit trail
-          behind every action.
+          {{ $t('auth.heroBody') }}
         </p>
       </div>
 
       <p class="relative text-xs text-surface-400">
-        © {{ new Date().getFullYear() }} PLAZA PRO — internal sales platform
+        © {{ new Date().getFullYear() }} PLAZA PRO — {{ $t('auth.internalPlatform') }}
       </p>
     </div>
 
     <!-- Form panel -->
     <div class="flex flex-1 items-center justify-center p-6">
+      <span class="!absolute end-4 top-4 flex items-center gap-1">
+      <LanguageSwitcher />
       <Button
         :icon="isNight ? 'pi pi-sun' : 'pi pi-moon'"
         text
         rounded
         severity="secondary"
-        class="!absolute right-4 top-4"
-        :aria-label="isNight ? 'Switch to day theme' : 'Switch to night theme'"
+        :aria-label="isNight ? $t('shell.switchToDay') : $t('shell.switchToNight')"
         @click="toggle"
       />
+      </span>
 
       <div class="w-full max-w-sm">
         <div class="mb-8 lg:hidden">
@@ -92,20 +95,20 @@ async function submit() {
           />
         </div>
 
-        <h1 class="text-2xl font-semibold tracking-tight text-ink">Welcome back</h1>
-        <p class="mt-1 text-sm text-mute">Sign in with your work account to continue.</p>
+        <h1 class="text-2xl font-semibold tracking-tight text-ink">{{ $t('auth.welcomeBack') }}</h1>
+        <p class="mt-1 text-sm text-mute">{{ $t('auth.signInHint') }}</p>
 
         <form class="mt-8 flex flex-col gap-5" @submit.prevent="submit">
           <div class="flex flex-col gap-1.5">
             <label for="login-id" class="text-sm font-medium text-ink"
-              >Username or email<span class="text-danger" aria-hidden="true"> *</span></label
+              >{{ $t('auth.usernameOrEmail') }}<span class="text-danger" aria-hidden="true"> *</span></label
             >
             <InputText
               id="login-id"
               v-model="login"
               type="text"
               autocomplete="username"
-              placeholder="username or you@company.com"
+:placeholder="$t('auth.loginPlaceholder')"
               required
               fluid
             />
@@ -113,7 +116,7 @@ async function submit() {
 
           <div class="flex flex-col gap-1.5">
             <label for="login-password" class="text-sm font-medium text-ink"
-              >Password<span class="text-danger" aria-hidden="true"> *</span></label
+              >{{ $t('auth.password') }}<span class="text-danger" aria-hidden="true"> *</span></label
             >
             <Password
               id="login-password"
@@ -129,7 +132,7 @@ async function submit() {
 
           <Button
             type="submit"
-            :label="loading ? 'Signing in…' : 'Sign in'"
+            :label="loading ? $t('auth.signingIn') : $t('auth.signIn')"
             icon="pi pi-arrow-right"
             icon-pos="right"
             :loading="loading"
@@ -138,7 +141,7 @@ async function submit() {
         </form>
 
         <p class="mt-8 text-center text-xs text-mute">
-          Access is provisioned by your administrator.
+          {{ $t('auth.provisioned') }}
         </p>
       </div>
     </div>

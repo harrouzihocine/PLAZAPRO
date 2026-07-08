@@ -11,6 +11,7 @@ import { geographyApi } from '@/features/settings/api'
 import { invalidateWilayas, invalidateCommunes } from '@/composables/useGeography'
 import { confirmAction, toastError } from '@/composables/useConfirm'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
+import { t } from '@/i18n'
 
 const wilayas = ref([])
 const communes = ref([])
@@ -58,7 +59,7 @@ async function mutate(fn) {
     invalidateWilayas()
     if (selectedId.value) invalidateCommunes(selectedId.value)
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Action failed.')
+    toastError(e.response?.data?.message ?? t('common.actionFailed'))
     throw e
   } finally {
     saving.value = false
@@ -90,9 +91,9 @@ async function saveWilaya(payload) {
 async function removeWilaya(wilaya) {
   if (
     !(await confirmAction({
-      title: `Remove wilaya "${wilaya.name}"?`,
-      text: 'The record is kept but marked cancelled. It must have no communes or references.',
-      confirmText: 'Remove',
+      title: t('geoAdmin.removeWilayaTitle', { name: wilaya.name }),
+      text: t('geoAdmin.removeWilayaText'),
+      confirmText: t('common.remove'),
       danger: true,
     }))
   )
@@ -135,9 +136,9 @@ async function saveCommune(payload) {
 async function removeCommune(commune) {
   if (
     !(await confirmAction({
-      title: `Remove commune "${commune.name}"?`,
-      text: 'The record is kept but marked cancelled. It must have no references.',
-      confirmText: 'Remove',
+      title: t('geoAdmin.removeCommuneTitle', { name: commune.name }),
+      text: t('geoAdmin.removeCommuneText'),
+      confirmText: t('common.remove'),
       danger: true,
     }))
   )
@@ -155,25 +156,25 @@ async function removeCommune(commune) {
 <template>
   <div>
     <PageHeader
-      title="Wilayas & Communes"
-      subtitle="Manage Algeria's wilayas and the communes that belong to each one."
+:title="$t('geoAdmin.title')"
+      :subtitle="$t('geoAdmin.subtitle')"
     >
       <template #actions>
-        <Button label="Add wilaya" icon="pi pi-plus" class="native-fab" @click="openCreateWilaya" />
+        <Button :label="$t('geoAdmin.addWilaya')" icon="pi pi-plus" class="native-fab" @click="openCreateWilaya" />
       </template>
     </PageHeader>
 
     <div class="grid grid-cols-1 gap-5 lg:grid-cols-[20rem_minmax(0,1fr)]">
       <!-- Wilaya picker -->
       <SectionCard :title="`Wilayas (${wilayas.length})`" icon="pi pi-map" class="self-start">
-        <BaseInput v-model="search" placeholder="Search wilayas…" class="mb-3" />
+        <BaseInput v-model="search" :placeholder="$t('geoAdmin.searchWilayas')" class="mb-3" />
         <p v-if="loading" class="py-2 text-center text-sm text-mute">Loading…</p>
         <nav v-else class="-mx-1 flex max-h-[26rem] flex-col gap-0.5 overflow-y-auto px-1">
           <button
             v-for="w in filtered"
             :key="w.id"
             type="button"
-            class="flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors"
+            class="flex items-center justify-between rounded-lg px-3 py-2 text-start text-sm transition-colors"
             :class="
               w.id === selectedId
                 ? 'bg-highlight font-semibold text-ink'
@@ -203,7 +204,7 @@ async function removeCommune(commune) {
         <template #actions>
           <Button
             icon="pi pi-pencil"
-            label="Edit"
+:label="$t('common.edit')"
             size="small"
             severity="secondary"
             outlined
@@ -211,13 +212,13 @@ async function removeCommune(commune) {
           />
           <Button
             icon="pi pi-ban"
-            label="Remove"
+:label="$t('common.remove')"
             size="small"
             severity="danger"
             outlined
             @click="removeWilaya(selected)"
           />
-          <Button label="Add commune" icon="pi pi-plus" size="small" @click="openCreateCommune" />
+          <Button :label="$t('geoAdmin.addCommune')" icon="pi pi-plus" size="small" @click="openCreateCommune" />
         </template>
 
         <div class="space-y-2">
@@ -236,7 +237,7 @@ async function removeCommune(commune) {
               rounded
               size="small"
               severity="secondary"
-              aria-label="Edit commune"
+:aria-label="$t('geoAdmin.editCommune')"
               @click="openEditCommune(c)"
             />
             <Button
@@ -245,14 +246,14 @@ async function removeCommune(commune) {
               rounded
               size="small"
               severity="danger"
-              aria-label="Remove commune"
+:aria-label="$t('geoAdmin.removeCommune')"
               @click="removeCommune(c)"
             />
           </div>
           <EmptyState
             v-if="!communes.length"
             icon="pi pi-map-marker"
-            title="No communes yet"
+:title="$t('geoAdmin.noCommunes')"
             body="Add the first commune for this wilaya."
           />
         </div>
@@ -261,7 +262,7 @@ async function removeCommune(commune) {
       <SectionCard v-else>
         <EmptyState
           icon="pi pi-map"
-          title="Select a wilaya"
+:title="$t('geoAdmin.selectWilaya')"
           body="Pick one on the left to manage its communes."
         />
       </SectionCard>

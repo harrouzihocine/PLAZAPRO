@@ -49,49 +49,49 @@ function submit() {
 </script>
 
 <template>
-  <BaseModal :title="isEdit ? 'Edit user' : 'New user'" size="max-w-lg" @close="emit('close')">
+  <BaseModal :title="isEdit ? $t('users.editUser') : $t('users.newUser')" size="max-w-lg" @close="emit('close')">
     <form class="space-y-4" @submit.prevent="submit">
       <div class="grid gap-4 sm:grid-cols-2">
-        <BaseInput v-model="form.name" label="Name" required capitalize />
-        <BaseInput v-model="form.email" label="Email" type="email" required />
+        <BaseInput v-model="form.name" :label="$t('common.name')" required capitalize />
+        <BaseInput v-model="form.email" :label="$t('common.email')" type="email" required />
       </div>
 
       <div>
-        <BaseInput v-model="form.username" label="Username" required placeholder="e.g. sami.k" />
+        <BaseInput v-model="form.username" :label="$t('users.username')" required :placeholder="$t('users.usernamePlaceholder')" />
         <p class="mt-1 text-xs text-mute">
-          Used to sign in. Letters, digits, dot and underscore only. Users can't change their own.
+          {{ $t('users.usernameHint') }}
         </p>
       </div>
 
       <div>
-        <BaseInput v-model="form.password" label="Password" type="password" :required="!isEdit" />
-        <p v-if="isEdit" class="mt-1 text-xs text-mute">Leave blank to keep the current password.</p>
+        <BaseInput v-model="form.password" :label="$t('auth.password')" type="password" :required="!isEdit" />
+        <p v-if="isEdit" class="mt-1 text-xs text-mute">{{ $t('users.passwordKeepHint') }}</p>
       </div>
 
       <div class="grid gap-4 sm:grid-cols-2">
         <BaseSelect
           v-model="form.role_id"
-          label="Role"
+:label="$t('users.role')"
           required
-          placeholder="Select a role"
+:placeholder="$t('users.selectRole')"
           :clearable="false"
           :options="roles.map((r) => ({ value: r.id, label: r.name }))"
         />
         <BaseSelect
           v-model="form.department_id"
-          label="Department"
-          placeholder="None"
+:label="$t('users.department')"
+          :placeholder="$t('common.none')"
           :options="departments.map((d) => ({ value: d.id, label: d.name }))"
         />
       </div>
 
-      <BasePhoneInput v-model="form.phone" label="Phone" />
+      <BasePhoneInput v-model="form.phone" :label="$t('common.phone')" />
 
       <div class="flex justify-end gap-2 pt-2">
-        <Button type="button" label="Cancel" severity="secondary" outlined @click="emit('close')" />
+        <Button type="button" :label="$t('common.cancel')" severity="secondary" outlined @click="emit('close')" />
         <Button
           type="submit"
-          :label="isEdit ? 'Save changes' : 'Create user'"
+          :label="isEdit ? $t('chat.saveChanges') : $t('users.createUser')"
           icon="pi pi-check"
           :loading="saving"
           :disabled="!valid"

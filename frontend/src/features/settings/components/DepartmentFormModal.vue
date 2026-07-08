@@ -22,17 +22,17 @@ function submit() {
 
 <template>
   <BaseModal
-    :title="isEdit ? 'Edit department' : 'Add department'"
+    :title="isEdit ? $t('departments.editDepartment') : $t('departments.addDepartment')"
     size="max-w-md"
     @close="emit('close')"
   >
     <form class="space-y-4" @submit.prevent="submit">
-      <BaseInput v-model="name" label="Name" required placeholder="e.g. Sales" />
+      <BaseInput v-model="name" :label="$t('common.name')" required :placeholder="$t('departments.namePlaceholder')" />
       <div class="flex justify-end gap-2 pt-2">
-        <Button type="button" label="Cancel" severity="secondary" outlined @click="emit('close')" />
+        <Button type="button" :label="$t('common.cancel')" severity="secondary" outlined @click="emit('close')" />
         <Button
           type="submit"
-          :label="isEdit ? 'Save changes' : 'Add department'"
+          :label="isEdit ? $t('chat.saveChanges') : $t('departments.addDepartment')"
           icon="pi pi-check"
           :loading="saving"
           :disabled="!name.trim()"

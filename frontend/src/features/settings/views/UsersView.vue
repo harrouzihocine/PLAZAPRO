@@ -16,6 +16,7 @@ import { useAuthStore } from '@/features/settings/store'
 import { confirmAction, toastSuccess } from '@/composables/useConfirm'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { countActiveFilters, initials } from '@/utils/format'
+import { t } from '@/i18n'
 
 const store = useUsersStore()
 const activeFilterCount = computed(() => countActiveFilters(store.filters))
@@ -61,10 +62,10 @@ async function toggleActive(user) {
       const ok = await confirmAction({
         title:
           openTotal === null
-            ? `Could not check ${user.name}'s open work`
-            : `${user.name} still has ${openTotal} open item${openTotal === 1 ? '' : 's'}`,
-        text: 'Clients, projects, planned actions, visits or tasks would be left without an owner. Use "Transfer work" first, or deactivate anyway.',
-        confirmText: 'Deactivate anyway',
+            ? t('users.checkWorkFailed', { name: user.name })
+            : t('users.stillHasOpen', { name: user.name, n: openTotal }),
+        text: t('users.orphanWarning'),
+        confirmText: t('users.deactivateAnyway'),
         danger: true,
       })
       if (!ok) return
@@ -78,12 +79,12 @@ const transferUser = ref(null) // null = closed
 
 async function onTransfer(payload) {
   const leaver = transferUser.value
-  const after = payload.deactivate ? ' The account is deactivated right after.' : ''
+  const after = payload.deactivate ? ' ' + t('users.deactivatedAfter') : ''
   if (
     !(await confirmAction({
-      title: `Hand ${leaver.name}'s open work to ${payload.successor_name}?`,
-      text: `${payload.open_total} open item${payload.open_total === 1 ? '' : 's'} will move to ${payload.successor_name}. History (calls, conducted visits, closed deals) stays under ${leaver.name}'s name.${after}`,
-      confirmText: 'Transfer',
+      title: t('users.transferTitle', { leaver: leaver.name, successor: payload.successor_name }),
+      text: t('users.transferText', { n: payload.open_total, successor: payload.successor_name, leaver: leaver.name }) + after,
+      confirmText: t('users.transfer'),
       danger: true,
     }))
   ) {
@@ -102,7 +103,7 @@ async function onTransfer(payload) {
   // The transfer is committed from here on: a failed deactivation must not
   // read as a failed hand-over (it surfaces its own toast via the store).
   transferUser.value = null
-  toastSuccess(`${leaver.name}'s open work was handed to ${payload.successor_name}.`)
+  toastSuccess(t('users.transferDone', { leaver: leaver.name, successor: payload.successor_name }))
   if (payload.deactivate && leaver.is_active) {
     await store.setActive(leaver.id, false).catch(() => {})
   }
@@ -113,9 +114,9 @@ async function onTransfer(payload) {
 async function unlockUser(user) {
   if (
     await confirmAction({
-      title: `Unlock "${user.name}"?`,
-      text: 'The account was locked after too many failed sign-in attempts. Unlocking lets them try again.',
-      confirmText: 'Unlock',
+      title: t('users.unlockTitle', { name: user.name }),
+      text: t('users.unlockText'),
+      confirmText: t('users.unlock'),
     })
   ) {
     store.unlock(user.id)
@@ -125,9 +126,9 @@ async function unlockUser(user) {
 async function cancelUser(user) {
   if (
     await confirmAction({
-      title: `Cancel user "${user.name}"?`,
-      text: 'The record is kept but marked cancelled.',
-      confirmText: 'Cancel user',
+      title: t('users.cancelTitle', { name: user.name }),
+      text: t('project.removeText'),
+      confirmText: t('users.cancelUser'),
       danger: true,
     })
   ) {
@@ -138,9 +139,9 @@ async function cancelUser(user) {
 
 <template>
   <div>
-    <PageHeader title="Users" subtitle="People with access. Exactly one role each.">
+    <PageHeader :title="$t('settings.users')" :subtitle="$t('users.subtitle')">
       <template #actions>
-        <Button label="New user" icon="pi pi-plus" class="native-fab" @click="openCreate" />
+        <Button :label="$t('users.newUser')" icon="pi pi-plus" class="native-fab" @click="openCreate" />
       </template>
     </PageHeader>
 
@@ -150,35 +151,35 @@ async function cancelUser(user) {
       <div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
         <BaseSelect
           v-model="store.filters.role_id"
-          aria-label="Filter by role"
-          placeholder="All roles"
+:aria-label="$t('users.filterByRole')"
+          :placeholder="$t('users.allRoles')"
           class="w-full sm:w-44"
           :options="store.roles.map((r) => ({ value: r.id, label: r.name }))"
           @change="store.fetch()"
         />
         <BaseSelect
           v-model="store.filters.department_id"
-          aria-label="Filter by department"
-          placeholder="All departments"
+:aria-label="$t('users.filterByDepartment')"
+          :placeholder="$t('users.allDepartments')"
           class="w-full sm:w-48"
           :options="store.departments.map((d) => ({ value: d.id, label: d.name }))"
           @change="store.fetch()"
         />
         <BaseSelect
           v-model="store.filters.is_active"
-          aria-label="Filter by state"
-          placeholder="Any state"
+:aria-label="$t('users.filterByState')"
+          :placeholder="$t('users.anyState')"
           class="w-full sm:w-40"
           :options="[
-            { value: '1', label: 'Active' },
-            { value: '0', label: 'Inactive' },
+            { value: '1', label: $t('status.active') },
+            { value: '0', label: $t('status.inactive') },
           ]"
           @change="store.fetch()"
         />
       </div>
       </FilterPanel>
 
-      <EmptyState v-if="!store.items.length" icon="pi pi-users" title="No users match" />
+      <EmptyState v-if="!store.items.length" icon="pi pi-users" :title="$t('users.emptyTitle')" />
 
       <ul v-else class="divide-y divide-line">
         <li
@@ -197,15 +198,15 @@ async function cancelUser(user) {
             <div class="min-w-0">
               <p class="flex flex-wrap items-center gap-2">
                 <span class="truncate text-sm font-medium text-ink">{{ user.name }}</span>
-                <Tag v-if="!user.is_active" value="inactive" severity="secondary" />
+                <Tag v-if="!user.is_active" :value="$t('status.inactive').toLowerCase()" severity="secondary" />
                 <Tag
                   v-if="user.locked_at"
-                  v-tooltip.top="'Locked after too many failed sign-in attempts'"
-                  value="locked"
+                  v-tooltip.top="$t('users.lockedTooltip')"
+                  :value="$t('users.locked')"
                   severity="danger"
                   icon="pi pi-lock"
                 />
-                <Tag v-if="user.role?.is_agent" value="agent" severity="info" />
+                <Tag v-if="user.role?.is_agent" :value="$t('users.agent')" severity="info" />
               </p>
               <p class="truncate text-xs text-mute">
                 <span v-if="user.username" class="font-medium">@{{ user.username }}</span>
@@ -222,13 +223,13 @@ async function cancelUser(user) {
               rounded
               size="small"
               severity="secondary"
-              aria-label="Edit user"
+:aria-label="$t('users.editUser')"
               @click="openEdit(user)"
             />
             <Button
               v-if="user.locked_at && auth.can('users.unlock')"
               icon="pi pi-lock-open"
-              label="Unlock"
+:label="$t('users.unlock')"
               text
               size="small"
               severity="warn"
@@ -236,18 +237,18 @@ async function cancelUser(user) {
             />
             <Button
               v-if="auth.can('users.transfer')"
-              v-tooltip.top="'Transfer work — hand this user\'s open clients, projects and visits to a successor'"
+              v-tooltip.top="$t('users.transferTooltip')"
               icon="pi pi-arrow-right-arrow-left"
               text
               rounded
               size="small"
               severity="secondary"
-              aria-label="Transfer work"
+:aria-label="$t('users.transferWork')"
               @click="transferUser = user"
             />
             <Button
               :icon="user.is_active ? 'pi pi-pause' : 'pi pi-play'"
-              :label="user.is_active ? 'Deactivate' : 'Activate'"
+              :label="user.is_active ? $t('users.deactivate') : $t('users.activate')"
               text
               size="small"
               severity="secondary"
@@ -259,7 +260,7 @@ async function cancelUser(user) {
               rounded
               size="small"
               severity="danger"
-              aria-label="Cancel user"
+:aria-label="$t('users.cancelUser')"
               @click="cancelUser(user)"
             />
           </div>
