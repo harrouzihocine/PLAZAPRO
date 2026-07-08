@@ -34,11 +34,11 @@ const pageSubtitle = computed(() =>
     : 'Your rapports (calls, office & in-site visits) and planned work.',
 )
 
-// Default view = the agent's day: everything logged today plus all planned
-// work from today onward, in agenda order. `from` uses the LOCAL date helper
-// (Africa/Algiers rule — never toISOString). Clearing/editing filters reaches
-// any past range.
-const DEFAULTS = { user_id: '', type: '', mode: 'all', from: todayInput(), to: '' }
+// Default view = the agent's plan: upcoming work (scheduled visits + pending
+// next-actions) from today onward, soonest first. `from` uses the LOCAL date
+// helper (Africa/Algiers rule — never toISOString). The Show switch flips to
+// logged (or both merged), and clearing filters reaches any past range.
+const DEFAULTS = { user_id: '', type: '', mode: 'upcoming', from: todayInput(), to: '' }
 const filters = ref({ ...DEFAULTS })
 // Badge counts what differs from the DEFAULT view (a stock "today + planned"
 // prefill isn't a user-applied filter; mode is a presentation switch).
