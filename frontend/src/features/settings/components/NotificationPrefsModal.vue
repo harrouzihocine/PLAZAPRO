@@ -104,7 +104,7 @@ async function save() {
 
       <div class="flex justify-end gap-2 pt-1">
         <Button type="button" :label="$t('common.cancel')" severity="secondary" outlined @click="emit('close')" />
-        <Button type="submit" label="Save" icon="pi pi-check" :loading="saving" />
+        <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="saving" />
       </div>
     </form>
   </BaseModal>

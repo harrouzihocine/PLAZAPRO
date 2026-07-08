@@ -67,7 +67,7 @@ const visitCols = [
         :data="data.lost_paid ?? {}"
         :columns="cols"
         :row-to="dealLink"
-        empty-text="No lost deal is carrying unrefunded payments."
+        :empty-text="$t('oversight.lostEmpty')"
       />
       <!-- Nothing may stay "Scheduled" once the deal decided the thread —
            these visits must be completed (or their project reactivated). -->
@@ -77,7 +77,7 @@ const visitCols = [
         :data="data.stale_visits ?? {}"
         :columns="visitCols"
         :row-to="dealLink"
-        empty-text="No visit is lingering on a concluded project."
+        :empty-text="$t('oversight.visitsEmpty')"
       />
     </div>
   </div>

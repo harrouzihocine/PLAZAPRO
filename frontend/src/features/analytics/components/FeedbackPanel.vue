@@ -344,7 +344,7 @@ const hasAnyData = computed(() => {
       </SectionCard>
 
       <!-- Most-demanded units leaderboard (development view only). -->
-      <SectionCard v-if="isLocation" title="Most demanded units" icon="pi pi-th-large" flush>
+      <SectionCard v-if="isLocation" :title="$t('feedback.mostDemanded')" icon="pi pi-th-large" flush>
         <DataTable
           :value="data.demand_units"
           data-key="id"
@@ -353,9 +353,9 @@ const hasAnyData = computed(() => {
           removable-sort
         >
           <template #empty>
-            <EmptyState icon="pi pi-th-large" title="No demand signals yet" />
+            <EmptyState icon="pi pi-th-large" :title="$t('feedback.noDemand')" />
           </template>
-          <Column header="Unit">
+          <Column :header="$t('project.unit')">
             <template #body="{ data: u }">
               <RouterLink
                 :to="{ name: 'inventory.unit', params: { id: u.id } }"
@@ -365,22 +365,22 @@ const hasAnyData = computed(() => {
               </RouterLink>
             </template>
           </Column>
-          <Column field="price" header="Price">
+          <Column field="price" :header="$t('inventory.price')">
             <template #body="{ data: u }"><span class="num">{{ formatMoney(u.price) }}</span></template>
           </Column>
-          <Column field="demand" header="Demand" sortable>
+          <Column field="demand" :header="$t('feedback.demand')" sortable>
             <template #body="{ data: u }"><span class="num font-semibold text-ink">{{ u.demand }}</span></template>
           </Column>
-          <Column field="visits" header="Visits" sortable>
+          <Column field="visits" :header="$t('reports.visits')" sortable>
             <template #body="{ data: u }"><span class="num">{{ u.visits }}</span></template>
           </Column>
-          <Column field="interested" header="Interested" sortable>
+          <Column field="interested" :header="$t('status.interested')" sortable>
             <template #body="{ data: u }"><span class="num text-success">{{ u.interested }}</span></template>
           </Column>
-          <Column field="not_interested" header="Rejected" sortable>
+          <Column field="not_interested" :header="$t('feedback.rejected')" sortable>
             <template #body="{ data: u }"><span class="num text-danger">{{ u.not_interested }}</span></template>
           </Column>
-          <Column field="won" header="Won" sortable>
+          <Column field="won" :header="$t('status.won')" sortable>
             <template #body="{ data: u }"><span class="num">{{ u.won }}</span></template>
           </Column>
           <Column :header="$t('common.status')">

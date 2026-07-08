@@ -161,9 +161,7 @@ useRefreshable(load) // pull-to-refresh (APK)
       >
         <i class="pi pi-exclamation-triangle text-amber-600 dark:text-amber-400" aria-hidden="true" />
         <span class="text-ink">
-          You have <span class="font-semibold">{{ data.my_empty_clients }}</span>
-          empty {{ data.my_empty_clients === 1 ? 'client' : 'clients' }} — captured but not yet
-          worked. Follow up so nothing goes cold.
+          {{ $t('dashboard.emptyClientsNudge', data.my_empty_clients) }}
         </span>
         <i class="pi pi-chevron-right ms-auto text-mute" aria-hidden="true" />
       </RouterLink>
@@ -185,7 +183,7 @@ useRefreshable(load) // pull-to-refresh (APK)
 
       <!-- My upcoming — personal, per type, soonest first. -->
       <SectionCard v-if="hasUpcoming" :title="$t('dashboard.myUpcoming')" icon="pi pi-calendar">
-        <WorkItemGroups :groups="myUpcoming" empty-text="Nothing planned." />
+        <WorkItemGroups :groups="myUpcoming" :empty-text="$t('dashboard.nothingPlanned')" />
       </SectionCard>
 
       <!-- My open & overdue actions — mine only, never other users', per type. -->
@@ -194,9 +192,9 @@ useRefreshable(load) // pull-to-refresh (APK)
           v-if="!loading && !hasOverdue"
           icon="pi pi-check-circle"
 :title="$t('dashboard.allCaughtUp')"
-          body="Nothing of yours is past its due date."
+          :body="$t('dashboard.nothingOverdueBody')"
         />
-        <WorkItemGroups v-else :groups="myOverdue" empty-text="Nothing overdue." />
+        <WorkItemGroups v-else :groups="myOverdue" :empty-text="$t('dashboard.nothingOverdue')" />
       </SectionCard>
     </div>
   </div>

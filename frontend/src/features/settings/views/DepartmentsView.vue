@@ -65,7 +65,7 @@ async function remove(dept) {
         v-if="!store.items.length"
         icon="pi pi-sitemap"
 :title="$t('departments.emptyTitle')"
-        body="Add your first organisational unit."
+        :body="$t('departments.emptyBody')"
       />
       <ul v-else class="divide-y divide-line">
         <li

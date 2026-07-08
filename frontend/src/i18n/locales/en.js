@@ -226,7 +226,7 @@ export default {
     internalPlatform: 'internal sales platform',
     signInHint: 'Sign in with your work account to continue.',
     usernameOrEmail: 'Username or email',
-    loginPlaceholder: 'username or you@company.com',
+    loginPlaceholder: "username or you{'@'}company.com",
     provisioned: 'Access is provisioned by your administrator.',
   },
 
@@ -296,6 +296,7 @@ export default {
   },
   // ── Inventory vocabulary (fields shared across features) ─────────────
   inventory: {
+    cover: 'Cover',
     projectType: 'Project type',
     roomNumber: 'Room number',
     contractType: 'Contract type',
@@ -959,6 +960,9 @@ export default {
   },
   // ── Chat / messaging ─────────────────────────────────────────────────
   chat: {
+    sending: 'Sending…',
+    shareToConversation: 'Share to a conversation',
+    startOneFirst: 'Open Chat and start one first.',
     chats: 'Chats',
     subtitle: 'Your conversations with the team.',
     newConversation: 'New conversation',
@@ -1212,6 +1216,8 @@ export default {
 
   // ── Geography admin ──────────────────────────────────────────────────
   geoAdmin: {
+    noCommunesBody: 'Add the first commune for this wilaya.',
+    selectWilayaBody: 'Pick one on the left to manage its communes.',
     title: 'Wilayas & Communes',
     subtitle: "Manage Algeria's wilayas and the communes that belong to each one.",
     addWilaya: 'Add wilaya',
@@ -1231,6 +1237,7 @@ export default {
 
   // ── Departments admin ────────────────────────────────────────────────
   departments: {
+    emptyBody: 'Add your first organisational unit.',
     subtitle: 'Organisational units you can assign users to.',
     addDepartment: 'Add department',
     editDepartment: 'Edit department',
@@ -1242,6 +1249,7 @@ export default {
 
   // ── Offboarding transfer desk ────────────────────────────────────────
   transfer: {
+    noOpenWorkBody: 'Nothing is left on this user — the account can simply be deactivated.',
     modalTitle: 'Transfer work — {name}',
     loadFailed: 'Could not load the workload.',
     careerRecord: "Career record (stays under {name}'s name)",
@@ -1301,6 +1309,14 @@ export default {
   },
   // ── Oversight monitors ───────────────────────────────────────────────
   oversight: {
+    stuckEmpty: 'Every active project has a planned next step.',
+    overdueEmpty: 'No next action is past its due date.',
+    officeEmpty: 'No office visits scheduled ahead — nothing to organise.',
+    emptyClientsEmpty: 'No empty clients — every captured lead has activity.',
+    noNameEmpty: 'Every client was captured with a name.',
+    draftsEmpty: 'No user is sitting on an unsaved draft.',
+    lostEmpty: 'No lost deal is carrying unrefunded payments.',
+    visitsEmpty: 'No visit is lingering on a concluded project.',
     allClear: 'All clear',
     nothingToFollow: 'Nothing to follow up here.',
     allUsers: 'All users',
@@ -1338,6 +1354,7 @@ export default {
 
   // ── Archive of lost & closed deals ───────────────────────────────────
   archive: {
+    emptyBody: 'When a deal is archived as lost or closed, it lands here.',
     subtitle: 'Lost & closed deals kept for the record. Reactivate the recoverable ones; the rest stay as searchable history.',
     anyReason: 'Any reason',
     anyProject: 'Any project',
@@ -1420,6 +1437,7 @@ export default {
 
   // ── Team logs ────────────────────────────────────────────────────────
   teamLogs: {
+    loadFailedBody: 'Check the connection, then retry.',
     subtitleAll: "Every user's rapports (calls, office & in-site visits) and planned work — company-wide.",
     subtitleOwn: 'Your rapports (calls, office & in-site visits) and planned work.',
     allTypes: 'All types',
@@ -1448,6 +1466,10 @@ export default {
 
   // ── Voice-of-Client feedback ─────────────────────────────────────────
   feedback: {
+    mostDemanded: 'Most demanded units',
+    noDemand: 'No demand signals yet',
+    demand: 'Demand',
+    rejected: 'Rejected',
     days30: '30 days',
     days90: '90 days',
     allTime: 'All time',
@@ -1493,6 +1515,10 @@ export default {
 
   // ── Dashboard ────────────────────────────────────────────────────────
   dashboard: {
+    emptyClientsNudge: 'You have {n} empty client — captured but not yet worked. Follow up so nothing goes cold. | You have {n} empty clients — captured but not yet worked. Follow up so nothing goes cold.',
+    nothingPlanned: 'Nothing planned.',
+    nothingOverdue: 'Nothing overdue.',
+    nothingOverdueBody: 'Nothing of yours is past its due date.',
     goodMorning: 'Good morning',
     goodAfternoon: 'Good afternoon',
     goodEvening: 'Good evening',

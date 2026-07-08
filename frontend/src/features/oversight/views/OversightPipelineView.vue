@@ -75,7 +75,7 @@ const officeVisitCols = [
         :data="data.stuck"
         :columns="stuckCols"
         :row-to="subjectLink"
-        empty-text="Every active project has a planned next step."
+        :empty-text="$t('oversight.stuckEmpty')"
       />
       <OversightList
 :title="$t('oversight.overdueActions')"
@@ -83,7 +83,7 @@ const officeVisitCols = [
         :data="data.overdue"
         :columns="overdueCols"
         :row-to="subjectLink"
-        empty-text="No next action is past its due date."
+        :empty-text="$t('oversight.overdueEmpty')"
       />
       <OversightList
 :title="$t('oversight.upcomingOffice')"
@@ -91,7 +91,7 @@ const officeVisitCols = [
         :data="data.upcoming_office_visits"
         :columns="officeVisitCols"
         :row-to="subjectLink"
-        empty-text="No office visits scheduled ahead — nothing to organise."
+        :empty-text="$t('oversight.officeEmpty')"
       />
     </div>
   </div>

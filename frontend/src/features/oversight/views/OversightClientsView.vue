@@ -53,7 +53,7 @@ const cols = [
         :data="data.empty"
         :columns="cols"
         :row-to="clientLink"
-        empty-text="No empty clients — every captured lead has activity."
+        :empty-text="$t('oversight.emptyClientsEmpty')"
       />
       <OversightList
 :title="$t('oversight.noNameClients')"
@@ -61,7 +61,7 @@ const cols = [
         :data="data.no_name"
         :columns="cols"
         :row-to="clientLink"
-        empty-text="Every client was captured with a name."
+        :empty-text="$t('oversight.noNameEmpty')"
       />
     </div>
   </div>

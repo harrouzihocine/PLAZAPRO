@@ -346,7 +346,7 @@ function ageLabel(days) {
         v-else-if="!items.length"
         icon="pi pi-inbox"
 :title="$t('archive.emptyTitle')"
-        body="When a deal is archived as lost or closed, it lands here."
+        :body="$t('archive.emptyBody')"
       />
 
       <div v-else class="overflow-x-auto">

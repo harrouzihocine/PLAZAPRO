@@ -29,6 +29,9 @@ class SetLocale
 
         if (in_array($locale, self::SUPPORTED, true)) {
             app()->setLocale($locale);
+            // Dates too (translatedFormat): Algeria writes Arabic months
+            // French-style (جانفي، فيفري…), which is Carbon's ar_DZ.
+            \Illuminate\Support\Carbon::setLocale($locale === 'ar' ? 'ar_DZ' : $locale);
         }
 
         return $next($request);

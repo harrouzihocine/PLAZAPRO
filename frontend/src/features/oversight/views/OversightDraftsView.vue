@@ -81,7 +81,7 @@ const cols = [
       :data="data"
       :columns="cols"
       :row-to="draftLink"
-      empty-text="No user is sitting on an unsaved draft."
+      :empty-text="$t('oversight.draftsEmpty')"
     >
       <template #action="{ item }">
         <Button

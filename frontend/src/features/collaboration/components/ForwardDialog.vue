@@ -110,7 +110,7 @@ async function send() {
         :loading="sending"
         @click="send"
       />
-      <Button label="Cancel" severity="secondary" outlined @click="emit('close')" />
+      <Button :label="$t('common.cancel')" severity="secondary" outlined @click="emit('close')" />
     </div>
   </Dialog>
 </template>

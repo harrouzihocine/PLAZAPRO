@@ -254,7 +254,7 @@ async function removeCommune(commune) {
             v-if="!communes.length"
             icon="pi pi-map-marker"
 :title="$t('geoAdmin.noCommunes')"
-            body="Add the first commune for this wilaya."
+            :body="$t('geoAdmin.noCommunesBody')"
           />
         </div>
       </SectionCard>
@@ -263,7 +263,7 @@ async function removeCommune(commune) {
         <EmptyState
           icon="pi pi-map"
 :title="$t('geoAdmin.selectWilaya')"
-          body="Pick one on the left to manage its communes."
+          :body="$t('geoAdmin.selectWilayaBody')"
         />
       </SectionCard>
     </div>

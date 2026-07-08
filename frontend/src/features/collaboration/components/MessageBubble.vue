@@ -328,7 +328,7 @@ function act(action) {
           <span v-if="m.edited_at" class="italic">{{ $t('pipeline.edited') }}</span>
           {{ formatTime(m.created_at) }}
           <template v-if="m.is_mine">
-            <i v-if="m.pending" class="pi pi-clock text-[10px]" aria-hidden="true" title="Sending…" />
+            <i v-if="m.pending" class="pi pi-clock text-[10px]" aria-hidden="true" :title="$t('chat.sending')" />
             <i
               v-else-if="m.failed"
               class="pi pi-exclamation-circle text-[10px] !text-red-300"

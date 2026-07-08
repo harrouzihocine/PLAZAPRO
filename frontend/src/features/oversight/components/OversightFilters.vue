@@ -66,7 +66,7 @@ function clear() {
       searchable="auto"
       @update:model-value="emit('update:userId', $event)"
     />
-    <Button label="Apply" icon="pi pi-filter" size="small" @click="emit('apply')" />
+    <Button :label="$t('common.apply')" icon="pi pi-filter" size="small" @click="emit('apply')" />
     <Button v-if="from || to || userId" :label="$t('common.clear')" size="small" text severity="secondary" @click="clear" />
   </div>
   </FilterPanel>

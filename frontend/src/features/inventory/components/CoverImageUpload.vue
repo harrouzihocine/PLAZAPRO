@@ -90,7 +90,7 @@ function end() {
       <img
         v-if="modelValue"
         :src="mediaFileUrl(modelValue)"
-        alt="Cover"
+        :alt="$t('inventory.cover')"
         class="pointer-events-none h-full w-full object-cover"
         :style="{ objectPosition: `${focusX}% ${focusY}%` }"
       />

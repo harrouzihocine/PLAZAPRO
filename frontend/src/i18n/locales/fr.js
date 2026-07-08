@@ -225,7 +225,7 @@ export default {
     internalPlatform: 'plateforme de vente interne',
     signInHint: 'Connectez-vous avec votre compte professionnel pour continuer.',
     usernameOrEmail: "Nom d'utilisateur ou e-mail",
-    loginPlaceholder: 'nom.utilisateur ou vous@entreprise.com',
+    loginPlaceholder: "nom.utilisateur ou vous{'@'}entreprise.com",
     provisioned: "L'accès est attribué par votre administrateur.",
   },
 
@@ -295,6 +295,7 @@ export default {
   },
   // ── Vocabulaire inventaire (champs partagés) ─────────────────────────
   inventory: {
+    cover: 'Couverture',
     projectType: 'Type de projet',
     roomNumber: 'Nombre de pièces',
     contractType: 'Type de contrat',
@@ -958,6 +959,9 @@ export default {
   },
   // ── Chat / messagerie ────────────────────────────────────────────────
   chat: {
+    sending: 'Envoi…',
+    shareToConversation: 'Partager dans une conversation',
+    startOneFirst: "Ouvrez Messages et démarrez-en une d'abord.",
     chats: 'Discussions',
     subtitle: "Vos conversations avec l'équipe.",
     newConversation: 'Nouvelle conversation',
@@ -1211,6 +1215,8 @@ export default {
 
   // ── Admin géographie ─────────────────────────────────────────────────
   geoAdmin: {
+    noCommunesBody: 'Ajoutez la première commune de cette wilaya.',
+    selectWilayaBody: 'Choisissez-en une à gauche pour gérer ses communes.',
     title: 'Wilayas et communes',
     subtitle: "Gérez les wilayas d'Algérie et les communes de chacune.",
     addWilaya: 'Ajouter une wilaya',
@@ -1230,6 +1236,7 @@ export default {
 
   // ── Admin départements ───────────────────────────────────────────────
   departments: {
+    emptyBody: 'Ajoutez votre première unité organisationnelle.',
     subtitle: 'Unités organisationnelles auxquelles affecter les utilisateurs.',
     addDepartment: 'Ajouter un département',
     editDepartment: 'Modifier le département',
@@ -1241,6 +1248,7 @@ export default {
 
   // ── Guichet de transfert (départ) ────────────────────────────────────
   transfer: {
+    noOpenWorkBody: "Rien ne reste sur cet utilisateur — le compte peut simplement être désactivé.",
     modalTitle: 'Transférer le travail — {name}',
     loadFailed: 'Impossible de charger la charge de travail.',
     careerRecord: 'Parcours (reste au nom de {name})',
@@ -1300,6 +1308,14 @@ export default {
   },
   // ── Moniteurs de supervision ─────────────────────────────────────────
   oversight: {
+    stuckEmpty: 'Chaque projet actif a une prochaine étape planifiée.',
+    overdueEmpty: "Aucune prochaine action n'a dépassé son échéance.",
+    officeEmpty: 'Aucune visite bureau planifiée — rien à organiser.',
+    emptyClientsEmpty: 'Aucun client vide — chaque prospect saisi a de l\'activité.',
+    noNameEmpty: 'Chaque client a été saisi avec un nom.',
+    draftsEmpty: "Aucun utilisateur n'a de brouillon non enregistré.",
+    lostEmpty: 'Aucun deal perdu ne porte de paiements non remboursés.',
+    visitsEmpty: 'Aucune visite ne traîne sur un projet conclu.',
     allClear: 'Tout est en ordre',
     nothingToFollow: 'Rien à suivre ici.',
     allUsers: 'Tous les utilisateurs',
@@ -1337,6 +1353,7 @@ export default {
 
   // ── Archives des deals perdus & clos ─────────────────────────────────
   archive: {
+    emptyBody: "Quand un deal est archivé comme perdu ou clos, il atterrit ici.",
     subtitle: "Deals perdus et clos conservés pour mémoire. Réactivez les récupérables ; le reste demeure un historique consultable.",
     anyReason: 'Toute raison',
     anyProject: 'Tout projet',
@@ -1419,6 +1436,7 @@ export default {
 
   // ── Journal d'équipe ─────────────────────────────────────────────────
   teamLogs: {
+    loadFailedBody: 'Vérifiez la connexion, puis réessayez.',
     subtitleAll: 'Les rapports de chaque utilisateur (appels, visites bureau et sur site) et le travail planifié — toute la société.',
     subtitleOwn: 'Vos rapports (appels, visites bureau et sur site) et votre travail planifié.',
     allTypes: 'Tous les types',
@@ -1447,6 +1465,10 @@ export default {
 
   // ── Voix du client ───────────────────────────────────────────────────
   feedback: {
+    mostDemanded: 'Unités les plus demandées',
+    noDemand: 'Pas encore de signaux de demande',
+    demand: 'Demande',
+    rejected: 'Rejetées',
     days30: '30 jours',
     days90: '90 jours',
     allTime: 'Tout',
@@ -1492,6 +1514,10 @@ export default {
 
   // ── Tableau de bord ──────────────────────────────────────────────────
   dashboard: {
+    emptyClientsNudge: 'Vous avez {n} client vide — saisi mais jamais travaillé. Relancez-le pour que rien ne refroidisse. | Vous avez {n} clients vides — saisis mais jamais travaillés. Relancez-les pour que rien ne refroidisse.',
+    nothingPlanned: 'Rien de planifié.',
+    nothingOverdue: 'Rien en retard.',
+    nothingOverdueBody: "Rien de ce qui vous appartient n'a dépassé son échéance.",
     goodMorning: 'Bonjour',
     goodAfternoon: 'Bon après-midi',
     goodEvening: 'Bonsoir',

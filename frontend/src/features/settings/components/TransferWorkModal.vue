@@ -150,7 +150,7 @@ function submit() {
         v-if="!openTotal"
         icon="pi pi-check-circle"
 :title="$t('transfer.noOpenWork')"
-        body="Nothing is left on this user — the account can simply be deactivated."
+        :body="$t('transfer.noOpenWorkBody')"
       />
 
       <template v-else>

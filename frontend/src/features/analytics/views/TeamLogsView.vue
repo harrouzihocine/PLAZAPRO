@@ -171,7 +171,7 @@ useAutoFilter(
         v-else-if="loadError"
         icon="pi pi-exclamation-triangle"
 :title="$t('teamLogs.loadFailed')"
-        body="Check the connection, then retry."
+        :body="$t('teamLogs.loadFailedBody')"
       >
         <Button :label="$t('common.retry')" icon="pi pi-refresh" size="small" outlined @click="fetch" />
       </EmptyState>

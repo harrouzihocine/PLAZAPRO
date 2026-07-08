@@ -55,7 +55,7 @@ async function shareTo(conversationId) {
       v-model:visible="open"
       modal
       dismissable-mask
-      header="Share to a conversation"
+      :header="$t('chat.shareToConversation')"
       class="w-[95vw] max-w-md"
     >
       <ul class="max-h-72 divide-y divide-line overflow-y-auto">
@@ -75,7 +75,7 @@ async function shareTo(conversationId) {
         v-if="!store.conversations.length"
         icon="pi pi-comments"
 :title="$t('chat.noConversations')"
-        body="Open Chat and start one first."
+        :body="$t('chat.startOneFirst')"
       />
     </Dialog>
   </span>

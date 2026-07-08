@@ -90,179 +90,184 @@ function resetModal() {
 </script>
 
 <template>
-  <!-- Native tablet: two-pane (inbox | thread), WhatsApp-style -->
-  <div
-    v-if="twoPane"
-    class="flex h-[calc(100dvh-11.5rem)] min-h-[24rem] overflow-hidden rounded-xl border border-line bg-card shadow-card lg:h-[calc(100vh-7.5rem)]"
-  >
-    <div class="flex w-[21rem] shrink-0 flex-col border-e border-line xl:w-[24rem]">
-      <div class="flex items-center justify-between px-4 pb-1 pt-3">
-        <h1 class="text-lg font-bold text-ink">{{ $t('chat.chats') }}</h1>
-        <Button
-          v-tooltip.bottom="$t('chat.newConversation')"
-          icon="pi pi-pen-to-square"
-          rounded
-          text
-:aria-label="$t('chat.newConversation')"
-          @click="modalOpen = true"
-        />
-      </div>
-      <ConversationList :selected-id="selectedId" @select="select" />
-    </div>
-
-    <ThreadPane
-      v-if="selectedId"
-      :key="selectedId"
-      :conversation-id="selectedId"
-      :show-back="false"
-      @back="back"
-    />
-    <div v-else class="flex flex-1 flex-col items-center justify-center gap-3 bg-ground text-mute">
-      <span
-        class="flex h-20 w-20 items-center justify-center rounded-full bg-surface-100 dark:bg-surface-800"
-      >
-        <i class="pi pi-comments text-3xl" aria-hidden="true" />
-      </span>
-      <p class="text-sm font-medium">{{ $t('chat.selectConversation') }}</p>
-      <p class="max-w-[26ch] text-center text-xs">
-        {{ $t('chat.selectConversationHint') }}
-      </p>
-    </div>
-  </div>
-
-  <!-- Phone (native) thread: full-bleed takeover; web thread: the classic card -->
-  <div
-    v-else-if="selectedId"
-    class="flex flex-col overflow-hidden bg-card"
-    :class="
-      nativePhone
-        ? 'h-[calc(100dvh-4rem)]'
-        : 'h-[calc(100dvh-10.5rem)] rounded-xl border border-line shadow-card lg:h-[calc(100dvh-7.5rem)]'
-    "
-  >
-    <ThreadPane :key="selectedId" :conversation-id="selectedId" show-back @back="back" />
-  </div>
-
-  <!-- Inbox page (phone + web) -->
-  <div v-else>
-    <PageHeader v-if="!isNative" :title="$t('nav.chat')" :subtitle="$t('chat.subtitle')">
-      <template #actions>
-        <Button :label="$t('chat.newConversation')" icon="pi pi-plus" @click="modalOpen = true" />
-      </template>
-    </PageHeader>
-    <h1 v-else class="mb-2 px-1 text-2xl font-bold text-ink">{{ $t('chat.chats') }}</h1>
-
-    <SectionCard flush>
-      <ConversationList :selected-id="selectedId" @select="select" />
-    </SectionCard>
-
-    <!-- Native FAB: new chat, WhatsApp-style -->
-    <button
-      v-if="isNative"
-      type="button"
-      class="fixed bottom-24 end-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-contrast shadow-pop transition-transform active:scale-95 lg:bottom-8"
-:aria-label="$t('chat.newConversation')"
-      @click="modalOpen = true"
+  <!-- Single root, on purpose: AppShell renders routed views inside a
+       <Transition mode="out-in">, which cannot animate a fragment root —
+       leaving this page would hang the swap and blank the next view. -->
+  <div>
+    <!-- Native tablet: two-pane (inbox | thread), WhatsApp-style -->
+    <div
+      v-if="twoPane"
+      class="flex h-[calc(100dvh-11.5rem)] min-h-[24rem] overflow-hidden rounded-xl border border-line bg-card shadow-card lg:h-[calc(100vh-7.5rem)]"
     >
-      <i class="pi pi-pen-to-square text-xl" aria-hidden="true" />
-    </button>
-  </div>
-
-  <!-- New conversation (bottom sheet on native via native.css) -->
-  <Dialog
-    :visible="modalOpen"
-    modal
-    dismissable-mask
-    class="w-[95vw] max-w-md"
-    @update:visible="(v) => !v && resetModal()"
-  >
-    <template #header>
-      <span class="flex w-full items-center justify-between gap-3 pe-2">
-        <span class="font-semibold text-ink">{{ groupMode ? $t('chat.newGroup') : $t('chat.newMessage') }}</span>
-        <Button
-          :label="groupMode ? $t('chat.directMessage') : $t('chat.newGroup')"
-          :icon="groupMode ? 'pi pi-user' : 'pi pi-users'"
-          text
-          size="small"
-          @click="groupMode = !groupMode"
-        />
-      </span>
-    </template>
-
-    <template v-if="groupMode">
-      <BaseInput v-model="groupTitle" :label="$t('chat.groupName')" required />
-      <div class="relative mt-4">
-        <i
-          class="pi pi-search pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-xs text-mute"
-          aria-hidden="true"
-        />
-        <input
-          v-model="contactQuery"
-          type="search"
-:placeholder="$t('chat.searchPeople')"
-          :aria-label="$t('chat.searchPeopleAria')"
-          class="w-full rounded-full border border-line bg-ground py-2 ps-9 pe-3.5 text-sm text-ink outline-none transition-colors focus:border-primary native:py-2.5"
-        />
+      <div class="flex w-[21rem] shrink-0 flex-col border-e border-line xl:w-[24rem]">
+        <div class="flex items-center justify-between px-4 pb-1 pt-3">
+          <h1 class="text-lg font-bold text-ink">{{ $t('chat.chats') }}</h1>
+          <Button
+            v-tooltip.bottom="$t('chat.newConversation')"
+            icon="pi pi-pen-to-square"
+            rounded
+            text
+            :aria-label="$t('chat.newConversation')"
+            @click="modalOpen = true"
+          />
+        </div>
+        <ConversationList :selected-id="selectedId" @select="select" />
       </div>
-      <div class="my-4 max-h-60 space-y-0.5 overflow-y-auto">
-        <label
-          v-for="u in filteredContacts"
-          :key="u.id"
-          class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-ink hover:bg-surface-100 dark:hover:bg-surface-800"
+
+      <ThreadPane
+        v-if="selectedId"
+        :key="selectedId"
+        :conversation-id="selectedId"
+        :show-back="false"
+        @back="back"
+      />
+      <div v-else class="flex flex-1 flex-col items-center justify-center gap-3 bg-ground text-mute">
+        <span
+          class="flex h-20 w-20 items-center justify-center rounded-full bg-surface-100 dark:bg-surface-800"
         >
-          <Checkbox v-model="groupPicks" :value="u.id" />
-          {{ u.name }}
-        </label>
-        <p v-if="!filteredContacts.length" class="px-2 py-3 text-center text-sm text-mute">
-          {{ contactQuery ? $t('chat.noOneMatches') : $t('chat.noContacts') }}
+          <i class="pi pi-comments text-3xl" aria-hidden="true" />
+        </span>
+        <p class="text-sm font-medium">{{ $t('chat.selectConversation') }}</p>
+        <p class="max-w-[26ch] text-center text-xs">
+          {{ $t('chat.selectConversationHint') }}
         </p>
       </div>
-      <div class="flex gap-2">
-        <Button
-:label="$t('chat.createGroup')"
-          icon="pi pi-check"
-          :disabled="!groupTitle.trim() || !groupPicks.length"
-          @click="createGroup"
-        />
-        <Button :label="$t('common.cancel')" severity="secondary" outlined @click="resetModal" />
-      </div>
-    </template>
+    </div>
 
-    <template v-else>
-      <div class="relative mb-3">
-        <i
-          class="pi pi-search pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-xs text-mute"
-          aria-hidden="true"
-        />
-        <input
-          v-model="contactQuery"
-          type="search"
-:placeholder="$t('chat.searchPeople')"
-          :aria-label="$t('chat.searchPeopleAria')"
-          class="w-full rounded-full border border-line bg-ground py-2 ps-9 pe-3.5 text-sm text-ink outline-none transition-colors focus:border-primary native:py-2.5"
-        />
-      </div>
-      <ul class="max-h-72 divide-y divide-line overflow-y-auto">
-        <li v-for="u in filteredContacts" :key="u.id">
-          <button
-            type="button"
-            class="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-start text-sm text-ink transition-colors hover:bg-surface-100 dark:hover:bg-surface-800"
-            @click="startDirect(u.id)"
+    <!-- Phone (native) thread: full-bleed takeover; web thread: the classic card -->
+    <div
+      v-else-if="selectedId"
+      class="flex flex-col overflow-hidden bg-card"
+      :class="
+        nativePhone
+          ? 'h-[calc(100dvh-4rem)]'
+          : 'h-[calc(100dvh-10.5rem)] rounded-xl border border-line shadow-card lg:h-[calc(100dvh-7.5rem)]'
+      "
+    >
+      <ThreadPane :key="selectedId" :conversation-id="selectedId" show-back @back="back" />
+    </div>
+
+    <!-- Inbox page (phone + web) -->
+    <div v-else>
+      <PageHeader v-if="!isNative" :title="$t('nav.chat')" :subtitle="$t('chat.subtitle')">
+        <template #actions>
+          <Button :label="$t('chat.newConversation')" icon="pi pi-plus" @click="modalOpen = true" />
+        </template>
+      </PageHeader>
+      <h1 v-else class="mb-2 px-1 text-2xl font-bold text-ink">{{ $t('chat.chats') }}</h1>
+
+      <SectionCard flush>
+        <ConversationList :selected-id="selectedId" @select="select" />
+      </SectionCard>
+
+      <!-- Native FAB: new chat, WhatsApp-style -->
+      <button
+        v-if="isNative"
+        type="button"
+        class="fixed bottom-24 end-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-contrast shadow-pop transition-transform active:scale-95 lg:bottom-8"
+        :aria-label="$t('chat.newConversation')"
+        @click="modalOpen = true"
+      >
+        <i class="pi pi-pen-to-square text-xl" aria-hidden="true" />
+      </button>
+    </div>
+
+    <!-- New conversation (bottom sheet on native via native.css) -->
+    <Dialog
+      :visible="modalOpen"
+      modal
+      dismissable-mask
+      class="w-[95vw] max-w-md"
+      @update:visible="(v) => !v && resetModal()"
+    >
+      <template #header>
+        <span class="flex w-full items-center justify-between gap-3 pe-2">
+          <span class="font-semibold text-ink">{{ groupMode ? $t('chat.newGroup') : $t('chat.newMessage') }}</span>
+          <Button
+            :label="groupMode ? $t('chat.directMessage') : $t('chat.newGroup')"
+            :icon="groupMode ? 'pi pi-user' : 'pi pi-users'"
+            text
+            size="small"
+            @click="groupMode = !groupMode"
+          />
+        </span>
+      </template>
+
+      <template v-if="groupMode">
+        <BaseInput v-model="groupTitle" :label="$t('chat.groupName')" required />
+        <div class="relative mt-4">
+          <i
+            class="pi pi-search pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-xs text-mute"
+            aria-hidden="true"
+          />
+          <input
+            v-model="contactQuery"
+            type="search"
+            :placeholder="$t('chat.searchPeople')"
+            :aria-label="$t('chat.searchPeopleAria')"
+            class="w-full rounded-full border border-line bg-ground py-2 ps-9 pe-3.5 text-sm text-ink outline-none transition-colors focus:border-primary native:py-2.5"
+          />
+        </div>
+        <div class="my-4 max-h-60 space-y-0.5 overflow-y-auto">
+          <label
+            v-for="u in filteredContacts"
+            :key="u.id"
+            class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-ink hover:bg-surface-100 dark:hover:bg-surface-800"
           >
-            <Avatar
-              :label="initials(u.name)"
-              shape="circle"
-              class="!bg-highlight !text-primary-700 dark:!text-primary-300"
-            />
+            <Checkbox v-model="groupPicks" :value="u.id" />
             {{ u.name }}
-          </button>
-        </li>
-      </ul>
-      <EmptyState
-        v-if="!filteredContacts.length"
-        icon="pi pi-users"
-        :title="contactQuery ? $t('chat.noOneMatches') : $t('chat.noContacts')"
-      />
-    </template>
-  </Dialog>
+          </label>
+          <p v-if="!filteredContacts.length" class="px-2 py-3 text-center text-sm text-mute">
+            {{ contactQuery ? $t('chat.noOneMatches') : $t('chat.noContacts') }}
+          </p>
+        </div>
+        <div class="flex gap-2">
+          <Button
+            :label="$t('chat.createGroup')"
+            icon="pi pi-check"
+            :disabled="!groupTitle.trim() || !groupPicks.length"
+            @click="createGroup"
+          />
+          <Button :label="$t('common.cancel')" severity="secondary" outlined @click="resetModal" />
+        </div>
+      </template>
+
+      <template v-else>
+        <div class="relative mb-3">
+          <i
+            class="pi pi-search pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-xs text-mute"
+            aria-hidden="true"
+          />
+          <input
+            v-model="contactQuery"
+            type="search"
+            :placeholder="$t('chat.searchPeople')"
+            :aria-label="$t('chat.searchPeopleAria')"
+            class="w-full rounded-full border border-line bg-ground py-2 ps-9 pe-3.5 text-sm text-ink outline-none transition-colors focus:border-primary native:py-2.5"
+          />
+        </div>
+        <ul class="max-h-72 divide-y divide-line overflow-y-auto">
+          <li v-for="u in filteredContacts" :key="u.id">
+            <button
+              type="button"
+              class="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-start text-sm text-ink transition-colors hover:bg-surface-100 dark:hover:bg-surface-800"
+              @click="startDirect(u.id)"
+            >
+              <Avatar
+                :label="initials(u.name)"
+                shape="circle"
+                class="!bg-highlight !text-primary-700 dark:!text-primary-300"
+              />
+              {{ u.name }}
+            </button>
+          </li>
+        </ul>
+        <EmptyState
+          v-if="!filteredContacts.length"
+          icon="pi pi-users"
+          :title="contactQuery ? $t('chat.noOneMatches') : $t('chat.noContacts')"
+        />
+      </template>
+    </Dialog>
+  </div>
 </template>
