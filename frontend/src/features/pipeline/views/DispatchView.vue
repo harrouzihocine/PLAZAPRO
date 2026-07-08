@@ -11,7 +11,8 @@ import { pipelineApi } from '@/features/pipeline/api'
 import { toastError, toastSuccess } from '@/composables/useConfirm'
 import { copyToClipboard } from '@/composables/useClipboard'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
-import { formatDateTime, humanize, todayInput } from '@/utils/format'
+import { formatDateTime, humanize, intlLocale, todayInput } from '@/utils/format'
+import { i18n, t } from '@/i18n'
 
 // The dispatch board: unassigned in-site plans in the PENDING strip, and one
 // row per field agent × the shown week. Drag a pending task onto an agent's
@@ -59,7 +60,7 @@ const days = computed(() => {
     const date = addDays(weekStart.value, i)
     return {
       date,
-      label: new Date(date + 'T00:00:00Z').toLocaleDateString(undefined, {
+      label: new Date(date + 'T00:00:00Z').toLocaleDateString(intlLocale(), {
         weekday: 'short',
         day: 'numeric',
         month: 'short',
@@ -211,7 +212,7 @@ const columns = computed(() => {
   const today = localToday()
   const nowHour = new Date().getHours()
   return [
-    ...(dayHasUntimed.value ? [{ kind: 'untimed', key: 'u', label: 'No time' }] : []),
+    ...(dayHasUntimed.value ? [{ kind: 'untimed', key: 'u', label: t('dispatch.noTime') }] : []),
     ...dayHours.value.map((h) => ({
       kind: 'hour',
       key: h,
@@ -310,10 +311,10 @@ async function save() {
   saving.value = true
   try {
     await pipelineApi.dispatchAssign([...moves.value.values()])
-    toastSuccess('Assignments saved — the agents and contributors were notified.')
+    toastSuccess(t('dispatch.saved'))
     await load()
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not save the assignments.')
+    toastError(e.response?.data?.message ?? t('dispatch.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -364,6 +365,11 @@ function showDetails(event, item) {
   detailsRef.value?.show(event)
 }
 
+const typeLabel = (type) => {
+  const key = type === 'in_site' ? 'status.in_site_visit' : type === 'office' ? 'status.office_visit' : type === 'call' ? 'pipeline.typeCall' : `status.${type}`
+  return i18n.global.te(key) ? t(key) : humanize(type)
+}
+
 const TYPE_TONES = {
   in_site: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
   office: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
@@ -375,22 +381,22 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
 <template>
   <div>
     <PageHeader
-      title="Dispatch board"
-      subtitle="Assign pending in-site visits to field agents — drag onto a day (or an hour in day view), then save."
+:title="$t('dispatch.title')"
+      :subtitle="$t('dispatch.subtitle')"
     >
       <template #actions>
         <!-- Week navigation, or day navigation when zoomed into hours. -->
         <template v-if="!viewDay">
-          <Button icon="pi pi-chevron-left" severity="secondary" text aria-label="Previous week" @click="shiftWeek(-7)" />
-          <span class="num self-center text-sm font-medium text-ink">week of {{ weekStart }}</span>
-          <Button icon="pi pi-chevron-right" severity="secondary" text aria-label="Next week" @click="shiftWeek(7)" />
+          <Button icon="pi pi-chevron-left" severity="secondary" text :aria-label="$t('pipeline.previousWeek')" @click="shiftWeek(-7)" />
+          <span class="num self-center text-sm font-medium text-ink">{{ $t('dispatch.weekOf', { date: weekStart }) }}</span>
+          <Button icon="pi pi-chevron-right" severity="secondary" text :aria-label="$t('pipeline.nextWeek')" @click="shiftWeek(7)" />
         </template>
         <template v-else>
           <Button
             icon="pi pi-chevron-left"
             severity="secondary"
             text
-            aria-label="Previous day"
+:aria-label="$t('dispatch.previousDay')"
             :disabled="!canPrevDay"
             @click="shiftDay(-1)"
           />
@@ -399,14 +405,14 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
             icon="pi pi-chevron-right"
             severity="secondary"
             text
-            aria-label="Next day"
+:aria-label="$t('dispatch.nextDay')"
             :disabled="!canNextDay"
             @click="shiftDay(1)"
           />
-          <Button label="Week view" icon="pi pi-calendar" severity="secondary" outlined @click="exitDay" />
+          <Button :label="$t('dispatch.weekView')" icon="pi pi-calendar" severity="secondary" outlined @click="exitDay" />
         </template>
         <Button
-          label="Save assignments"
+:label="$t('dispatch.saveAssignments')"
           icon="pi pi-check"
           :disabled="!hasChanges"
           :loading="saving"
@@ -417,15 +423,15 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
 
     <!-- Pending pool -->
     <SectionCard
-      :title="`Pending in-site visits (${pending.length})`"
+      :title="$t('dispatch.pendingTitle', { n: pending.length })"
       icon="pi pi-inbox"
       class="mb-5"
     >
-      <p v-if="loading" class="py-4 text-center text-sm text-mute">Loading…</p>
+      <p v-if="loading" class="py-4 text-center text-sm text-mute">{{ $t('common.loading') }}</p>
       <template v-else>
         <p v-if="!pending.length" class="mb-2 text-sm text-mute">
           <i class="pi pi-check-circle me-1 text-success" aria-hidden="true" />
-          No visit waiting for an agent — drop one here to un-assign it.
+          {{ $t('dispatch.noPending') }}
         </p>
         <draggable
           v-model="pending"
@@ -447,7 +453,7 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
                 <button
                   type="button"
                   class="text-mute transition-colors hover:text-ink"
-                  aria-label="Task details"
+:aria-label="$t('dispatch.taskDetails')"
                   @click.stop="showDetails($event, element)"
                 >
                   <i class="pi pi-info-circle" aria-hidden="true" />
@@ -462,7 +468,7 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
                 class="num text-xs"
                 :class="isDuePast(element) ? 'font-medium text-danger' : 'text-mute'"
               >
-                due {{ formatDateTime(element.due_at) }}
+                {{ $t('pipeline.due', { date: formatDateTime(element.due_at) }) }}
               </span>
             </div>
           </template>
@@ -476,7 +482,7 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
          or back to the pending pool to un-assign. -->
     <SectionCard
       v-if="overdue.length"
-      :title="`Overdue — reschedule these (${overdue.length})`"
+      :title="$t('dispatch.overdueTitle', { n: overdue.length })"
       icon="pi pi-history"
       class="mb-5"
     >
@@ -502,33 +508,32 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
               <button
                 type="button"
                 class="text-mute transition-colors hover:text-ink"
-                aria-label="Task details"
+  :aria-label="$t('dispatch.taskDetails')"
                 @click.stop="showDetails($event, element)"
               >
                 <i class="pi pi-info-circle" aria-hidden="true" />
               </button>
             </div>
             <span class="num text-xs text-red-700 dark:text-red-300">
-              was {{ formatDateTime(element.at) }}
+              {{ $t('dispatch.was', { date: formatDateTime(element.at) }) }}
             </span>
           </div>
         </template>
       </draggable>
       <p class="mt-2 text-xs text-mute">
-        These field visits were never completed — drag each onto a new upcoming day (or an hour in
-        day view), or back to the pending pool.
+        {{ $t('dispatch.overdueHint') }}
       </p>
     </SectionCard>
 
     <!-- Agents × weekdays grid (or × hours when zoomed into a day) -->
     <SectionCard flush>
-      <p v-if="loading" class="py-10 text-center text-sm text-mute">Loading the week…</p>
+      <p v-if="loading" class="py-10 text-center text-sm text-mute">{{ $t('dispatch.loadingWeek') }}</p>
       <div v-else class="overflow-x-auto">
         <table class="w-full border-collapse text-sm" :class="viewDay ? 'min-w-[1100px]' : 'min-w-[900px]'">
           <thead>
             <tr>
               <th class="sticky start-0 z-10 border-b border-line bg-card px-3 py-2 text-start text-xs font-semibold uppercase tracking-wide text-mute">
-                Agent
+                {{ $t('clients.agent') }}
               </th>
               <th
                 v-for="col in columns"
@@ -542,7 +547,7 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
                   v-if="col.kind === 'day'"
                   type="button"
                   class="group inline-flex items-center gap-1.5 uppercase tracking-wide transition-colors hover:text-ink"
-                  :title="col.isPast ? `${col.label} — past, history only` : `Zoom into ${col.label} by hour`"
+                  :title="col.isPast ? $t('dispatch.pastDayTitle', { day: col.label }) : $t('dispatch.zoomDayTitle', { day: col.label })"
                   @click="showDay(col.key)"
                 >
                   <i v-if="col.isPast" class="pi pi-ban text-[10px] text-danger/60" aria-hidden="true" />
@@ -561,7 +566,7 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
               <th class="sticky start-0 z-10 border-b border-line bg-card px-3 py-2 text-start font-medium text-ink">
                 {{ agent.name }}
                 <span class="num mt-0.5 block text-xs font-normal text-mute">
-                  {{ agentCount(agent.id) }} {{ viewDay ? 'this day' : 'this week' }}
+                  {{ agentCount(agent.id) }} · {{ viewDay ? $t('dispatch.thisDay') : $t('dispatch.thisWeek') }}
                 </span>
               </th>
               <td
@@ -611,12 +616,12 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
                           type="button"
                           class="num inline-flex items-center gap-1 rounded-full border border-current px-1.5 py-0.5 text-[10px] leading-none transition-opacity hover:opacity-100 native:max-md:px-2.5 native:max-md:py-1.5 native:max-md:text-xs"
                           :class="element.time ? 'opacity-80' : 'opacity-60'"
-                          :aria-label="`Set the time (now ${element.time ?? 'not set'})`"
-                          title="Set the exact time"
+                          :aria-label="$t('dispatch.setTimeAria')"
+                          :title="$t('dispatch.setExactTime')"
                           @click.stop="openTimeEdit($event, element)"
                         >
                           <i class="pi pi-clock text-[9px]" aria-hidden="true" />
-                          {{ element.time ?? 'set time' }}
+                          {{ element.time ?? $t('dispatch.setTime') }}
                         </button>
                         <span
                           v-else-if="element.time"
@@ -633,7 +638,7 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
             </tr>
             <tr v-if="!agents.length">
               <td :colspan="columns.length + 1" class="px-4 py-8 text-center text-sm text-mute">
-                No field agents (is_agent roles) found.
+                {{ $t('dispatch.noAgents') }}
               </td>
             </tr>
           </tbody>
@@ -642,28 +647,24 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
     </SectionCard>
 
     <p class="mt-2 text-xs text-mute">
-      Drag between agents and days, or back to the pending strip to un-assign. Striped cells are
-      the past — forbidden ground for drops; overdue work sits in its own rail above. Click a day
-      header to zoom into its hours and drop on an exact slot, or click a card's time chip to set
-      the time by hand. Faded cards (calls, office visits, completed) are workload context and
-      don't drag.
+      {{ $t('dispatch.boardHint') }}
     </p>
 
     <!-- Time chip editor: exact HH:mm without dragging. -->
     <Popover ref="timeEditRef" class="w-60 max-w-[92vw]">
       <form class="space-y-2.5" @submit.prevent="applyTimeEdit">
         <p class="text-xs font-semibold uppercase tracking-wide text-mute">
-          Time — {{ timeEditItem?.client ?? 'task' }}
+          {{ $t('common.time') }} — {{ timeEditItem?.client ?? $t('pipeline.typeTask') }}
         </p>
         <input
           v-model="timeEditValue"
           type="time"
           class="w-full rounded-md border border-line bg-card px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-primary"
-          aria-label="Time"
+:aria-label="$t('common.time')"
         />
         <div class="flex justify-end gap-2">
-          <Button label="Cancel" size="small" text severity="secondary" @click="timeEditRef?.hide()" />
-          <Button type="submit" label="Set time" size="small" :disabled="!timeEditValid" />
+          <Button :label="$t('common.cancel')" size="small" text severity="secondary" @click="timeEditRef?.hide()" />
+          <Button type="submit" :label="$t('dispatch.setTime')" size="small" :disabled="!timeEditValid" />
         </div>
       </form>
     </Popover>
@@ -673,31 +674,31 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
       <div v-if="detailsItem" class="space-y-2 text-sm">
         <p class="flex items-center gap-2 font-semibold text-ink">
           <i :class="TYPE_ICONS[detailsItem.type] ?? 'pi pi-map-marker'" aria-hidden="true" />
-          {{ humanize(detailsItem.type ?? 'in_site') }}
-          <Tag v-if="detailsItem.is_completed" value="completed" severity="secondary" />
+          {{ typeLabel(detailsItem.type ?? 'in_site') }}
+          <Tag v-if="detailsItem.is_completed" :value="$t('status.completed')" severity="secondary" />
         </p>
         <dl class="space-y-1.5">
           <div class="flex justify-between gap-2">
-            <dt class="text-mute">Client</dt>
+            <dt class="text-mute">{{ $t('clients.client') }}</dt>
             <dd class="text-ink">{{ detailsItem.client ?? '—' }}</dd>
           </div>
           <div class="flex justify-between gap-2">
-            <dt class="text-mute">When</dt>
+            <dt class="text-mute">{{ $t('dispatch.when') }}</dt>
             <dd class="num text-ink">{{ formatDateTime(detailsItem.at ?? detailsItem.due_at) }}</dd>
           </div>
           <div v-if="detailsItem.unit" class="flex justify-between gap-2">
-            <dt class="text-mute">Unit</dt>
+            <dt class="text-mute">{{ $t('project.unit') }}</dt>
             <dd class="text-ink">{{ detailsItem.unit }}</dd>
           </div>
           <div v-if="detailsItem.location" class="flex justify-between gap-2">
-            <dt class="text-mute">Site</dt>
+            <dt class="text-mute">{{ $t('dispatch.site') }}</dt>
             <dd class="text-ink">{{ detailsItem.location }}</dd>
           </div>
         </dl>
 
         <!-- Pending in-site plans: the properties + sites to visit once assigned. -->
         <div v-if="detailsItem.units?.length" class="border-t border-line pt-2">
-          <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-mute">To visit</p>
+          <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-mute">{{ $t('dispatch.toVisit') }}</p>
           <ul class="space-y-1">
             <li
               v-for="(u, i) in detailsItem.units"
@@ -713,7 +714,7 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
           v-else-if="detailsItem.kind === 'action' && detailsItem.type !== 'call'"
           class="border-t border-line pt-2 text-xs text-mute"
         >
-          No shortlisted property yet — the site is set on the project.
+          {{ $t('dispatch.noShortlistedYet') }}
         </p>
 
         <!-- Per-site Google Maps links for a pending plan (may span sites). -->
@@ -733,10 +734,10 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
             </a>
             <button
               type="button"
-              title="Copy Maps link"
-              aria-label="Copy Maps link"
+:title="$t('pipeline.copyMapsLink')"
+              :aria-label="$t('pipeline.copyMapsLink')"
               class="inline-flex items-center text-xs text-primary-600 hover:underline dark:text-primary-400"
-              @click="copyToClipboard(s.maps_url, 'Maps link copied')"
+              @click="copyToClipboard(s.maps_url, $t('pipeline.mapsLinkCopied'))"
             >
               <i class="pi pi-copy" aria-hidden="true" />
             </button>
@@ -748,7 +749,7 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
             :to="detailsItem.link"
             class="inline-flex items-center gap-1.5 text-primary-600 hover:underline dark:text-primary-400"
           >
-            <i class="pi pi-folder-open" aria-hidden="true" /> Open project
+            <i class="pi pi-folder-open" aria-hidden="true" /> {{ $t('dispatch.openProject') }}
           </RouterLink>
           <a
             v-if="detailsItem.maps_url"
@@ -762,10 +763,10 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
           <button
             v-if="detailsItem.maps_url"
             type="button"
-            title="Copy Maps link"
-            aria-label="Copy Maps link"
+:title="$t('pipeline.copyMapsLink')"
+            :aria-label="$t('pipeline.copyMapsLink')"
             class="inline-flex items-center text-primary-600 hover:underline dark:text-primary-400"
-            @click="copyToClipboard(detailsItem.maps_url, 'Maps link copied')"
+            @click="copyToClipboard(detailsItem.maps_url, $t('pipeline.mapsLinkCopied'))"
           >
             <i class="pi pi-copy" aria-hidden="true" />
           </button>

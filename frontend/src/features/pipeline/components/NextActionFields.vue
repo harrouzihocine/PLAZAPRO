@@ -6,6 +6,7 @@ import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPick
 import AgentAgendaStrip from '@/features/pipeline/components/AgentAgendaStrip.vue'
 import { useAuthStore } from '@/features/settings/store'
 import { todayInput, unitLine } from '@/utils/format'
+import { t } from '@/i18n'
 
 // The next-action fieldset, shared by the log-call and complete-visit forms.
 // Emits a merged object so the parent owns the value (no prop mutation).
@@ -31,11 +32,11 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 const auth = useAuthStore()
 
-const types = [
-  { value: 'call', label: 'Call' },
-  { value: 'office_visit', label: 'Office visit' },
-  { value: 'in_site_visit', label: 'In-site visit' },
-]
+const types = computed(() => [
+  { value: 'call', label: t('pipeline.typeCall') },
+  { value: 'office_visit', label: t('status.office_visit') },
+  { value: 'in_site_visit', label: t('status.in_site_visit') },
+])
 
 const inputClass =
   'w-full rounded-md border border-line bg-card px-3 py-2 min-h-[42px] text-sm text-ink outline-none transition-colors focus:border-primary'
@@ -134,10 +135,10 @@ onMounted(() => {
 <template>
   <fieldset class="grid gap-3 rounded-xl border border-line p-3 sm:grid-cols-3">
     <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">
-      Next action
+      {{ $t('pipeline.nextAction') }}
     </legend>
     <BaseSelect
-      label="Type"
+:label="$t('inventory.type')"
       required
       :model-value="modelValue.type"
       :clearable="false"
@@ -146,7 +147,7 @@ onMounted(() => {
     />
     <label class="block">
       <span class="mb-1.5 block text-sm font-medium text-ink"
-        >Due date<span class="text-danger" aria-hidden="true"> *</span></span
+        >{{ $t('pipeline.dueDate') }}<span class="text-danger" aria-hidden="true"> *</span></span
       >
       <input
         type="date"
@@ -158,11 +159,11 @@ onMounted(() => {
     </label>
     <div class="block">
       <span class="mb-1.5 block text-sm font-medium text-ink">
-        Time
+        {{ $t('common.time') }}
       </span>
       <TimeField
         :model-value="modelValue.due_time"
-        aria-label="Time"
+        :aria-label="$t('common.time')"
         @update:model-value="update('due_time', $event)"
       />
     </div>
@@ -179,7 +180,7 @@ onMounted(() => {
     <!-- In-site: which apartment is this next field visit for? Same one (a
          second look) or another apartment picked from the full property picker. -->
     <div v-if="showApartmentChoice" class="sm:col-span-3">
-      <p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-mute">Which apartment?</p>
+      <p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-mute">{{ $t('pipeline.whichApartment') }}</p>
       <div class="mb-2 flex flex-wrap gap-1.5">
         <button
           type="button"
@@ -192,7 +193,7 @@ onMounted(() => {
           @click="selectMode('same')"
         >
           <i class="pi pi-home text-[10px]" aria-hidden="true" />
-          Same apartment<template v-if="currentUnitLabel"> — {{ currentUnitLabel }}</template>
+          {{ $t('pipeline.sameApartment') }}<template v-if="currentUnitLabel"> — {{ currentUnitLabel }}</template>
         </button>
         <button
           type="button"
@@ -205,7 +206,7 @@ onMounted(() => {
           @click="selectMode('another')"
         >
           <i class="pi pi-building text-[10px]" aria-hidden="true" />
-          Another apartment
+          {{ $t('pipeline.anotherApartment') }}
         </button>
       </div>
       <ProjectUnitsPicker
@@ -222,15 +223,15 @@ onMounted(() => {
       <BaseSelect
         v-if="canDispatch"
         class="sm:col-span-3"
-        label="Assign to (field agent, else via the dispatch board)"
+:label="$t('pipeline.assignToField')"
         :model-value="modelValue.assigned_to"
-        placeholder="Decide later on the dispatch board"
+        :placeholder="$t('pipeline.decideLater')"
         :options="fieldAgents.map((a) => ({ value: a.id, label: a.name }))"
         @change="(v) => update('assigned_to', v)"
       />
       <p v-else class="flex items-center gap-2 text-sm text-mute sm:col-span-3">
         <i class="pi pi-send" aria-hidden="true" />
-        The dispatcher will be notified to assign a field agent.
+        {{ $t('pipeline.dispatcherNotified') }}
       </p>
     </template>
   </fieldset>

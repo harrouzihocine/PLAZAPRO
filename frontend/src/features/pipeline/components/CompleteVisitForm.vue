@@ -5,7 +5,7 @@ import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import TimeField from '@/components/base/TimeField.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
-import { useDynamicList } from '@/composables/useDynamicList'
+import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { toastError } from '@/composables/useConfirm'
 import { shortlistApi } from '@/features/clients/api'
 import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPicker.vue'
@@ -17,6 +17,7 @@ import DraftBanner from '@/features/drafts/DraftBanner.vue'
 import NextActionFields from '@/features/pipeline/components/NextActionFields.vue'
 import { useModalDraft } from '@/composables/useModalDraft'
 import { todayInput, unitLine } from '@/utils/format'
+import { t } from '@/i18n'
 
 // The rapid visit-completion log. It records the outcome + (office) the deal's
 // property shortlist, then MUST conclude — self-closing rule — into one of:
@@ -87,7 +88,7 @@ const desireForm = ref(makeDesireForm(null))
 const draft = props.draftKey
   ? useModalDraft({
       key: props.draftKey,
-      label: `Complete ${props.visit.type === 'in_site' ? 'in-site' : 'office'} visit`,
+      label: props.visit.type === 'in_site' ? t('visits.completeInSiteLabel') : t('visits.completeOfficeLabel'),
       getForm: () => ({
         outcomeId: outcomeId.value,
         notes: notes.value,
@@ -209,15 +210,15 @@ const CONCLUSIONS = computed(() => {
   // the client may still commit to another apartment (its own deal).
   if (props.dealSettled) {
     return [
-      { value: 'none', label: 'Nothing further (deal in progress)', icon: 'pi pi-check' },
-      ...(canOpenDeal.value ? [{ value: 'deal', label: 'Open another deal', icon: 'pi pi-briefcase' }] : []),
+      { value: 'none', label: t('visits.nothingFurther'), icon: 'pi pi-check' },
+      ...(canOpenDeal.value ? [{ value: 'deal', label: t('visits.openAnotherDeal'), icon: 'pi pi-briefcase' }] : []),
     ]
   }
   return [
-    { value: 'next_action', label: 'Plan next action', icon: 'pi pi-calendar-plus' },
-    ...(canOpenDeal.value ? [{ value: 'deal', label: 'Open deal', icon: 'pi pi-briefcase' }] : []),
-    { value: 'desire', label: 'To desire list', icon: 'pi pi-heart' },
-    { value: 'archive', label: 'Archive', icon: 'pi pi-inbox' },
+    { value: 'next_action', label: t('calls.planNextAction'), icon: 'pi pi-calendar-plus' },
+    ...(canOpenDeal.value ? [{ value: 'deal', label: t('project.openDeal'), icon: 'pi pi-briefcase' }] : []),
+    { value: 'desire', label: t('calls.toDesireList'), icon: 'pi pi-heart' },
+    { value: 'archive', label: t('project.archive'), icon: 'pi pi-inbox' },
   ]
 })
 
@@ -254,7 +255,7 @@ const bailing = computed(() => ['desire', 'archive'].includes(conclusion.value))
 function submit() {
   if (!ready.value) return
   if (isOffice.value && hasDeal.value && !bailing.value && !finalShortlist.value.length) {
-    toastError('At least one property must remain shortlisted (or archive / desire the project).')
+    toastError(t('visits.shortlistMinimum'))
     return
   }
   const payload = {
@@ -318,7 +319,7 @@ function submit() {
     <DraftBanner :visible="!!draft?.restored.value" />
     <!-- In-site: one-tap result (didn't visit / interested / not interested / …). -->
     <fieldset v-if="!isOffice" class="rounded-xl border border-line p-3">
-      <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">Result</legend>
+      <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">{{ $t('visits.result') }}</legend>
       <div class="flex flex-wrap gap-1.5">
         <button
           v-for="o in insiteOutcomes"
@@ -332,7 +333,7 @@ function submit() {
           "
           @click="outcomeId = outcomeId === o.id ? '' : o.id"
         >
-          {{ o.label }}
+          {{ itemLabel(o) }}
         </button>
       </div>
     </fieldset>
@@ -342,12 +343,12 @@ function submit() {
          moment (agents often log after leaving the site). -->
     <fieldset v-if="!isOffice" class="rounded-xl border border-line p-3">
       <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">
-        When did the visit happen?<span class="text-danger" aria-hidden="true"> *</span>
+        {{ $t('visits.whenHappened') }}<span class="text-danger" aria-hidden="true"> *</span>
       </legend>
       <div class="grid gap-3 sm:grid-cols-2">
         <label class="block">
           <span class="mb-1.5 block text-sm font-medium text-ink"
-            >Visit date<span class="text-danger" aria-hidden="true"> *</span></span
+            >{{ $t('visits.visitDate') }}<span class="text-danger" aria-hidden="true"> *</span></span
           >
           <input
             v-model="visitedDate"
@@ -358,9 +359,9 @@ function submit() {
         </label>
         <div class="block">
           <span class="mb-1.5 block text-sm font-medium text-ink"
-            >Visit time<span class="text-danger" aria-hidden="true"> *</span></span
+            >{{ $t('visits.visitTime') }}<span class="text-danger" aria-hidden="true"> *</span></span
           >
-          <TimeField v-model="visitedTime" aria-label="Visit time" />
+          <TimeField v-model="visitedTime" :aria-label="$t('visits.visitTime')" />
         </div>
       </div>
     </fieldset>
@@ -368,15 +369,15 @@ function submit() {
     <template v-else>
       <BaseSelect
         v-model="outcomeId"
-        label="Outcome"
-        placeholder="None"
-        :options="officeOutcomes.map((o) => ({ value: o.id, label: o.label }))"
+:label="$t('visits.outcome')"
+        :placeholder="$t('common.none')"
+        :options="officeOutcomes.map((o) => ({ value: o.id, label: itemLabel(o) }))"
       />
 
       <!-- Office-visit checklist — what happened, logged in taps. -->
       <fieldset v-if="officeChecklist.length" class="rounded-xl border border-line p-3">
         <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">
-          What happened
+          {{ $t('visits.whatHappened') }}
         </legend>
         <div class="flex flex-wrap gap-1.5">
           <button
@@ -391,7 +392,7 @@ function submit() {
             "
             @click="toggleChecklist(c.id)"
           >
-            {{ c.label }}
+            {{ itemLabel(c) }}
           </button>
         </div>
       </fieldset>
@@ -401,7 +402,7 @@ function submit() {
            call log's "Qualify the client" picker. ≥1 unless bailing. -->
       <fieldset v-if="hasDeal" class="rounded-xl border border-line p-3">
         <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">
-          Property shortlist<template v-if="!bailing"> (at least one)</template>
+          {{ $t('shortlist.title') }}<template v-if="!bailing"> {{ $t('visits.atLeastOne') }}</template>
         </legend>
         <div v-if="shortlist.length" class="mb-3 flex flex-wrap gap-1.5">
           <span
@@ -415,7 +416,7 @@ function submit() {
               v-else
               type="button"
               class="text-mute hover:text-danger"
-              aria-label="Remove from shortlist"
+:aria-label="$t('shortlist.removeAria')"
               @click="shortlist.splice(i, 1)"
             >
               <i class="pi pi-times text-[10px]" aria-hidden="true" />
@@ -430,7 +431,7 @@ function submit() {
          analytics (an in-site visit's objections attribute to its unit). -->
     <fieldset v-if="objectionReasons.length" class="rounded-xl border border-line p-3">
       <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">
-        Objections / concerns
+        {{ $t('calls.objections') }}
       </legend>
       <div class="flex flex-wrap gap-1.5">
         <button
@@ -445,12 +446,12 @@ function submit() {
           "
           @click="toggleObjection(o.id)"
         >
-          {{ o.label }}
+          {{ itemLabel(o) }}
         </button>
       </div>
     </fieldset>
 
-    <BaseTextarea v-model="notes" label="Notes" :rows="3" />
+    <BaseTextarea v-model="notes" :label="$t('common.notes')" :rows="3" />
 
     <!-- Interim in-site log (siblings still open): the conclusion waits for the
          last remaining visit — record just the result here. -->
@@ -459,8 +460,7 @@ function submit() {
       class="flex items-center gap-2 rounded-lg border border-line bg-surface-50 px-3 py-2.5 text-sm text-mute dark:bg-surface-800/50"
     >
       <i class="pi pi-info-circle" aria-hidden="true" />
-      More in-site visits are still open for this project — record this result; conclude on the
-      last one.
+      {{ $t('visits.interimNotice') }}
     </p>
 
     <!-- …but the client may commit to THIS apartment right away: its own deal
@@ -470,13 +470,13 @@ function submit() {
         <input v-model="interimDeal" type="checkbox" class="h-4 w-4 accent-primary" />
         <span>
           <i class="pi pi-briefcase text-[11px] text-mute" aria-hidden="true" />
-          The client takes this apartment — open its deal now
+          {{ $t('visits.clientTakesApartment') }}
         </span>
       </label>
       <div v-if="interimDeal" class="mt-2 space-y-2 border-t border-line pt-2">
         <div v-for="u in dealUnits" :key="u.unit_id" class="text-xs">
           <p class="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-mute">
-            Boxes with this apartment
+            {{ $t('calls.boxesWithApartment') }}
           </p>
           <UnitBoxPicker v-model="u.box_ids" :unit-id="u.unit_id" :location-id="u.location_id" />
         </div>
@@ -486,7 +486,7 @@ function submit() {
     <!-- How the visit concludes — the self-closing rule (exactly one outcome). -->
     <fieldset v-if="showConclusion" class="rounded-xl border border-line p-3">
       <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">
-        How does this visit conclude?
+        {{ $t('visits.howConclude') }}
       </legend>
       <div class="mb-3 flex flex-wrap gap-1.5">
         <button
@@ -528,7 +528,7 @@ function submit() {
           </label>
           <div v-if="u.include" class="mt-2 border-t border-line pt-2">
             <p class="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-mute">
-              Boxes with this apartment
+              {{ $t('calls.boxesWithApartment') }}
             </p>
             <UnitBoxPicker v-model="u.box_ids" :unit-id="u.unit_id" :location-id="u.location_id" />
           </div>
@@ -542,18 +542,18 @@ function submit() {
       <div v-else-if="conclusion === 'archive'" class="space-y-3">
         <BaseSelect
           v-model="archive.reason_id"
-          label="Reason"
+:label="$t('calls.reason')"
           required
-          placeholder="Why is this archived?"
-          :options="archiveReasons.map((r) => ({ value: r.id, label: r.label }))"
+          :placeholder="$t('calls.whyArchived')"
+          :options="archiveReasons.map((r) => ({ value: r.id, label: itemLabel(r) }))"
         />
-        <BaseTextarea v-model="archive.note" label="Note" required :rows="2" />
+        <BaseTextarea v-model="archive.note" :label="$t('common.note')" required :rows="2" />
       </div>
     </fieldset>
 
     <div class="flex gap-2 pt-1">
-      <BaseButton type="submit" :disabled="saving || !ready">Complete visit</BaseButton>
-      <BaseButton type="button" variant="ghost" @click="cancel">Cancel</BaseButton>
+      <BaseButton type="submit" :disabled="saving || !ready">{{ $t('visits.completeVisit') }}</BaseButton>
+      <BaseButton type="button" variant="ghost" @click="cancel">{{ $t('common.cancel') }}</BaseButton>
     </div>
   </form>
 </template>

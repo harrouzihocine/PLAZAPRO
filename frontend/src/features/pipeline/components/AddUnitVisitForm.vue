@@ -54,7 +54,7 @@ function submit() {
   <form class="space-y-4" @submit.prevent="submit">
     <p class="flex items-center gap-2 text-sm text-mute">
       <i class="pi pi-map-marker" aria-hidden="true" />
-      Pick the apartment(s) to visit and set a date — each goes out as an in-site visit.
+      {{ $t('pipeline.addUnitIntro') }}
     </p>
 
     <ProjectUnitsPicker v-model="picks" units-only />
@@ -62,15 +62,15 @@ function submit() {
     <div class="grid gap-3 sm:grid-cols-2">
       <label class="block">
         <span class="mb-1.5 block text-sm font-medium text-ink"
-          >Date<span class="text-danger" aria-hidden="true"> *</span></span
+          >{{ $t('common.date') }}<span class="text-danger" aria-hidden="true"> *</span></span
         >
         <input v-model="dueDate" type="date" :min="today" :class="inputClass" />
       </label>
       <div class="block">
         <span class="mb-1.5 block text-sm font-medium text-ink">
-          Time
+          {{ $t('common.time') }}
         </span>
-        <TimeField v-model="dueTime" aria-label="Time" />
+        <TimeField v-model="dueTime" :aria-label="$t('common.time')" />
       </div>
     </div>
 
@@ -79,18 +79,18 @@ function submit() {
     <BaseSelect
       v-if="canDispatch"
       v-model="assignedTo"
-      label="Assign to (field agent, else via the dispatch board)"
-      placeholder="Decide later on the dispatch board"
+:label="$t('pipeline.assignToField')"
+      :placeholder="$t('pipeline.decideLater')"
       :options="fieldAgents.map((a) => ({ value: a.id, label: a.name }))"
     />
     <p v-else class="flex items-center gap-2 text-sm text-mute">
       <i class="pi pi-send" aria-hidden="true" />
-      The dispatcher will be notified to assign a field agent.
+      {{ $t('pipeline.dispatcherNotified') }}
     </p>
 
     <div class="flex gap-2 pt-1">
-      <BaseButton type="submit" :disabled="saving || !ready">Add to visits</BaseButton>
-      <BaseButton type="button" variant="ghost" @click="emit('cancel')">Cancel</BaseButton>
+      <BaseButton type="submit" :disabled="saving || !ready">{{ $t('pipeline.addToVisits') }}</BaseButton>
+      <BaseButton type="button" variant="ghost" @click="emit('cancel')">{{ $t('common.cancel') }}</BaseButton>
     </div>
   </form>
 </template>

@@ -3,10 +3,11 @@ import { ref } from 'vue'
 import Button from 'primevue/button'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import { useDynamicList } from '@/composables/useDynamicList'
+import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { googleMapsUrl } from '@/features/inventory/googleMaps'
 import { copyToClipboard } from '@/composables/useClipboard'
 import { formatDateTime, humanize, unitLine } from '@/utils/format'
+import { i18n, t } from '@/i18n'
 
 // The presentational interaction timeline: one expandable card per entry
 // (call / visit / next action), newest first, with edited logs keeping their
@@ -19,8 +20,8 @@ import { formatDateTime, humanize, unitLine } from '@/utils/format'
 defineProps({
   // Prepared entries: { kind: 'call'|'visit'|'action', at, loggedAt, data }.
   entries: { type: Array, required: true },
-  emptyTitle: { type: String, default: 'Nothing here yet' },
-  emptyBody: { type: String, default: 'The story starts with the first logged call.' },
+  emptyTitle: { type: String, default: null }, // null → localized defaults
+  emptyBody: { type: String, default: null },
 })
 
 const { items: officeChecklist } = useDynamicList('office_visit_checklist')
@@ -28,22 +29,25 @@ const { items: callTopics } = useDynamicList('call_topics')
 const { items: objectionReasons } = useDynamicList('objection_reasons')
 
 // "Discussed" chips are stored as ids — resolve them to their labels for display.
-const topicLabels = (ids) =>
-  (ids ?? []).map((id) => callTopics.value.find((t) => t.id === id)?.label ?? `#${id}`)
-const checklistLabels = (ids) =>
-  (ids ?? []).map((id) => officeChecklist.value.find((c) => c.id === id)?.label ?? `#${id}`)
-const objectionLabels = (ids) =>
-  (ids ?? []).map((id) => objectionReasons.value.find((o) => o.id === id)?.label ?? `#${id}`)
+const resolve = (list, id) => {
+  const item = list.find((x) => x.id === id)
+  return item ? itemLabel(item) : `#${id}`
+}
+const topicLabels = (ids) => (ids ?? []).map((id) => resolve(callTopics.value, id))
+const checklistLabels = (ids) => (ids ?? []).map((id) => resolve(officeChecklist.value, id))
+const objectionLabels = (ids) => (ids ?? []).map((id) => resolve(objectionReasons.value, id))
 
 const mapsUrl = (visit) => googleMapsUrl(visit.unit?.location ?? {})
 
 const isCancelled = (row) => row.status === 'cancelled'
 
 // The card headline per log kind (the direction icon for calls is added inline).
+const typeLabel = (type) => (i18n.global.te(`status.${type}`) ? t(`status.${type}`) : humanize(type))
+
 function entryTitle(e) {
-  if (e.kind === 'call') return e.data.direction === 'in' ? 'Incoming call' : 'Outgoing call'
-  if (e.kind === 'action') return `Planned ${humanize(e.data.type)}`
-  return `${humanize(e.data.type)} visit`
+  if (e.kind === 'call') return e.data.direction === 'in' ? t('pipeline.incomingCall') : t('pipeline.outgoingCall')
+  if (e.kind === 'action') return t('pipeline.plannedType', { type: e.data.type === 'call' ? t('pipeline.typeCall') : typeLabel(e.data.type) })
+  return e.data.type === 'in_site' ? t('status.in_site_visit') : t('status.office_visit')
 }
 
 // The at-a-glance facts shown as spaced chips under the headline (collapsed) —
@@ -53,9 +57,9 @@ function entryChips(e) {
   // In-site logs state when the visit ACTUALLY happened — worth a glance chip
   // next to the scheduled slot (the detail view compares it to the log time).
   if (e.kind === 'visit' && e.data.visited_at) {
-    chips.push({ icon: 'pi pi-map-marker', text: `Visited ${formatDateTime(e.data.visited_at)}` })
+    chips.push({ icon: 'pi pi-map-marker', text: t('pipeline.visitedChip', { date: formatDateTime(e.data.visited_at) }) })
   }
-  if (e.loggedAt) chips.push({ icon: 'pi pi-clock', text: `Logged ${formatDateTime(e.loggedAt)}` })
+  if (e.loggedAt) chips.push({ icon: 'pi pi-clock', text: t('pipeline.loggedChip', { date: formatDateTime(e.loggedAt) }) })
   if (e.kind === 'visit' && e.data.unit) {
     chips.push({
       icon: 'pi pi-home',
@@ -83,7 +87,7 @@ const isExpanded = (e) => expanded.value.has(keyOf(e))
 </script>
 
 <template>
-  <EmptyState v-if="!entries.length" icon="pi pi-phone" :title="emptyTitle" :body="emptyBody" />
+  <EmptyState v-if="!entries.length" icon="pi pi-phone" :title="emptyTitle ?? $t('pipeline.emptyTab')" :body="emptyBody ?? $t('pipeline.emptyBody')" />
   <ol v-else class="mt-4 space-y-4">
     <li v-for="(e, i) in entries" :key="keyOf(e)" class="relative flex gap-3.5">
       <!-- Icon rail: the dot + the connector that threads the whole story. -->
@@ -141,19 +145,19 @@ const isExpanded = (e) => expanded.value.has(keyOf(e))
               class="rounded-full bg-surface-100 px-2 py-0.5 text-[11px] italic text-mute dark:bg-surface-800"
               :title="e.data.edit_reason"
             >
-              edited
+              {{ $t('pipeline.edited') }}
             </span>
           </div>
           <span class="flex shrink-0 items-center gap-1">
             <slot name="actions" :entry="e" />
             <Button
-              :label="isExpanded(e) ? 'Less' : 'Details'"
+              :label="isExpanded(e) ? $t('common.less') : $t('pipeline.details')"
               :icon="isExpanded(e) ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
               icon-pos="right"
               text
               size="small"
               severity="secondary"
-              :aria-label="isExpanded(e) ? 'Collapse details' : 'Expand details'"
+              :aria-label="isExpanded(e) ? $t('pipeline.collapseDetails') : $t('pipeline.expandDetails')"
               @click="toggle(e)"
             />
           </span>
@@ -184,62 +188,62 @@ const isExpanded = (e) => expanded.value.has(keyOf(e))
           <dl class="grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-3">
             <template v-if="e.kind === 'call'">
               <div>
-                <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">Direction</dt>
-                <dd class="mt-0.5 text-ink">{{ e.data.direction === 'in' ? 'Incoming' : 'Outgoing' }}</dd>
+                <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">{{ $t('calls.direction') }}</dt>
+                <dd class="mt-0.5 text-ink">{{ e.data.direction === 'in' ? $t('pipeline.incoming') : $t('pipeline.outgoing') }}</dd>
               </div>
               <div>
-                <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">Called at</dt>
+                <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">{{ $t('pipeline.calledAt') }}</dt>
                 <dd class="mt-0.5 text-ink">{{ formatDateTime(e.data.called_at) }}</dd>
               </div>
             </template>
 
             <template v-else-if="e.kind === 'visit'">
               <div>
-                <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">Scheduled</dt>
+                <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">{{ $t('status.scheduled') }}</dt>
                 <dd class="mt-0.5 text-ink">{{ formatDateTime(e.data.scheduled_at) }}</dd>
               </div>
               <!-- When the visit actually happened (agent-stated) vs when its
                    log was filled — the gap is the oversight signal. -->
               <div v-if="e.data.visited_at">
-                <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">Visited</dt>
+                <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">{{ $t('pipeline.visited') }}</dt>
                 <dd class="mt-0.5 text-ink">{{ formatDateTime(e.data.visited_at) }}</dd>
               </div>
               <div>
-                <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">Log filled</dt>
+                <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">{{ $t('pipeline.logFilled') }}</dt>
                 <dd class="mt-0.5 text-ink">{{ e.data.completed_at ? formatDateTime(e.data.completed_at) : '—' }}</dd>
               </div>
             </template>
 
             <template v-else>
               <div>
-                <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">Due</dt>
+                <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">{{ $t('pipeline.dueLabel') }}</dt>
                 <dd class="mt-0.5 text-ink">{{ formatDateTime(e.data.due_at) }}</dd>
               </div>
               <div>
-                <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">Completed</dt>
+                <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">{{ $t('status.completed') }}</dt>
                 <dd class="mt-0.5 text-ink">{{ e.data.completed_at ? formatDateTime(e.data.completed_at) : '—' }}</dd>
               </div>
             </template>
 
             <div v-if="e.data.agent || e.data.assigned_to">
               <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">
-                {{ e.kind === 'action' ? 'Assigned to' : 'Agent' }}
+                {{ e.kind === 'action' ? $t('pipeline.assignedTo') : $t('clients.agent') }}
               </dt>
               <dd class="mt-0.5 text-ink">{{ e.data.agent?.name ?? e.data.assigned_to?.name }}</dd>
             </div>
             <div v-if="e.data.outcome">
-              <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">Outcome</dt>
+              <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">{{ $t('visits.outcome') }}</dt>
               <dd class="mt-0.5 text-ink">{{ e.data.outcome.label }}</dd>
             </div>
             <div v-if="e.data.created_at">
-              <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">Logged</dt>
+              <dt class="text-[11px] font-medium uppercase tracking-wide text-mute">{{ $t('pipeline.logged') }}</dt>
               <dd class="mt-0.5 text-ink">{{ formatDateTime(e.data.created_at) }}</dd>
             </div>
           </dl>
 
           <!-- Property card (visits) — the full unit line on its own row. -->
           <div v-if="e.kind === 'visit' && e.data.unit" class="rounded-lg bg-surface-50 p-3 dark:bg-surface-800/50">
-            <p class="text-[11px] font-medium uppercase tracking-wide text-mute">Property</p>
+            <p class="text-[11px] font-medium uppercase tracking-wide text-mute">{{ $t('pipeline.property') }}</p>
             <p class="mt-1 font-medium text-ink">
               {{ unitLine(e.data.unit) }}
               <template v-if="e.data.unit.location?.name"> — {{ e.data.unit.location.name }}</template>
@@ -251,14 +255,14 @@ const isExpanded = (e) => expanded.value.has(keyOf(e))
                 rel="noopener"
                 class="inline-flex items-center gap-1.5 text-primary-600 hover:underline dark:text-primary-400"
               >
-                <i class="pi pi-map" aria-hidden="true" /> Open the site in Google Maps
+                <i class="pi pi-map" aria-hidden="true" /> {{ $t('pipeline.openInMaps') }}
               </a>
               <button
                 type="button"
-                title="Copy Maps link"
-                aria-label="Copy Maps link"
+:title="$t('pipeline.copyMapsLink')"
+                :aria-label="$t('pipeline.copyMapsLink')"
                 class="inline-flex items-center text-primary-600 hover:underline dark:text-primary-400"
-                @click="copyToClipboard(mapsUrl(e.data), 'Maps link copied')"
+                @click="copyToClipboard(mapsUrl(e.data), $t('pipeline.mapsLinkCopied'))"
               >
                 <i class="pi pi-copy" aria-hidden="true" />
               </button>
@@ -267,7 +271,7 @@ const isExpanded = (e) => expanded.value.has(keyOf(e))
 
           <!-- Discussed (calls) / Checklist (visits) as chips. -->
           <div v-if="e.kind === 'call' && e.data.topics?.length">
-            <p class="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-mute">Discussed</p>
+            <p class="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-mute">{{ $t('calls.discussed') }}</p>
             <div class="flex flex-wrap gap-1.5">
               <span
                 v-for="label in topicLabels(e.data.topics)"
@@ -279,7 +283,7 @@ const isExpanded = (e) => expanded.value.has(keyOf(e))
             </div>
           </div>
           <div v-if="e.kind === 'visit' && e.data.checklist?.length">
-            <p class="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-mute">Checklist</p>
+            <p class="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-mute">{{ $t('pipeline.checklist') }}</p>
             <div class="flex flex-wrap gap-1.5">
               <span
                 v-for="label in checklistLabels(e.data.checklist)"
@@ -294,7 +298,7 @@ const isExpanded = (e) => expanded.value.has(keyOf(e))
           <!-- Objections / concerns (calls + visits) — the "why not" signals. -->
           <div v-if="e.data.objections?.length">
             <p class="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-mute">
-              Objections
+              {{ $t('pipeline.objections') }}
             </p>
             <div class="flex flex-wrap gap-1.5">
               <span
@@ -309,7 +313,7 @@ const isExpanded = (e) => expanded.value.has(keyOf(e))
 
           <!-- Notes get their own quoted block — the heart of the log. -->
           <div v-if="e.data.notes">
-            <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-mute">Notes</p>
+            <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-mute">{{ $t('common.notes') }}</p>
             <p class="whitespace-pre-line rounded-lg border-s-2 border-primary-300 bg-surface-50 px-3 py-2 text-ink dark:border-primary-500/40 dark:bg-surface-800/50">
               {{ e.data.notes }}
             </p>
@@ -319,14 +323,14 @@ const isExpanded = (e) => expanded.value.has(keyOf(e))
             v-if="isCancelled(e.data) && e.data.cancellation_reason"
             class="rounded-lg bg-red-50 px-3 py-2 dark:bg-red-500/10"
           >
-            <p class="text-[11px] font-medium uppercase tracking-wide text-danger">Cancelled because</p>
+            <p class="text-[11px] font-medium uppercase tracking-wide text-danger">{{ $t('pipeline.cancelledBecause') }}</p>
             <p class="mt-0.5 font-medium text-danger">{{ e.data.cancellation_reason }}</p>
           </div>
 
           <!-- Previous versions: the cancelled originals this log replaced. -->
           <div v-if="e.data.previous_versions?.length" class="border-t border-line pt-2">
             <p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-mute">
-              Previous versions
+              {{ $t('pipeline.previousVersions') }}
             </p>
             <ol class="space-y-1.5">
               <li

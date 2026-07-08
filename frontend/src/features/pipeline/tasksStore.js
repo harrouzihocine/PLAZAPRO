@@ -3,6 +3,7 @@ import { toastError } from '@/composables/useConfirm'
 import { tasksApi } from '@/features/pipeline/api'
 import { agentsApi } from '@/features/clients/api'
 import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
+import { t } from '@/i18n'
 
 // State for the tasks board. Filters are sent to the server (scope mine/team,
 // state, priority, overdue); every write refetches so the list reflects server
@@ -60,7 +61,7 @@ export const useTasksStore = defineStore('tasks', {
         await tasksApi.create(payload)
         await this.fetch()
       } catch (e) {
-        this.error = e.response?.data?.message ?? 'Could not create the task.'
+        this.error = e.response?.data?.message ?? t('tasks.createFailed')
         toastError(this.error)
         throw e
       } finally {

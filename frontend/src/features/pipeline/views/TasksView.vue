@@ -14,7 +14,8 @@ import OfflineStamp from '@/components/ui/OfflineStamp.vue'
 import FilterPanel from '@/components/ui/FilterPanel.vue'
 import { useTasksStore } from '@/features/pipeline/tasksStore'
 import { confirmAction } from '@/composables/useConfirm'
-import { countActiveFilters, todayInput } from '@/utils/format'
+import { countActiveFilters, intlLocale, todayInput } from '@/utils/format'
+import { t } from '@/i18n'
 
 const store = useTasksStore()
 const activeFilterCount = computed(() => countActiveFilters(store.filters, ['scope']))
@@ -61,9 +62,9 @@ async function quickAdd() {
 async function cancelTask(task) {
   if (
     await confirmAction({
-      title: `Cancel task "${task.title}"?`,
-      text: 'The record is kept.',
-      confirmText: 'Cancel task',
+      title: t('tasks.cancelTitle', { title: task.title }),
+      text: t('tasks.cancelText'),
+      confirmText: t('tasks.cancelConfirm'),
       danger: true,
     })
   ) {
@@ -75,7 +76,7 @@ const prioritySeverity = { high: 'danger', normal: 'info', low: 'secondary' }
 
 function formatDue(value) {
   if (!value) return '—'
-  return new Date(value).toLocaleString(undefined, {
+  return new Date(value).toLocaleString(intlLocale(), {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
@@ -86,49 +87,49 @@ function formatDue(value) {
 
 <template>
   <div>
-    <PageHeader title="Tasks" subtitle="Your to-dos and the team's. Overdue items are flagged." />
+    <PageHeader :title="$t('nav.tasks')" :subtitle="$t('tasks.subtitle')" />
     <OfflineStamp :at="store.offlineAt" />
 
     <!-- Quick add -->
-    <SectionCard title="Quick add" icon="pi pi-plus-circle" class="mb-5">
+    <SectionCard :title="$t('tasks.quickAdd')" icon="pi pi-plus-circle" class="mb-5">
       <form class="grid gap-3 sm:grid-cols-2 lg:grid-cols-6" @submit.prevent="quickAdd">
         <BaseInput
           v-model="form.title"
-          label="New task"
+:label="$t('tasks.newTask')"
           required
-          placeholder="What needs doing?"
+          :placeholder="$t('tasks.whatNeedsDoing')"
           class="lg:col-span-2"
         />
         <BaseSelect
           v-model="form.assigned_to"
-          label="Assign to"
-          placeholder="Me"
+:label="$t('pipeline.assignedTo')"
+          :placeholder="$t('tasks.me')"
           :options="store.agents.map((a) => ({ value: a.id, label: a.name }))"
         />
         <BaseSelect
           v-model="form.priority"
-          label="Priority"
+:label="$t('tasks.priority')"
           :clearable="false"
           :options="[
-            { value: 'low', label: 'Low' },
-            { value: 'normal', label: 'Normal' },
-            { value: 'high', label: 'High' },
+            { value: 'low', label: $t('status.low') },
+            { value: 'normal', label: $t('tasks.normal') },
+            { value: 'high', label: $t('status.high') },
           ]"
         />
         <BaseInput
           v-model="form.due_date"
-          label="Due date"
+:label="$t('pipeline.dueDate')"
           type="date"
           :min="todayInput()"
         />
         <div class="block">
           <span class="mb-1.5 block text-sm font-medium text-ink">
-            Time
+            {{ $t('common.time') }}
           </span>
-          <TimeField v-model="form.due_time" aria-label="Due time" />
+          <TimeField v-model="form.due_time" :aria-label="$t('common.time')" />
         </div>
         <div class="lg:col-span-6">
-          <Button type="submit" label="Add task" icon="pi pi-plus" :loading="store.saving" />
+          <Button type="submit" :label="$t('tasks.addTask')" icon="pi pi-plus" :loading="store.saving" />
         </div>
       </form>
     </SectionCard>
@@ -139,58 +140,58 @@ function formatDue(value) {
       <div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
         <BaseSelect
           v-model="store.filters.scope"
-          aria-label="Scope"
+:aria-label="$t('tasks.scope')"
           class="w-full sm:w-36"
           :clearable="false"
           :options="[
-            { value: 'mine', label: 'Mine' },
-            { value: 'team', label: 'Team' },
+            { value: 'mine', label: $t('tasks.mine') },
+            { value: 'team', label: $t('tasks.team') },
           ]"
           @change="store.fetch()"
         />
         <BaseSelect
           v-model="store.filters.state"
-          placeholder="All states"
-          aria-label="State"
+:placeholder="$t('tasks.allStates')"
+          :aria-label="$t('common.status')"
           class="w-full sm:w-36"
           :options="[
-            { value: 'open', label: 'Open' },
-            { value: 'done', label: 'Done' },
+            { value: 'open', label: $t('status.open') },
+            { value: 'done', label: $t('status.done') },
           ]"
           @change="store.fetch()"
         />
         <BaseSelect
           v-model="store.filters.priority"
-          placeholder="All priorities"
-          aria-label="Priority"
+:placeholder="$t('tasks.allPriorities')"
+          :aria-label="$t('tasks.priority')"
           class="w-full sm:w-40"
           :options="[
-            { value: 'high', label: 'High' },
-            { value: 'normal', label: 'Normal' },
-            { value: 'low', label: 'Low' },
+            { value: 'high', label: $t('status.high') },
+            { value: 'normal', label: $t('tasks.normal') },
+            { value: 'low', label: $t('status.low') },
           ]"
           @change="store.fetch()"
         />
         <label class="flex cursor-pointer items-center gap-2 text-sm text-ink">
           <Checkbox v-model="store.filters.overdue" binary @change="store.fetch()" />
-          Overdue only
+          {{ $t('tasks.overdueOnly') }}
         </label>
       </div>
       </FilterPanel>
 
-      <p v-if="store.loading" class="py-8 text-center text-sm text-mute">Loading…</p>
+      <p v-if="store.loading" class="py-8 text-center text-sm text-mute">{{ $t('common.loading') }}</p>
 
       <div v-else>
         <section>
           <h2
             class="border-b border-line px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-mute sm:px-5"
           >
-            Open ({{ openTasks.length }})
+            {{ $t('status.open') }} ({{ openTasks.length }})
           </h2>
           <EmptyState
             v-if="!openTasks.length"
             icon="pi pi-check-circle"
-            title="Nothing open. Nice."
+:title="$t('tasks.nothingOpen')"
           />
           <ul v-else class="divide-y divide-line">
             <li
@@ -216,20 +217,20 @@ function formatDue(value) {
                   <span class="truncate text-sm font-medium text-ink">{{ t.title }}</span>
                   <Tag
                     v-if="t.priority !== 'normal'"
-                    :value="t.priority"
+:value="$t(`status.${t.priority}`) || t.priority"
                     :severity="prioritySeverity[t.priority]"
                   />
                 </p>
                 <p class="mt-0.5 text-xs text-mute">
                   <span :class="{ 'font-medium text-danger': isOverdue(t) }">
-                    Due {{ formatDue(t.due_at) }}
+                    {{ $t('pipeline.due', { date: formatDue(t.due_at) }) }}
                   </span>
-                  · {{ t.assigned_to?.name ?? 'Unassigned' }}
+                  · {{ t.assigned_to?.name ?? $t('clients.unassigned') }}
                   <span v-if="t.subject_label"> · {{ t.subject_label }}</span>
                 </p>
               </div>
               <Button
-                label="Done"
+:label="$t('status.done')"
                 icon="pi pi-check"
                 size="small"
                 outlined
@@ -242,7 +243,7 @@ function formatDue(value) {
                 rounded
                 size="small"
                 severity="danger"
-                aria-label="Cancel task"
+:aria-label="$t('tasks.cancelConfirm')"
                 @click="cancelTask(t)"
               />
             </li>
@@ -253,7 +254,7 @@ function formatDue(value) {
           <h2
             class="border-y border-line px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-mute sm:px-5"
           >
-            Done ({{ doneTasks.length }})
+            {{ $t('status.done') }} ({{ doneTasks.length }})
           </h2>
           <ul class="divide-y divide-line">
             <li

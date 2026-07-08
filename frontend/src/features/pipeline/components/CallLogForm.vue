@@ -4,7 +4,7 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
-import { useDynamicList } from '@/composables/useDynamicList'
+import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { shortlistApi } from '@/features/clients/api'
 import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPicker.vue'
 import UnitBoxPicker from '@/features/inventory/components/UnitBoxPicker.vue'
@@ -15,6 +15,7 @@ import DraftBanner from '@/features/drafts/DraftBanner.vue'
 import NextActionFields from '@/features/pipeline/components/NextActionFields.vue'
 import { useModalDraft } from '@/composables/useModalDraft'
 import { unitLine } from '@/utils/format'
+import { t } from '@/i18n'
 
 // The fast-entry call log (qualification happens on the phone): direction
 // defaults to outbound, what-was-discussed is one tap-chip list, free-text notes.
@@ -108,7 +109,7 @@ onMounted(async () => {
 const draft = props.draftKey
   ? useModalDraft({
       key: props.draftKey,
-      label: `Call log — ${props.client?.full_name ?? 'client'}`,
+      label: t('offline.label.callLog', { name: props.client?.full_name ?? '' }),
       getForm: () => ({
         direction: direction.value,
         notes: notes.value,
@@ -157,10 +158,10 @@ function toggleObjection(id) {
 }
 
 const CONCLUSIONS = computed(() => [
-  { value: 'next_action', label: 'Plan next action', icon: 'pi pi-calendar-plus' },
-  { value: 'desire', label: 'To desire list', icon: 'pi pi-heart' },
-  { value: 'archive', label: 'Archive', icon: 'pi pi-inbox' },
-  { value: 'deal', label: 'Create deal', icon: 'pi pi-briefcase' },
+  { value: 'next_action', label: t('calls.planNextAction'), icon: 'pi pi-calendar-plus' },
+  { value: 'desire', label: t('calls.toDesireList'), icon: 'pi pi-heart' },
+  { value: 'archive', label: t('project.archive'), icon: 'pi pi-inbox' },
+  { value: 'deal', label: t('calls.createDeal'), icon: 'pi pi-briefcase' },
 ])
 
 // The Branch A desire capture (alongside any conclusion) still requires its notes.
@@ -242,19 +243,19 @@ function submit() {
     <DraftBanner :visible="!!draft?.restored.value" />
     <BaseSelect
       v-model="direction"
-      label="Direction"
+:label="$t('calls.direction')"
       required
       class="sm:max-w-xs"
       :clearable="false"
       :options="[
-        { value: 'outbound', label: 'Outbound' },
-        { value: 'inbound', label: 'Inbound' },
+        { value: 'outbound', label: $t('calls.outbound') },
+        { value: 'inbound', label: $t('calls.inbound') },
       ]"
     />
 
     <!-- Fast talking-points — everything discussed / how the call went, in taps. -->
     <fieldset v-if="callTopics.length" class="rounded-xl border border-line p-3">
-      <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">Discussed</legend>
+      <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">{{ $t('calls.discussed') }}</legend>
       <div class="flex flex-wrap gap-1.5">
         <button
           v-for="t in callTopics"
@@ -268,7 +269,7 @@ function submit() {
           "
           @click="toggleTopic(t.id)"
         >
-          {{ t.label }}
+          {{ itemLabel(t) }}
         </button>
       </div>
     </fieldset>
@@ -277,7 +278,7 @@ function submit() {
          Voice-of-Client analytics mine to tell the promoteur what blocks sales. -->
     <fieldset v-if="objectionReasons.length" class="rounded-xl border border-line p-3">
       <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">
-        Objections / concerns
+        {{ $t('calls.objections') }}
       </legend>
       <div class="flex flex-wrap gap-1.5">
         <button
@@ -292,18 +293,18 @@ function submit() {
           "
           @click="toggleObjection(o.id)"
         >
-          {{ o.label }}
+          {{ itemLabel(o) }}
         </button>
       </div>
     </fieldset>
 
-    <BaseTextarea v-model="notes" label="Notes" :rows="3" />
+    <BaseTextarea v-model="notes" :label="$t('common.notes')" :rows="3" />
 
     <!-- Qualify the interest first — matched to inventory (shortlist) or the
          requirements captured (desire). Rides on the call however it concludes. -->
     <fieldset class="rounded-xl border border-line p-3">
       <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">
-        Qualify the client
+        {{ $t('calls.qualifyClient') }}
       </legend>
       <div class="mb-3 flex flex-wrap gap-1.5">
         <button
@@ -316,7 +317,7 @@ function submit() {
           "
           @click="branch = branch === 'properties' ? null : 'properties'"
         >
-          <i class="pi pi-building text-[10px]" aria-hidden="true" /> Select matching properties
+          <i class="pi pi-building text-[10px]" aria-hidden="true" /> {{ $t('calls.selectMatching') }}
         </button>
         <button
           type="button"
@@ -328,13 +329,13 @@ function submit() {
           "
           @click="branch = branch === 'desire' ? null : 'desire'"
         >
-          <i class="pi pi-heart text-[10px]" aria-hidden="true" /> No match — capture requirements
+          <i class="pi pi-heart text-[10px]" aria-hidden="true" /> {{ $t('calls.noMatchCapture') }}
         </button>
       </div>
       <div v-if="branch === 'properties'">
         <div v-if="existingShortlist.length" class="mb-3">
           <p class="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-mute">
-            Already shortlisted
+            {{ $t('calls.alreadyShortlisted') }}
           </p>
           <div class="flex flex-wrap gap-1.5">
             <span
@@ -355,7 +356,7 @@ function submit() {
     <!-- How the call concludes — the self-closing rule (exactly one outcome). -->
     <fieldset class="rounded-xl border border-line p-3">
       <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-mute">
-        How does this call conclude?
+        {{ $t('calls.howConclude') }}
       </legend>
       <div class="mb-3 flex flex-wrap gap-1.5">
         <button
@@ -386,12 +387,12 @@ function submit() {
       <div v-else-if="conclusion === 'archive'" class="space-y-3">
         <BaseSelect
           v-model="archive.reason_id"
-          label="Reason"
+:label="$t('calls.reason')"
           required
-          placeholder="Why is this archived?"
-          :options="archiveReasons.map((r) => ({ value: r.id, label: r.label }))"
+          :placeholder="$t('calls.whyArchived')"
+          :options="archiveReasons.map((r) => ({ value: r.id, label: itemLabel(r) }))"
         />
-        <BaseTextarea v-model="archive.note" label="Note" required :rows="2" />
+        <BaseTextarea v-model="archive.note" :label="$t('common.note')" required :rows="2" />
       </div>
 
       <!-- Deal → the client commits: pick from the interested list (each
@@ -401,7 +402,7 @@ function submit() {
       <div v-else-if="conclusion === 'deal'" class="space-y-3">
         <div v-if="dealChoices.length" class="space-y-2">
           <p class="text-xs font-semibold uppercase tracking-wide text-mute">
-            Apartments the client is interested in
+            {{ $t('calls.interestedApartments') }}
           </p>
           <div
             v-for="c in dealChoices"
@@ -416,7 +417,7 @@ function submit() {
             </label>
             <div v-if="c.include" class="mt-2 border-t border-line pt-2">
               <p class="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-mute">
-                Boxes with this apartment
+                {{ $t('calls.boxesWithApartment') }}
               </p>
               <UnitBoxPicker
                 v-model="c.box_ids"
@@ -427,16 +428,15 @@ function submit() {
           </div>
         </div>
         <p v-else class="text-xs text-mute">
-          Nothing on the interested list yet — pick the apartment(s) below (they join the
-          shortlist with the deal).
+          {{ $t('calls.nothingInterestedYet') }}
         </p>
         <ProjectUnitsPicker v-model="dealAdditions" units-only with-boxes />
       </div>
     </fieldset>
 
     <div class="flex gap-2 pt-1">
-      <BaseButton type="submit" :disabled="saving || !ready">Save call</BaseButton>
-      <BaseButton type="button" variant="ghost" @click="cancel">Cancel</BaseButton>
+      <BaseButton type="submit" :disabled="saving || !ready">{{ $t('calls.saveCall') }}</BaseButton>
+      <BaseButton type="button" variant="ghost" @click="cancel">{{ $t('common.cancel') }}</BaseButton>
     </div>
   </form>
 </template>

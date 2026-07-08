@@ -2,7 +2,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import { pipelineApi } from '@/features/pipeline/api'
-import { todayInput } from '@/utils/format'
+import { intlLocale, todayInput } from '@/utils/format'
+import { t } from '@/i18n'
 
 // The "when are you free?" picker on the next-action form: the signed-in agent's
 // own workload for the coming week, one cell per day with a capacity meter, so she
@@ -55,12 +56,12 @@ const addDays = (iso, n) => {
 const weekStart = computed(() => addDays(localToday(), weekOffset.value * props.days))
 
 const KIND = {
-  call: { icon: 'pi pi-phone', label: 'Call' },
-  office_visit: { icon: 'pi pi-building', label: 'Office visit' },
-  in_site_visit: { icon: 'pi pi-map-marker', label: 'In-site visit' },
-  task: { icon: 'pi pi-check-square', label: 'Task' },
+  call: { icon: 'pi pi-phone', key: 'pipeline.typeCall' },
+  office_visit: { icon: 'pi pi-building', key: 'status.office_visit' },
+  in_site_visit: { icon: 'pi pi-map-marker', key: 'status.in_site_visit' },
+  task: { icon: 'pi pi-check-square', key: 'pipeline.typeTask' },
 }
-const kindOf = (k) => KIND[k] ?? { icon: 'pi pi-circle', label: k }
+const kindOf = (k) => (KIND[k] ? { icon: KIND[k].icon, label: t(KIND[k].key) } : { icon: 'pi pi-circle', label: k })
 
 // One cell of derived display state per returned day.
 const columns = computed(() => {
@@ -70,8 +71,8 @@ const columns = computed(() => {
     const count = b.items.length
     return {
       date: b.date,
-      weekday: d.toLocaleDateString(undefined, { weekday: 'short', timeZone: 'UTC' }),
-      dayNum: d.toLocaleDateString(undefined, { day: 'numeric', timeZone: 'UTC' }),
+      weekday: d.toLocaleDateString(intlLocale(), { weekday: 'short', timeZone: 'UTC' }),
+      dayNum: d.toLocaleDateString(intlLocale(), { day: 'numeric', timeZone: 'UTC' }),
       isToday: b.date === today,
       items: b.items,
       count,
@@ -83,18 +84,18 @@ const columns = computed(() => {
 
 const total = computed(() => columns.value.reduce((n, c) => n + c.count, 0))
 const selectedCol = computed(() => columns.value.find((c) => c.date === props.modelValue) ?? null)
-const dayTitle = (col) => (col.isToday ? 'today' : `${col.weekday} ${col.dayNum}`)
+const dayTitle = (col) => (col.isToday ? t('common.today') : `${col.weekday} ${col.dayNum}`)
 
 // "This week" / "Next week" read plainer than a date range; beyond that the range
 // (e.g. "19–25 Jul") is clearer than "in 3 weeks".
 const weekLabel = computed(() => {
-  if (weekOffset.value === 0) return 'This week'
-  if (weekOffset.value === 1) return 'Next week'
+  if (weekOffset.value === 0) return t('pipeline.thisWeek')
+  if (weekOffset.value === 1) return t('pipeline.nextWeek')
   const start = new Date(weekStart.value + 'T00:00:00Z')
   const end = new Date(addDays(weekStart.value, props.days - 1) + 'T00:00:00Z')
   const sameMonth = start.getUTCMonth() === end.getUTCMonth()
   const fmt = (d, month) =>
-    d.toLocaleDateString(undefined, {
+    d.toLocaleDateString(intlLocale(), {
       day: 'numeric',
       month: month ? 'short' : undefined,
       timeZone: 'UTC',
@@ -144,11 +145,11 @@ function select(date) {
         class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-mute"
       >
         <i class="pi pi-calendar text-[11px]" aria-hidden="true" />
-        Your workload
+        {{ $t('pipeline.yourWorkload') }}
       </span>
       <span class="flex items-center gap-1.5">
         <span v-if="!expanded" class="text-[11px] text-mute">
-          {{ total }} planned · {{ weekLabel.toLowerCase() }}
+          {{ $t('pipeline.plannedCount', { n: total }) }} · {{ weekLabel.toLowerCase() }}
         </span>
         <Button
           :icon="expanded ? 'pi pi-minus' : 'pi pi-plus'"
@@ -157,7 +158,7 @@ function select(date) {
           size="small"
           severity="secondary"
           class="!h-7 !w-7 shrink-0"
-          :aria-label="expanded ? 'Collapse your workload' : 'Expand your workload'"
+          :aria-label="expanded ? $t('pipeline.collapseWorkload') : $t('pipeline.expandWorkload')"
           :aria-expanded="expanded"
           @click="expanded = !expanded"
         />
@@ -177,7 +178,7 @@ function select(date) {
           severity="secondary"
           class="!h-7 !w-7 shrink-0"
           :disabled="!canPrev"
-          aria-label="Previous week"
+:aria-label="$t('pipeline.previousWeek')"
           @click="shiftWeek(-1)"
         />
         <button
@@ -188,7 +189,7 @@ function select(date) {
               ? 'cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800'
               : 'cursor-default'
           "
-          :title="canPrev ? 'Back to this week' : null"
+          :title="canPrev ? $t('pipeline.backToThisWeek') : null"
           @click="canPrev && shiftWeek(-weekOffset)"
         >
           {{ weekLabel }}
@@ -202,18 +203,18 @@ function select(date) {
           severity="secondary"
           class="!h-7 !w-7 shrink-0"
           :disabled="!canNext"
-          aria-label="Next week"
+:aria-label="$t('pipeline.nextWeek')"
           @click="shiftWeek(1)"
         />
       </div>
 
       <div v-if="loading" class="px-3 pb-5 pt-3 text-center text-xs text-mute">
-        <i class="pi pi-spin pi-spinner" aria-hidden="true" /> Loading your agenda…
+        <i class="pi pi-spin pi-spinner" aria-hidden="true" /> {{ $t('pipeline.loadingAgenda') }}
       </div>
       <p v-else-if="failed" class="px-3 pb-5 pt-3 text-center text-xs text-mute">
-        Couldn't load your agenda.
+        {{ $t('pipeline.agendaFailed') }}
         <button type="button" class="font-medium text-primary-600 underline" @click="load">
-          Retry
+          {{ $t('common.retry') }}
         </button>
       </p>
 
@@ -231,7 +232,7 @@ function select(date) {
                 : 'border-transparent hover:bg-surface-100 dark:hover:bg-surface-800'
             "
             :aria-pressed="modelValue === col.date"
-            :aria-label="`${col.weekday} ${col.dayNum} — ${col.count === 0 ? 'free' : col.count + ' scheduled'}. Set as due date`"
+            :aria-label="$t('pipeline.dayAria', { day: `${col.weekday} ${col.dayNum}`, n: col.count })"
             @click="select(col.date)"
           >
             <span
@@ -244,7 +245,7 @@ function select(date) {
                     : 'text-mute'
               "
             >
-              {{ col.isToday ? 'Today' : col.weekday }}
+              {{ col.isToday ? $t('common.today') : col.weekday }}
             </span>
             <span
               class="text-base font-semibold leading-none"
@@ -283,7 +284,7 @@ function select(date) {
                       : 'text-mute'
               "
             >
-              {{ col.count === 0 ? 'Free' : col.count }}
+              {{ col.count === 0 ? $t('pipeline.free') : col.count }}
             </span>
           </button>
         </div>
@@ -293,12 +294,12 @@ function select(date) {
         <div v-if="selectedCol" class="border-t border-line bg-ground/40 px-3 py-2.5">
           <p v-if="selectedCol.count === 0" class="flex items-center gap-1.5 text-xs text-success">
             <i class="pi pi-check-circle" aria-hidden="true" />
-            <span class="capitalize">{{ dayTitle(selectedCol) }}</span> is clear — good pick.
+            {{ $t('pipeline.dayClear', { day: dayTitle(selectedCol) }) }}
           </p>
           <template v-else>
             <p class="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-mute">
-              On <span class="text-ink">{{ dayTitle(selectedCol) }}</span> · {{ selectedCol.count }}
-              <span v-if="selectedCol.overloaded" class="ms-1 text-warning">— heavy day</span>
+              {{ $t('pipeline.onDay', { day: dayTitle(selectedCol) }) }} · {{ selectedCol.count }}
+              <span v-if="selectedCol.overloaded" class="ms-1 text-warning">— {{ $t('pipeline.heavyDay') }}</span>
             </p>
             <ul class="space-y-1">
               <li
@@ -311,7 +312,7 @@ function select(date) {
                   class="w-4 text-center text-[11px] text-mute"
                   aria-hidden="true"
                 />
-                <span class="w-14 shrink-0 tabular-nums text-mute">{{ it.time ?? 'All day' }}</span>
+                <span class="w-14 shrink-0 tabular-nums text-mute">{{ it.time ?? $t('pipeline.allDay') }}</span>
                 <span class="truncate">
                   {{ kindOf(it.kind).label
                   }}<span v-if="it.client ?? it.label" class="text-mute">

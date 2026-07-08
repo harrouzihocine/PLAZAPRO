@@ -18,9 +18,10 @@ import NextActionFields from '@/features/pipeline/components/NextActionFields.vu
 import { pipelineApi } from '@/features/pipeline/api'
 import { actionEntries, byNewest, callEntries, visitEntries } from '@/features/pipeline/timeline'
 import { useAuthStore } from '@/features/settings/store'
-import { useDynamicList } from '@/composables/useDynamicList'
+import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { toastInfo, toastSuccess } from '@/composables/useConfirm'
 import { dateInputValue, formatDate, formatTimeIfSet, humanize, timeInputValue } from '@/utils/format'
+import { i18n, t } from '@/i18n'
 
 // The interaction timeline — scoped to ONE project when projectId is set (its
 // logs + the client-level qualifying calls). The pipeline keeps exactly one
@@ -90,6 +91,10 @@ async function submitPlanNa() {
 // In-site plans may stay unassigned — the dispatch board picks the agent.
 const nextActionReady = (na) => !!na.due_date
 
+// Localized label for a next-action type ('call' | 'office_visit' | 'in_site_visit').
+const naTypeLabel = (type) =>
+  type === 'call' ? t('pipeline.typeCall') : i18n.global.te(`status.${type}`) ? t(`status.${type}`) : humanize(type)
+
 // The single open next action drives what may be logged next.
 const pending = computed(() => store.timeline.next_actions[0] ?? null)
 const pendingIsCall = computed(() => !pending.value || pending.value.type === 'call')
@@ -116,11 +121,11 @@ const calls = computed(() => callEntries(store.timeline.calls))
 const visits = computed(() => visitEntries(store.timeline.visits))
 const actions = computed(() => actionEntries(store.timeline.next_action_history ?? []))
 const TABS = computed(() => [
-  { value: 'all', label: 'All', icon: 'pi pi-history', entries: [...calls.value, ...visits.value].sort(byNewest) },
-  { value: 'calls', label: 'Calls', icon: 'pi pi-phone', entries: [...calls.value].sort(byNewest) },
-  { value: 'office', label: 'Office visits', icon: 'pi pi-building', entries: visits.value.filter((e) => e.data.type === 'office').sort(byNewest) },
-  { value: 'in_site', label: 'In-site visits', icon: 'pi pi-map-marker', entries: visits.value.filter((e) => e.data.type === 'in_site').sort(byNewest) },
-  { value: 'actions', label: 'Next actions', icon: 'pi pi-flag', entries: [...actions.value].sort(byNewest) },
+  { value: 'all', label: t('common.all'), icon: 'pi pi-history', entries: [...calls.value, ...visits.value].sort(byNewest) },
+  { value: 'calls', label: t('pipeline.tabCalls'), icon: 'pi pi-phone', entries: [...calls.value].sort(byNewest) },
+  { value: 'office', label: t('pipeline.tabOfficeVisits'), icon: 'pi pi-building', entries: visits.value.filter((e) => e.data.type === 'office').sort(byNewest) },
+  { value: 'in_site', label: t('pipeline.tabInSiteVisits'), icon: 'pi pi-map-marker', entries: visits.value.filter((e) => e.data.type === 'in_site').sort(byNewest) },
+  { value: 'actions', label: t('pipeline.tabNextActions'), icon: 'pi pi-flag', entries: [...actions.value].sort(byNewest) },
 ])
 const entries = computed(() => TABS.value.find((t) => t.value === tab.value)?.entries ?? [])
 
@@ -153,9 +158,7 @@ function handleLogcall() {
     openEditNa(pending.value)
     editNa.form.type = 'call'
     logcallSwitch.value = true
-    toastInfo(
-      `The planned next action is a ${humanize(pending.value.type)} — pick a reason to switch it to a call first.`,
-    )
+    toastInfo(t('pipeline.switchToCallNotice', { type: naTypeLabel(pending.value.type) }))
   }
 }
 
@@ -222,11 +225,7 @@ async function submitComplete(payload) {
 async function submitAddUnit(payload) {
   await store.proposeInSiteVisit(props.clientId, props.projectId, payload)
   showAddUnit.value = false
-  toastSuccess(
-    payload.assigned_to
-      ? 'Added to the field agent’s visits.'
-      : 'Added to the dispatch pool — the dispatcher was notified.',
-  )
+  toastSuccess(payload.assigned_to ? t('pipeline.addedToAgentVisits') : t('pipeline.addedToPool'))
   emit('changed')
 }
 
@@ -274,14 +273,14 @@ async function submitEditNa() {
     <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
       <h3 class="flex items-center gap-2 text-sm font-semibold text-ink">
         <i class="pi pi-history text-mute" aria-hidden="true" />
-        Timeline
+        {{ $t('pipeline.timeline') }}
       </h3>
       <!-- One pending log at a time: the call CTA shows only when the open next
            action IS a call (or nothing is planned yet). -->
       <span class="flex flex-wrap items-center justify-end gap-2">
         <Button
           v-if="canPlanNextAction && !pending && !frozen"
-          label="Plan next action"
+:label="$t('calls.planNextAction')"
           icon="pi pi-flag"
           size="small"
           severity="secondary"
@@ -292,7 +291,7 @@ async function submitEditNa() {
              in-site visit first (the field agent finds more units on site). -->
         <Button
           v-if="canAddUnitVisit && !frozen"
-          label="Add unit to visit"
+:label="$t('pipeline.addUnitToVisit')"
           icon="pi pi-map-marker"
           size="small"
           severity="secondary"
@@ -301,7 +300,7 @@ async function submitEditNa() {
         />
         <Button
           v-if="canLogCall() && pendingIsCall && !frozen"
-          label="Log call"
+:label="$t('pipeline.logCall')"
           icon="pi pi-phone"
           size="small"
           @click="showCall = true"
@@ -319,13 +318,13 @@ async function submitEditNa() {
       <div class="flex gap-2">
         <Button
           type="submit"
-          label="Plan it"
+:label="$t('pipeline.planIt')"
           size="small"
           :disabled="store.saving || !nextActionReady(planNa.form)"
         />
         <Button
           type="button"
-          label="Cancel"
+:label="$t('common.cancel')"
           size="small"
           severity="secondary"
           outlined
@@ -357,10 +356,10 @@ async function submitEditNa() {
               aria-hidden="true"
             />
             <span>
-              Next:
-              <span class="font-semibold">{{ humanize(na.type) }}</span>
+              {{ $t('pipeline.next') }}
+              <span class="font-semibold">{{ naTypeLabel(na.type) }}</span>
               <span :class="na.is_overdue ? 'font-medium text-danger' : 'text-mute'">
-                · due {{ formatDate(na.due_at)
+                · {{ $t('pipeline.due', { date: formatDate(na.due_at) })
                 }}<template v-if="formatTimeIfSet(na.due_at)">, {{ formatTimeIfSet(na.due_at) }}</template>
               </span>
             </span>
@@ -376,7 +375,7 @@ async function submitEditNa() {
               rounded
               size="small"
               severity="secondary"
-              aria-label="Edit next action (with a reason)"
+:aria-label="$t('pipeline.editNaAria')"
               @click="openEditNa(na)"
             />
           </span>
@@ -391,22 +390,22 @@ async function submitEditNa() {
           <NextActionFields v-model="editNa.form" :field-agents="store.agents" />
           <BaseSelect
             v-model="editNa.reasonId"
-            label="Reason for the change"
+:label="$t('pipeline.changeReason')"
             required
-            placeholder="Pick a reason"
-            :options="changeReasons.map((r) => ({ value: r.id, label: r.label }))"
+            :placeholder="$t('pipeline.pickReason')"
+            :options="changeReasons.map((r) => ({ value: r.id, label: itemLabel(r) }))"
           />
-          <BaseTextarea v-model="editNa.note" label="Note" :rows="2" />
+          <BaseTextarea v-model="editNa.note" :label="$t('common.note')" :rows="2" />
           <div class="flex gap-2">
             <Button
               type="submit"
-              label="Save change"
+:label="$t('pipeline.saveChange')"
               size="small"
               :disabled="store.saving || !editNa.reasonId"
             />
             <Button
               type="button"
-              label="Cancel"
+:label="$t('common.cancel')"
               size="small"
               severity="secondary"
               outlined
@@ -418,7 +417,7 @@ async function submitEditNa() {
 
       <!-- A pending visit's log is completed on the visit itself below. -->
       <p v-if="!pendingIsCall && openVisits.length" class="px-1 text-xs text-mute">
-        The pending log is the scheduled visit — fill it with its “Complete” button below.
+        {{ $t('pipeline.pendingVisitNotice') }}
       </p>
     </div>
 
@@ -440,13 +439,13 @@ async function submitEditNa() {
          is injected through its #actions slot. -->
     <LogTimeline
       :entries="entries"
-      :empty-title="tab === 'all' ? 'No calls or visits yet' : 'Nothing here yet'"
-      empty-body="The story starts with the first logged call."
+      :empty-title="tab === 'all' ? $t('pipeline.emptyAll') : $t('pipeline.emptyTab')"
+      :empty-body="$t('pipeline.emptyBody')"
     >
       <template #actions="{ entry: e }">
         <Button
           v-if="e.kind === 'visit' && e.data.status !== 'cancelled' && canComplete(e.data) && !e.data.is_completed && !frozen"
-          label="Complete"
+:label="$t('pipeline.complete')"
           icon="pi pi-check"
           size="small"
           outlined
@@ -456,7 +455,7 @@ async function submitEditNa() {
     </LogTimeline>
 
     <!-- Log call — the fast-entry qualification form (properties / desire). -->
-    <BaseModal v-if="showCall" title="Log a call" @close="showCall = false">
+    <BaseModal v-if="showCall" :title="$t('pipeline.logACall')" @close="showCall = false">
       <CallLogForm
         :client="store.current"
         :project-id="projectId"
@@ -471,7 +470,7 @@ async function submitEditNa() {
 
     <!-- Add apartment(s) to visit, standalone — picks + date go out as in-site
          visit(s) (assigned by a dispatcher, else pooled for the board). -->
-    <BaseModal v-if="showAddUnit" title="Add unit to visit" @close="showAddUnit = false">
+    <BaseModal v-if="showAddUnit" :title="$t('pipeline.addUnitToVisit')" @close="showAddUnit = false">
       <AddUnitVisitForm
         :field-agents="store.agents"
         :saving="store.saving"
@@ -483,7 +482,7 @@ async function submitEditNa() {
     <!-- Complete visit (rapid log; office variant embeds the shortlist + deal step). -->
     <BaseModal
       v-if="completing"
-      :title="`Complete ${completing.type.replace('_', '-')} visit`"
+      :title="completing.type === 'in_site' ? $t('visits.completeInSiteLabel') : $t('visits.completeOfficeLabel')"
       @close="completing = null"
     >
       <CompleteVisitForm
