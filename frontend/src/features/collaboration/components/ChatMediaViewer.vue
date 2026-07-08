@@ -83,7 +83,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
       data-gesture-surface
       data-app-overlay
       role="dialog"
-      aria-label="Image viewer"
+      :aria-label="$t('chat.imageViewer')"
     >
       <!-- Top bar -->
       <div
@@ -92,7 +92,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         <button
           type="button"
           class="flex h-11 w-11 items-center justify-center rounded-full active:bg-white/10"
-          aria-label="Close viewer"
+          :aria-label="$t('common.close')"
           @click="emit('close')"
         >
           <i class="pi pi-arrow-left text-lg" aria-hidden="true" />
@@ -104,7 +104,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           target="_blank"
           rel="noopener"
           class="flex h-11 w-11 items-center justify-center rounded-full active:bg-white/10"
-          aria-label="Download image"
+          :aria-label="$t('common.download')"
         >
           <i class="pi pi-download text-lg" aria-hidden="true" />
         </a>
@@ -132,7 +132,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           v-if="index > 0"
           type="button"
           class="absolute start-2 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white sm:flex"
-          aria-label="Previous image"
+          :aria-label="$t('media.previous')"
           @click.stop="go(-1)"
         >
           <i class="pi pi-chevron-left" aria-hidden="true" />
@@ -141,7 +141,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           v-if="index < items.length - 1"
           type="button"
           class="absolute end-2 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white sm:flex"
-          aria-label="Next image"
+          :aria-label="$t('media.next')"
           @click.stop="go(1)"
         >
           <i class="pi pi-chevron-right" aria-hidden="true" />

@@ -7,6 +7,7 @@ import { playNotificationSound } from '@/utils/notificationSound'
 import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
 import { queueable } from '@/features/offline/apiOrQueue'
 import { closeCallLogPrompt, promptCallLog } from '@/features/pipeline/callPrompt'
+import { t } from '@/i18n'
 
 // In-app notification feed backing the AppShell bell. Loads the latest page over
 // HTTP and keeps the unread badge live over Reverb (the user's private channel).
@@ -81,7 +82,7 @@ export const useNotificationsStore = defineStore('notifications', {
           const res = await queueable({
             method: 'post',
             url: `/notifications/${id}/read`,
-            label: 'Notification read',
+            label: t('notifications.readLabel'),
             silent: true,
             ledger: false, // naturally idempotent — no ledger row per mark
             queuedToast: null,
@@ -113,7 +114,7 @@ export const useNotificationsStore = defineStore('notifications', {
         const res = await queueable({
           method: 'post',
           url: '/notifications/read-all',
-          label: 'Notifications read',
+          label: t('notifications.readAllLabel'),
           silent: true,
           ledger: false,
           queuedToast: null,

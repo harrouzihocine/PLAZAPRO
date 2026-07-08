@@ -11,7 +11,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 const props = defineProps({
   subjectType: { type: String, required: true },
   subjectId: { type: [String, Number], required: true },
-  label: { type: String, default: 'Share to chat' },
+  label: { type: String, default: null }, // null → localized "Share to chat"
 })
 
 const store = useChatStore()
@@ -40,7 +40,7 @@ async function shareTo(conversationId) {
 <template>
   <span class="inline-flex items-center gap-2">
     <Button
-      :label="label"
+      :label="label ?? $t('clients.shareToChat')"
       icon="pi pi-share-alt"
       size="small"
       severity="secondary"
@@ -67,14 +67,14 @@ async function shareTo(conversationId) {
             @click="shareTo(c.id)"
           >
             <i class="pi pi-comments text-mute" aria-hidden="true" />
-            {{ c.title ?? 'Conversation' }}
+            {{ c.title ?? $t('chat.conversation') }}
           </button>
         </li>
       </ul>
       <EmptyState
         v-if="!store.conversations.length"
         icon="pi pi-comments"
-        title="No conversations yet"
+:title="$t('chat.noConversations')"
         body="Open Chat and start one first."
       />
     </Dialog>

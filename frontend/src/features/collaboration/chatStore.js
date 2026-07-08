@@ -7,6 +7,7 @@ import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
 import { queueable } from '@/features/offline/apiOrQueue'
 import { messagePreview } from '@/features/collaboration/preview'
 import { newUuid } from '@/utils/uuid'
+import { t } from '@/i18n'
 
 // Chat state. Messages live in a PER-CONVERSATION map (threads) consumed by the
 // /chat page, the tablet two-pane and the dock windows alike — one Echo channel
@@ -220,7 +221,7 @@ export const useChatStore = defineStore('chat', {
         convo.last_message = {
           id: payload.id,
           type: payload.type,
-          preview: payload.redacted ? 'Message deleted' : messagePreview(payload),
+          preview: payload.redacted ? t('chat.messageDeleted') : messagePreview(payload),
           created_at: convo.last_message_at,
         }
       }
@@ -322,7 +323,7 @@ export const useChatStore = defineStore('chat', {
         queueable({
           method: 'post',
           url: `/conversations/${id}/read`,
-          label: 'Chat read cursor',
+          label: t('chat.readCursorLabel'),
           silent: true,
           ledger: false, // last-write-wins cursor — no idempotency row per mark
           queuedToast: null,
@@ -442,7 +443,7 @@ export const useChatStore = defineStore('chat', {
         // (thread went read-only, project closed) also gets its reason toasted.
         message.pending = false
         message.failed = true
-        this.error = e.response?.data?.message ?? 'Could not send the message.'
+        this.error = e.response?.data?.message ?? t('chat.sendFailed')
         if (e.response) toastError(this.error)
         return null
       } finally {
@@ -515,7 +516,7 @@ export const useChatStore = defineStore('chat', {
         message.reactions = saved.reactions ?? message.reactions
       } catch (e) {
         message.reactions = before
-        toastError(e.response?.data?.message ?? 'Could not react to the message.')
+        toastError(e.response?.data?.message ?? t('chat.reactFailed'))
       }
     },
 
@@ -557,7 +558,7 @@ export const useChatStore = defineStore('chat', {
         if (idx !== -1) t.messages.splice(idx, 1, { ...t.messages[idx], ...saved })
         return saved
       } catch (e) {
-        toastError(e.response?.data?.message ?? 'Could not edit the message.')
+        toastError(e.response?.data?.message ?? t('chat.editFailed'))
         return null
       }
     },
@@ -569,7 +570,7 @@ export const useChatStore = defineStore('chat', {
         await chatApi.forwardMessage(messageId, conversationIds)
         return true
       } catch (e) {
-        toastError(e.response?.data?.message ?? 'Could not forward the message.')
+        toastError(e.response?.data?.message ?? t('chat.forwardFailed'))
         return false
       }
     },

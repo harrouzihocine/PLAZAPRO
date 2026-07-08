@@ -26,10 +26,10 @@ const isNative = isNativeApp()
 const query = ref('')
 const filter = ref('all') // all | unread | groups | projects
 const FILTERS = [
-  { key: 'all', label: 'All' },
-  { key: 'unread', label: 'Unread' },
-  { key: 'groups', label: 'Groups' },
-  { key: 'projects', label: 'Projects' },
+  { key: 'all', labelKey: 'common.all' },
+  { key: 'unread', labelKey: 'chat.unread' },
+  { key: 'groups', labelKey: 'chat.groups' },
+  { key: 'projects', labelKey: 'inventory.projects' },
 ]
 
 function otherOf(c) {
@@ -101,8 +101,8 @@ async function onSheetPick(key) {
         <input
           v-model="query"
           type="search"
-          placeholder="Search conversations…"
-          aria-label="Search conversations"
+:placeholder="$t('chat.searchConversations')"
+          :aria-label="$t('chat.searchConversations')"
           class="w-full rounded-full border border-line bg-ground py-2 ps-9 pe-3.5 text-sm text-ink outline-none transition-colors focus:border-primary native:py-2.5"
         />
       </div>
@@ -119,7 +119,7 @@ async function onSheetPick(key) {
           "
           @click="filter = f.key"
         >
-          {{ f.label }}
+          {{ $t(f.labelKey) }}
         </button>
       </div>
     </div>
@@ -132,8 +132,8 @@ async function onSheetPick(key) {
       <EmptyState
         v-else-if="!shown.length"
         icon="pi pi-comments"
-        :title="query || filter !== 'all' ? 'No matches' : 'No conversations yet'"
-        :body="query || filter !== 'all' ? undefined : 'Start a direct message or a group with your team.'"
+        :title="query || filter !== 'all' ? $t('chat.noMatches') : $t('chat.noConversations')"
+        :body="query || filter !== 'all' ? undefined : $t('chat.noConversationsBody')"
       />
 
       <ul v-else class="divide-y divide-line">
@@ -159,7 +159,7 @@ async function onSheetPick(key) {
               <span
                 v-if="isNative && otherOf(c) && presence.isOnline(otherOf(c).id)"
                 class="absolute bottom-0 end-0 h-3.5 w-3.5 rounded-full border-2 border-card bg-green-500"
-                aria-label="Online"
+                :aria-label="$t('chat.online')"
               />
             </span>
             <span class="min-w-0 flex-1">
@@ -171,10 +171,10 @@ async function onSheetPick(key) {
                   <i
                     v-if="c.type === 'project'"
                     class="pi pi-folder me-1 text-xs text-mute"
-                    title="Project chat"
+                    :title="$t('project.projectChat')"
                     aria-hidden="true"
                   />
-                  {{ c.title ?? 'Conversation' }}
+                  {{ c.title ?? $t('chat.conversation') }}
                 </span>
                 <span
                   class="num shrink-0 text-xs"
@@ -185,12 +185,12 @@ async function onSheetPick(key) {
               </span>
               <span class="mt-0.5 flex items-center gap-1.5">
                 <span class="min-w-0 flex-1 truncate text-sm text-mute">
-                  {{ c.last_message?.preview ?? 'No messages yet' }}
+                  {{ c.last_message?.preview ?? $t('chat.noMessagesYet') }}
                 </span>
                 <i
                   v-if="c.is_muted"
                   class="pi pi-bell-slash shrink-0 text-xs text-mute"
-                  title="Muted"
+                  :title="$t('chat.muted')"
                   aria-hidden="true"
                 />
               </span>
@@ -203,7 +203,7 @@ async function onSheetPick(key) {
 
     <ActionSheet
       :open="!!sheetFor"
-      :title="sheetFor?.title ?? 'Conversation'"
+      :title="sheetFor?.title ?? $t('chat.conversation')"
       :actions="sheetActions"
       @close="sheetFor = null"
       @pick="onSheetPick"

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { toastError, toastInfo } from '@/composables/useConfirm'
+import { t } from '@/i18n'
 
 // Messenger-style voice notes: HOLD the mic to record, RELEASE to send, SLIDE
 // LEFT to cancel. Emits recorded({ file, durationMs }) on a successful take and
@@ -35,14 +36,14 @@ const support = (() => {
     return {
       ok: false,
       reason:
-        'Voice notes need a secure (HTTPS) connection. Open the app over HTTPS or via localhost to record.',
+        t('chat.voiceNeedsHttps'),
     }
   }
   const hasMic = !!navigator.mediaDevices?.getUserMedia
   if (!hasMic || !('MediaRecorder' in window)) {
     return {
       ok: false,
-      reason: 'This browser can’t record audio. Try a recent Chrome, Safari, or Firefox.',
+      reason: t('chat.voiceNoRecorder'),
     }
   }
   return { ok: true, reason: '' }
@@ -101,12 +102,12 @@ async function onPointerDown(e) {
     const name = err?.name
     if (name === 'NotAllowedError' || name === 'SecurityError') {
       toastError(
-        'Microphone access was blocked. Allow it in your browser’s site settings, then try again.',
+        t('chat.micBlocked'),
       )
     } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
-      toastError('No microphone was found on this device.')
+      toastError(t('chat.noMic'))
     } else {
-      toastError('Could not start recording.' + (err?.message ? ` (${err.message})` : ''))
+      toastError(t('chat.recordStartFailed') + (err?.message ? ` (${err.message})` : ''))
     }
     return
   }
@@ -130,7 +131,7 @@ async function onPointerDown(e) {
     if (event.data?.size) chunks.push(event.data)
   }
   recorder.onerror = () => {
-    toastError('Recording stopped unexpectedly.')
+    toastError(t('chat.recordStopped'))
     discard()
   }
   recorder.onstop = () => {
@@ -170,7 +171,7 @@ function onPointerUp() {
   }
   if (Date.now() - startedAt < MIN_MS) {
     discard()
-    toastInfo('Hold the microphone to record, release to send.')
+    toastInfo(t('chat.holdToRecord'))
     return
   }
   finish(true)
@@ -227,8 +228,8 @@ onBeforeUnmount(discard)
         :class="willCancel ? 'font-semibold text-danger' : 'text-mute'"
         aria-live="polite"
       >
-        <template v-if="willCancel">Release to cancel</template>
-        <template v-else><i class="pi pi-angle-left" aria-hidden="true" /> Slide to cancel</template>
+        <template v-if="willCancel">{{ $t('chat.releaseToCancel') }}</template>
+        <template v-else><i class="pi pi-angle-left" aria-hidden="true" /> {{ $t('chat.slideToCancel') }}</template>
       </span>
     </template>
 

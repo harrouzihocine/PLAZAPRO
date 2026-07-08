@@ -109,7 +109,7 @@ async function startChat(userId) {
         class="w-80 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-line bg-card shadow-card"
       >
         <div class="flex items-center justify-between border-b border-line px-4 py-2.5">
-          <span class="text-sm font-semibold text-ink">Chats</span>
+          <span class="text-sm font-semibold text-ink">{{ $t('chat.chats') }}</span>
           <RouterLink
             to="/chat"
             class="text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
@@ -122,8 +122,8 @@ async function startChat(userId) {
           <input
             v-model="query"
             type="search"
-            placeholder="Search or start a new chat…"
-            aria-label="Search conversations or people"
+:placeholder="$t('chat.dockSearch')"
+            :aria-label="$t('chat.dockSearchAria')"
             class="w-full rounded-full border border-line bg-ground px-3.5 py-2 text-sm text-ink outline-none transition-colors focus:border-primary"
           />
         </div>
@@ -158,12 +158,12 @@ async function startChat(userId) {
                     class="block truncate text-sm text-ink"
                     :class="{ 'font-semibold': c.unread_count > 0 }"
                   >
-                    {{ c.title ?? 'Conversation' }}
+                    {{ c.title ?? $t('chat.conversation') }}
                   </span>
                   <span class="block truncate text-xs text-mute">
                     {{
                       c.last_message?.preview ||
-                      (c.last_message_at ? timeAgo(c.last_message_at) : 'No messages yet')
+                      (c.last_message_at ? timeAgo(c.last_message_at) : $t('chat.noMessagesYet'))
                     }}
                   </span>
                 </span>
@@ -214,7 +214,7 @@ async function startChat(userId) {
       <TransitionGroup name="page" tag="div" class="flex flex-col items-end gap-2">
         <div v-for="c in dock.heads" :key="c.id" class="group relative">
           <button
-            v-tooltip.left="`${c.title ?? 'Conversation'} — ${c.last_message?.preview ?? 'new message'}`"
+            v-tooltip.left="`${c.title ?? $t('chat.conversation')} — ${c.last_message?.preview ?? $t('chat.newMessage')}`"
             type="button"
             class="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-card text-sm font-semibold text-primary-700 shadow-card transition-transform hover:scale-105 dark:text-primary-300"
             :aria-label="`Open chat with ${c.title ?? 'conversation'} (${c.unread_count} unread)`"
@@ -245,8 +245,8 @@ async function startChat(userId) {
           class="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-contrast shadow-card transition-transform hover:scale-105"
           :aria-label="
             dock.panelOpen
-              ? 'Close chats panel'
-              : `Open chats${dock.totalUnread > 0 ? ` (${dock.totalUnread} unread)` : ''}`
+              ? $t('chat.closePanel')
+              : $t('chat.openPanel') + (dock.totalUnread > 0 ? ` (${dock.totalUnread})` : '')
           "
           @click="dock.togglePanel()"
         >

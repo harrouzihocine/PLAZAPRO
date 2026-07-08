@@ -8,6 +8,7 @@ import { usePresenceStore } from '@/features/collaboration/presenceStore'
 import { useAuthStore } from '@/features/settings/store'
 import { isNativeApp } from '@/utils/nativeApp'
 import { initials } from '@/utils/format'
+import { t } from '@/i18n'
 
 // The conversation header: back, avatar + presence, title, live status line
 // (typing… beats Active now), mute bell, project deep-link, group info toggle.
@@ -35,11 +36,11 @@ const typing = computed(() => store.typingIn(props.conversationId))
 
 const statusLine = computed(() => {
   if (typing.value.length === 1) return `${typing.value[0].name} is typing…`
-  if (typing.value.length > 1) return 'Several people are typing…'
+  if (typing.value.length > 1) return t('chat.severalTyping')
   if (isGroup.value || convo.value?.type === 'project') {
     return `${convo.value?.participants?.length ?? 0} members`
   }
-  return otherOnline.value ? 'Active now' : 'Away'
+  return otherOnline.value ? t('chat.activeNow') : t('chat.away')
 })
 
 async function toggleMute() {
@@ -53,7 +54,7 @@ async function toggleMute() {
       v-if="showBack"
       type="button"
       class="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg text-mute hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800"
-      aria-label="Back to inbox"
+      :aria-label="$t('chat.backToInbox')"
       @click="emit('back')"
     >
       <i class="pi pi-arrow-left" aria-hidden="true" />
@@ -69,7 +70,7 @@ async function toggleMute() {
       <span
         v-if="isNative && otherOnline"
         class="absolute bottom-0 end-0 h-3 w-3 rounded-full border-2 border-card bg-green-500"
-        aria-label="Online"
+        :aria-label="$t('chat.online')"
       />
     </span>
 
@@ -78,10 +79,10 @@ async function toggleMute() {
         <i
           v-if="convo?.type === 'project'"
           class="pi pi-folder me-1 text-sm text-mute"
-          title="Project chat — participants follow the project's contributors"
+          :title="$t('chat.projectChatTooltip')"
           aria-hidden="true"
         />
-        {{ convo?.title ?? 'Conversation' }}
+        {{ convo?.title ?? $t('chat.conversation') }}
       </h1>
       <p
         v-if="convo"
@@ -100,10 +101,10 @@ async function toggleMute() {
 
     <button
       v-if="convo"
-      v-tooltip.bottom="convo.is_muted ? 'Unmute' : 'Mute'"
+      v-tooltip.bottom="convo.is_muted ? $t('chat.unmute') : $t('chat.mute')"
       type="button"
       class="flex h-10 w-10 items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800"
-      :aria-label="convo.is_muted ? 'Unmute conversation' : 'Mute conversation'"
+      :aria-label="convo.is_muted ? $t('chat.unmuteAria') : $t('chat.muteAria')"
       @click="toggleMute"
     >
       <i :class="convo.is_muted ? 'pi pi-bell-slash text-danger' : 'pi pi-bell'" aria-hidden="true" />
@@ -113,10 +114,10 @@ async function toggleMute() {
          follows its project and cannot be deleted. -->
     <button
       v-if="convo && convo.type !== 'project'"
-      v-tooltip.bottom="'Delete conversation'"
+      v-tooltip.bottom="$t('chat.deleteConversation')"
       type="button"
       class="flex h-10 w-10 items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-danger dark:hover:bg-surface-800"
-      aria-label="Delete conversation"
+      :aria-label="$t('chat.deleteConversation')"
       @click="emit('delete-conversation')"
     >
       <i class="pi pi-trash" aria-hidden="true" />
@@ -125,21 +126,21 @@ async function toggleMute() {
     <!-- A project thread deep-links back to its project workspace. -->
     <RouterLink
       v-if="convo?.project_link"
-      v-tooltip.bottom="'Open project'"
+      v-tooltip.bottom="$t('dispatch.openProject')"
       :to="convo.project_link"
       class="flex h-10 w-10 items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800"
-      aria-label="Open the project workspace"
+      :aria-label="$t('chat.openProjectAria')"
     >
       <i class="pi pi-folder-open" aria-hidden="true" />
     </RouterLink>
 
     <Button
       v-if="isGroup"
-      v-tooltip.bottom="infoOpen ? 'Hide info' : 'Group info'"
+      v-tooltip.bottom="infoOpen ? $t('chat.hideInfo') : $t('chat.groupInfo')"
       icon="pi pi-users"
       text
       rounded
-      :aria-label="infoOpen ? 'Hide group info' : 'Show group info'"
+      :aria-label="infoOpen ? $t('chat.hideInfo') : $t('chat.groupInfo')"
       @click="emit('toggle-info')"
     />
   </div>

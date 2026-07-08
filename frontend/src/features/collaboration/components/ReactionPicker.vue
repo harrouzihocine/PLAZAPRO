@@ -14,7 +14,7 @@ const emit = defineEmits(['pick'])
   <div
     class="flex items-center gap-0.5 rounded-full border border-line bg-card px-1.5 py-1 shadow-pop"
     role="menu"
-    aria-label="React to message"
+    :aria-label="$t('chat.react')"
   >
     <button
       v-for="e in EMOJIS"

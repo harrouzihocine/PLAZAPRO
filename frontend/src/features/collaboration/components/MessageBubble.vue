@@ -255,28 +255,28 @@ function act(action) {
         >
           <span class="block font-semibold">{{ m.reply_to.author_name ?? 'Message' }}</span>
           <span class="block truncate" :class="{ italic: m.reply_to.redacted }">
-            {{ m.reply_to.redacted ? 'Message deleted' : m.reply_to.excerpt }}
+            {{ m.reply_to.redacted ? $t('chat.messageDeleted') : m.reply_to.excerpt }}
           </span>
         </button>
 
-        <p v-if="m.redacted" class="text-sm italic opacity-70">Message deleted</p>
+        <p v-if="m.redacted" class="text-sm italic opacity-70">{{ $t('chat.messageDeleted') }}</p>
 
         <template v-else>
           <!-- Provenance tag on a forwarded copy, Messenger-style. -->
           <p v-if="m.forwarded" class="mb-0.5 flex items-center gap-1 text-[11px] italic opacity-70">
-            <i class="pi pi-share-alt text-[10px]" aria-hidden="true" /> Forwarded
+            <i class="pi pi-share-alt text-[10px]" aria-hidden="true" /> {{ $t('chat.forwarded') }}
           </p>
           <template v-for="a in m.attachments" :key="a.id">
             <button
               v-if="a.kind === 'image'"
               type="button"
               class="mb-1 block overflow-hidden rounded-xl"
-              aria-label="Open image"
+              :aria-label="$t('chat.openImage')"
               @click="emit('open-media', a)"
             >
               <img
                 :src="a.url"
-                alt="Shared image"
+                :alt="$t('chat.sharedImage')"
                 class="max-h-64 w-auto"
                 :class="compact && '!max-h-40'"
                 loading="lazy"
@@ -325,7 +325,7 @@ function act(action) {
           v-if="!m.redacted && (groupLast || m.pending || m.failed) && !compact"
           class="num mt-0.5 flex items-center justify-end gap-1 text-end text-[10px] opacity-70"
         >
-          <span v-if="m.edited_at" class="italic">edited</span>
+          <span v-if="m.edited_at" class="italic">{{ $t('pipeline.edited') }}</span>
           {{ formatTime(m.created_at) }}
           <template v-if="m.is_mine">
             <i v-if="m.pending" class="pi pi-clock text-[10px]" aria-hidden="true" title="Sending…" />
@@ -334,7 +334,7 @@ function act(action) {
               class="pi pi-exclamation-circle text-[10px] !text-red-300"
               aria-hidden="true"
             />
-            <span v-else class="relative inline-block w-4" :title="seen ? 'Seen' : 'Sent'">
+            <span v-else class="relative inline-block w-4" :title="seen ? $t('chat.seen') : $t('chat.sent')">
               <i class="pi pi-check absolute start-0 top-1/2 -translate-y-1/2 text-[9px]" aria-hidden="true" />
               <i
                 v-if="seen"
@@ -347,9 +347,9 @@ function act(action) {
 
         <!-- Failed send: retry / discard, WhatsApp-style. -->
         <div v-if="m.failed" class="mt-1 flex items-center gap-2 text-[11px]">
-          <span class="font-medium" :class="m.is_mine ? 'text-red-200' : 'text-danger'">Not sent</span>
-          <button type="button" class="underline" @click="emit('retry', m)">Retry</button>
-          <button type="button" class="underline opacity-80" @click="emit('discard', m)">Discard</button>
+          <span class="font-medium" :class="m.is_mine ? 'text-red-200' : 'text-danger'">{{ $t('chat.notSent') }}</span>
+          <button type="button" class="underline" @click="emit('retry', m)">{{ $t('common.retry') }}</button>
+          <button type="button" class="underline opacity-80" @click="emit('discard', m)">{{ $t('sync.discard') }}</button>
         </div>
       </div>
 
@@ -383,7 +383,7 @@ function act(action) {
         <button
           type="button"
           class="flex h-7 w-7 items-center justify-center rounded-full border border-line bg-card text-mute shadow-card hover:text-ink"
-          aria-label="React"
+          :aria-label="$t('chat.react')"
           @click="menuOpen = !menuOpen"
         >
           <i class="pi pi-face-smile text-xs" aria-hidden="true" />
@@ -391,7 +391,7 @@ function act(action) {
         <button
           type="button"
           class="flex h-7 w-7 items-center justify-center rounded-full border border-line bg-card text-mute shadow-card hover:text-ink"
-          aria-label="Reply"
+          :aria-label="$t('chat.reply')"
           @click="emit('reply', m)"
         >
           <i class="pi pi-reply text-xs" aria-hidden="true" />

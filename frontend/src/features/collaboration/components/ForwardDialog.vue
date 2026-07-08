@@ -8,6 +8,7 @@ import { useChatStore } from '@/features/collaboration/chatStore'
 import { messagePreview } from '@/features/collaboration/preview'
 import { toastSuccess } from '@/composables/useConfirm'
 import { initials } from '@/utils/format'
+import { t } from '@/i18n'
 
 // Messenger-style "Forward to…": pick one or more of my writable conversations
 // and send a copy of the message there. The store call owns error toasts.
@@ -47,7 +48,7 @@ async function send() {
   try {
     const ok = await store.forwardMessage(props.message.id, picks.value)
     if (ok) {
-      toastSuccess(picks.value.length > 1 ? 'Message forwarded to the selected chats.' : 'Message forwarded.')
+      toastSuccess(picks.value.length > 1 ? t('chat.forwardedMany') : t('chat.forwardedOne'))
       emit('close')
     }
   } finally {
@@ -65,7 +66,7 @@ async function send() {
     @update:visible="(v) => !v && emit('close')"
   >
     <template #header>
-      <span class="font-semibold text-ink">Forward to…</span>
+      <span class="font-semibold text-ink">{{ $t('chat.forwardTo') }}</span>
     </template>
 
     <p v-if="message" class="mb-3 truncate rounded-lg bg-ground px-3 py-2 text-xs text-mute">
@@ -75,7 +76,7 @@ async function send() {
     <input
       v-model="query"
       type="text"
-      placeholder="Search chats…"
+      :placeholder="$t('chat.searchChats')"
       class="mb-2 w-full rounded-xl border border-line bg-ground px-3 py-2 text-sm text-ink outline-none focus:border-primary"
     />
 
@@ -99,11 +100,11 @@ async function send() {
         </label>
       </li>
     </ul>
-    <p v-if="!candidates.length" class="py-6 text-center text-sm text-mute">No chats to forward to.</p>
+    <p v-if="!candidates.length" class="py-6 text-center text-sm text-mute">{{ $t('chat.noChatsToForward') }}</p>
 
     <div class="mt-3 flex gap-2">
       <Button
-        :label="picks.length > 1 ? `Forward (${picks.length})` : 'Forward'"
+        :label="picks.length > 1 ? $t('chat.forwardN', { n: picks.length }) : $t('chat.forward')"
         icon="pi pi-share-alt"
         :disabled="!picks.length"
         :loading="sending"

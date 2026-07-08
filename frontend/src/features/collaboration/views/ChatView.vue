@@ -97,13 +97,13 @@ function resetModal() {
   >
     <div class="flex w-[21rem] shrink-0 flex-col border-e border-line xl:w-[24rem]">
       <div class="flex items-center justify-between px-4 pb-1 pt-3">
-        <h1 class="text-lg font-bold text-ink">Chats</h1>
+        <h1 class="text-lg font-bold text-ink">{{ $t('chat.chats') }}</h1>
         <Button
-          v-tooltip.bottom="'New conversation'"
+          v-tooltip.bottom="$t('chat.newConversation')"
           icon="pi pi-pen-to-square"
           rounded
           text
-          aria-label="New conversation"
+:aria-label="$t('chat.newConversation')"
           @click="modalOpen = true"
         />
       </div>
@@ -123,9 +123,9 @@ function resetModal() {
       >
         <i class="pi pi-comments text-3xl" aria-hidden="true" />
       </span>
-      <p class="text-sm font-medium">Select a conversation</p>
+      <p class="text-sm font-medium">{{ $t('chat.selectConversation') }}</p>
       <p class="max-w-[26ch] text-center text-xs">
-        Pick a chat on the left, or start a new one with the pen button.
+        {{ $t('chat.selectConversationHint') }}
       </p>
     </div>
   </div>
@@ -145,12 +145,12 @@ function resetModal() {
 
   <!-- Inbox page (phone + web) -->
   <div v-else>
-    <PageHeader v-if="!isNative" title="Chat" subtitle="Your conversations with the team.">
+    <PageHeader v-if="!isNative" :title="$t('nav.chat')" :subtitle="$t('chat.subtitle')">
       <template #actions>
-        <Button label="New conversation" icon="pi pi-plus" @click="modalOpen = true" />
+        <Button :label="$t('chat.newConversation')" icon="pi pi-plus" @click="modalOpen = true" />
       </template>
     </PageHeader>
-    <h1 v-else class="mb-2 px-1 text-2xl font-bold text-ink">Chats</h1>
+    <h1 v-else class="mb-2 px-1 text-2xl font-bold text-ink">{{ $t('chat.chats') }}</h1>
 
     <SectionCard flush>
       <ConversationList :selected-id="selectedId" @select="select" />
@@ -161,7 +161,7 @@ function resetModal() {
       v-if="isNative"
       type="button"
       class="fixed bottom-24 end-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-contrast shadow-pop transition-transform active:scale-95 lg:bottom-8"
-      aria-label="New conversation"
+:aria-label="$t('chat.newConversation')"
       @click="modalOpen = true"
     >
       <i class="pi pi-pen-to-square text-xl" aria-hidden="true" />
@@ -178,9 +178,9 @@ function resetModal() {
   >
     <template #header>
       <span class="flex w-full items-center justify-between gap-3 pe-2">
-        <span class="font-semibold text-ink">{{ groupMode ? 'New group' : 'New message' }}</span>
+        <span class="font-semibold text-ink">{{ groupMode ? $t('chat.newGroup') : $t('chat.newMessage') }}</span>
         <Button
-          :label="groupMode ? 'Direct message' : 'New group'"
+          :label="groupMode ? $t('chat.directMessage') : $t('chat.newGroup')"
           :icon="groupMode ? 'pi pi-user' : 'pi pi-users'"
           text
           size="small"
@@ -190,7 +190,7 @@ function resetModal() {
     </template>
 
     <template v-if="groupMode">
-      <BaseInput v-model="groupTitle" label="Group name" required />
+      <BaseInput v-model="groupTitle" :label="$t('chat.groupName')" required />
       <div class="relative mt-4">
         <i
           class="pi pi-search pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-xs text-mute"
@@ -199,8 +199,8 @@ function resetModal() {
         <input
           v-model="contactQuery"
           type="search"
-          placeholder="Search people…"
-          aria-label="Search people"
+:placeholder="$t('chat.searchPeople')"
+          :aria-label="$t('chat.searchPeopleAria')"
           class="w-full rounded-full border border-line bg-ground py-2 ps-9 pe-3.5 text-sm text-ink outline-none transition-colors focus:border-primary native:py-2.5"
         />
       </div>
@@ -214,17 +214,17 @@ function resetModal() {
           {{ u.name }}
         </label>
         <p v-if="!filteredContacts.length" class="px-2 py-3 text-center text-sm text-mute">
-          {{ contactQuery ? 'No one matches your search.' : 'No contacts available.' }}
+          {{ contactQuery ? $t('chat.noOneMatches') : $t('chat.noContacts') }}
         </p>
       </div>
       <div class="flex gap-2">
         <Button
-          label="Create group"
+:label="$t('chat.createGroup')"
           icon="pi pi-check"
           :disabled="!groupTitle.trim() || !groupPicks.length"
           @click="createGroup"
         />
-        <Button label="Cancel" severity="secondary" outlined @click="resetModal" />
+        <Button :label="$t('common.cancel')" severity="secondary" outlined @click="resetModal" />
       </div>
     </template>
 
@@ -237,8 +237,8 @@ function resetModal() {
         <input
           v-model="contactQuery"
           type="search"
-          placeholder="Search people…"
-          aria-label="Search people"
+:placeholder="$t('chat.searchPeople')"
+          :aria-label="$t('chat.searchPeopleAria')"
           class="w-full rounded-full border border-line bg-ground py-2 ps-9 pe-3.5 text-sm text-ink outline-none transition-colors focus:border-primary native:py-2.5"
         />
       </div>
@@ -261,7 +261,7 @@ function resetModal() {
       <EmptyState
         v-if="!filteredContacts.length"
         icon="pi pi-users"
-        :title="contactQuery ? 'No one matches your search' : 'No contacts available'"
+        :title="contactQuery ? $t('chat.noOneMatches') : $t('chat.noContacts')"
       />
     </template>
   </Dialog>

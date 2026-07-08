@@ -91,7 +91,7 @@ onBeforeUnmount(() => {
         :max="total || 1"
         step="0.1"
         :value="position"
-        aria-label="Seek in voice note"
+        :aria-label="$t('chat.seekVoice')"
         @input="seek"
       />
       <p class="num mt-0.5 text-[10px]" :class="onPrimary ? 'text-primary-contrast/80' : 'text-mute'">

@@ -6,6 +6,7 @@ import { useChatStore } from '@/features/collaboration/chatStore'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction } from '@/composables/useConfirm'
 import { formatDate } from '@/utils/format'
+import { t } from '@/i18n'
 
 // The scrollable message pane: day chips, Messenger-style grouped runs,
 // scroll-up history loading (scroll anchor preserved), typing indicator,
@@ -60,8 +61,8 @@ function dayLabel(value) {
   const today = new Date()
   const yesterday = new Date(today)
   yesterday.setDate(today.getDate() - 1)
-  if (d.toDateString() === today.toDateString()) return 'Today'
-  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  if (d.toDateString() === today.toDateString()) return t('common.today')
+  if (d.toDateString() === yesterday.toDateString()) return t('common.yesterday')
   return formatDate(value)
 }
 
@@ -154,9 +155,9 @@ function jump(messageId) {
 async function remove(message) {
   if (
     await confirmAction({
-      title: 'Delete this message?',
-      text: 'It will show as deleted for everyone.',
-      confirmText: 'Delete',
+      title: t('chat.deleteMessageTitle'),
+      text: t('chat.deleteMessageText'),
+      confirmText: t('common.delete'),
       danger: true,
     })
   ) {

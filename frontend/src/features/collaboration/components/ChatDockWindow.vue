@@ -8,6 +8,7 @@ import MessageComposer from '@/features/collaboration/components/MessageComposer
 import MessageList from '@/features/collaboration/components/MessageList.vue'
 import { toastError } from '@/composables/useConfirm'
 import { initials } from '@/utils/format'
+import { t } from '@/i18n'
 
 // One popped-open thread in the dock. Messages live in the chat store's
 // per-conversation map (shared with the /chat page — one refcounted Echo
@@ -32,7 +33,7 @@ onMounted(async () => {
     await chat.loadThread(props.conversationId)
     chat.markRead(props.conversationId)
   } catch {
-    toastError('Could not open this conversation.')
+    toastError(t('chat.openFailed'))
     dock.close(props.conversationId)
     return
   } finally {
@@ -65,7 +66,7 @@ function sendFile({ file, durationMs }) {
 <template>
   <section
     class="flex h-[26rem] w-80 max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-xl border border-line bg-card shadow-card sm:w-[22rem]"
-    aria-label="Chat window"
+    :aria-label="$t('chat.chatWindow')"
   >
     <!-- Header -->
     <header class="flex items-center gap-2 border-b border-line px-3 py-2">
@@ -76,20 +77,20 @@ function sendFile({ file, durationMs }) {
         class="!bg-highlight !text-primary-700 dark:!text-primary-300"
       />
       <p class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
-        {{ convo?.title ?? 'Conversation' }}
+        {{ convo?.title ?? $t('chat.conversation') }}
       </p>
       <RouterLink
-        v-tooltip.top="'Open in Chat'"
+        v-tooltip.top="$t('chat.openInChat')"
         :to="`/chat/${conversationId}`"
         class="flex h-8 w-8 items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800"
-        aria-label="Open the full chat page"
+        :aria-label="$t('chat.openInChat')"
       >
         <i class="pi pi-window-maximize text-xs" aria-hidden="true" />
       </RouterLink>
       <button
         type="button"
         class="flex h-8 w-8 items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800"
-        aria-label="Close chat window"
+        :aria-label="$t('chat.closeWindow')"
         @click="dock.close(conversationId)"
       >
         <i class="pi pi-times text-xs" aria-hidden="true" />

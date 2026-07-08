@@ -117,7 +117,7 @@ const replyExcerpt = messagePreview
       <button
         type="button"
         class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-mute hover:text-ink"
-        aria-label="Cancel edit"
+        :aria-label="$t('chat.cancelEdit')"
         @click="emit('cancel-edit')"
       >
         <i class="pi pi-times text-xs" aria-hidden="true" />
@@ -131,14 +131,14 @@ const replyExcerpt = messagePreview
     >
       <div class="min-w-0 flex-1 text-xs">
         <p class="font-semibold text-ink">
-          Replying to {{ replyTo.is_mine ? 'yourself' : (replyTo.author?.name ?? 'message') }}
+          {{ $t('chat.replyingTo', { name: replyTo.is_mine ? $t('chat.yourself') : (replyTo.author?.name ?? $t('chat.message')) }) }}
         </p>
         <p class="truncate text-mute">{{ replyExcerpt(replyTo) }}</p>
       </div>
       <button
         type="button"
         class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-mute hover:text-ink"
-        aria-label="Cancel reply"
+        :aria-label="$t('chat.cancelReply')"
         @click="emit('cancel-reply')"
       >
         <i class="pi pi-times text-xs" aria-hidden="true" />
@@ -150,7 +150,7 @@ const replyExcerpt = messagePreview
       v-show="!recordingVoice && !editing"
       type="button"
       class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink disabled:opacity-50 dark:hover:bg-surface-800"
-      aria-label="Attach a photo or file"
+      :aria-label="$t('chat.attach')"
       :disabled="disabled"
       @click="pickFile"
     >
@@ -198,7 +198,7 @@ const replyExcerpt = messagePreview
       ref="textInput"
       v-model="text"
       rows="1"
-      placeholder="Message…"
+      :placeholder="$t('chat.messagePlaceholder')"
       class="max-h-32 min-h-[44px] flex-1 resize-none rounded-3xl border border-line bg-ground px-4 py-2.5 text-sm text-ink outline-none transition-colors focus:border-primary"
       :disabled="disabled"
       @input="emit('typing')"
@@ -211,7 +211,7 @@ const replyExcerpt = messagePreview
       v-show="!recordingVoice"
       type="button"
       class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-primary text-primary-contrast transition-opacity hover:opacity-90 disabled:opacity-40"
-      :aria-label="editing ? 'Save changes' : 'Send message'"
+      :aria-label="editing ? $t('chat.saveChanges') : $t('chat.sendMessage')"
       :disabled="disabled || !text.trim()"
       @click="submitText"
     >

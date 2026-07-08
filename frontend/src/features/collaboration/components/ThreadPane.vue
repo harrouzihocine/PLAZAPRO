@@ -10,6 +10,7 @@ import ForwardDialog from '@/features/collaboration/components/ForwardDialog.vue
 import { useChatStore } from '@/features/collaboration/chatStore'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction, toastError, toastSuccess } from '@/composables/useConfirm'
+import { t } from '@/i18n'
 
 // One full conversation: header + message list + composer (with reply quoting
 // and typing signals). Used by the phone thread page and the tablet two-pane —
@@ -60,7 +61,7 @@ async function open(id) {
     // Not readable (not a participant, no oversight grant) → back to the inbox
     // with a clear message instead of an uncaught 403.
     if (e.response?.status === 403) {
-      toastError('You are not part of this conversation.')
+      toastError(t('chat.notParticipant'))
       router.replace({ name: 'chat' })
       return
     }
@@ -103,7 +104,7 @@ async function kick(userId) {
 }
 
 async function leave() {
-  if (!(await confirmAction({ title: 'Leave this group?', confirmText: 'Leave', danger: true })))
+  if (!(await confirmAction({ title: t('chat.leaveGroupTitle'), confirmText: t('chat.leave'), danger: true })))
     return
   await store.removeParticipant(props.conversationId, auth.user.id)
   emit('back')
@@ -121,9 +122,9 @@ async function saveEdit(body) {
 async function deleteConversation() {
   if (
     !(await confirmAction({
-      title: 'Delete this conversation?',
-      text: 'It disappears from your chats only — the other participants keep it. A new message will bring the thread back, without your deleted history.',
-      confirmText: 'Delete',
+      title: t('chat.deleteConversationTitle'),
+      text: t('chat.deleteConversationText'),
+      confirmText: t('common.delete'),
       danger: true,
     }))
   )
@@ -131,10 +132,10 @@ async function deleteConversation() {
   try {
     await store.deleteConversation(props.conversationId)
   } catch (e) {
-    toastError(e.response?.data?.message ?? 'Could not delete the conversation.')
+    toastError(e.response?.data?.message ?? t('chat.deleteFailed'))
     return
   }
-  toastSuccess('Conversation deleted.')
+  toastSuccess(t('chat.conversationDeleted'))
   emit('back')
 }
 </script>
@@ -152,7 +153,7 @@ async function deleteConversation() {
 
     <!-- Group info / participants -->
     <div v-if="isGroup && showInfo" class="border-b border-line px-4 py-3 text-sm">
-      <p class="mb-2 font-semibold text-ink">Participants</p>
+      <p class="mb-2 font-semibold text-ink">{{ $t('chat.participants') }}</p>
       <ul class="space-y-1">
         <li
           v-for="p in convo?.participants ?? []"
@@ -165,7 +166,7 @@ async function deleteConversation() {
           </span>
           <Button
             v-if="iAmAdmin && p.id !== auth.user?.id"
-            label="Remove"
+:label="$t('common.remove')"
             text
             size="small"
             severity="danger"
@@ -175,7 +176,7 @@ async function deleteConversation() {
       </ul>
 
       <div v-if="iAmAdmin && nonParticipants.length" class="mt-3">
-        <p class="mb-1.5 font-semibold text-ink">Add member</p>
+        <p class="mb-1.5 font-semibold text-ink">{{ $t('chat.addMember') }}</p>
         <div class="flex flex-wrap gap-1.5">
           <button
             v-for="u in nonParticipants"
@@ -190,7 +191,7 @@ async function deleteConversation() {
       </div>
 
       <Button
-        label="Leave group"
+:label="$t('chat.leaveGroup')"
         icon="pi pi-sign-out"
         text
         size="small"
@@ -200,7 +201,7 @@ async function deleteConversation() {
       />
     </div>
 
-    <p v-if="store.loadingThread" class="bg-ground py-4 text-center text-sm text-mute">Loading…</p>
+    <p v-if="store.loadingThread" class="bg-ground py-4 text-center text-sm text-mute">{{ $t('common.loading') }}</p>
     <MessageList
       v-else
       :conversation-id="conversationId"

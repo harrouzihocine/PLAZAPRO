@@ -69,7 +69,7 @@ function onScroll(e) {
         <span class="flex items-center gap-1">
           <Button
             v-if="store.unreadCount > 0"
-            label="Mark all read"
+:label="$t('notifications.markAllRead')"
             size="small"
             text
             @click="store.markAllRead()"
@@ -80,7 +80,7 @@ function onScroll(e) {
             text
             rounded
             severity="secondary"
-            aria-label="Notification settings"
+            :aria-label="$t('notifications.settings')"
             @click="openPrefs"
           />
         </span>
@@ -91,7 +91,7 @@ function onScroll(e) {
         <EmptyState
           v-else-if="store.items.length === 0"
           icon="pi pi-bell-slash"
-          title="You're all caught up"
+:title="$t('notifications.caughtUp')"
         />
 
         <ul v-else class="divide-y divide-line">
@@ -120,7 +120,7 @@ function onScroll(e) {
 
             <button
               v-if="!n.read_at"
-              v-tooltip.left="'Mark as read'"
+              v-tooltip.left="$t('notifications.markRead')"
               type="button"
               class="absolute end-2 top-3 flex h-6 w-6 items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-700"
               :aria-label="`Mark '${n.title}' as read`"
@@ -130,7 +130,7 @@ function onScroll(e) {
             </button>
             <button
               v-else
-              v-tooltip.left="'Mark as unread'"
+              v-tooltip.left="$t('notifications.markUnread')"
               type="button"
               class="absolute end-2 top-3 flex h-6 w-6 items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-700"
               :aria-label="`Mark '${n.title}' as unread`"
