@@ -140,7 +140,7 @@ async function cancelUser(user) {
   <div>
     <PageHeader title="Users" subtitle="People with access. Exactly one role each.">
       <template #actions>
-        <Button label="New user" icon="pi pi-plus" @click="openCreate" />
+        <Button label="New user" icon="pi pi-plus" class="native-fab" @click="openCreate" />
       </template>
     </PageHeader>
 

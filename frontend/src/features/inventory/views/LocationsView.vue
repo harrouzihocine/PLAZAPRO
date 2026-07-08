@@ -196,7 +196,13 @@ function toggleArchived() {
   <div>
     <PageHeader title="Projects" subtitle="Real-estate projects, buildings and sites.">
       <template #actions>
-        <Button v-if="canManage" label="New project" icon="pi pi-plus" @click="openCreate" />
+        <Button
+          v-if="canManage"
+          label="New project"
+          icon="pi pi-plus"
+          class="native-fab"
+          @click="openCreate"
+        />
       </template>
     </PageHeader>
 

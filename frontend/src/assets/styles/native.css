@@ -13,8 +13,9 @@
 html.native {
   /* Kill the grey tap flash — active states below give the feedback instead. */
   -webkit-tap-highlight-color: transparent;
-  /* No pull-to-refresh bounce fighting scrollable panes inside the app. */
-  overscroll-behavior-y: none;
+  /* No pull-to-refresh bounce fighting scrollable panes inside the app, and
+     no browser back/forward swipe hijacking the nav-drawer edge gesture. */
+  overscroll-behavior: none;
 }
 
 /* Momentum scrolling everywhere a pane scrolls. */
@@ -153,6 +154,47 @@ html.native * {
   }
   html.native .page-actions > :only-child {
     grid-column: 1 / -1;
+  }
+
+  /* ── Page create button becomes a floating corner FAB ──
+     Tag the header's create Button with `native-fab` and it detaches into the
+     round bottom-right button the chat page uses, instead of a full-width bar
+     under the title. Colors come from the Button itself (primary). */
+  html.native .p-button.native-fab {
+    /* !important: the ripple directive stamps position:relative inline */
+    position: fixed !important;
+    right: 1rem;
+    bottom: 6rem; /* clears the bottom tab bar — same spot as the chat FAB */
+    z-index: 30;
+    width: 3.5rem;
+    height: 3.5rem;
+    padding: 0;
+    justify-content: center;
+    border-radius: 9999px;
+    box-shadow:
+      0 4px 6px -1px rgb(24 20 8 / 0.08),
+      0 10px 24px -6px rgb(24 20 8 / 0.12);
+    transition: transform 0.15s;
+  }
+  html.native .p-button.native-fab:active {
+    transform: scale(0.95);
+  }
+  html.native .p-button.native-fab .p-button-icon {
+    font-size: 1.25rem;
+  }
+  /* The label stays for screen readers only. */
+  html.native .p-button.native-fab .p-button-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  /* Once every action floated away, the header row's box dissolves —
+     display:none would take the fixed FAB down with it. */
+  html.native .page-actions:not(:has(> :not(.native-fab))) {
+    display: contents;
   }
 
   /* ── Forms in sheets & drawers: pair the short fields ──

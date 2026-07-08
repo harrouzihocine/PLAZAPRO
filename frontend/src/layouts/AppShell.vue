@@ -8,6 +8,7 @@ import Popover from 'primevue/popover'
 import Tag from 'primevue/tag'
 import { useTheme } from '@/composables/useTheme'
 import { useNativePhone } from '@/composables/useNativeMode'
+import { useNavSwipe } from '@/composables/useNavSwipe'
 import { hasRefreshHandler, runRefresh } from '@/composables/useRefreshRegistry'
 import { isNativeApp } from '@/utils/nativeApp'
 import { initNativePush } from '@/utils/nativePush'
@@ -114,6 +115,15 @@ const userPanel = ref(null)
 const mobileNav = ref(false)
 const showProfile = ref(false)
 const showNotifPrefs = ref(false)
+
+// APK phones: swipe left→right anywhere opens the nav drawer, right→left
+// closes it (the chat takeover thread owns its own gestures and stands down).
+useNavSwipe({
+  enabled: () => nativePhone.value && !chatTakeover.value,
+  isOpen: () => mobileNav.value,
+  open: () => (mobileNav.value = true),
+  close: () => (mobileNav.value = false),
+})
 
 function openProfile() {
   userPanel.value?.hide()

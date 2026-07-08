@@ -260,7 +260,13 @@ async function remove(u) {
           >
         </template>
         <template #actions>
-          <Button v-if="canManage" label="Add unit" icon="pi pi-plus" @click="openCreate" />
+          <Button
+            v-if="canManage"
+            label="Add unit"
+            icon="pi pi-plus"
+            class="native-fab"
+            @click="openCreate"
+          />
         </template>
       </PageHeader>
 

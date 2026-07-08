@@ -71,8 +71,10 @@ watch(() => props.media?.id, resetZoom)
 </script>
 
 <template>
+  <!-- data-gesture-surface: owns its photo-swipe — the nav drawer swipe stands down. -->
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 backdrop-blur-sm sm:p-6"
+    data-gesture-surface
     @click.self="$emit('close')"
   >
     <div

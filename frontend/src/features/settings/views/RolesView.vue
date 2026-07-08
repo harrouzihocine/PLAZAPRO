@@ -84,7 +84,7 @@ async function cancelRole(role) {
       subtitle="One role per user. Each permission below explains exactly what it unlocks."
     >
       <template #actions>
-        <Button label="New role" icon="pi pi-plus" @click="openCreate" />
+        <Button label="New role" icon="pi pi-plus" class="native-fab" @click="openCreate" />
       </template>
     </PageHeader>
 

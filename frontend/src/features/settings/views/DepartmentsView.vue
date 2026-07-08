@@ -55,7 +55,7 @@ async function remove(dept) {
   <div>
     <PageHeader title="Departments" subtitle="Organisational units you can assign users to.">
       <template #actions>
-        <Button label="Add department" icon="pi pi-plus" @click="openCreate" />
+        <Button label="Add department" icon="pi pi-plus" class="native-fab" @click="openCreate" />
       </template>
     </PageHeader>
 

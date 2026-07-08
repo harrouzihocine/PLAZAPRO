@@ -159,7 +159,7 @@ async function removeCommune(commune) {
       subtitle="Manage Algeria's wilayas and the communes that belong to each one."
     >
       <template #actions>
-        <Button label="Add wilaya" icon="pi pi-plus" @click="openCreateWilaya" />
+        <Button label="Add wilaya" icon="pi pi-plus" class="native-fab" @click="openCreateWilaya" />
       </template>
     </PageHeader>
 
