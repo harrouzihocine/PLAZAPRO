@@ -7,6 +7,7 @@ import OversightFilters from '@/features/oversight/components/OversightFilters.v
 import { oversightApi } from '@/features/oversight/api'
 import { defaultOversightRange } from '@/features/oversight/dateRange'
 import { confirmAction, toastError, toastSuccess } from '@/composables/useConfirm'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 
 const data = ref({})
 const loading = ref(true)
@@ -24,6 +25,7 @@ async function load() {
   }
 }
 onMounted(load)
+useRefreshable(load) // pull-to-refresh + reconnect self-heal
 
 async function remove(item) {
   if (

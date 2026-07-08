@@ -12,6 +12,18 @@ const api = axios.create({
   headers: { Accept: 'application/json' },
 })
 
+// Reads get a deadline: a WebView resumed from background can sit on a dead
+// socket, and axios's default (no timeout) leaves the page on "Loading…"
+// forever. A timed-out GET rejects with no response → the offline probe and
+// the reconnect self-heal take over. GETs only — uploads (avatars, chat
+// media, voice notes) legitimately run long; writes keep their own semantics.
+api.interceptors.request.use((config) => {
+  if ((config.method ?? 'get').toLowerCase() === 'get' && !config.timeout) {
+    config.timeout = 30_000
+  }
+  return config
+})
+
 api.interceptors.response.use(
   (response) => {
     useNetworkStore().noteOnline() // any answer proves the link is up

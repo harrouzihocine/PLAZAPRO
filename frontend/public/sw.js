@@ -9,7 +9,9 @@
 //
 // Bump the version to force-drop every old cache on the next visit.
 // v2: the worker now also runs inside the Android shell (offline boot).
-const CACHE = 'plaza-pwa-v2'
+// v3: only 2xx navigation responses may become the cached shell (a mid-deploy
+//     502 page was cacheable as '/' and then served as "the app" when offline).
+const CACHE = 'plaza-pwa-v3'
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png']
 
 // Paths the worker must stay out of: Laravel API + auth cookies + websockets.
@@ -43,8 +45,12 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone()
-          caches.open(CACHE).then((c) => c.put('/', copy))
+          // Only a healthy answer may become the offline shell: caching a 502
+          // (mid-deploy) or a redirect here would serve THAT as the app later.
+          if (res.ok) {
+            const copy = res.clone()
+            caches.open(CACHE).then((c) => c.put('/', copy))
+          }
           return res
         })
         .catch(() => caches.match('/')),

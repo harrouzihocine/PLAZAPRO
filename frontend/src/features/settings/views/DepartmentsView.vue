@@ -7,6 +7,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import DepartmentFormModal from '@/features/settings/components/DepartmentFormModal.vue'
 import { useDepartmentsStore } from '@/features/settings/departmentsStore'
 import { confirmAction } from '@/composables/useConfirm'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 
 const store = useDepartmentsStore()
 
@@ -14,6 +15,7 @@ const modalOpen = ref(false)
 const modalDept = ref(null)
 
 onMounted(() => store.fetch())
+useRefreshable(() => store.fetch()) // pull-to-refresh + reconnect self-heal
 
 function openCreate() {
   modalDept.value = null

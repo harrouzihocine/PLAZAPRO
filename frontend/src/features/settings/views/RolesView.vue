@@ -8,6 +8,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import RoleFormModal from '@/features/settings/components/RoleFormModal.vue'
 import { useRolesStore } from '@/features/settings/rolesStore'
 import { confirmAction } from '@/composables/useConfirm'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 
 const store = useRolesStore()
 
@@ -19,6 +20,7 @@ onMounted(async () => {
   await store.fetch()
   if (!selectedId.value && store.roles.length) selectedId.value = store.roles[0].id
 })
+useRefreshable(() => store.fetch()) // pull-to-refresh + reconnect self-heal
 
 const selectedRole = computed(() => store.roles.find((r) => r.id === selectedId.value) ?? null)
 

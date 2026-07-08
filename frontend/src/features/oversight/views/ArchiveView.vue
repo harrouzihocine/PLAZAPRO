@@ -17,6 +17,7 @@ import { oversightApi } from '@/features/oversight/api'
 import { projectsApi, staffApi } from '@/features/clients/api'
 import { locationsApi } from '@/features/inventory/api'
 import { useDynamicList } from '@/composables/useDynamicList'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction, toastSuccess, toastError } from '@/composables/useConfirm'
 import { formatMoney } from '@/features/payments/money'
@@ -110,6 +111,7 @@ async function load() {
   }
 }
 onMounted(load)
+useRefreshable(load) // pull-to-refresh + reconnect self-heal
 
 function apply() {
   page.value = 1

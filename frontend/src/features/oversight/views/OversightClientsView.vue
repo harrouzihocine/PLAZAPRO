@@ -6,6 +6,7 @@ import OversightFilters from '@/features/oversight/components/OversightFilters.v
 import { oversightApi } from '@/features/oversight/api'
 import { defaultOversightRange } from '@/features/oversight/dateRange'
 import { toastError } from '@/composables/useConfirm'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 
 const data = ref({ empty: {}, no_name: {} })
 const loading = ref(true)
@@ -22,6 +23,7 @@ async function load() {
   }
 }
 onMounted(load)
+useRefreshable(load) // pull-to-refresh + reconnect self-heal
 
 const clientLink = (item) => ({ name: 'clients.file', params: { id: item.link.client_id } })
 

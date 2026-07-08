@@ -20,6 +20,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import DuplicateProjectRow from '@/features/oversight/components/DuplicateProjectRow.vue'
 import { duplicateRequestsApi } from '@/features/clients/api'
 import { confirmAction, toastError, toastSuccess } from '@/composables/useConfirm'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { formatDateTime } from '@/utils/format'
 
 const items = ref([])
@@ -37,6 +38,7 @@ async function load() {
   }
 }
 onMounted(load)
+useRefreshable(load) // pull-to-refresh + reconnect self-heal
 
 async function resolve(req, payload, successMsg) {
   busy.value = req.id

@@ -16,6 +16,7 @@ import { useClientsStore } from '@/features/clients/clientsStore'
 import { useAuthStore } from '@/features/settings/store'
 import { agentsApi, desireMatchesApi, followUpAgentsApi } from '@/features/clients/api'
 import { toastSuccess } from '@/composables/useConfirm'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { formatPhone } from '@/data/countryCodes'
 import { formatDate, initials } from '@/utils/format'
 import { formatMoney } from '@/features/payments/money'
@@ -83,6 +84,7 @@ onMounted(async () => {
   if (canAssign()) followUpAgents.value = await followUpAgentsApi.list()
   await load()
 })
+useRefreshable(load) // pull-to-refresh + reconnect self-heal
 
 // Manager delegates: set the client's assigned agent (server notifies them).
 async function assign(row, agentId) {

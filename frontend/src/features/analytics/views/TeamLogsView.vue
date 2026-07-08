@@ -51,6 +51,7 @@ const items = ref([])
 const summary = ref({})
 const meta = ref({})
 const loading = ref(true)
+const loadError = ref(false)
 const staff = ref([])
 
 const userOptions = computed(() => [
@@ -77,15 +78,28 @@ const summaryTiles = computed(() => [
   { label: 'Lost', value: summary.value.lost ?? 0, icon: 'pi pi-times-circle', tone: 'danger' },
 ])
 
+// Stale-response guard: filters auto-apply, so a slow older answer must never
+// overwrite a newer one (same ticket pattern as the store-backed pages).
+let fetchTicket = 0
+
 async function fetch() {
   loading.value = true
+  const ticket = ++fetchTicket
   try {
     const res = await analyticsApi.teamLogs({ ...filters.value, page: page.value })
+    if (ticket !== fetchTicket) return
     items.value = res.items
     summary.value = res.summary
     meta.value = res.meta
+    loadError.value = false
+  } catch (e) {
+    // A failed load must never masquerade as "Nothing planned" — show the
+    // error state (with Retry) instead of the empty state. Rethrow so the
+    // global recovery layer still toasts server errors.
+    if (ticket === fetchTicket) loadError.value = true
+    throw e
   } finally {
-    loading.value = false
+    if (ticket === fetchTicket) loading.value = false
   }
 }
 
@@ -152,6 +166,14 @@ useAutoFilter(
       </FilterPanel>
 
       <p v-if="loading" class="py-8 text-center text-sm text-mute">Loading…</p>
+      <EmptyState
+        v-else-if="loadError"
+        icon="pi pi-exclamation-triangle"
+        title="Couldn't load the logs"
+        body="Check the connection, then retry."
+      >
+        <Button label="Retry" icon="pi pi-refresh" size="small" outlined @click="fetch" />
+      </EmptyState>
       <EmptyState
         v-else-if="!items.length"
         icon="pi pi-list-check"

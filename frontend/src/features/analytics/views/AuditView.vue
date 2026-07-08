@@ -8,6 +8,7 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import FilterPanel from '@/components/ui/FilterPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { useAutoFilter } from '@/composables/useAutoFilter'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { useAuditStore } from '@/features/analytics/auditStore'
 import { useAuthStore } from '@/features/settings/store'
 import { formatDateTime, countActiveFilters } from '@/utils/format'
@@ -49,6 +50,7 @@ const ACTION_SEVERITY = {
 }
 
 onMounted(store.fetch)
+useRefreshable(() => store.fetch()) // pull-to-refresh + reconnect self-heal
 
 // Filters apply themselves as they change — no "Apply" button.
 useAutoFilter(() => store.filters, () => store.applyFilters())

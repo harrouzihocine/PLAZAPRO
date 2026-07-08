@@ -7,6 +7,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import DynamicListItemRow from '@/features/settings/components/DynamicListItemRow.vue'
 import ListItemFormModal from '@/features/settings/components/ListItemFormModal.vue'
 import { useDynamicListsStore } from '@/features/settings/dynamicListsStore'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 
 const store = useDynamicListsStore()
 
@@ -17,6 +18,7 @@ const modalOpen = ref(false)
 const modalItem = ref(null)
 
 onMounted(() => store.fetchLists())
+useRefreshable(() => store.fetchLists()) // pull-to-refresh + reconnect self-heal
 
 function openCreate() {
   modalItem.value = null

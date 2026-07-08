@@ -9,6 +9,7 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import FilterPanel from '@/components/ui/FilterPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { analyticsApi } from '@/features/analytics/api'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { formatMoney } from '@/features/payments/money'
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
 
@@ -57,6 +58,8 @@ function show(next) {
 }
 
 onMounted(loadRoi)
+// Refresh whichever report tab is on screen (pull-to-refresh + reconnect self-heal).
+useRefreshable(() => (tab.value === 'units' ? loadUnits() : loadRoi()))
 </script>
 
 <template>

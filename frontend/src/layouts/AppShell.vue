@@ -8,6 +8,7 @@ import Popover from 'primevue/popover'
 import Tag from 'primevue/tag'
 import { useTheme } from '@/composables/useTheme'
 import { useNativePhone } from '@/composables/useNativeMode'
+import { hasRefreshHandler, runRefresh } from '@/composables/useRefreshRegistry'
 import { isNativeApp } from '@/utils/nativeApp'
 import { initNativePush } from '@/utils/nativePush'
 import { initAppUpdateCheck } from '@/utils/appUpdate'
@@ -70,6 +71,11 @@ watch(
     if (!online) return
     if (auth.offlineSession) auth.fetchMe()
     outbox.sync()
+    // The visible page may have mounted EMPTY while the link was down (its
+    // fetch died with no snapshot to serve) — re-run its registered reload so
+    // it heals without a manual refresh. Handler-registered views only: the
+    // full-reload PTR fallback must never fire on its own mid-session.
+    if (hasRefreshHandler(route.name)) runRefresh(route.name)
   },
 )
 // A fresh login (including re-login after a mid-sync 401) resumes the queue.

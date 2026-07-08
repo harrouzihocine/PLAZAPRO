@@ -10,6 +10,7 @@ import CommuneFormModal from '@/features/settings/components/CommuneFormModal.vu
 import { geographyApi } from '@/features/settings/api'
 import { invalidateWilayas, invalidateCommunes } from '@/composables/useGeography'
 import { confirmAction, toastError } from '@/composables/useConfirm'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 
 const wilayas = ref([])
 const communes = ref([])
@@ -32,6 +33,7 @@ const filtered = computed(() => {
 })
 
 onMounted(loadWilayas)
+useRefreshable(loadWilayas) // pull-to-refresh + reconnect self-heal
 
 async function loadWilayas() {
   loading.value = true

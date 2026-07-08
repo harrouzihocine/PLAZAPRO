@@ -5,6 +5,7 @@ import BaseInput from '@/components/base/BaseInput.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import { toastError, toastSuccess } from '@/composables/useConfirm'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { appSettingsApi } from '@/features/settings/api'
 
 // Scalar app-wide settings. Interest hold = how long a plain interest hold
@@ -19,7 +20,7 @@ const lockoutMinutes = ref('')
 const loading = ref(true)
 const saving = ref(false)
 
-onMounted(async () => {
+async function load() {
   try {
     const settings = await appSettingsApi.get()
     holdHours.value = settings.interest_hold_hours ?? '48'
@@ -31,7 +32,10 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(load)
+useRefreshable(load) // pull-to-refresh + reconnect self-heal
 
 async function save() {
   const hours = Number(holdHours.value)

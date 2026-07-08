@@ -10,6 +10,7 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import { pipelineApi } from '@/features/pipeline/api'
 import { toastError, toastSuccess } from '@/composables/useConfirm'
 import { copyToClipboard } from '@/composables/useClipboard'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { formatDateTime, humanize, todayInput } from '@/utils/format'
 
 // The dispatch board: unassigned in-site plans in the PENDING strip, and one
@@ -120,6 +121,7 @@ function shiftWeek(deltaDays) {
 }
 
 onMounted(() => load(null))
+useRefreshable(() => load()) // reload the shown week (pull-to-refresh + reconnect self-heal)
 
 // --- Day view (hour columns) ------------------------------------------------
 // Zooming into a day re-buckets that day's cards per hour: `hourCells` becomes

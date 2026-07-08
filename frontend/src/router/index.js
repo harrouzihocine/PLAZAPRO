@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/features/settings/store'
+import { isStaleChunkError, reloadForFreshBuild } from '@/utils/appRecovery'
 
 const routes = [
   {
@@ -242,6 +243,14 @@ router.beforeEach(async (to) => {
     return { name: 'dashboard' } // lacks the required permission
   }
   return true
+})
+
+// A deploy replaces the hashed chunk files, so a session opened before it
+// 404s on every page it hadn't lazy-loaded yet and the navigation dies with
+// no UI at all — the blank-page-until-refresh bug. Hard-load the target URL:
+// the fresh index.html carries the new chunk names.
+router.onError((error, to) => {
+  if (isStaleChunkError(error)) reloadForFreshBuild(to?.fullPath)
 })
 
 export default router
