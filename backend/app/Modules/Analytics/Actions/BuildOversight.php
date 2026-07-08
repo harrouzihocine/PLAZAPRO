@@ -248,23 +248,20 @@ class BuildOversight
     /** Users sitting on unsaved drafts (server-mirrored metadata). */
     public function drafts(array $f = []): array
     {
+        // Capped at 200 like every other monitor — the chips + total still cover
+        // the full set, so a runaway draft count can't ship an unbounded payload.
         $q = $this->filter(UserDraft::query(), $f, 'updated_at', 'user_id');
 
-        $rows = (clone $q)->with('user:id,name')->orderByDesc('updated_at')->get();
+        $items = (clone $q)->with('user:id,name')->orderByDesc('updated_at')->limit(200)->get()
+            ->map(fn (UserDraft $d) => [
+                'id' => $d->id,
+                'path' => $d->route, // the page the draft lived on
+                'user' => $d->user?->name,
+                'label' => $d->label,
+                'updated_at' => $d->updated_at,
+            ])->all();
 
-        $items = $rows->map(fn (UserDraft $d) => [
-            'id' => $d->id,
-            'path' => $d->route, // the page the draft lived on
-            'user' => $d->user?->name,
-            'label' => $d->label,
-            'updated_at' => $d->updated_at,
-        ])->all();
-
-        $byUser = $rows->groupBy(fn (UserDraft $d) => $d->user?->name ?? '—')
-            ->map(fn ($group, $name) => ['name' => $name, 'count' => $group->count()])
-            ->values()->all();
-
-        return ['total' => $rows->count(), 'by_user' => $byUser, 'items' => $items];
+        return ['total' => (clone $q)->count(), 'by_user' => $this->byUser((clone $q), 'user_id'), 'items' => $items];
     }
 
     /**

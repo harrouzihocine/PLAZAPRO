@@ -51,6 +51,12 @@ class ClientProject extends BaseModel
      * assigned agent. A client's own agent is never locked out of that client's
      * projects, even a project a colleague opened on it.
      *
+     * A dispatched FIELD AGENT also sees the project holding their (live)
+     * in-site visit — their working remit: the dispatch notification deep-links
+     * here, and they must reach the project to conduct and complete that visit
+     * (and keep seeing their completed log afterwards). Reassigning the visit
+     * moves agent_id, so the replaced agent drops out on their own.
+     *
      * Exception: a hidden_from_owner project (a duplicate-resolution "separate
      * project") is siloed from the client owner — the owner-branch does NOT reach
      * it. Its own creator still sees it (created_by), and view_all still sees all.
@@ -66,6 +72,10 @@ class ClientProject extends BaseModel
             ->orWhereHas('viewers', fn (Builder $v) => $v
                 ->whereKey($user->id)
                 ->whereNull('client_project_viewers.hidden_at'))
+            ->orWhereHas('visits', fn (Builder $v) => $v
+                ->active()
+                ->where('type', VisitType::InSite->value)
+                ->where('agent_id', $user->id))
             ->orWhere(fn (Builder $owner) => $owner
                 ->where('hidden_from_owner', false)
                 ->whereHas('client', fn (Builder $c) => $c
@@ -93,7 +103,8 @@ class ClientProject extends BaseModel
     {
         return $user->can('projects.view_all')
             || $this->isContributor($user)
-            || (! $this->hidden_from_owner && $this->isClientOwner($user));
+            || (! $this->hidden_from_owner && $this->isClientOwner($user))
+            || $this->isDispatchedFieldAgent($user);
     }
 
     /**
@@ -140,6 +151,19 @@ class ClientProject extends BaseModel
             return false;
         }
 
+        return $this->isDispatchedFieldAgent($user);
+    }
+
+    /**
+     * The user holds one of this project's (live) in-site visits — the dispatch
+     * tie itself, regardless of any other role they may also have here. This is
+     * what lets a field agent SEE the project (isVisibleTo / scopeVisibleTo and
+     * Client::scopeVisibleTo mirror it); isDispatchOnlyAgent layers on "…and
+     * nothing more" to RESTRICT what they may do. A cancelled visit never ties;
+     * a completed one still does — the agent keeps their log's story.
+     */
+    public function isDispatchedFieldAgent(User $user): bool
+    {
         return $this->visits()->active()
             ->where('type', VisitType::InSite->value)
             ->where('agent_id', $user->id)

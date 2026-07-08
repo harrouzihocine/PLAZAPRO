@@ -34,8 +34,8 @@ class SendDueReminderNotification implements ShouldQueue
 
         $user->notify(new DomainNotification(
             kind: 'reminder',
-            title: 'A follow-up is due',
-            body: 'Your next action ('.$action->type->value.') is due now.',
+            key: 'reminder',
+            params: ['type' => '@notifications.reminder_type.'.$action->type->value],
             link: $link,
             subjectType: $subjectType,
             subjectId: $subjectId,

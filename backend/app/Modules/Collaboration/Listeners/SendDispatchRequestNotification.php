@@ -36,8 +36,8 @@ class SendDispatchRequestNotification implements ShouldQueue
         foreach ($dispatchers as $dispatcher) {
             $dispatcher->notify(new DomainNotification(
                 kind: 'dispatch_request',
-                title: 'An in-site visit needs an agent',
-                body: 'Visit for '.$clientName.' due '.$action->due_at?->format('D d M').' — assign a field agent on the board.',
+                key: 'dispatch_request',
+                params: ['client' => $clientName, 'date' => (string) $action->due_at?->format('D d M')],
                 link: '/dispatch',
                 subjectType: $subjectType,
                 subjectId: $subjectId,

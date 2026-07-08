@@ -58,8 +58,8 @@ class AnnounceUnitEdited implements ShouldQueue
 
             Notification::send($recipients, new DomainNotification(
                 kind: 'unit_updated',
-                title: 'Unit '.$unit->reference.' updated',
-                body: $body,
+                key: 'unit_updated',
+                params: ['unit' => $unit->reference, 'details' => $body],
                 link: $link,
                 subjectType: 'unit',
                 subjectId: $unit->id,

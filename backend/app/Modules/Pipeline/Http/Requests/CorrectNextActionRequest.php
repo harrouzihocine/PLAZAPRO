@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Pipeline\Http\Requests;
 
+use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Pipeline\Enums\NextActionType;
+use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Settings\Rules\IsAgentUser;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Enum;
@@ -21,7 +23,27 @@ class CorrectNextActionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->can('calls.log');
+        $user = $this->user();
+
+        if ($user === null || ! $user->can('calls.log')) {
+            return false;
+        }
+
+        // Correcting a plan ON a project the user is only dispatched to (a field
+        // agent, not a contributor / the client's own agent) is outside their
+        // remit — same rule as logging its calls or planning on it standalone.
+        // A visit administrator is exempt.
+        $nextAction = $this->route('nextAction');
+        if ($nextAction instanceof NextAction
+            && $nextAction->subject_type === 'client_project'
+            && ! $user->can('visits.assign')) {
+            $project = ClientProject::find((int) $nextAction->subject_id);
+            if ($project?->isDispatchOnlyAgent($user)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

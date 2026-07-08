@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Clients\Actions;
 
+use App\Core\Enums\RecordStatus;
 use App\Modules\Clients\Models\Desire;
 use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Models\Unit;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Match a client's desire to inventory: return the still-purchasable units (not
@@ -39,6 +41,39 @@ class MatchDesireToInventory
     }
 
     /**
+     * The page-sized form of handle(): rank in SQL and hydrate only the top
+     * $limit units, plus the full match count (for "+N more not shown"). A
+     * loose desire matches most of the units table, and the board pays that
+     * hydration per row without this — handle() stays for single-desire
+     * callers that want the whole list.
+     *
+     * @return array{units: Collection<int, Unit>, total: int}
+     */
+    public function handleTop(Desire $desire, int $limit): array
+    {
+        $total = $this->query($desire)->count();
+
+        $q = $this->query($desire)->with([
+            'location.type', 'location.wilaya', 'location.commune', 'location.contractType',
+            'floor', 'roomNumber',
+        ]);
+
+        // Same closeness score() computes, expressed in SQL so the database
+        // ranks and we fetch only the leaders.
+        $min = $desire->budget_min !== null ? (float) $desire->budget_min : null;
+        $max = $desire->budget_max !== null ? (float) $desire->budget_max : null;
+        if ($min !== null && $max !== null) {
+            $q->orderByRaw('ABS(price - ?)', [($min + $max) / 2]);
+        } elseif ($max !== null) {
+            $q->orderByRaw('ABS(? - price)', [$max]);
+        } elseif ($min !== null) {
+            $q->orderByRaw('ABS(price - ?)', [$min]);
+        }
+
+        return ['units' => $q->orderBy('id')->limit($limit)->get(), 'total' => $total];
+    }
+
+    /**
      * Whether a desire has at least one match — same criteria as handle(), but no
      * hydration/eager-loads/ranking. Cheap enough to run per waiting desire (the
      * sidebar "Matches" badge counts how many desires have at least one hit).
@@ -46,6 +81,41 @@ class MatchDesireToInventory
     public function exists(Desire $desire): bool
     {
         return $this->query($desire)->exists();
+    }
+
+    /**
+     * Constrain a `desires` query to desires with at least one matching unit —
+     * the whole board's "has a match" test as ONE correlated EXISTS instead of a
+     * query per desire (the per-row form melts down past a few hundred waiting
+     * clients). Mirrors query() exactly: `desires.x IS NULL` is "no preference",
+     * and the LEFT JOIN keeps whereHas semantics for location criteria (a
+     * location-less unit passes only when the criterion is unset).
+     */
+    public function whereHasMatch(Builder $desires): Builder
+    {
+        return $desires->whereExists(function ($q) {
+            $q->select(DB::raw(1))
+                ->from('units')
+                ->leftJoin('locations', 'locations.id', '=', 'units.location_id')
+                ->where('units.status', RecordStatus::Active->value)
+                ->where('units.sale_status', '!=', SaleStatus::Sold->value)
+                ->whereRaw('(desires.type_id IS NULL OR locations.type_id = desires.type_id)')
+                ->whereRaw('(desires.room_number_id IS NULL OR units.room_number_id = desires.room_number_id)')
+                ->whereRaw('(desires.floor_id IS NULL OR units.floor_id = desires.floor_id)')
+                ->whereRaw('(desires.area_min IS NULL OR units.area_sqm >= desires.area_min)')
+                ->whereRaw('(desires.area_max IS NULL OR units.area_sqm <= desires.area_max)')
+                ->whereRaw('(desires.budget_min IS NULL OR units.price >= desires.budget_min)')
+                ->whereRaw('(desires.budget_max IS NULL OR units.price <= desires.budget_max)')
+                ->whereRaw('(desires.wilaya_id IS NULL OR locations.wilaya_id = desires.wilaya_id)')
+                ->whereRaw('(desires.commune_id IS NULL OR locations.commune_id = desires.commune_id)')
+                ->whereRaw('(desires.contract_type_id IS NULL OR locations.contract_type_id = desires.contract_type_id)')
+                // Preferred sites: no pivot rows = any site; otherwise the unit's
+                // project must be one of them (the whereIn on plucked ids in query()).
+                ->whereRaw(
+                    '(NOT EXISTS (SELECT 1 FROM desire_locations dl WHERE dl.desire_id = desires.id)'
+                    .' OR EXISTS (SELECT 1 FROM desire_locations dl WHERE dl.desire_id = desires.id AND dl.location_id = units.location_id))'
+                );
+        });
     }
 
     /** The still-purchasable units matching a desire's criteria — unranked, unhydrated. */

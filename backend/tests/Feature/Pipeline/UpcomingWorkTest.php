@@ -95,7 +95,7 @@ class UpcomingWorkTest extends TestCase
         Notification::assertSentTo(
             $assignee,
             DomainNotification::class,
-            fn ($n) => $n->kind === 'upcoming_digest' && str_contains($n->title, 'call'),
+            fn ($n) => $n->kind === 'upcoming_digest' && str_contains((string) $n->params['group'], 'calls'),
         );
         Notification::assertNothingSentTo($bystander);
     }

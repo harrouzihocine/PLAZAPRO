@@ -39,8 +39,8 @@ class RequestDuplicateResolution
         foreach ($resolvers as $resolver) {
             $resolver->notify(new DomainNotification(
                 kind: 'duplicate',
-                title: 'Duplicate client attempt',
-                body: $finder->name.' tried to add a client that already exists.',
+                key: 'duplicate_attempt',
+                params: ['name' => $finder->name],
                 link: '/oversight/duplicates',
             ));
         }

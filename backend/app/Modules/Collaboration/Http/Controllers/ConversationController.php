@@ -83,9 +83,14 @@ class ConversationController extends Controller
         // of a project the user cannot otherwise see — this is what silos a
         // duplicate-resolution "separate project" both ways (the finder never sees
         // the original's chat; the client's own agent never sees the fork's).
+        //
+        // The dispatched FIELD AGENT holds this chat by design (the VisitAssigned
+        // grant — GrantFieldAgentChatAccess) — the project page's chat button must
+        // reach it for them too, not only through their inbox.
         $user = $request->user();
         abort_unless(
             ($project->isVisibleTo($user) && $project->collaboratorsVisibleTo($user))
+                || $project->isDispatchedFieldAgent($user)
                 || $user->can('chat.view_project_chats')
                 || $user->can('chat.participate_project_chats'),
             404,

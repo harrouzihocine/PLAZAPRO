@@ -189,8 +189,8 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
         foreach ($unlockers as $unlocker) {
             $unlocker->notify(new DomainNotification(
                 kind: 'account_locked',
-                title: 'Account locked: '.$this->name,
-                body: $attempts.' failed sign-in attempts. Unlock it from the Users page.',
+                key: 'account_locked',
+                params: ['name' => $this->name, 'attempts' => $attempts],
                 link: '/settings/users',
                 subjectType: self::class,
                 subjectId: $this->id,

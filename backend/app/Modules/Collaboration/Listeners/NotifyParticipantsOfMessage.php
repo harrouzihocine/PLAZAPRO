@@ -32,17 +32,17 @@ class NotifyParticipantsOfMessage implements ShouldQueue
         }
 
         $title = $conversation->type === ConversationType::Group
-            ? ($conversation->title ?? 'Group chat')
-            : ($message->author?->name ?? 'New message');
+            ? ($conversation->title ?? '@notifications.chat_group')
+            : ($message->author?->name ?? '@notifications.chat_new_message');
 
         $preview = $message->body !== null && $message->body !== ''
             ? Str::limit($message->body, 120)
-            : 'Sent an attachment';
+            : '@notifications.chat_attachment';
 
         Notification::send($recipients, new DomainNotification(
             kind: 'chat_message',
-            title: $title,
-            body: $preview,
+            key: 'chat_message',
+            params: ['title' => $title, 'preview' => $preview],
             link: '/chat/'.$conversation->id,
             subjectType: 'conversation',
             subjectId: $conversation->id,

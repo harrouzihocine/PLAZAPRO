@@ -51,8 +51,8 @@ class NotifyNextInReservationQueue implements ShouldQueue
         $where = $unit->location?->name !== null ? ' at '.$unit->location->name : '';
         $notification = new DomainNotification(
             kind: 'reservation_next',
-            title: 'Your client is now first in line',
-            body: 'The reservation on '.$unit->reference.$where.' was released — your client is next. Call them before the unit moves.',
+            key: 'queue_first',
+            params: ['unit' => $unit->reference.$where],
             link: $link,
             subjectType: $subjectType,
             subjectId: $subjectId,

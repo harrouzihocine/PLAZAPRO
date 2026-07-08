@@ -61,7 +61,7 @@ class SendUpcomingDigest extends Command
     {
         $sent = 0;
 
-        foreach (self::LABELS as $group => [$singular, $plural]) {
+        foreach (array_keys(self::LABELS) as $group) {
             $items = $upcoming[$group] ?? [];
             if ($items === []) {
                 continue;
@@ -81,18 +81,18 @@ class SendUpcomingDigest extends Command
                 array_slice($items, 0, 3),
             );
             if ($count > 3) {
-                $lines[] = '… and '.($count - 3).' more';
+                $lines[] = __('notifications.digest_more', ['count' => $count - 3], $user->preferredLocale());
             }
 
             $user->notify(new DomainNotification(
                 kind: 'upcoming_digest',
-                title: sprintf(
-                    'You have %d %s coming up%s',
-                    $count,
-                    $count === 1 ? $singular : $plural,
-                    $overdue > 0 ? " ({$overdue} overdue)" : '',
-                ),
-                body: implode(' — ', $lines),
+                key: $overdue > 0 ? 'upcoming_digest_overdue' : 'upcoming_digest',
+                params: [
+                    'count' => $count,
+                    'group' => '@notifications.group.'.$group,
+                    'overdue' => $overdue,
+                    'lines' => implode(' — ', $lines),
+                ],
                 // One item → straight to its project; several → the dashboard list.
                 link: $count === 1 ? ($items[0]['link'] ?? '/') : '/',
             ));

@@ -49,8 +49,12 @@ class NotifyAgentsOfMatchingUnit implements ShouldQueue
 
             $agent->notify(new DomainNotification(
                 kind: 'unit_match',
-                title: $isNew ? 'New unit matches a client' : 'A matching unit was repriced',
-                body: 'Unit '.$unit->reference.($unitDetails !== '' ? ' ('.$unitDetails.')' : '').' fits: '.$clients.'.',
+                key: $isNew ? 'unit_match_new' : 'unit_match_repriced',
+                params: [
+                    'unit' => $unit->reference,
+                    'details' => $unitDetails !== '' ? ' ('.$unitDetails.')' : '',
+                    'clients' => $clients,
+                ],
                 link: '/inventory/units/'.$unit->id,
                 subjectType: 'unit',
                 subjectId: $unit->id,

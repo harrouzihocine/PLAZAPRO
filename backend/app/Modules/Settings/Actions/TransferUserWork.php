@@ -296,25 +296,16 @@ class TransferUserWork
     /** @param  array<string, int>  $moved */
     private function notifySuccessor(User $from, User $to, array $moved): void
     {
-        $parts = collect([
-            'client' => $moved['clients'],
-            'project' => $moved['projects'],
-            'planned action' => $moved['next_actions'],
-            'visit' => $moved['visits'],
-            'task' => $moved['tasks'],
-        ])
-            ->filter()
-            ->map(fn (int $n, string $label) => $n.' '.$label.($n === 1 ? '' : 's'))
-            ->join(', ');
+        $count = array_sum($moved);
 
-        if ($parts === '') {
+        if ($count === 0) {
             return; // everything went to the pool — nothing landed on them
         }
 
         $to->notify(new DomainNotification(
             kind: 'work_transferred',
-            title: "{$from->name}'s open work was handed to you",
-            body: "You received {$parts}. Your dashboard's upcoming list has the details.",
+            key: 'work_transferred',
+            params: ['from' => $from->name, 'count' => $count],
             link: '/dashboard',
             subjectType: User::class,
             subjectId: $from->id,
@@ -340,8 +331,8 @@ class TransferUserWork
         foreach ($dispatchers as $dispatcher) {
             $dispatcher->notify(new DomainNotification(
                 kind: 'dispatch_request',
-                title: 'Field plans returned to the pool',
-                body: $pooled.' in-site plan'.($pooled === 1 ? '' : 's')." from {$from->name} went back to the pool — assign new agents on the board.",
+                key: 'plans_pooled',
+                params: ['count' => $pooled, 'from' => $from->name],
                 link: '/dispatch',
                 subjectType: User::class,
                 subjectId: $from->id,

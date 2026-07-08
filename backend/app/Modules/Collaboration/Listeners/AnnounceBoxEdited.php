@@ -52,8 +52,8 @@ class AnnounceBoxEdited implements ShouldQueue
 
             Notification::send($recipients, new DomainNotification(
                 kind: 'box_updated',
-                title: 'Box '.$box->reference.' updated',
-                body: $body,
+                key: 'box_updated',
+                params: ['box' => $box->reference, 'details' => $body],
                 link: $link,
                 subjectType: 'box',
                 subjectId: $box->id,

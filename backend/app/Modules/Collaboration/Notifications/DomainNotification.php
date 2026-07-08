@@ -50,12 +50,46 @@ class DomainNotification extends Notification implements ShouldQueue
 
     public function __construct(
         public string $kind,
-        public string $title,
+        public string $title = '',
         public string $body = '',
         public ?string $link = null,
         public ?string $subjectType = null,
         public ?int $subjectId = null,
+        // Localizable variant: when `key` is set, title/body resolve per
+        // RECIPIENT at send time (Laravel renders each channel inside the
+        // notifiable's preferredLocale) from lang/xx/notifications.php:
+        // "notifications.{key}.title" / ".body". Params starting with '@' are
+        // themselves translation keys, resolved in the recipient's language —
+        // for words that vary (visit types, digest groups) inside a fan-out
+        // where one instance serves users with different languages.
+        public ?string $key = null,
+        public array $params = [],
     ) {}
+
+    private function resolvedParams(): array
+    {
+        return array_map(
+            fn ($v) => is_string($v) && str_starts_with($v, '@') ? __(substr($v, 1)) : $v,
+            $this->params,
+        );
+    }
+
+    private function resolvedTitle(): string
+    {
+        return $this->key ? __("notifications.{$this->key}.title", $this->resolvedParams()) : $this->title;
+    }
+
+    private function resolvedBody(): string
+    {
+        if ($this->key === null) {
+            return $this->body;
+        }
+
+        $key = "notifications.{$this->key}.body";
+        $body = __($key, $this->resolvedParams());
+
+        return $body === $key ? $this->body : $body;
+    }
 
     /**
      * @return list<class-string|string>
@@ -94,8 +128,8 @@ class DomainNotification extends Notification implements ShouldQueue
 
         return [
             'kind' => $this->kind,
-            'title' => $this->title,
-            'body' => $this->body,
+            'title' => $this->resolvedTitle(),
+            'body' => $this->resolvedBody(),
             'link' => (string) ($this->link ?? ''),
             'tag' => $tag,
             // Chat pushes carry the conversation id so the shell's quick-reply
@@ -111,8 +145,8 @@ class DomainNotification extends Notification implements ShouldQueue
     {
         return [
             'kind' => $this->kind,
-            'title' => $this->title,
-            'body' => $this->body,
+            'title' => $this->resolvedTitle(),
+            'body' => $this->resolvedBody(),
             'link' => $this->link,
             'subject_type' => $this->subjectType,
             'subject_id' => $this->subjectId,

@@ -53,8 +53,12 @@ class AnnounceUnitStatusChange implements ShouldQueue
 
         Notification::send($recipients, new DomainNotification(
             kind: 'unit_status',
-            title: 'Unit '.$unit->reference.' — '.self::LABELS[$status],
-            body: trim(ucfirst(self::LABELS[$status]).($details !== '' ? ' · '.$details : '')),
+            key: 'unit_status',
+            params: [
+                'unit' => $unit->reference,
+                'status' => '@notifications.unit_status_label.'.$status,
+                'details' => $details !== '' ? ' · '.$details : '',
+            ],
             link: '/inventory/units/'.$unit->id,
             subjectType: 'unit',
             subjectId: $unit->id,

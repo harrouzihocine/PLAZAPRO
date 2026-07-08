@@ -56,8 +56,7 @@ class ResolveDuplicateRequest
 
         $this->notifyFinder(
             $request,
-            'Duplicate request declined',
-            'Your request to add an existing client was declined.',
+            'duplicate_denied',
             '/clients',
         );
     }
@@ -98,8 +97,7 @@ class ResolveDuplicateRequest
 
         $this->notifyFinder(
             $request,
-            'A project was shared with you',
-            'A supervisor shared an existing client’s project with you.',
+            'project_shared',
             '/clients/'.$request->existing_client_id.'/projects/'.$project->id,
         );
     }
@@ -145,15 +143,14 @@ class ResolveDuplicateRequest
 
         $this->notifyFinder(
             $request,
-            'A client was set up for you',
-            'A supervisor set this client up as your own project — open it to start.',
+            'project_set_up',
             '/clients/'.$request->existing_client_id.'/projects/'.$project->id,
         );
     }
 
-    private function notifyFinder(ClientDuplicateRequest $request, string $title, string $body, string $link): void
+    private function notifyFinder(ClientDuplicateRequest $request, string $key, string $link): void
     {
         $finder = User::query()->find($request->requested_by);
-        $finder?->notify(new DomainNotification(kind: 'duplicate', title: $title, body: $body, link: $link));
+        $finder?->notify(new DomainNotification(kind: 'duplicate', key: $key, link: $link));
     }
 }

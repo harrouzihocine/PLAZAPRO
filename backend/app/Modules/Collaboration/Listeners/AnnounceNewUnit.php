@@ -31,8 +31,8 @@ class AnnounceNewUnit implements ShouldQueue
 
             Notification::send($recipients, new DomainNotification(
                 kind: 'unit_published',
-                title: 'New unit added',
-                body: $body,
+                key: 'unit_published',
+                params: ['details' => $body],
                 link: '/inventory/units/'.$unit->id,
                 subjectType: 'unit',
                 subjectId: $unit->id,

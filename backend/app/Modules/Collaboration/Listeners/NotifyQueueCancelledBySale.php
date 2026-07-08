@@ -42,8 +42,8 @@ class NotifyQueueCancelledBySale implements ShouldQueue
 
             $notification = new DomainNotification(
                 kind: 'reservation_cancelled',
-                title: 'Reservation cancelled — unit sold',
-                body: $unit->reference.$where.' was sold to another client. Your client\'s reservation (was #'.$row['position'].' in line) is cancelled.',
+                key: 'queue_cancelled',
+                params: ['unit' => $unit->reference.$where, 'position' => $row['position']],
                 link: $link,
                 subjectType: $subjectType,
                 subjectId: $subjectId,

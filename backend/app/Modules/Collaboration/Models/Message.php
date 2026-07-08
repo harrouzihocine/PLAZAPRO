@@ -78,13 +78,13 @@ class Message extends BaseModel
     public function previewLabel(): string
     {
         if ($this->isCancelled()) {
-            return 'Message deleted';
+            return __('notifications.message_deleted');
         }
 
         return match ($this->type->value) {
-            'image' => '📷 Photo',
-            'voice' => '🎤 Voice note',
-            'file' => '📎 File',
+            'image' => __('notifications.message_photo'),
+            'voice' => __('notifications.message_voice'),
+            'file' => __('notifications.message_file'),
             default => (string) ($this->body ?? ''),
         };
     }

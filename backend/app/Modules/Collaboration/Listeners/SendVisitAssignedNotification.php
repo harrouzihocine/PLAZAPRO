@@ -40,18 +40,23 @@ class SendVisitAssignedNotification implements ShouldQueue
         // is only the fallback for project-less (qualifying) visits.
         [$link, $subjectType, $subjectId] = NotificationLink::forSubject($visit->clientProject ?? $client);
 
-        $details = array_filter([
-            ucfirst(str_replace('_', '-', $visit->type->value)).' visit with '.$clientName,
-            $when ? 'on '.$when : null,
-            $visit->unit ? 'at '.$visit->unit->reference : null,
-            $visit->unit?->location?->name,
-        ]);
-        $summary = implode(' · ', $details);
+        // Locale-neutral extras (times, references, site names); the sentence
+        // itself is a per-recipient template in lang/xx/notifications.php.
+        $extra = implode('', array_filter([
+            $when ? ' · '.$when : null,
+            $visit->unit ? ' · '.$visit->unit->reference : null,
+            $visit->unit?->location?->name ? ' · '.$visit->unit->location->name : null,
+        ]));
+        $params = [
+            'type' => '@notifications.type.'.$visit->type->value,
+            'client' => $clientName,
+            'extra' => $extra,
+        ];
 
         $agent->notify(new DomainNotification(
             kind: 'visit_assigned',
-            title: 'A visit was assigned to you',
-            body: $summary.'.',
+            key: 'visit_assigned',
+            params: $params,
             link: $link,
             subjectType: $subjectType,
             subjectId: $subjectId,
@@ -63,8 +68,8 @@ class SendVisitAssignedNotification implements ShouldQueue
         if ($visit->type->value === 'in_site' && $project !== null) {
             $this->fanOut($project->contributorIds(), $agent->id, new DomainNotification(
                 kind: 'visit_agent_assigned',
-                title: 'In-site agent assigned',
-                body: $agent->name.' will handle the '.$summary.'.',
+                key: 'visit_agent_assigned',
+                params: [...$params, 'agent' => $agent->name],
                 link: $link,
                 subjectType: $subjectType,
                 subjectId: $subjectId,
@@ -83,8 +88,8 @@ class SendVisitAssignedNotification implements ShouldQueue
 
             $this->fanOut($recipientIds, $agent->id, new DomainNotification(
                 kind: 'office_visit_scheduled',
-                title: 'Upcoming office visit',
-                body: $summary.' — with '.$agent->name.'.',
+                key: 'office_visit_scheduled',
+                params: [...$params, 'agent' => $agent->name],
                 link: $link,
                 subjectType: $subjectType,
                 subjectId: $subjectId,

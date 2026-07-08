@@ -25,6 +25,14 @@ class ClientProjectResource extends JsonResource
         return [
             'id' => $this->id,
             'can_view_collaborators' => $canSeeCollaborators,
+            // The caller is here ONLY as the dispatched field agent (they hold an
+            // in-site visit, but are no contributor / client owner): their remit
+            // is that visit — the FE hides the project's other log affordances
+            // (log call / plan / complete office visit), which the server rejects
+            // anyway. A visit administrator (visits.assign) is never dispatch-only.
+            'is_dispatch_only' => $user !== null
+                && ! $user->can('visits.assign')
+                && $this->resource->isDispatchOnlyAgent($user),
             'client_id' => $this->client_id,
             'stage' => $this->stage?->value,
             // The legal next stages — lets the UI offer only valid moves.

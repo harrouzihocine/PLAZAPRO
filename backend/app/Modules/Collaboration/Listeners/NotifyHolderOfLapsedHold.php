@@ -32,8 +32,8 @@ class NotifyHolderOfLapsedHold implements ShouldQueue
 
         $agent->notify(new DomainNotification(
             kind: 'reserved_lapsed',
-            title: 'Reservation expired',
-            body: 'The reservation on '.$unit->reference.$where.' lapsed — it is back on the market.',
+            key: 'reserved_lapsed',
+            params: ['unit' => $unit->reference.$where],
             link: '/inventory/units/'.$unit->id,
             subjectType: 'unit',
             subjectId: $unit->id,

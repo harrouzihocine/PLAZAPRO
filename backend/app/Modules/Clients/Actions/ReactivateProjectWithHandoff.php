@@ -98,8 +98,7 @@ class ReactivateProjectWithHandoff
 
         $this->notify(
             $newlyAdded,
-            'A project was handed to you',
-            'A supervisor reactivated a client project and put you on it — open it to continue.',
+            'project_handed',
             "/clients/{$project->client_id}/projects/{$project->id}",
         );
 
@@ -135,8 +134,7 @@ class ReactivateProjectWithHandoff
 
         $this->notify(
             $handlerIds,
-            'A client was set up for you',
-            'A supervisor set this client up as your own project — open it to start.',
+            'project_set_up',
             "/clients/{$client->id}/projects/{$newProject->id}",
         );
 
@@ -151,14 +149,14 @@ class ReactivateProjectWithHandoff
         );
     }
 
-    private function notify(Collection $userIds, string $title, string $body, string $link): void
+    private function notify(Collection $userIds, string $key, string $link): void
     {
         if ($userIds->isEmpty()) {
             return;
         }
 
         User::query()->whereIn('id', $userIds->all())->get()->each(
-            fn (User $u) => $u->notify(new DomainNotification(kind: 'project', title: $title, body: $body, link: $link)),
+            fn (User $u) => $u->notify(new DomainNotification(kind: 'project', key: $key, link: $link)),
         );
     }
 }

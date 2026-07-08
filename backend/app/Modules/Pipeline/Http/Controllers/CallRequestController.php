@@ -103,8 +103,8 @@ class CallRequestController extends Controller
 
             $request->user()->notify(new DomainNotification(
                 kind: 'call_log_prompt',
-                title: 'You called '.$callRequest->client->full_name,
-                body: 'Need to log this phone call? Tap to open the call log.',
+                key: 'call_prompt',
+                params: ['name' => $callRequest->client->full_name],
                 link: $callRequest->link(),
                 subjectType: 'call_request',
                 subjectId: $callRequest->id,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Pipeline\Http\Requests;
 
+use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Pipeline\Enums\NextActionType;
 use App\Modules\Settings\Rules\IsAgentUser;
 use Illuminate\Foundation\Http\FormRequest;
@@ -22,7 +23,26 @@ class StoreNextActionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->can('next_actions.plan');
+        $user = $this->user();
+
+        if ($user === null || ! $user->can('next_actions.plan')) {
+            return false;
+        }
+
+        // A plan AGAINST a project the user is only dispatched to (a field
+        // agent, not a contributor / the client's own agent) is outside their
+        // remit — they are here for the in-site visit; its follow-up is planned
+        // inside that visit's completion. Client-level plans (no project) are
+        // unaffected; a visit administrator is exempt. Same rule as LogCallRequest.
+        $projectId = $this->input('client_project_id');
+        if ($projectId !== null && ! $user->can('visits.assign')) {
+            $project = ClientProject::find((int) $projectId);
+            if ($project?->isDispatchOnlyAgent($user)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

@@ -36,8 +36,8 @@ class AnnounceUnitSold implements ShouldQueue
 
         Notification::send($recipients, new DomainNotification(
             kind: 'unit_sold',
-            title: 'Unit sold 🎉',
-            body: implode(' · ', $parts),
+            key: 'unit_sold',
+            params: ['details' => implode(' · ', $parts)],
             link: '/inventory/units/'.$event->unitId,
             subjectType: 'unit',
             subjectId: $event->unitId,

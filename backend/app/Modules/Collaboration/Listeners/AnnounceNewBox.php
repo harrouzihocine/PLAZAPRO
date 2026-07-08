@@ -32,8 +32,8 @@ class AnnounceNewBox implements ShouldQueue
 
             Notification::send($recipients, new DomainNotification(
                 kind: 'box_published',
-                title: 'New box added',
-                body: $body,
+                key: 'box_published',
+                params: ['details' => $body],
                 link: $box->location_id !== null ? '/inventory/locations/'.$box->location_id : null,
                 subjectType: 'box',
                 subjectId: $box->id,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Clients\Models;
 
 use App\Core\Models\BaseModel;
+use App\Modules\Pipeline\Enums\VisitType;
 use App\Modules\Pipeline\Models\Call;
 use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\User;
@@ -96,9 +97,11 @@ class Client extends BaseModel
     /**
      * Visibility rule (clients.view_all): without the grant a user sees only
      * the clients they created or are assigned to follow up — plus clients
-     * whose PROJECT they contribute to (creator or non-hidden viewer): being
-     * shared a project must include its client, or the project workspace 404s
-     * on its own client.
+     * whose PROJECT they contribute to (creator or non-hidden viewer) or are
+     * DISPATCHED to (they hold a project's live in-site visit): being shared or
+     * dispatched a project must include its client, or the project workspace
+     * 404s on its own client. Same reach as ClientProject::scopeVisibleTo, so a
+     * visible project always comes with a visible client.
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
@@ -113,7 +116,11 @@ class Client extends BaseModel
                 ->where('created_by', $user->id)
                 ->orWhereHas('viewers', fn (Builder $v) => $v
                     ->whereKey($user->id)
-                    ->whereNull('client_project_viewers.hidden_at'))));
+                    ->whereNull('client_project_viewers.hidden_at'))
+                ->orWhereHas('visits', fn (Builder $v) => $v
+                    ->active()
+                    ->where('type', VisitType::InSite->value)
+                    ->where('agent_id', $user->id))));
     }
 
     /**

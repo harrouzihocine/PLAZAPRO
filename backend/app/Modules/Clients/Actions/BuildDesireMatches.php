@@ -24,27 +24,43 @@ class BuildDesireMatches
     /** Matches shown per client — ranked best-first by the matcher. */
     private const MAX_MATCHES = 10;
 
+    /** Waiting clients per page — the board lazy-loads page by page. */
+    public const PER_PAGE = 15;
+
     public function __construct(private MatchDesireToInventory $matcher) {}
 
     /**
-     * @return list<array<string, mixed>>
+     * One page of the board. The "has a match" test runs as a single set-based
+     * EXISTS (whereHasMatch) so only the page's desires pay the per-desire
+     * ranking/hydration cost — the unpaginated form ran the matcher for every
+     * waiting client and collapsed past a couple thousand cases.
+     *
+     * @param  array{page?: int|string|null, per_page?: int|string|null, search?: ?string, unassigned?: bool|int|string|null}  $filters
+     * @return array{items: list<array<string, mixed>>, meta: array{current_page: int, last_page: int, per_page: int, total: int}}
      */
-    public function handle(?int $agentId): array
+    public function handle(?int $agentId, array $filters = []): array
     {
-        $desires = $this->desiresQuery($agentId)
+        $perPage = max(1, min(50, (int) ($filters['per_page'] ?? self::PER_PAGE)));
+
+        $desires = $this->matchableDesiresQuery($agentId, $filters)
             ->with(['client.assignedAgent', 'wilaya', 'commune', 'type', 'roomNumber', 'contractType', 'floor', 'locations'])
-            ->get();
+            // Waiting-longest first — the order the unpaginated board showed, now
+            // explicit because pagination needs a stable sort.
+            ->orderBy('desires.id')
+            ->paginate($perPage, ['desires.*'], 'page', max(1, (int) ($filters['page'] ?? 1)));
 
         $out = [];
 
-        foreach ($desires as $desire) {
-            $matches = $this->matcher->handle($desire);
+        foreach ($desires->items() as $desire) {
+            // Ranked in SQL, hydrating only the shown units — a loose desire
+            // matches most of the inventory, and this runs once per page row.
+            ['units' => $shown, 'total' => $matchTotal] = $this->matcher->handleTop($desire, self::MAX_MATCHES);
 
-            if ($matches->isEmpty()) {
+            // whereHasMatch guarantees a hit; a unit sold between the two queries
+            // can still empty a row — skip it rather than show a matchless client.
+            if ($shown->isEmpty()) {
                 continue;
             }
-
-            $shown = $matches->take(self::MAX_MATCHES)->values();
 
             $out[] = [
                 'client' => [
@@ -63,25 +79,69 @@ class BuildDesireMatches
                 // Best-first ordering already answers "which is the closest fit" —
                 // flagging the leader beats a synthetic percentage on units that
                 // all already passed every hard criterion.
-                'matches' => $shown->map(fn (Unit $unit, int $i) => $this->presentUnit($unit, $i === 0))->all(),
-                'more_count' => max(0, $matches->count() - $shown->count()),
+                'matches' => $shown->values()->map(fn (Unit $unit, int $i) => $this->presentUnit($unit, $i === 0))->all(),
+                'more_count' => max(0, $matchTotal - $shown->count()),
             ];
         }
 
-        return $out;
+        return [
+            'items' => $out,
+            'meta' => [
+                'current_page' => $desires->currentPage(),
+                'last_page' => $desires->lastPage(),
+                'per_page' => $desires->perPage(),
+                'total' => $desires->total(),
+            ],
+        ];
     }
 
     /**
-     * Waiting clients with at least one match — same scope as handle(), but skips
-     * the presentation work (origin-project lookup, unit/resource mapping) so the
-     * sidebar "Matches" badge stays cheap.
+     * Waiting clients with at least one match — same scope as handle(), one
+     * COUNT query (the sidebar "Matches" badge rides on every app load, so the
+     * old load-all-then-exists()-per-desire form was a per-navigation stampede).
      */
     public function count(?int $agentId): int
     {
-        return $this->desiresQuery($agentId)
-            ->get()
-            ->filter(fn (Desire $desire) => $this->matcher->exists($desire))
-            ->count();
+        return $this->matchableDesiresQuery($agentId)->count();
+    }
+
+    /** The board's base set: waiting desires that have ≥1 match, plus the list filters. */
+    private function matchableDesiresQuery(?int $agentId, array $filters = []): Builder
+    {
+        $q = $this->matcher->whereHasMatch($this->desiresQuery($agentId));
+
+        if (! empty($filters['unassigned'])) {
+            $q->whereHas('client', fn ($c) => $c->whereNull('assigned_agent_id'));
+        }
+
+        if (! empty($filters['search'])) {
+            $this->applySearch($q, (string) $filters['search']);
+        }
+
+        return $q;
+    }
+
+    /**
+     * Search on the waiting client — name or phone. Mirrors ClientController@index
+     * (and BuildArchive): phone matches digits-only, trunk 0 stripped, so a
+     * fragment matches however the number was written.
+     */
+    private function applySearch(Builder $q, string $term): void
+    {
+        $term = trim($term);
+        $digits = ltrim(preg_replace('/\D/', '', $term), '0');
+
+        $q->whereHas('client', function (Builder $c) use ($term, $digits) {
+            $c->where(function (Builder $sub) use ($term, $digits) {
+                $sub->where('first_name', 'like', "%{$term}%")
+                    ->orWhere('last_name', 'like', "%{$term}%");
+                if ($digits !== '') {
+                    $sub->orWhereRaw("REGEXP_REPLACE(phone, '[^0-9]', '') LIKE ?", ["%{$digits}%"]);
+                } else {
+                    $sub->orWhere('phone', 'like', "%{$term}%");
+                }
+            });
+        });
     }
 
     /** Waiting clients' active desires (no deal yet), scoped to the agent's own book or company-wide. */

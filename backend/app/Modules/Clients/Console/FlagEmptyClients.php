@@ -35,8 +35,8 @@ class FlagEmptyClients extends Command
         foreach ($clients as $client) {
             $client->creator?->notify(new DomainNotification(
                 kind: 'reminder',
-                title: 'Empty client — follow up',
-                body: 'You captured '.$client->full_name.' but nothing has been logged yet.',
+                key: 'empty_client',
+                params: ['name' => $client->full_name],
                 link: '/clients/'.$client->id,
             ));
 

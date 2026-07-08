@@ -32,8 +32,8 @@ class SendPaymentNotification implements ShouldQueue
 
         $agent->notify(new DomainNotification(
             kind: 'payment',
-            title: 'Payment recorded',
-            body: 'A payment of '.$versement->amount.' was recorded on '.$clientName."'s deal.",
+            key: 'payment',
+            params: ['amount' => $versement->amount, 'client' => $clientName],
             link: $link,
             subjectType: $subjectType,
             subjectId: $subjectId,

@@ -37,8 +37,8 @@ class AssignClientAgent
         $agent = User::find($agentId);
         $agent?->notify(new DomainNotification(
             kind: 'desire_assigned',
-            title: 'A waiting client was assigned to you',
-            body: "Reconnect with {$client->full_name} — their wishlist now fits available inventory.",
+            key: 'client_assigned',
+            params: ['name' => $client->full_name],
             link: '/clients/'.$client->id,
             subjectType: 'client',
             subjectId: $client->id,

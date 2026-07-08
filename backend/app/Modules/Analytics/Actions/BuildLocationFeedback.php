@@ -402,32 +402,32 @@ class BuildLocationFeedback
             $top = $ranked[0];
             $out[] = [
                 'severity' => 'high',
-                'title' => 'Top objection: '.$top['label'],
-                'body' => "\"{$top['label']}\" is the #1 concern clients raise here ({$top['count']} mentions). Tackle it head-on in your pitch and marketing.",
+                'title' => __('feedback.top_objection_title', ['label' => $top['label']]),
+                'body' => __('feedback.top_objection_body', ['label' => $top['label'], 'count' => $top['count']]),
             ];
         }
 
         if ($has('price_too_high') || $has('wants_more_discount')) {
             $out[] = [
                 'severity' => 'high',
-                'title' => 'Price is a recurring blocker',
-                'body' => 'Clients repeatedly flag price. Consider a limited-time discount, a launch offer, or repackaging with a box/parking incentive.',
+                'title' => __('feedback.price_blocker_title'),
+                'body' => __('feedback.price_blocker_body'),
             ];
         }
 
         if ($has('payment_plan_too_short')) {
             $out[] = [
                 'severity' => 'medium',
-                'title' => 'Offer a longer payment plan',
-                'body' => 'Several clients find the instalment window too short. A longer plan could unlock hesitant buyers.',
+                'title' => __('feedback.payment_plan_title'),
+                'body' => __('feedback.payment_plan_body'),
             ];
         }
 
         if ($has('location_not_preferred')) {
             $out[] = [
                 'severity' => 'medium',
-                'title' => 'Location is a common concern',
-                'body' => 'Lead with amenities, transport links and neighbourhood value in your pitch and media to reframe the location objection.',
+                'title' => __('feedback.location_concern_title'),
+                'body' => __('feedback.location_concern_body'),
             ];
         }
 
@@ -435,8 +435,8 @@ class BuildLocationFeedback
         if ($funnel['shortlisted'] >= 5 && $funnel['in_site_visits'] < $funnel['shortlisted'] / 2) {
             $out[] = [
                 'severity' => 'medium',
-                'title' => 'Interested clients aren\'t visiting the site',
-                'body' => "{$funnel['shortlisted']} properties were shortlisted but only {$funnel['in_site_visits']} in-site visits happened. Tighten visit scheduling and follow-up.",
+                'title' => __('feedback.visits_gap_title'),
+                'body' => __('feedback.visits_gap_body', ['shortlisted' => $funnel['shortlisted'], 'visits' => $funnel['in_site_visits']]),
             ];
         }
 
@@ -445,8 +445,8 @@ class BuildLocationFeedback
             if (($u['demand'] ?? 0) >= 4 && ($u['won'] ?? 0) === 0 && ($u['interest_ratio'] !== null && $u['interest_ratio'] < 0.5)) {
                 $out[] = [
                     'severity' => 'medium',
-                    'title' => "Unit {$u['reference']} is seen but not selling",
-                    'body' => "Unit {$u['reference']} draws interest but rarely converts. Review its price, floor or finish against comparable units.",
+                    'title' => __('feedback.unit_stuck_title', ['unit' => $u['reference']]),
+                    'body' => __('feedback.unit_stuck_body', ['unit' => $u['reference']]),
                 ];
                 break;
             }
@@ -456,16 +456,16 @@ class BuildLocationFeedback
             $topLost = $lostReasons[0];
             $out[] = [
                 'severity' => 'info',
-                'title' => 'Deals are lost mostly to: '.$topLost['label'],
-                'body' => "\"{$topLost['label']}\" is the leading reason deals close as lost here ({$topLost['count']}). Address it earlier in the pipeline.",
+                'title' => __('feedback.lost_reason_title', ['label' => $topLost['label']]),
+                'body' => __('feedback.lost_reason_body', ['label' => $topLost['label'], 'count' => $topLost['count']]),
             ];
         }
 
         if ($funnel['objections'] === 0) {
             $out[] = [
                 'severity' => 'info',
-                'title' => 'Log objections to unlock insights',
-                'body' => 'No objections have been captured in this window. Ask agents to tick client concerns on calls and visits so this page can guide your next move.',
+                'title' => __('feedback.log_objections_title'),
+                'body' => __('feedback.log_objections_body'),
             ];
         }
 

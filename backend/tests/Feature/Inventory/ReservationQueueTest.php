@@ -190,13 +190,13 @@ class ReservationQueueTest extends TestCase
             $agentB,
             DomainNotification::class,
             fn (DomainNotification $n) => $n->kind === 'reservation_cancelled'
-                && str_contains($n->body, '#2'),
+                && (int) $n->params['position'] === 2,
         );
         Notification::assertSentTo(
             $agentC,
             DomainNotification::class,
             fn (DomainNotification $n) => $n->kind === 'reservation_cancelled'
-                && str_contains($n->body, '#3'),
+                && (int) $n->params['position'] === 3,
         );
     }
 

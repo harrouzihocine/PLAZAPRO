@@ -96,7 +96,7 @@ class ClientController extends Controller
                 return response()->json([
                     'duplicate' => true,
                     'client_id' => $existing->id,
-                    'message' => 'A client with this phone already exists in your list.',
+                    'message' => __('app.duplicate_own'),
                 ], 409);
             }
 
@@ -105,8 +105,7 @@ class ClientController extends Controller
             return response()->json([
                 'duplicate' => true,
                 'request_id' => $created->id,
-                'message' => 'This phone already belongs to another user’s client. '
-                    .'A request was sent to a supervisor.',
+                'message' => __('app.duplicate_other'),
             ], 409);
         }
 
