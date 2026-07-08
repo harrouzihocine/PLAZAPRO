@@ -21,9 +21,9 @@
   --color-warning: var(--app-warning);
   --radius: 10px;
 
-  /* My own chat bubble — the brand NAVY (Messenger-style), not the gold
-     primary: a wall of gold read as "yellow" and drowned the accent. */
-  --chat-own-bubble: #1e214b;
+  /* My own chat bubble — DARK gold (deep bronze): stays in the brand's gold
+     family without reading as yellow the way the bright primary did. */
+  --chat-own-bubble: #7a5c17;
   --chat-own-text: #ffffff;
 }
 
@@ -41,7 +41,7 @@
   --color-on-primary: #37270c;
   --color-border: #2b2a24;
 
-  /* Same navy family, lifted so the bubble reads on the near-black ground. */
-  --chat-own-bubble: #454e8f;
+  /* Same dark-gold family, lifted a step for the near-black ground. */
+  --chat-own-bubble: #8f7020;
   --chat-own-text: #ffffff;
 }

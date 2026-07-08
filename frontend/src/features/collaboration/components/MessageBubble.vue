@@ -44,32 +44,38 @@ const canEdit = computed(() => props.m.is_mine && props.m.type === 'text' && !pr
 // Forwarding copies body + attachments; shared-record cards stay in their thread.
 const canForward = computed(() => !props.m.subject_type && props.m.type !== 'system')
 
-// ── Swipe-to-reply (native): horizontal-intent drag with resistance ──
+// ── Swipe-to-reply (any touch device): WhatsApp grammar — drag right with
+// resistance, a reply arrow reveals behind the bubble, a haptic tick marks the
+// threshold, release quotes the message. touchstart never fires for mice, so
+// no isNative gate is needed (PWA phones get it too).
 let startX = 0
 let startY = 0
 let horizontal = null
-const SWIPE_TRIGGER = 48
+const SWIPE_TRIGGER = 40
 
 function onTouchStart(e) {
-  if (!isNative || !interactive.value || props.compact) return
+  if (!interactive.value || props.compact) return
   startX = e.touches[0].clientX
   startY = e.touches[0].clientY
   horizontal = null
 }
 
 function onTouchMove(e) {
-  if (!isNative || !interactive.value || props.compact) return
+  if (!interactive.value || props.compact) return
   const dx = e.touches[0].clientX - startX
   const dy = e.touches[0].clientY - startY
   if (horizontal === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
-    horizontal = Math.abs(dx) > Math.abs(dy) * 2
+    horizontal = Math.abs(dx) > Math.abs(dy) * 1.2
   }
   if (!horizontal || dx <= 0) {
     dragX.value = 0
     return
   }
   e.preventDefault() // the swipe owns the gesture — stop the list scrolling
-  dragX.value = Math.min(72, dx * 0.5)
+  const next = Math.min(72, dx * 0.5)
+  // One vibration exactly when the drag crosses the send-it threshold.
+  if (next >= SWIPE_TRIGGER && dragX.value < SWIPE_TRIGGER) navigator.vibrate?.(10)
+  dragX.value = next
 }
 
 function onTouchEnd() {
@@ -183,6 +189,19 @@ function act(action) {
           </div>
         </div>
       </template>
+
+      <!-- Reply arrow revealed by the swipe (fades/grows with the drag) -->
+      <span
+        v-if="dragX > 0"
+        class="pointer-events-none absolute -left-9 top-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-surface-200 text-mute dark:bg-surface-700"
+        :style="{
+          opacity: Math.min(1, dragX / 40),
+          transform: `translateY(-50%) scale(${Math.min(1, 0.5 + dragX / 80)})`,
+        }"
+        aria-hidden="true"
+      >
+        <i class="pi pi-reply text-xs" />
+      </span>
 
       <!-- The bubble -->
       <div
