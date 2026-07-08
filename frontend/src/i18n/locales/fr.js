@@ -584,6 +584,11 @@ export default {
     paidOn: 'Payé le',
     method: 'Mode',
     recordDeposit: "Enregistrer l'acompte",
+    backToMarketLabel: 'Retour au marché le',
+    backToMarketHint:
+      "Si la vente n'est pas finalisée d'ici là, l'appartement revient sur le marché — ou passe au client suivant dans la file. Prérempli avec la fenêtre par défaut de l'entreprise.",
+    alreadyReservedNote:
+      "Déjà réservé jusqu'au {date} — enregistrer un autre paiement ne déplace pas l'échéance.",
     boxesModalTitle: 'Boxes avec {ref}',
     boxesModalBody: "Touchez pour ajouter / libérer des boxes avec cet appartement. Seuls ses boxes liés et ceux non liés du projet sont proposés — choisir un box non lié le lie ici.",
     saveBoxes: 'Enregistrer les boxes',
@@ -1117,8 +1122,8 @@ export default {
     holds: 'Réservations',
     holdHoursLabel: "Durée d'une marque d'intérêt (heures)",
     holdHoursHint: "Combien de temps une unité reste Intéressé après une simple marque d'intérêt avant que le balayage la libère. Une marque adossée à un deal ouvert n'expire jamais — seule la clôture du deal (gagné / perdu) la libère ou la convertit.",
-    reservedHoursLabel: 'Fenêtre Réservé après un acompte (heures)',
-    reservedHoursHint: "Quand un client verse un acompte, l'unité passe Réservé — hors marché pour les autres. Si elle n'est pas vendue dans cette fenêtre, le balayage la remet sur le marché et notifie le détenteur.",
+    reservedHoursLabel: 'Fenêtre Réservé par défaut après un acompte (heures)',
+    reservedHoursHint: "Quand un client verse un acompte, l'unité passe Réservé — hors marché pour les autres. L'agent peut fixer un moment exact de retour au marché par affaire en enregistrant l'acompte ; cette fenêtre s'applique quand rien n'est fixé et préremplit ce champ. Si l'unité n'est pas vendue à temps, le balayage la remet sur le marché et notifie le détenteur.",
     loginSecurity: 'Sécurité de connexion',
     maxAttemptsLabel: 'Échecs avant verrouillage du compte',
     maxAttemptsHint: "Après autant de mots de passe erronés d'affilée, le compte est verrouillé et refuse la connexion — même avec le bon mot de passe. Une connexion réussie remet le compteur à zéro.",

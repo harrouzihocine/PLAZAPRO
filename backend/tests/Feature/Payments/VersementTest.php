@@ -85,6 +85,19 @@ class VersementTest extends TestCase
         $this->assertSame(ScheduleState::Paid, $item->state);
     }
 
+    public function test_a_deposit_reserved_window_must_be_in_the_future(): void
+    {
+        $project = ClientProject::factory()->create(['total_price' => '2000.00']);
+        Sanctum::actingAs($this->cashier());
+
+        $this->postJson("/api/v1/projects/{$project->id}/versements", [
+            'amount' => '500.00',
+            'paid_on' => now()->toDateString(),
+            'method_id' => $this->method()->id,
+            'reserved_until' => now()->subHour()->toDateTimeString(),
+        ])->assertUnprocessable()->assertJsonValidationErrors('reserved_until');
+    }
+
     public function test_the_running_balance_is_computed_server_side(): void
     {
         $project = ClientProject::factory()->create(['total_price' => '2000.00']);

@@ -34,6 +34,11 @@ class RecordVersementRequest extends FormRequest
                     ->where('client_project_id', $this->route('project')?->id)
                     ->where('status', 'active'),
             ],
+            // Per-deal Reserved window: the moment the unit goes back to the
+            // market (or to the next in line) if the sale doesn't finalize.
+            // Only honored by the deposit that arms the Reserved lock; empty
+            // falls back to the global reserved_hold_hours window.
+            'reserved_until' => ['nullable', 'date', 'after:now'],
         ];
     }
 }

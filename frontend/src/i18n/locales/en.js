@@ -585,6 +585,11 @@ export default {
     paidOn: 'Paid on',
     method: 'Method',
     recordDeposit: 'Record deposit',
+    backToMarketLabel: 'Back to the market on',
+    backToMarketHint:
+      'If the sale is not finalized by then, the apartment returns to the market — or moves to the next client in line. Prefilled with the company default window.',
+    alreadyReservedNote:
+      'Already reserved until {date} — recording another payment does not move the deadline.',
     boxesModalTitle: 'Boxes with {ref}',
     boxesModalBody: "Tap to add / release boxes with this apartment. Only its linked boxes and the project's unlinked ones are offered — picking an unlinked box links it here.",
     saveBoxes: 'Save boxes',
@@ -1118,8 +1123,8 @@ export default {
     holds: 'Holds',
     holdHoursLabel: 'Interest hold duration (hours)',
     holdHoursHint: 'How long a unit stays Interested after a plain interest hold before the sweep releases it back to available. A hold backing an open deal never expires — only closing the deal (won / lost) releases or converts it.',
-    reservedHoursLabel: 'Reserved window after a holding deposit (hours)',
-    reservedHoursHint: 'When a client pays a holding deposit, the unit goes Reserved — off the market for everyone else (backups aside). If it is not sold within this window, the sweep returns it to the market and notifies the holder.',
+    reservedHoursLabel: 'Default Reserved window after a holding deposit (hours)',
+    reservedHoursHint: 'When a client pays a holding deposit, the unit goes Reserved — off the market for everyone else (backups aside). The agent can set an exact back-to-market moment per deal when recording the deposit; this window applies when none is set, and prefills that field. If the unit is not sold in time, the sweep returns it to the market and notifies the holder.',
     loginSecurity: 'Login security',
     maxAttemptsLabel: 'Failed attempts before the account locks',
     maxAttemptsHint: 'After this many wrong passwords in a row, the account is locked and refuses to sign in — even with the correct password. A successful sign-in resets the counter.',

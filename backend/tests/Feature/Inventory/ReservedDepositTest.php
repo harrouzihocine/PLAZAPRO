@@ -16,6 +16,7 @@ use App\Modules\Inventory\Events\UnitSold;
 use App\Modules\Inventory\Models\Reservation;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Payments\Actions\RecordVersement;
+use App\Modules\Settings\Models\AppSetting;
 use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -42,13 +43,14 @@ class ReservedDepositTest extends TestCase
         );
     }
 
-    private function deposit(ClientProject $project, Unit $unit, User $agent, string $amount = '50000.00'): void
+    private function deposit(ClientProject $project, Unit $unit, User $agent, string $amount = '50000.00', ?string $reservedUntil = null): void
     {
         app(RecordVersement::class)->handle($project, [
             'unit_id' => $unit->id,
             'amount' => $amount,
             'paid_on' => now()->toDateString(),
             'method_id' => DynamicListItem::factory()->create()->id,
+            'reserved_until' => $reservedUntil,
         ], $agent);
     }
 
@@ -65,6 +67,51 @@ class ReservedDepositTest extends TestCase
         $this->assertSame(SaleStatus::Reserved, $unit->sale_status);
         $this->assertSame($project->id, (int) $unit->reserved_project_id);
         $this->assertNotNull($unit->reserved_expires_at);
+    }
+
+    public function test_a_deposit_can_set_its_own_reserved_window(): void
+    {
+        $agent = User::factory()->create();
+        $unit = Unit::factory()->create(['sale_status' => 'available']);
+        $project = ClientProject::factory()->create();
+        $this->reserve($unit, $project, $agent);
+
+        // The agent picked the exact back-to-market moment for THIS deal.
+        $deadline = now()->addHours(6)->startOfMinute();
+        $this->deposit($project, $unit, $agent, '50000.00', $deadline->toDateTimeString());
+
+        $this->assertTrue($deadline->equalTo($unit->fresh()->reserved_expires_at));
+    }
+
+    public function test_the_default_window_comes_from_the_app_setting(): void
+    {
+        $frozen = now()->startOfSecond();
+        Carbon::setTestNow($frozen);
+        AppSetting::set('reserved_hold_hours', '10');
+        $agent = User::factory()->create();
+        $unit = Unit::factory()->create(['sale_status' => 'available']);
+        $project = ClientProject::factory()->create();
+        $this->reserve($unit, $project, $agent);
+
+        $this->deposit($project, $unit, $agent);
+        Carbon::setTestNow();
+
+        $this->assertTrue($frozen->copy()->addHours(10)->equalTo($unit->fresh()->reserved_expires_at));
+    }
+
+    public function test_a_later_payment_never_moves_the_deadline(): void
+    {
+        $agent = User::factory()->create();
+        $unit = Unit::factory()->create(['sale_status' => 'available']);
+        $project = ClientProject::factory()->create();
+        $this->reserve($unit, $project, $agent);
+
+        $deadline = now()->addHours(6)->startOfMinute();
+        $this->deposit($project, $unit, $agent, '50000.00', $deadline->toDateTimeString());
+        // A second instalment tries a later window — the armed deadline stands.
+        $this->deposit($project, $unit, $agent, '10000.00', now()->addDays(30)->toDateTimeString());
+
+        $this->assertTrue($deadline->equalTo($unit->fresh()->reserved_expires_at));
     }
 
     public function test_a_backup_can_reserve_but_not_deposit_on_a_held_unit(): void

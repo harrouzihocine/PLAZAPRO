@@ -14,6 +14,7 @@ use App\Modules\Payments\Models\PaymentSchedule;
 use App\Modules\Payments\Models\Versement;
 use App\Modules\Settings\Models\AppSetting;
 use App\Modules\Settings\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -72,7 +73,12 @@ class RecordVersement
             // A deposit on a not-yet-sold unit is a holding deposit: Reserve it
             // for this project.
             if ($unitId !== null) {
-                $this->placeReservedLock($project, $unitId, $actor);
+                $this->placeReservedLock(
+                    $project,
+                    $unitId,
+                    $actor,
+                    empty($data['reserved_until']) ? null : Carbon::parse($data['reserved_until']),
+                );
             }
 
             // Return the created instance (not a refetch) so the API responds 201.
@@ -92,8 +98,12 @@ class RecordVersement
      * window lapses, though other projects may still queue as interested
      * backups. Recording further payments while already reserved does NOT reset
      * the timer, and a payment can never steal a unit held by another project.
+     *
+     * The deadline is per-deal: the agent picks it when filling the deposit
+     * ($reservedUntil); left empty, the global reserved_hold_hours window
+     * applies.
      */
-    private function placeReservedLock(ClientProject $project, int $unitId, User $actor): void
+    private function placeReservedLock(ClientProject $project, int $unitId, User $actor, ?Carbon $reservedUntil = null): void
     {
         $unit = Unit::whereKey($unitId)->lockForUpdate()->first();
 
@@ -133,7 +143,8 @@ class RecordVersement
             $unit->update([
                 'sale_status' => SaleStatus::Reserved->value,
                 'reserved_project_id' => $project->id,
-                'reserved_expires_at' => now()->addHours(AppSetting::integer('reserved_hold_hours', 72)),
+                'reserved_expires_at' => $reservedUntil
+                    ?? now()->addHours(AppSetting::integer('reserved_hold_hours', 72)),
             ]);
         }
     }

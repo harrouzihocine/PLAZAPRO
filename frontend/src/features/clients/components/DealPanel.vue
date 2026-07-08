@@ -8,6 +8,7 @@ import BaseMultiSelect from '@/components/base/BaseMultiSelect.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import MoneyInput from '@/components/base/MoneyInput.vue'
+import TimeField from '@/components/base/TimeField.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { dealsApi, staffApi } from '@/features/clients/api'
@@ -15,11 +16,12 @@ import { useClientsStore } from '@/features/clients/clientsStore'
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
 import UnitBoxPicker from '@/features/inventory/components/UnitBoxPicker.vue'
 import { useAuthStore } from '@/features/settings/store'
+import { appSettingsApi } from '@/features/settings/api'
 import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { versementsApi } from '@/features/payments/api'
 import { useNetworkStore } from '@/features/offline/networkStore'
 import { BASE_SWAL_OPTS, toastError, toastSuccess } from '@/composables/useConfirm'
-import { formatDate, todayInput } from '@/utils/format'
+import { dateInputValue, formatDateTime, timeInputValue, todayInput } from '@/utils/format'
 import { dzdToMil, formatMoney, milToDzd, MIL_LABEL } from '@/features/payments/money'
 import { t } from '@/i18n'
 
@@ -50,11 +52,35 @@ const depositFlow = ref({
   amount: '',
   paid_on: todayInput(),
   method_id: '',
+  back_date: '',
+  back_time: '',
 })
 // Guards double-submit: the deposit records a versement directly (not via a
 // store action), so store.saving never covers it — a double-click would book
 // two deposits without this.
 const depositSubmitting = ref(false)
+
+// Only the deposit that flips the unit to Reserved sets the back-to-market
+// deadline — a later payment on an already-Reserved unit never moves it
+// (matching the backend), so the picker hides then.
+const depositArmsReservation = computed(
+  () => depositFlow.value.unit && depositFlow.value.unit.sale_status !== 'reserved',
+)
+
+// The global window (app setting) seeds the deadline so the agent sees the
+// concrete moment and adjusts it per deal. Fetched once; if the fetch fails the
+// fields stay empty and the backend applies the same default itself.
+let cachedReservedHoldHours = null
+async function defaultReservedDeadline() {
+  if (cachedReservedHoldHours === null) {
+    try {
+      cachedReservedHoldHours = Number((await appSettingsApi.get()).reserved_hold_hours) || 72
+    } catch {
+      return null
+    }
+  }
+  return new Date(Date.now() + cachedReservedHoldHours * 3600000)
+}
 
 function openDeposit(unit) {
   depositFlow.value = {
@@ -63,6 +89,18 @@ function openDeposit(unit) {
     amount: '',
     paid_on: todayInput(),
     method_id: '',
+    back_date: '',
+    back_time: '',
+  }
+  if (unit.sale_status !== 'reserved') {
+    defaultReservedDeadline().then((d) => {
+      const f = depositFlow.value
+      // Don't clobber a deadline the agent already started typing.
+      if (d && f.open && f.unit === unit && !f.back_date) {
+        f.back_date = dateInputValue(d)
+        f.back_time = timeInputValue(d)
+      }
+    })
   }
 }
 
@@ -84,6 +122,11 @@ async function submitDeposit() {
       amount: f.amount,
       paid_on: f.paid_on,
       method_id: f.method_id,
+      // Per-deal Reserved window (only meaningful on the arming deposit);
+      // omitted = the global default window.
+      ...(depositArmsReservation.value && f.back_date
+        ? { reserved_until: `${f.back_date} ${f.back_time || '00:00'}` }
+        : {}),
     })
     depositFlow.value.open = false
     toastSuccess(t('deal.depositRecorded', { ref: f.unit.reference }))
@@ -420,7 +463,7 @@ async function saveBoxes() {
               {{ $t('deal.depositPaid') }}
               <span class="num font-semibold text-ink">{{ formatMoney(u.collected) }}</span>
               <span v-if="u.sale_status === 'reserved' && u.reserved_expires_at">
-                · {{ $t('deal.reservedUntil', { date: formatDate(u.reserved_expires_at) }) }}
+                · {{ $t('deal.reservedUntil', { date: formatDateTime(u.reserved_expires_at) }) }}
               </span>
             </p>
 
@@ -641,6 +684,36 @@ async function saveBoxes() {
           :options="methods.map((m) => ({ value: m.id, label: itemLabel(m) }))"
           class="sm:col-span-2"
         />
+
+        <!-- Per-deal Reserved window: when the apartment goes back to the
+             market (or to the next in line) if the sale doesn't finalize.
+             Prefilled with the company default; empty also means default. -->
+        <div v-if="depositArmsReservation" class="sm:col-span-2">
+          <span class="mb-1.5 block text-sm font-medium text-ink">
+            {{ $t('deal.backToMarketLabel') }}
+          </span>
+          <div class="flex gap-2">
+            <BaseInput
+              v-model="depositFlow.back_date"
+              type="date"
+              :min="todayInput()"
+              class="flex-1"
+            />
+            <TimeField
+              v-model="depositFlow.back_time"
+              :aria-label="$t('common.time')"
+              class="w-32"
+            />
+          </div>
+          <p class="mt-1 text-xs text-mute">{{ $t('deal.backToMarketHint') }}</p>
+        </div>
+        <p v-else class="text-xs text-mute sm:col-span-2">
+          {{
+            $t('deal.alreadyReservedNote', {
+              date: formatDateTime(depositFlow.unit.reserved_expires_at),
+            })
+          }}
+        </p>
       </div>
       <div class="mt-4 flex gap-2">
         <Button
