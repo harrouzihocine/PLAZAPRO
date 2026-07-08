@@ -35,6 +35,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/boxes', [BoxController::class, 'index']);
 
+        // The reservation follow-up board: reserved/held units + ordered queues.
+        Route::get('/reservations/queues', [ReservationController::class, 'queues']);
+
         // Media: list + permission-gated streaming of the private files.
         Route::get('/{mediableType}/{mediableId}/media', [MediaController::class, 'index'])
             ->whereIn('mediableType', ['locations', 'units'])->whereNumber('mediableId');

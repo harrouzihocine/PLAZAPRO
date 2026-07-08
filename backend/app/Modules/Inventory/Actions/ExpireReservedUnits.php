@@ -7,6 +7,7 @@ namespace App\Modules\Inventory\Actions;
 use App\Modules\Inventory\Enums\HoldStatus;
 use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Events\ReservedLapsed;
+use App\Modules\Inventory\Events\ReservedReleased;
 use App\Modules\Inventory\Models\Unit;
 use Illuminate\Support\Facades\DB;
 
@@ -49,6 +50,9 @@ class ExpireReservedUnits
 
                     if ($projectId > 0) {
                         ReservedLapsed::dispatch($unit, $projectId);
+                        // The queue moves up: tell the next project in line the
+                        // unit is theirs to pursue (no-op when nobody queues).
+                        ReservedReleased::dispatch($unit, $projectId);
                     }
 
                     $freed++;

@@ -7,6 +7,7 @@ namespace App\Modules\Inventory\Actions;
 use App\Modules\Clients\Enums\ClientProjectStage;
 use App\Modules\Inventory\Enums\HoldStatus;
 use App\Modules\Inventory\Enums\SaleStatus;
+use App\Modules\Inventory\Events\BackupHoldsCancelled;
 use App\Modules\Inventory\Models\Reservation;
 use App\Modules\Inventory\Models\Unit;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +23,7 @@ class ConvertReservation
     {
         abort_if($reservation->hold_status !== HoldStatus::Active, 422, 'This hold is not active.');
 
-        return DB::transaction(function () use ($reservation) {
+        [$fresh, $unit, $cancelled] = DB::transaction(function () use ($reservation) {
             // Lock the unit so two concurrent conversions can't both sell it, and
             // re-assert its state under the lock.
             $unit = Unit::whereKey($reservation->unit_id)->lockForUpdate()->firstOrFail();
@@ -34,6 +35,10 @@ class ConvertReservation
                 422,
                 'This unit is reserved for another client.',
             );
+
+            // Snapshot the queue BEFORE releasing it — the cancellation notice
+            // tells each losing team which place their client held.
+            $cancelled = $unit->queuedProjectsExcept((int) $reservation->client_project_id);
 
             // This hold converts to the sale; every other live hold on the unit
             // (backups from other projects) loses it.
@@ -59,7 +64,15 @@ class ConvertReservation
                 ]);
             }
 
-            return $reservation->fresh();
+            return [$reservation->fresh(), $unit, $cancelled];
         });
+
+        // After commit (never on a rolled-back sale): tell each queued project
+        // its reservation is gone.
+        if ($cancelled !== []) {
+            BackupHoldsCancelled::dispatch($unit, $cancelled);
+        }
+
+        return $fresh;
     }
 }

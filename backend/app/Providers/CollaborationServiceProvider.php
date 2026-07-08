@@ -14,14 +14,18 @@ use App\Modules\Collaboration\Listeners\AnnounceUnitSold;
 use App\Modules\Collaboration\Listeners\AnnounceUnitStatusChange;
 use App\Modules\Collaboration\Listeners\NotifyAgentsOfMatchingUnit;
 use App\Modules\Collaboration\Listeners\NotifyHolderOfLapsedHold;
+use App\Modules\Collaboration\Listeners\NotifyNextInReservationQueue;
 use App\Modules\Collaboration\Listeners\NotifyParticipantsOfMessage;
+use App\Modules\Collaboration\Listeners\NotifyQueueCancelledBySale;
 use App\Modules\Collaboration\Listeners\SendDispatchRequestNotification;
 use App\Modules\Collaboration\Listeners\SendDueReminderNotification;
 use App\Modules\Collaboration\Listeners\SendPaymentNotification;
 use App\Modules\Collaboration\Listeners\SendVisitAssignedNotification;
+use App\Modules\Inventory\Events\BackupHoldsCancelled;
 use App\Modules\Inventory\Events\BoxEdited;
 use App\Modules\Inventory\Events\BoxPublished;
 use App\Modules\Inventory\Events\ReservedLapsed;
+use App\Modules\Inventory\Events\ReservedReleased;
 use App\Modules\Inventory\Events\UnitEdited;
 use App\Modules\Inventory\Events\UnitPublished;
 use App\Modules\Inventory\Events\UnitRepriced;
@@ -60,6 +64,10 @@ class CollaborationServiceProvider extends ServiceProvider
         UnitSold::class => [AnnounceUnitSold::class],
         UnitStatusChanged::class => [AnnounceUnitStatusChange::class],
         ReservedLapsed::class => [NotifyHolderOfLapsedHold::class],
+        // The reservation queue: promotion when the deposit lock lifts,
+        // cancellation notices when a sale ends every queued hold.
+        ReservedReleased::class => [NotifyNextInReservationQueue::class],
+        BackupHoldsCancelled::class => [NotifyQueueCancelledBySale::class],
     ];
 
     public function boot(): void

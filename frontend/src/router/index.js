@@ -114,6 +114,14 @@ const routes = [
         meta: { permission: 'versements.view' },
       },
       {
+        // The reservation follow-up board: reserved/held units and the ordered
+        // queue on each ("you are 2nd in line").
+        path: 'reservations',
+        name: 'reservations',
+        component: () => import('@/features/inventory/views/ReservationsView.vue'),
+        meta: { permission: 'units.view' },
+      },
+      {
         path: 'analytics',
         name: 'analytics',
         component: () => import('@/features/analytics/views/ReportsView.vue'),

@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Collection as SupportCollection;
 
 /**
  * An apartment / lot inside a location. price and sale_status corrections go
@@ -111,6 +112,65 @@ class Unit extends BaseModel
         return $this->reservations()
             ->where('hold_status', HoldStatus::Active->value)
             ->exists();
+    }
+
+    /**
+     * The ordered reservation queue — the "you are Nth in line" order agents
+     * quote to clients: the Reserved deposit holder first (when the unit is
+     * Reserved), then every other live project hold oldest-first. Anonymous
+     * holds (no client project) hold nothing FOR anyone, so they never queue.
+     *
+     * @return SupportCollection<int, Reservation>
+     */
+    public function reservationQueue(): SupportCollection
+    {
+        // Reuse the eager-loaded holds when present (list views — no N+1),
+        // else query, like UnitResource's interested counter.
+        $holds = $this->relationLoaded('activeReservations')
+            ? $this->activeReservations
+                ->whereNotNull('client_project_id')
+                ->sortBy([['held_at', 'asc'], ['id', 'asc']])
+                ->values()
+            : $this->activeReservations()
+                ->whereNotNull('client_project_id')
+                ->orderBy('held_at')
+                ->orderBy('id')
+                ->get();
+
+        if ($this->sale_status !== SaleStatus::Reserved || $this->reserved_project_id === null) {
+            return $holds->toBase();
+        }
+
+        // The deposit holder outranks the backups regardless of when they held.
+        [$holder, $backups] = $holds->partition(
+            fn (Reservation $r) => (int) $r->client_project_id === (int) $this->reserved_project_id,
+        );
+
+        return $holder->concat($backups)->values()->toBase();
+    }
+
+    /**
+     * The queue entries a sale to $buyerProjectId would cancel — every queued
+     * project except the buyer, with the place each holds right now. Snapshot
+     * this BEFORE releasing any hold: it feeds the "your client was 2nd in
+     * line" cancellation notice (BackupHoldsCancelled).
+     *
+     * @return list<array{client_project_id: int, position: int}>
+     */
+    public function queuedProjectsExcept(int $buyerProjectId): array
+    {
+        $cancelled = [];
+
+        foreach ($this->reservationQueue()->values() as $index => $hold) {
+            if ((int) $hold->client_project_id !== $buyerProjectId) {
+                $cancelled[] = [
+                    'client_project_id' => (int) $hold->client_project_id,
+                    'position' => $index + 1,
+                ];
+            }
+        }
+
+        return $cancelled;
     }
 
     /** Distinct client projects holding this unit — the "Interested N" counter. */

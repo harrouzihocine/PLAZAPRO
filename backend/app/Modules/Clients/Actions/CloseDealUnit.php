@@ -12,6 +12,8 @@ use App\Modules\Clients\Models\DealItem;
 use App\Modules\Clients\Models\ShortlistItem;
 use App\Modules\Inventory\Enums\HoldStatus;
 use App\Modules\Inventory\Enums\SaleStatus;
+use App\Modules\Inventory\Events\BackupHoldsCancelled;
+use App\Modules\Inventory\Events\ReservedReleased;
 use App\Modules\Inventory\Events\UnitSold;
 use App\Modules\Inventory\Models\Reservation;
 use App\Modules\Inventory\Models\Unit;
@@ -54,7 +56,14 @@ class CloseDealUnit
         abort_unless($item->isActive() && $item->unit_id !== null, 422, 'This is not an apartment on the deal.');
         abort_if($item->state->isClosed(), 422, 'This apartment is already resolved.');
 
-        $deal = DB::transaction(function () use ($deal, $item, $outcome, $agreedPrice, $resolution, $note, $credits) {
+        // Filled inside the transaction, dispatched after commit (like UnitSold):
+        // the queue positions each losing project held when the sale killed its
+        // reservation, and whether a lost close lifted this project's own
+        // Reserved lock (→ the queue moves up for the next client).
+        $cancelledBackups = [];
+        $releasedReservedLock = false;
+
+        $deal = DB::transaction(function () use ($deal, $item, $outcome, $agreedPrice, $resolution, $note, $credits, &$cancelledBackups, &$releasedReservedLock) {
             // Serialize on the unit row so two concurrent closes on the same unit
             // (via different deals, or a double-clicked "Mark won") can never both
             // sell it — the same lock ReserveUnit takes. Holding the lock, re-read
@@ -66,14 +75,27 @@ class CloseDealUnit
             abort_unless($freshDeal->isActive() && ! $freshDeal->state->isClosed(), 422, 'This deal is not open.');
             abort_if($item->state->isClosed(), 422, 'This apartment is already resolved.');
 
-            $outcome === 'won'
-                ? $this->win($item, $agreedPrice, $credits)
-                : $this->lose($item);
+            if ($outcome === 'won') {
+                $cancelledBackups = $this->win($item, $agreedPrice, $credits);
+            } else {
+                $releasedReservedLock = $this->lose($item);
+            }
 
             $this->finalizeWhenResolved($deal, $resolution ?? 'reopen', $note);
 
             return $deal->fresh();
         });
+
+        // Post-commit fan-outs (never fire on a rolled-back close). The
+        // status-change broadcast rides the Unit model hook automatically.
+        if ($outcome === 'won' && $cancelledBackups !== []) {
+            // Each queued project just lost its reservation to this sale.
+            BackupHoldsCancelled::dispatch($item->unit, $cancelledBackups);
+        }
+        if ($releasedReservedLock) {
+            // This project's deposit lock is gone — promote the next in line.
+            ReservedReleased::dispatch($item->unit, (int) $deal->client_project_id);
+        }
 
         // Celebration + all-users bell (after commit, so it never fires on a
         // rolled-back sale). The status-change broadcast is fired by the Unit
@@ -111,7 +133,11 @@ class CloseDealUnit
         return $deal;
     }
 
-    private function win(DealItem $item, ?string $agreedPrice, ?array $credits = null): void
+    /**
+     * @return list<array{client_project_id: int, position: int}> the queued
+     *                                                            projects this sale cancelled, with the place each held
+     */
+    private function win(DealItem $item, ?string $agreedPrice, ?array $credits = null): array
     {
         abort_if(
             $agreedPrice === null,
@@ -134,11 +160,26 @@ class CloseDealUnit
             'This unit is reserved for another client.',
         );
 
+        // Snapshot the queue BEFORE the sale releases it — the cancellation
+        // notice tells each losing team which place their client held.
+        $cancelled = $unit->queuedProjectsExcept((int) $item->deal->client_project_id);
+
         $this->activeHold($item)?->update(['hold_status' => HoldStatus::Converted->value]);
 
         // The sale ends every backup — other projects interested in this unit
         // lose it (their deals re-resolve; the all-users "sold" bell tells them).
         $this->releaseBackups($item);
+
+        // Backups that never opened a deal (pure interest holds) end with the
+        // sale too — left active they would linger on a sold unit and corrupt
+        // the queue counters.
+        Reservation::query()
+            ->where('unit_id', $unit->id)
+            ->where('hold_status', HoldStatus::Active->value)
+            ->where(fn ($q) => $q
+                ->whereNull('client_project_id')
+                ->orWhere('client_project_id', '!=', $item->deal->client_project_id))
+            ->update(['hold_status' => HoldStatus::Released->value]);
 
         $unit->update([
             'sale_status' => SaleStatus::Sold->value,
@@ -158,6 +199,8 @@ class CloseDealUnit
             'closed_at' => now(),
             'credits' => $this->normalizeCredits($credits),
         ]);
+
+        return $cancelled;
     }
 
     /** A readable one-line address for the unit's project: street · commune · wilaya. */
@@ -221,7 +264,8 @@ class CloseDealUnit
         return ['sale' => $resolve('sale'), 'insite' => $resolve('insite'), 'other' => $resolve('other')];
     }
 
-    private function lose(DealItem $item): void
+    /** @return bool whether this close lifted the project's own Reserved lock */
+    private function lose(DealItem $item): bool
     {
         $item->load(['unit', 'boxItems' => fn ($q) => $q->active(), 'boxItems.box']);
 
@@ -249,9 +293,18 @@ class CloseDealUnit
         $unit = $item->unit;
         $heldByAnother = $unit->sale_status === SaleStatus::Reserved
             && (int) $unit->reserved_project_id !== (int) $item->deal->client_project_id;
-        if (! $heldByAnother) {
-            $unit->revertToMarket();
+        if ($heldByAnother) {
+            return false;
         }
+
+        // Losing while holding the deposit lock frees the unit for the queue —
+        // the caller promotes the next project in line after commit.
+        $liftsOwnLock = $unit->sale_status === SaleStatus::Reserved
+            && (int) $unit->reserved_project_id === (int) $item->deal->client_project_id;
+
+        $unit->revertToMarket();
+
+        return $liftsOwnLock;
     }
 
     /**
