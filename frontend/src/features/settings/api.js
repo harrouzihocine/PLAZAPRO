@@ -217,4 +217,18 @@ export const usersApi = {
   cancel(id) {
     return useApi().delete(`/users/${id}`)
   },
+
+  // Offboarding desk (users.transfer): everything the user owns — their
+  // career record plus the open work that would orphan when they leave.
+  // Pass { totals: 1 } for the cheap probe (open-book counts only).
+  async workload(id, params = {}) {
+    const { data } = await useApi().get(`/users/${id}/workload`, { params })
+    return data.data
+  },
+
+  // Hand the open work to a successor ({ successor_id, dispatch_to_pool }).
+  async transferWork(id, payload) {
+    const { data } = await useApi().post(`/users/${id}/transfer-work`, payload)
+    return data.data
+  },
 }

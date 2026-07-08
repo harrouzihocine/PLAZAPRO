@@ -69,6 +69,12 @@ export const useUsersStore = defineStore('users', {
       return this.mutate(() => usersApi.unlock(id))
     },
 
+    // Hand a (leaving) user's open work to a successor. Returns the moved
+    // counts so the caller can toast a summary.
+    transferWork(id, payload) {
+      return this.mutate(() => usersApi.transferWork(id, payload))
+    },
+
     cancel(id) {
       return this.mutate(() => usersApi.cancel(id))
     },

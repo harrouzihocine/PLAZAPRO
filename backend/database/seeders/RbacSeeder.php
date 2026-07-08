@@ -39,8 +39,10 @@ class RbacSeeder extends Seeder
     private array $permissions = [
         // Settings / admin. users.unlock is split out of users.manage: clearing
         // a brute-force login lock, grantable on its own (e.g. to a manager)
-        // without handing over full account administration.
-        'users.manage', 'users.unlock', 'roles.manage', 'settings.manage', 'audit.view', 'audit.export',
+        // without handing over full user administration. users.transfer is the
+        // offboarding desk (also split from users.manage): review everything a
+        // leaving user owns and hand their open work to a successor.
+        'users.manage', 'users.unlock', 'users.transfer', 'roles.manage', 'settings.manage', 'audit.view', 'audit.export',
         // Inventory
         'locations.manage', 'units.view', 'units.interest', 'units.manage', 'media.manage',
         // Clients — the client record itself. clients.manage covers ONLY the
@@ -116,6 +118,7 @@ class RbacSeeder extends Seeder
         // Settings / admin
         'users.manage' => 'Create, edit and deactivate staff accounts and set each person\'s role.',
         'users.unlock' => 'Unlock an account that was locked after too many failed sign-in attempts.',
+        'users.transfer' => 'Review everything a (leaving) user owns and hand their open work — clients, projects, planned actions, visits, tasks — to a successor.',
         'roles.manage' => 'Create roles and choose exactly what each role is allowed to do.',
         'settings.manage' => 'Edit workspace settings: dropdown lists, wilayas & communes, departments and general options.',
         'audit.view' => 'Open the audit trail and see who changed what.',
@@ -224,6 +227,9 @@ class RbacSeeder extends Seeder
         // Split from users.manage: clearing a brute-force login lock without
         // full account administration.
         'users.unlock' => 'users.manage',
+        // Split from users.manage: the offboarding desk (workload review +
+        // hand-over) without full account administration.
+        'users.transfer' => 'users.manage',
     ];
 
     /**

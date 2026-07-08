@@ -9,9 +9,12 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import FilterPanel from '@/components/ui/FilterPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import UserFormModal from '@/features/settings/components/UserFormModal.vue'
+import TransferWorkModal from '@/features/settings/components/TransferWorkModal.vue'
+import { usersApi } from '@/features/settings/api'
 import { useUsersStore } from '@/features/settings/usersStore'
 import { useAuthStore } from '@/features/settings/store'
-import { confirmAction } from '@/composables/useConfirm'
+import { confirmAction, toastSuccess } from '@/composables/useConfirm'
+import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { countActiveFilters, initials } from '@/utils/format'
 
 const store = useUsersStore()
@@ -22,6 +25,7 @@ const modalOpen = ref(false)
 const modalUser = ref(null) // null = creating
 
 onMounted(() => store.fetch())
+useRefreshable(() => store.fetch()) // pull-to-refresh + reconnect self-heal
 
 function openCreate() {
   modalUser.value = null
@@ -43,8 +47,65 @@ async function onSave(payload) {
   }
 }
 
-function toggleActive(user) {
+async function toggleActive(user) {
+  // Deactivating someone who still owns open work would silently orphan it —
+  // warn and point at "Transfer work" first (workload needs users.transfer).
+  if (user.is_active && auth.can('users.transfer')) {
+    let openTotal = null // null = the peek itself failed
+    try {
+      openTotal = (await usersApi.workload(user.id, { totals: 1 })).open_total
+    } catch {
+      /* handled below — the safety net must not silently vanish */
+    }
+    if (openTotal === null || openTotal > 0) {
+      const ok = await confirmAction({
+        title:
+          openTotal === null
+            ? `Could not check ${user.name}'s open work`
+            : `${user.name} still has ${openTotal} open item${openTotal === 1 ? '' : 's'}`,
+        text: 'Clients, projects, planned actions, visits or tasks would be left without an owner. Use "Transfer work" first, or deactivate anyway.',
+        confirmText: 'Deactivate anyway',
+        danger: true,
+      })
+      if (!ok) return
+    }
+  }
   store.setActive(user.id, !user.is_active)
+}
+
+// Offboarding: the transfer wizard for one (leaving) user.
+const transferUser = ref(null) // null = closed
+
+async function onTransfer(payload) {
+  const leaver = transferUser.value
+  const after = payload.deactivate ? ' The account is deactivated right after.' : ''
+  if (
+    !(await confirmAction({
+      title: `Hand ${leaver.name}'s open work to ${payload.successor_name}?`,
+      text: `${payload.open_total} open item${payload.open_total === 1 ? '' : 's'} will move to ${payload.successor_name}. History (calls, conducted visits, closed deals) stays under ${leaver.name}'s name.${after}`,
+      confirmText: 'Transfer',
+      danger: true,
+    }))
+  ) {
+    return
+  }
+
+  try {
+    await store.transferWork(leaver.id, {
+      successor_id: payload.successor_id,
+      dispatch_to_pool: payload.dispatch_to_pool,
+    })
+  } catch {
+    return // transfer failed — error surfaced via store.error toast
+  }
+
+  // The transfer is committed from here on: a failed deactivation must not
+  // read as a failed hand-over (it surfaces its own toast via the store).
+  transferUser.value = null
+  toastSuccess(`${leaver.name}'s open work was handed to ${payload.successor_name}.`)
+  if (payload.deactivate && leaver.is_active) {
+    await store.setActive(leaver.id, false).catch(() => {})
+  }
 }
 
 // Clear a brute-force login lock (too many failed passwords) so the user can
@@ -174,6 +235,17 @@ async function cancelUser(user) {
               @click="unlockUser(user)"
             />
             <Button
+              v-if="auth.can('users.transfer')"
+              v-tooltip.top="'Transfer work — hand this user\'s open clients, projects and visits to a successor'"
+              icon="pi pi-arrow-right-arrow-left"
+              text
+              rounded
+              size="small"
+              severity="secondary"
+              aria-label="Transfer work"
+              @click="transferUser = user"
+            />
+            <Button
               :icon="user.is_active ? 'pi pi-pause' : 'pi pi-play'"
               :label="user.is_active ? 'Deactivate' : 'Activate'"
               text
@@ -203,6 +275,15 @@ async function cancelUser(user) {
       :saving="store.saving"
       @save="onSave"
       @close="modalOpen = false"
+    />
+
+    <TransferWorkModal
+      v-if="transferUser"
+      :user="transferUser"
+      :users="store.items"
+      :saving="store.saving"
+      @transfer="onTransfer"
+      @close="transferUser = null"
     />
   </div>
 </template>

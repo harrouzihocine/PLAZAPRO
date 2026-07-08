@@ -20,6 +20,7 @@ use App\Modules\Settings\Http\Controllers\ProfileController;
 use App\Modules\Settings\Http\Controllers\RoleController;
 use App\Modules\Settings\Http\Controllers\UserController;
 use App\Modules\Settings\Http\Controllers\UserDraftController;
+use App\Modules\Settings\Http\Controllers\UserWorkloadController;
 use App\Modules\Settings\Http\Controllers\WilayaController;
 use Illuminate\Support\Facades\Route;
 
@@ -132,6 +133,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // users.manage) so unlocking can be delegated without full user admin.
     Route::put('/users/{user}/unlock', [UserController::class, 'unlock'])
         ->middleware('can:users.unlock');
+
+    // The offboarding desk — its own permission (split from users.manage):
+    // review a user's career + open book, then hand the open work to a
+    // successor (the deactivate itself stays under users.manage).
+    Route::middleware('can:users.transfer')->group(function () {
+        Route::get('/users/{user}/workload', [UserWorkloadController::class, 'workload']);
+        Route::post('/users/{user}/transfer-work', [UserWorkloadController::class, 'transfer']);
+    });
 
     // Users — admin only. Created with exactly one role; deactivated or
     // cancelled, never deleted.

@@ -34,7 +34,7 @@ class DomainNotification extends Notification implements ShouldQueue
         'payments' => ['payment', 'reserved_lapsed'],
         'reminders' => ['reminder', 'upcoming_digest'],
         'listings' => ['unit_published', 'unit_updated', 'unit_sold', 'unit_status', 'unit_match', 'box_published', 'box_updated'],
-        'workflow' => ['project', 'desire_assigned', 'duplicate'],
+        'workflow' => ['project', 'desire_assigned', 'duplicate', 'work_transferred'],
     ];
 
     public static function pushCategoryFor(string $kind): ?string
