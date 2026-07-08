@@ -678,6 +678,8 @@ export default {
   matches: {
     searchPlaceholder: 'ابحث باسم العميل أو الهاتف…',
     emptySearch: 'لا نتائج لبحثك',
+    waitingFrom: 'منتظر منذ',
+    waitingTo: 'حتى',
     showingOf: 'عرض {shown} من {total}',
     loadMore: 'تحميل المزيد',
     title: 'تطابقات الرغبات',

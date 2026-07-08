@@ -678,6 +678,8 @@ export default {
   matches: {
     searchPlaceholder: 'Rechercher un nom de client ou un téléphone…',
     emptySearch: 'Aucun résultat pour votre recherche',
+    waitingFrom: 'En attente depuis',
+    waitingTo: "Jusqu'au",
     showingOf: '{shown} sur {total} affichés',
     loadMore: 'Charger plus',
     title: 'Correspondances de besoins',

@@ -118,6 +118,15 @@ class BuildDesireMatches
             $this->applySearch($q, (string) $filters['search']);
         }
 
+        // Waiting-since window on the desire's capture date — at thousands of
+        // cases the manager triages a slice, not the whole history.
+        if (! empty($filters['from'])) {
+            $q->whereDate('desires.created_at', '>=', $filters['from']);
+        }
+        if (! empty($filters['to'])) {
+            $q->whereDate('desires.created_at', '<=', $filters['to']);
+        }
+
         return $q;
     }
 

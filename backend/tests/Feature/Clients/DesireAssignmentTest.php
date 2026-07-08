@@ -119,16 +119,16 @@ class DesireAssignmentTest extends TestCase
         Sanctum::actingAs($manager);
         $this->getJson('/api/v1/desires/matches')
             ->assertOk()
-            ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.client.id', $client->id)
-            ->assertJsonPath('data.0.client.assigned_agent', null);
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.items.0.client.id', $client->id)
+            ->assertJsonPath('data.items.0.client.assigned_agent', null);
 
         // The manager delegates — the same row now carries the assigned owner.
         $this->postJson("/api/v1/clients/{$client->id}/assign-agent", ['agent_id' => $agent->id])->assertOk();
 
         $this->getJson('/api/v1/desires/matches')
             ->assertOk()
-            ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.client.assigned_agent.id', $agent->id);
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.items.0.client.assigned_agent.id', $agent->id);
     }
 }

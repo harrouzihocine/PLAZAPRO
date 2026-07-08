@@ -29,6 +29,8 @@ class DesireMatchController extends Controller
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
             'search' => ['sometimes', 'nullable', 'string', 'max:120'],
             'unassigned' => ['sometimes', 'boolean'],
+            'from' => ['sometimes', 'nullable', 'date'],
+            'to' => ['sometimes', 'nullable', 'date'],
         ]);
 
         return response()->json(['data' => $action->handle(null, $filters)]);

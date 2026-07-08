@@ -679,6 +679,8 @@ export default {
   matches: {
     searchPlaceholder: 'Search client name or phone…',
     emptySearch: 'No match for your search',
+    waitingFrom: 'Waiting since',
+    waitingTo: 'Until',
     showingOf: 'Showing {shown} of {total}',
     loadMore: 'Load more',
     title: 'Desire matches',

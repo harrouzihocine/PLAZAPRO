@@ -47,6 +47,73 @@ class DesireFlexTest extends TestCase
         $this->assertDatabaseHas('desires', ['client_id' => $client->id, 'budget_max' => '3000000.00']);
     }
 
+    public function test_the_board_paginates_and_filters_server_side(): void
+    {
+        // The board can carry thousands of waiting clients — it pages (lazy
+        // loading on the frontend) and filters search/unassigned on the server.
+        $agent = $this->userWith(['clients.view'], isAgent: true);
+        Unit::factory()->create(['price' => '1000.00', 'sale_status' => 'available']);
+
+        $waiting = [
+            ['first_name' => 'Amine', 'phone' => '0551000001', 'assigned_agent_id' => $agent->id],
+            ['first_name' => 'Bilal', 'phone' => '0551000002', 'assigned_agent_id' => null],
+            ['first_name' => 'Chafik', 'phone' => '0551000003', 'assigned_agent_id' => null],
+        ];
+        foreach ($waiting as $attrs) {
+            $client = Client::factory()->create($attrs);
+            Desire::factory()->create([
+                'client_id' => $client->id, 'client_project_id' => null,
+                'budget_min' => null, 'budget_max' => '2000.00', 'type_id' => null,
+                'wilaya_id' => null, 'commune_id' => null,
+            ]);
+        }
+
+        Sanctum::actingAs($this->userWith(['oversight.matches']));
+
+        // Page 1 of 2 — the meta carries the full total for the "Showing X of Y" line.
+        $this->getJson('/api/v1/desires/matches?per_page=2')
+            ->assertOk()
+            ->assertJsonCount(2, 'data.items')
+            ->assertJsonPath('data.meta.total', 3)
+            ->assertJsonPath('data.meta.last_page', 2)
+            ->assertJsonPath('data.items.0.client.full_name', fn ($n) => str_contains((string) $n, 'Amine'));
+
+        $this->getJson('/api/v1/desires/matches?per_page=2&page=2')
+            ->assertOk()
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.meta.current_page', 2);
+
+        // Unassigned-only drops the delegated lead.
+        $this->getJson('/api/v1/desires/matches?unassigned=1')
+            ->assertOk()
+            ->assertJsonCount(2, 'data.items')
+            ->assertJsonPath('data.meta.total', 2);
+
+        // Search matches the client's name or phone fragment, however written.
+        $this->getJson('/api/v1/desires/matches?search=chafik')
+            ->assertOk()
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.items.0.client.phone', '0551000003');
+
+        $this->getJson('/api/v1/desires/matches?search=51000002')
+            ->assertOk()
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.items.0.client.phone', '0551000002');
+
+        // The waiting-since window keys on the desire's capture date.
+        Desire::query()->whereHas('client', fn ($c) => $c->where('phone', '0551000001'))
+            ->update(['created_at' => now()->subDays(30)]);
+
+        $this->getJson('/api/v1/desires/matches?from='.now()->subDay()->toDateString())
+            ->assertOk()
+            ->assertJsonPath('data.meta.total', 2);
+
+        $this->getJson('/api/v1/desires/matches?to='.now()->subDays(7)->toDateString())
+            ->assertOk()
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.items.0.client.phone', '0551000001');
+    }
+
     public function test_desire_matches_board_is_company_wide_for_oversight(): void
     {
         $overseer = $this->userWith(['oversight.matches']);
@@ -63,8 +130,8 @@ class DesireFlexTest extends TestCase
         Sanctum::actingAs($overseer);
         $this->getJson('/api/v1/desires/matches')
             ->assertOk()
-            ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.client.id', $client->id);
+            ->assertJsonCount(1, 'data.items')
+            ->assertJsonPath('data.items.0.client.id', $client->id);
 
         // A regular agent (no oversight.matches) cannot open the board at all.
         Sanctum::actingAs($agent);
@@ -109,11 +176,11 @@ class DesireFlexTest extends TestCase
         // matched" doesn't need a trip to the client file.
         $this->getJson('/api/v1/desires/matches')
             ->assertOk()
-            ->assertJsonPath('data.0.matches.0.id', $unit->id)
-            ->assertJsonPath('data.0.matches.0.area_sqm', '75.00')
-            ->assertJsonPath('data.0.matches.0.sale_status', 'available')
-            ->assertJsonPath('data.0.matches.0.best_match', true)
-            ->assertJsonPath('data.0.desire.notes', 'Wants something nice');
+            ->assertJsonPath('data.items.0.matches.0.id', $unit->id)
+            ->assertJsonPath('data.items.0.matches.0.area_sqm', '75.00')
+            ->assertJsonPath('data.items.0.matches.0.sale_status', 'available')
+            ->assertJsonPath('data.items.0.matches.0.best_match', true)
+            ->assertJsonPath('data.items.0.desire.notes', 'Wants something nice');
     }
 
     public function test_the_board_links_back_to_the_project_the_desire_was_shifted_from(): void
@@ -131,8 +198,8 @@ class DesireFlexTest extends TestCase
         // A desire shifted off a project points back to it — the board's link.
         $this->getJson('/api/v1/desires/matches')
             ->assertOk()
-            ->assertJsonPath('data.0.origin_project.id', $project->id)
-            ->assertJsonPath('data.0.origin_project.label', $location->name);
+            ->assertJsonPath('data.items.0.origin_project.id', $project->id)
+            ->assertJsonPath('data.items.0.origin_project.label', $location->name);
 
         // A desire captured straight off a call (no prior project) has none.
         $freshClient = Client::factory()->create(['assigned_agent_id' => $agent->id]);
@@ -143,7 +210,7 @@ class DesireFlexTest extends TestCase
         ]);
         $this->getJson('/api/v1/desires/matches')
             ->assertOk()
-            ->assertJsonPath('data.1.origin_project', null);
+            ->assertJsonPath('data.items.1.origin_project', null);
     }
 
     public function test_shifting_marks_the_project_as_waiting_on_desire(): void
@@ -225,7 +292,7 @@ class DesireFlexTest extends TestCase
         $unit = Unit::factory()->create(['price' => '1000.00', 'sale_status' => 'available']);
         Sanctum::actingAs($agent);
 
-        $this->getJson('/api/v1/desires/matches')->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson('/api/v1/desires/matches')->assertOk()->assertJsonCount(1, 'data.items');
 
         $this->postJson("/api/v1/clients/{$client->id}/calls", [
             'direction' => 'outbound',
@@ -233,7 +300,7 @@ class DesireFlexTest extends TestCase
             'next_action' => ['type' => 'call', 'due_date' => now()->addDay()->toDateString()],
         ])->assertCreated();
 
-        $this->getJson('/api/v1/desires/matches')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/v1/desires/matches')->assertOk()->assertJsonCount(0, 'data.items');
     }
 
     public function test_a_closed_out_desire_is_revived_not_left_stuck_cancelled(): void

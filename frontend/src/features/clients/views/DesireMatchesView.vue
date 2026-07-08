@@ -57,6 +57,9 @@ const loadingMore = ref(false)
 const error = ref('')
 const search = ref('')
 const unassignedOnly = ref(false)
+// Waiting-since window (desire capture date) — server-side, like the search.
+const from = ref('')
+const to = ref('')
 
 const hasMore = computed(() => meta.value.current_page < meta.value.last_page)
 
@@ -71,6 +74,8 @@ function listParams(page) {
   const params = { page }
   if (search.value.trim()) params.search = search.value.trim()
   if (unassignedOnly.value) params.unassigned = 1
+  if (from.value) params.from = from.value
+  if (to.value) params.to = to.value
   return params
 }
 
@@ -122,12 +127,14 @@ async function loadMore() {
 const { sentinel } = useInfiniteScroll(loadMore)
 
 // Search is server-side (the board spans the whole company) — debounced so a
-// pause in typing queries once, not every keystroke.
+// pause in typing queries once, not every keystroke. Date bounds reload as
+// soon as they change (a date picker commits one value, no debounce needed).
 let searchTimer = null
 watch(search, () => {
   clearTimeout(searchTimer)
   searchTimer = setTimeout(load, 400)
 })
+watch([from, to], load)
 
 function toggleUnassigned() {
   unassignedOnly.value = !unassignedOnly.value
@@ -253,23 +260,27 @@ async function submitReconnect(payload) {
 :title="$t('matches.title')"
       :subtitle="$t('matches.subtitle')"
     >
-      <template #actions>
-        <div class="flex flex-wrap items-center gap-2">
-          <div class="w-56">
-            <BaseInput v-model="search" :placeholder="$t('matches.searchPlaceholder')" />
-          </div>
-          <Button
-            v-if="canAssign()"
-            :label="unassignedOnly ? $t('matches.showingUnassigned') : $t('matches.unassignedOnly')"
-            :icon="unassignedOnly ? 'pi pi-filter-fill' : 'pi pi-filter'"
-            size="small"
-            severity="secondary"
-            :outlined="!unassignedOnly"
-            @click="toggleUnassigned"
-          />
-        </div>
+      <template v-if="canAssign()" #actions>
+        <Button
+          :label="unassignedOnly ? $t('matches.showingUnassigned') : $t('matches.unassignedOnly')"
+          :icon="unassignedOnly ? 'pi pi-filter-fill' : 'pi pi-filter'"
+          size="small"
+          severity="secondary"
+          :outlined="!unassignedOnly"
+          @click="toggleUnassigned"
+        />
       </template>
     </PageHeader>
+
+    <!-- Server-side slicers — at thousands of waiting clients the board is
+         searched and windowed, never scrolled end to end. -->
+    <div class="mb-4 grid grid-cols-2 items-end gap-2 sm:max-w-2xl sm:grid-cols-3">
+      <div class="col-span-2 sm:col-span-1">
+        <BaseInput v-model="search" :label="$t('common.search')" :placeholder="$t('matches.searchPlaceholder')" />
+      </div>
+      <BaseInput v-model="from" :label="$t('matches.waitingFrom')" type="date" />
+      <BaseInput v-model="to" :label="$t('matches.waitingTo')" type="date" />
+    </div>
 
     <SectionCard v-if="error && !rows.length">
       <EmptyState icon="pi pi-exclamation-triangle" :title="error" />
