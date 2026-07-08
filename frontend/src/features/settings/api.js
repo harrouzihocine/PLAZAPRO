@@ -36,6 +36,13 @@ export const authApi = {
     const { data } = await useApi().delete('/me/avatar')
     return data.data
   },
+
+  // Which notification categories reach the phone as system-tray push.
+  // Partial maps are fine — the backend merges over what's saved.
+  async updatePushPrefs(prefs) {
+    const { data } = await useApi().put('/me/push-prefs', prefs)
+    return data.data
+  },
 }
 
 // Scalar app-wide settings (e.g. the interest hold duration in hours).

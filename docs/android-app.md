@@ -104,6 +104,13 @@ No restart needed — nginx serves the new file immediately. `version.json` is
 what makes the /install page show the new version number. Phones update by
 downloading and installing over the top (same signature, higher versionCode).
 
+Publishing `version.json` is also what lights the **in-app update banner**:
+the shell compares its own build (`PlazaNative.getAppVersion()`, treated as
+code 3 for the pre-1.2.0 fleet that lacks the method) against
+`/downloads/version.json` on every launch/foreground (hourly at most,
+`utils/appUpdate.js`) and shows a gold "A new version is out → Update" bar
+that deep-links to /install. Dismissing it silences that release only.
+
 ## Installing on a phone (what staff do)
 
 Open **Menu → Mobile App** (or `/install`) → *Download for Android (.apk)*.
@@ -136,13 +143,24 @@ One-time setup (~10 minutes, any Google account):
    on first launch.
 
 How it works: `DomainNotification` adds an FCM channel when
-`FIREBASE_CREDENTIALS` is set and the recipient has a registered device
-(`device_tokens`, registered by the web layer via `window.PlazaNative`). The
-backend sends **data-only** messages (`FcmClient`, no SDK); the shell's
-`PlazaMessagingService` renders them — channel per kind, one tray entry per
-conversation (payload `tag`), tap → `MainActivity` → the SPA routes to the
-payload `link`. Foreground pushes are suppressed (the in-app toast/chime
-already covers them). Logout releases the device token.
+`FIREBASE_CREDENTIALS` is set, the recipient has a registered device
+(`device_tokens`, registered by the web layer via `window.PlazaNative`), and
+they haven't muted the kind's category (`users.push_prefs`, edited in-app
+under account menu → Notifications — tray push only, the bell always
+delivers; security kinds are never mutable). The backend sends **data-only**
+messages (`FcmClient`, no SDK); the shell's `PlazaMessagingService` renders
+them — channel per kind, one tray entry per conversation (payload `tag`), tap
+→ `MainActivity` → the SPA routes to the payload `link`. Foreground pushes are
+suppressed (the in-app toast/chime already covers them). Logout releases the
+device token.
+
+Chat entries are **MessagingStyle conversations** (v1.2.0+): consecutive
+messages stack in one tray entry, and an inline **Reply** action (Android 7+)
+sends without opening the app — `ReplyReceiver` posts to
+`/api/v1/conversations/{id}/messages` (id from the payload `subject_id`)
+reusing the WebView's session cookies + XSRF token, then appends the sent text
+as "You" (or raises a "Reply not sent — tap to open the chat" notice if the
+session is gone or the network drops).
 
 ## Future: bundled-assets mode (Play Store)
 

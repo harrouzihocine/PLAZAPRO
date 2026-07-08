@@ -55,6 +55,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'locked_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'push_prefs' => 'array',
             'status' => RecordStatus::class,
         ];
     }
@@ -73,6 +74,24 @@ class User extends Authenticatable implements MustVerifyEmail
     public function deviceTokens(): HasMany
     {
         return $this->hasMany(\App\Modules\Collaboration\Models\DeviceToken::class);
+    }
+
+    /**
+     * Does this user want a system-tray push for this notification kind?
+     * Consulted by DomainNotification::via() for the FCM channel only — the
+     * bell feed and live broadcast are never silenced. Defaults are all-on:
+     * a null column, a missing category key, and any kind outside the
+     * category map (security notices, future kinds) all deliver.
+     */
+    public function wantsPushFor(string $kind): bool
+    {
+        $category = DomainNotification::pushCategoryFor($kind);
+
+        if ($category === null) {
+            return true;
+        }
+
+        return (bool) ($this->push_prefs[$category] ?? true);
     }
 
     /**

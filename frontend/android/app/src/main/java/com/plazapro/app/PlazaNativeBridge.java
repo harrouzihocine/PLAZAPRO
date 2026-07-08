@@ -2,7 +2,12 @@ package com.plazapro.app;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
 import android.webkit.JavascriptInterface;
+
+import androidx.core.content.pm.PackageInfoCompat;
+
+import org.json.JSONObject;
 
 /**
  * The shell↔web contract, exposed to the page as `window.PlazaNative` via
@@ -15,6 +20,7 @@ import android.webkit.JavascriptInterface;
  *   getPushToken()      → the device's FCM token ("" until Firebase issues one)
  *   consumePendingLink()→ the deep link of the tapped notification, once
  *   isPushSupported()   → whether this build carries Firebase config
+ *   getAppVersion()     → {"versionName":"1.2.0","versionCode":4} of this build
  */
 public class PlazaNativeBridge {
     private static final String PREFS = "plaza_native";
@@ -58,5 +64,24 @@ public class PlazaNativeBridge {
     @JavascriptInterface
     public boolean isPushSupported() {
         return pushSupported;
+    }
+
+    /**
+     * This build's version, for the web layer's "update available" banner
+     * (utils/appUpdate.js compares it against /downloads/version.json). Shells
+     * without this method are treated as the last release that lacked it.
+     */
+    @JavascriptInterface
+    public String getAppVersion() {
+        try {
+            PackageInfo info = context.getPackageManager()
+                    .getPackageInfo(context.getPackageName(), 0);
+            JSONObject json = new JSONObject();
+            json.put("versionName", info.versionName == null ? "" : info.versionName);
+            json.put("versionCode", PackageInfoCompat.getLongVersionCode(info));
+            return json.toString();
+        } catch (Exception e) {
+            return "";
+        }
     }
 }

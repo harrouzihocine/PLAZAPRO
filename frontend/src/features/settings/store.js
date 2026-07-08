@@ -82,6 +82,11 @@ export const useAuthStore = defineStore('auth', {
       return this.user
     },
 
+    async updatePushPrefs(prefs) {
+      this.setUser(await authApi.updatePushPrefs(prefs))
+      return this.user
+    },
+
     async fetchMe() {
       try {
         this.setUser(await authApi.me())

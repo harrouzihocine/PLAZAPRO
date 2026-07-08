@@ -7,6 +7,7 @@ import { useAuthStore } from '@/features/settings/store'
 import { useNotificationsStore } from '@/features/collaboration/notificationsStore'
 import { timeAgo } from '@/utils/format'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import NotificationPrefsModal from '@/features/settings/components/NotificationPrefsModal.vue'
 
 // Bell + panel for the AppShell. Loads the latest notifications over HTTP and
 // keeps the unread badge live over Reverb. Clicking an item marks it read and
@@ -15,6 +16,12 @@ const auth = useAuthStore()
 const store = useNotificationsStore()
 const router = useRouter()
 const panel = ref(null)
+const showPrefs = ref(false)
+
+function openPrefs() {
+  panel.value?.hide()
+  showPrefs.value = true
+}
 
 onMounted(async () => {
   await store.fetch()
@@ -59,13 +66,24 @@ function onScroll(e) {
     <Popover ref="panel" class="w-96 max-w-[92vw]" :pt="{ content: { class: '!p-0' } }">
       <div class="flex items-center justify-between border-b border-line px-4 py-3">
         <span class="text-sm font-semibold text-ink">Notifications</span>
-        <Button
-          v-if="store.unreadCount > 0"
-          label="Mark all read"
-          size="small"
-          text
-          @click="store.markAllRead()"
-        />
+        <span class="flex items-center gap-1">
+          <Button
+            v-if="store.unreadCount > 0"
+            label="Mark all read"
+            size="small"
+            text
+            @click="store.markAllRead()"
+          />
+          <Button
+            icon="pi pi-cog"
+            size="small"
+            text
+            rounded
+            severity="secondary"
+            aria-label="Notification settings"
+            @click="openPrefs"
+          />
+        </span>
       </div>
 
       <div class="max-h-[60vh] overflow-y-auto" @scroll="onScroll">
@@ -126,5 +144,7 @@ function onScroll(e) {
         <p v-if="store.loadingMore" class="px-4 py-3 text-center text-xs text-mute">Loading more…</p>
       </div>
     </Popover>
+
+    <NotificationPrefsModal v-if="showPrefs" @close="showPrefs = false" />
   </div>
 </template>

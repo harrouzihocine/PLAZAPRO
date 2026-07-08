@@ -10,6 +10,7 @@ import { useTheme } from '@/composables/useTheme'
 import { useNativePhone } from '@/composables/useNativeMode'
 import { isNativeApp } from '@/utils/nativeApp'
 import { initNativePush } from '@/utils/nativePush'
+import { initAppUpdateCheck } from '@/utils/appUpdate'
 import { useAuthStore } from '@/features/settings/store'
 import { initials } from '@/utils/format'
 import NotificationBell from '@/features/collaboration/components/NotificationBell.vue'
@@ -21,6 +22,8 @@ import SyncIndicator from '@/components/shell/SyncIndicator.vue'
 import BrandLogo from '@/components/BrandLogo.vue'
 import UnitSoldCelebration from '@/features/inventory/components/UnitSoldCelebration.vue'
 import ProfileModal from '@/features/settings/components/ProfileModal.vue'
+import NotificationPrefsModal from '@/features/settings/components/NotificationPrefsModal.vue'
+import UpdateBanner from '@/components/shell/UpdateBanner.vue'
 import OfflineBanner from '@/features/offline/OfflineBanner.vue'
 import { useAnnouncementsStore } from '@/features/inventory/announcementsStore'
 import { usePresenceStore } from '@/features/collaboration/presenceStore'
@@ -83,6 +86,8 @@ onMounted(async () => {
   // APK: register this device for system-tray push + route a tapped
   // notification's deep link (no-op on the web / without Firebase config).
   initNativePush()
+  // APK: watch /downloads/version.json for a newer build (no-op on the web).
+  initAppUpdateCheck()
   await outbox.load(auth.user?.id)
   if (network.online) outbox.sync()
   announcements.subscribe()
@@ -102,10 +107,16 @@ const search = ref(null)
 const userPanel = ref(null)
 const mobileNav = ref(false)
 const showProfile = ref(false)
+const showNotifPrefs = ref(false)
 
 function openProfile() {
   userPanel.value?.hide()
   showProfile.value = true
+}
+
+function openNotifPrefs() {
+  userPanel.value?.hide()
+  showNotifPrefs.value = true
 }
 
 // Collapsed icon-rail preference survives reloads.
@@ -500,6 +511,15 @@ async function logout() {
                   @click="openProfile"
                 />
                 <Button
+                  label="Notifications"
+                  icon="pi pi-bell"
+                  severity="secondary"
+                  text
+                  size="small"
+                  class="w-full !justify-start"
+                  @click="openNotifPrefs"
+                />
+                <Button
                   label="Log out"
                   icon="pi pi-sign-out"
                   severity="danger"
@@ -518,6 +538,9 @@ async function logout() {
            the lg: offsets keep it clear of the sidebar; it must never push the
            page content down (that reflow made the app jump on flaky signal). -->
       <OfflineBanner :class="collapsed ? 'lg:left-[76px]' : 'lg:left-64'" />
+
+      <!-- "New APK published" notice (shell only; same overlay rules). -->
+      <UpdateBanner v-if="isNative" :class="collapsed ? 'lg:left-[76px]' : 'lg:left-64'" />
 
       <!-- Facebook-style pull-to-refresh (APK only; the chat takeover thread
            and any open overlay stand down). -->
@@ -612,5 +635,8 @@ async function logout() {
 
     <!-- Self-service profile editor (opened from the account menu). -->
     <ProfileModal v-if="showProfile" @close="showProfile = false" />
+
+    <!-- Per-category push toggles (account menu + the bell panel's gear). -->
+    <NotificationPrefsModal v-if="showNotifPrefs" @close="showNotifPrefs = false" />
   </div>
 </template>

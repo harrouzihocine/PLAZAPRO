@@ -41,6 +41,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/me/profile', [ProfileController::class, 'update']);
     Route::post('/me/avatar', [ProfileController::class, 'uploadAvatar']);
     Route::delete('/me/avatar', [ProfileController::class, 'deleteAvatar']);
+    // Which notification categories reach the phone as push (tray only —
+    // the in-app bell is never filtered).
+    Route::put('/me/push-prefs', [ProfileController::class, 'updatePushPrefs']);
 
     // Stream a user's avatar (shown app-wide). Any authed user; the file itself
     // stays on the private disk and is only reachable through this endpoint.

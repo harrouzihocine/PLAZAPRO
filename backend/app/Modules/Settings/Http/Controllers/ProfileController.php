@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Settings\Http\Controllers;
 
+use App\Modules\Collaboration\Notifications\DomainNotification;
 use App\Modules\Settings\Actions\ProcessAvatar;
 use App\Modules\Settings\Actions\UpdateProfile;
 use App\Modules\Settings\Http\Requests\UpdateProfileRequest;
@@ -24,6 +25,29 @@ class ProfileController extends Controller
     public function update(UpdateProfileRequest $request, UpdateProfile $action): UserResource
     {
         $user = $action->handle($request->user(), $request->validated());
+
+        return new UserResource($user->load('role.permissions'));
+    }
+
+    /**
+     * Per-category push toggles (system-tray only — the bell always delivers).
+     * Partial updates merge over what's saved, so a future category added to
+     * PUSH_CATEGORIES stays on for everyone until they explicitly turn it off.
+     */
+    public function updatePushPrefs(Request $request): UserResource
+    {
+        $rules = [];
+        foreach (array_keys(DomainNotification::PUSH_CATEGORIES) as $category) {
+            $rules[$category] = ['sometimes', 'boolean'];
+        }
+
+        $user = $request->user();
+        $user->forceFill([
+            'push_prefs' => array_merge($user->push_prefs ?? [], array_map(
+                fn ($v) => (bool) $v,
+                $request->validate($rules),
+            )),
+        ])->save();
 
         return new UserResource($user->load('role.permissions'));
     }

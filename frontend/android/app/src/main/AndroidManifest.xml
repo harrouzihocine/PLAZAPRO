@@ -31,6 +31,11 @@
             </intent-filter>
         </service>
 
+        <!-- Inline "Reply" on chat notifications (RemoteInput → backend). -->
+        <receiver
+            android:name=".ReplyReceiver"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
