@@ -92,14 +92,14 @@ function toggle(id) {
           <span
             v-if="b.linked"
             class="ms-1 rounded bg-surface-100 px-1 text-[10px] uppercase tracking-wide dark:bg-surface-700"
-            title="Already linked to this apartment"
+            :title="$t('inventory.alreadyLinked')"
           >
             linked
           </span>
         </button>
       </div>
       <p v-else class="text-xs text-mute">
-        No box is linked to this apartment and none is free to link.
+        {{ $t('inventory.noBoxesToLink') }}
       </p>
     </template>
   </div>

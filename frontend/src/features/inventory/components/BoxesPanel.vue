@@ -8,11 +8,12 @@ import BaseSelect from '@/components/base/BaseSelect.vue'
 import MoneyInput from '@/components/base/MoneyInput.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import { useDynamicList } from '@/composables/useDynamicList'
+import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
 import { useBoxesStore } from '@/features/inventory/boxesStore'
 import { confirmAction } from '@/composables/useConfirm'
 import { formatMoney } from '@/features/payments/money'
+import { t } from '@/i18n'
 
 const props = defineProps({
   locationId: { type: [String, Number], required: true },
@@ -74,8 +75,8 @@ async function submit() {
 async function remove(b) {
   if (
     await confirmAction({
-      title: `Cancel box "${b.reference}"?`,
-      confirmText: 'Cancel box',
+      title: t('inventory.cancelBoxTitle', { ref: b.reference }),
+      confirmText: t('inventory.cancelBox'),
       danger: true,
     })
   ) {
@@ -85,9 +86,9 @@ async function remove(b) {
 </script>
 
 <template>
-  <SectionCard title="Boxes (parking / storage)" icon="pi pi-car" flush>
+  <SectionCard :title="$t('inventory.boxesTitle')" icon="pi pi-car" flush>
     <template #actions>
-      <Button v-if="canManage" label="Add box" icon="pi pi-plus" size="small" @click="openCreate" />
+      <Button v-if="canManage" :label="$t('inventory.addBox')" icon="pi pi-plus" size="small" @click="openCreate" />
     </template>
 
     <form
@@ -95,33 +96,33 @@ async function remove(b) {
       class="grid gap-3 border-b border-line px-4 py-4 sm:grid-cols-3 sm:px-5"
       @submit.prevent="submit"
     >
-      <BaseInput v-model="form.reference" label="Reference" required />
+      <BaseInput v-model="form.reference" :label="$t('inventory.reference')" required />
       <BaseSelect
         v-model="form.type_id"
-        label="Type"
-        placeholder="— none —"
-        :options="boxTypes.map((t) => ({ value: t.id, label: t.label }))"
+:label="$t('inventory.type')"
+        :placeholder="$t('common.none')"
+        :options="boxTypes.map((t) => ({ value: t.id, label: itemLabel(t) }))"
       />
-      <MoneyInput v-model="form.price" label="Price" required />
+      <MoneyInput v-model="form.price" :label="$t('inventory.price')" required />
       <BaseSelect
         v-model="form.unit_id"
-        label="Linked unit"
-        placeholder="— none —"
+:label="$t('inventory.linkedUnit')"
+        :placeholder="$t('common.none')"
         :options="units.map((u) => ({ value: u.id, label: u.reference }))"
       />
       <BaseSelect
         v-model="form.sale_status"
-        label="Sale status"
+:label="$t('inventory.saleStatus')"
         :clearable="false"
         :options="[
-          { value: 'available', label: 'Available' },
-          { value: 'interested', label: 'Interested' },
-          { value: 'sold', label: 'Sold' },
+          { value: 'available', label: $t('status.available') },
+          { value: 'interested', label: $t('status.interested') },
+          { value: 'sold', label: $t('status.sold') },
         ]"
       />
       <div class="flex items-end gap-2">
-        <Button type="submit" label="Save" icon="pi pi-check" :loading="boxes.saving" />
-        <Button type="button" label="Cancel" severity="secondary" outlined @click="mode = null" />
+        <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="boxes.saving" />
+        <Button type="button" :label="$t('common.cancel')" severity="secondary" outlined @click="mode = null" />
       </div>
     </form>
 
@@ -129,29 +130,29 @@ async function remove(b) {
       <template #empty>
         <EmptyState
           icon="pi pi-car"
-          title="No boxes yet"
-          :body="canManage ? 'Add parking or storage boxes for this project.' : undefined"
+:title="$t('inventory.noBoxesTitle')"
+          :body="canManage ? $t('inventory.noBoxesBody') : undefined"
         />
       </template>
-      <Column header="Reference">
+      <Column :header="$t('inventory.reference')">
         <template #body="{ data }">
           <span class="font-medium text-ink">{{ data.reference }}</span>
         </template>
       </Column>
-      <Column header="Type">
+      <Column :header="$t('inventory.type')">
         <template #body="{ data }">{{ data.type || '—' }}</template>
       </Column>
-      <Column header="Price">
+      <Column :header="$t('inventory.price')">
         <template #body="{ data }">
           <span class="num">{{ formatMoney(data.price) }}</span>
         </template>
       </Column>
-      <Column header="Linked unit">
+      <Column :header="$t('inventory.linkedUnit')">
         <template #body="{ data }">
           {{ data.unit_id ? (unitRef[data.unit_id] ?? data.unit_id) : '—' }}
         </template>
       </Column>
-      <Column header="Status">
+      <Column :header="$t('common.status')">
         <template #body="{ data }"><SaleStatusBadge :status="data.sale_status" /></template>
       </Column>
       <Column v-if="canManage" header="" class="w-24">
@@ -163,7 +164,7 @@ async function remove(b) {
               rounded
               size="small"
               severity="secondary"
-              aria-label="Edit box"
+:aria-label="$t('inventory.editBox')"
               @click="openEdit(data)"
             />
             <Button
@@ -172,7 +173,7 @@ async function remove(b) {
               rounded
               size="small"
               severity="danger"
-              aria-label="Cancel box"
+:aria-label="$t('inventory.cancelBox')"
               @click="remove(data)"
             />
           </span>

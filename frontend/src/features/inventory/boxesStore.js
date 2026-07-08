@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { toastError } from '@/composables/useConfirm'
 import { boxesApi } from '@/features/inventory/api'
+import { t } from '@/i18n'
 
 // State for the boxes list shown under a project (parking / storage). Network
 // lives in api.js; writes refetch the current location's boxes.
@@ -32,7 +33,7 @@ export const useBoxesStore = defineStore('boxes', {
         await this.fetchForLocation(this.locationId)
         return result
       } catch (e) {
-        this.error = e.response?.data?.message ?? 'Action failed.'
+        this.error = e.response?.data?.message ?? t('common.actionFailed')
         toastError(this.error)
         throw e
       } finally {

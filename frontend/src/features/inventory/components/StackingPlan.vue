@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import { statusMeta } from '@/utils/status'
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
 import { stackingApi } from '@/features/inventory/api'
 import { analyticsApi } from '@/features/analytics/api'
@@ -113,16 +114,16 @@ watch(
 </script>
 
 <template>
-  <SectionCard title="Stacking plan" icon="pi pi-table">
+  <SectionCard :title="$t('inventory.tabStacking')" icon="pi pi-table">
     <template #actions>
       <div class="flex flex-wrap items-center gap-3 text-xs text-mute">
         <span v-for="l in LEGEND" :key="l.status" class="flex items-center gap-1.5">
           <span class="inline-block h-2.5 w-2.5 rounded-sm" :class="l.swatch" aria-hidden="true" />
-          {{ l.status }}
+          {{ statusMeta(l.status).label }}
         </span>
         <Button
           v-if="canReports"
-          label="Interest"
+:label="$t('inventory.interestHeat')"
           icon="pi pi-bolt"
           size="small"
           :severity="showHeat ? null : 'secondary'"
@@ -132,17 +133,17 @@ watch(
       </div>
     </template>
 
-    <p v-if="loading" class="py-4 text-center text-sm text-mute">Loading…</p>
+    <p v-if="loading" class="py-4 text-center text-sm text-mute">{{ $t('common.loading') }}</p>
     <EmptyState
       v-else-if="!blocks.length"
       icon="pi pi-table"
-      title="Nothing placed on the plan yet"
-      body="Set block / floor / position on units to draw the plan."
+:title="$t('inventory.stackingEmptyTitle')"
+      :body="$t('inventory.stackingEmptyBody')"
     />
 
     <div v-else class="space-y-5 overflow-x-auto pb-1">
       <div v-for="b in blocks" :key="b.block">
-        <h3 class="mb-1.5 text-sm font-semibold text-ink">Block {{ b.block }}</h3>
+        <h3 class="mb-1.5 text-sm font-semibold text-ink">{{ $t('inventory.blockN', { n: b.block }) }}</h3>
         <div class="space-y-1">
           <div v-for="f in b.floors" :key="`${b.block}-${f.floor}`" class="flex items-center gap-2">
             <span class="num w-10 shrink-0 text-end text-xs text-mute">

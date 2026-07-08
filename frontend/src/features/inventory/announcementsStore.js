@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
 import { getEcho } from '@/composables/useEcho'
 import { toastInfo, toastSuccess } from '@/composables/useConfirm'
-import { humanize } from '@/utils/format'
 import { useUnitsStore } from '@/features/inventory/unitsStore'
+import { t } from '@/i18n'
+import { statusMeta } from '@/utils/status'
 
 // The app-wide live announcements rail: one public "announcements" channel that
 // every logged-in browser subscribes to (once, from AppShell). Sold units fire a
@@ -54,24 +55,27 @@ export const useAnnouncementsStore = defineStore('announcements', {
         reserved_expires_at: payload.reserved_expires_at,
       })
       if (payload.reference) {
-        toastInfo(`${payload.reference} · ${humanize(payload.sale_status)}`)
+        toastInfo(`${payload.reference} · ${statusMeta(payload.sale_status).label}`)
       }
     },
 
     newUnit(payload) {
-      toastSuccess(`New unit added: ${payload.reference}`)
+      toastSuccess(t('inventory.newUnitAdded', { ref: payload.reference }))
     },
 
     newBox(payload) {
-      toastSuccess(`New box added: ${payload.reference}`)
+      toastSuccess(t('inventory.newBoxAdded', { ref: payload.reference }))
     },
 
     // A unit or box was edited anywhere — flash a live toast so the whole team
     // sees the change without a refresh, naming what moved when known.
     itemUpdated(payload) {
-      const label = payload.type === 'box' ? 'Box' : 'Unit'
-      const detail = payload.changed ? ` — ${payload.changed} changed` : ' updated'
-      toastInfo(`${label} ${payload.reference}${detail}`)
+      const label = payload.type === 'box' ? t('inventory.box') : t('project.unit')
+      toastInfo(
+        payload.changed
+          ? t('inventory.itemChanged', { label, ref: payload.reference, field: payload.changed })
+          : t('inventory.itemUpdated', { label, ref: payload.reference }),
+      )
     },
 
     // Live-patch the units store (the global table, a project's list, and the

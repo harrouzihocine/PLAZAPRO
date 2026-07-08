@@ -3,12 +3,13 @@ import { computed, onMounted, ref } from 'vue'
 import Button from 'primevue/button'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import { MEDIA_COLLECTIONS, mediaDownloadUrl, mediaFileUrl } from '@/features/inventory/api'
+import { MEDIA_COLLECTIONS, mediaCollectionLabel, mediaDownloadUrl, mediaFileUrl } from '@/features/inventory/api'
 import MediaViewer from '@/features/inventory/components/MediaViewer.vue'
 import AttachSheet from '@/components/ui/AttachSheet.vue'
 import { useMediaStore } from '@/features/inventory/mediaStore'
 import { confirmAction } from '@/composables/useConfirm'
 import { isNativeApp } from '@/utils/nativeApp'
+import { t } from '@/i18n'
 
 const props = defineProps({
   mediableType: { type: String, required: true }, // 'locations' | 'units'
@@ -18,7 +19,7 @@ const props = defineProps({
 
 const media = useMediaStore()
 const collections = MEDIA_COLLECTIONS
-const activeTab = ref(collections[0].key)
+const activeTab = ref(collections[0])
 const viewing = ref(null)
 const dragging = ref(false)
 const fileInput = ref(null)
@@ -63,7 +64,7 @@ const typeIcon = {
 
 // Only the active tab's assets; `byCollection` keeps the gallery order.
 const tabItems = computed(() => media.byCollection[activeTab.value] ?? [])
-const activeLabel = computed(() => collections.find((c) => c.key === activeTab.value)?.label ?? '')
+const activeLabel = computed(() => mediaCollectionLabel(activeTab.value))
 const countFor = (key) => (media.byCollection[key] ?? []).length
 
 onMounted(() => media.load(props.mediableType, props.mediableId))
@@ -96,9 +97,9 @@ function onReplacePick(e) {
 async function remove(item) {
   if (
     await confirmAction({
-      title: `Remove "${item.original_name}"?`,
-      text: 'The file is kept but hidden.',
-      confirmText: 'Remove',
+      title: t('media.removeTitle', { name: item.original_name }),
+      text: t('media.removeText'),
+      confirmText: t('common.remove'),
       danger: true,
     })
   ) {
@@ -108,11 +109,11 @@ async function remove(item) {
 </script>
 
 <template>
-  <SectionCard title="Media" icon="pi pi-images">
+  <SectionCard :title="$t('inventory.tabMedia')" icon="pi pi-images">
     <template #actions>
       <Button
         v-if="canManage"
-        :label="`Upload to ${activeLabel}`"
+        :label="$t('media.uploadTo', { collection: activeLabel })"
         icon="pi pi-upload"
         size="small"
         @click="openUpload"
@@ -159,22 +160,22 @@ async function remove(item) {
     <nav class="-mt-1 flex flex-wrap gap-1 border-b border-line">
       <button
         v-for="c in collections"
-        :key="c.key"
+        :key="c"
         type="button"
         class="min-h-[40px] px-3 py-2 text-sm transition-colors"
         :class="
-          activeTab === c.key
+          activeTab === c
             ? '-mb-px border-b-2 border-primary font-semibold text-ink'
             : 'text-mute hover:text-ink'
         "
-        @click="activeTab = c.key"
+        @click="activeTab = c"
       >
-        {{ c.label }}
+        {{ mediaCollectionLabel(c) }}
         <span
-          v-if="countFor(c.key)"
+          v-if="countFor(c)"
           class="num ms-1 rounded-full bg-surface-100 px-1.5 text-xs text-mute dark:bg-surface-800"
         >
-          {{ countFor(c.key) }}
+          {{ countFor(c) }}
         </span>
       </button>
     </nav>
@@ -189,11 +190,11 @@ async function remove(item) {
       @drop.prevent="onDrop"
     >
       <i class="pi pi-cloud-upload me-1" aria-hidden="true" />
-      Drag files here to add to <span class="font-medium text-ink">{{ activeLabel }}</span>
-      <span v-if="media.busy" class="block text-mute">Uploading…</span>
+      {{ $t('media.dragHere') }} <span class="font-medium text-ink">{{ activeLabel }}</span>
+      <span v-if="media.busy" class="block text-mute">{{ $t('media.uploading') }}</span>
     </div>
 
-    <p v-if="media.loading" class="py-4 text-center text-sm text-mute">Loading…</p>
+    <p v-if="media.loading" class="py-4 text-center text-sm text-mute">{{ $t('common.loading') }}</p>
 
     <div v-else class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       <div
@@ -230,7 +231,7 @@ async function remove(item) {
               :href="mediaDownloadUrl(item.id)"
               :download="item.original_name"
               class="flex min-h-[32px] min-w-[28px] items-center justify-center text-xs text-mute hover:text-ink"
-              aria-label="Download"
+:aria-label="$t('common.download')"
             >
               <i class="pi pi-download" aria-hidden="true" />
             </a>
@@ -238,7 +239,7 @@ async function remove(item) {
               <button
                 class="flex min-h-[32px] min-w-[28px] items-center justify-center text-xs text-mute hover:text-ink disabled:opacity-30"
                 :disabled="i === 0 || media.busy"
-                aria-label="Move up"
+:aria-label="$t('media.moveUp')"
                 @click="media.move(item.id, -1)"
               >
                 <i class="pi pi-arrow-up" aria-hidden="true" />
@@ -246,21 +247,21 @@ async function remove(item) {
               <button
                 class="flex min-h-[32px] min-w-[28px] items-center justify-center text-xs text-mute hover:text-ink disabled:opacity-30"
                 :disabled="i === tabItems.length - 1 || media.busy"
-                aria-label="Move down"
+:aria-label="$t('media.moveDown')"
                 @click="media.move(item.id, 1)"
               >
                 <i class="pi pi-arrow-down" aria-hidden="true" />
               </button>
               <button
                 class="flex min-h-[32px] min-w-[28px] items-center justify-center text-xs text-mute hover:text-ink"
-                aria-label="Replace"
+:aria-label="$t('media.replace')"
                 @click="startReplace(item.id)"
               >
                 <i class="pi pi-refresh" aria-hidden="true" />
               </button>
               <button
                 class="flex min-h-[32px] min-w-[28px] items-center justify-center text-xs text-mute hover:text-danger"
-                aria-label="Remove"
+:aria-label="$t('common.remove')"
                 @click="remove(item)"
               >
                 <i class="pi pi-times" aria-hidden="true" />
@@ -271,7 +272,7 @@ async function remove(item) {
       </div>
 
       <div v-if="!tabItems.length" class="col-span-full">
-        <EmptyState icon="pi pi-images" :title="`No ${activeLabel.toLowerCase()} yet`" />
+        <EmptyState icon="pi pi-images" :title="$t('media.emptyCollection', { collection: activeLabel })" />
       </div>
     </div>
 

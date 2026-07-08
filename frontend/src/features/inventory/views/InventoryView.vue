@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { useAuthStore } from '@/features/settings/store'
+import { t } from '@/i18n'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -12,13 +13,13 @@ const tabs = computed(() =>
   [
     {
       to: { name: 'inventory.locations' },
-      label: 'Projects',
+      label: t('inventory.projects'),
       icon: 'pi pi-building',
       permission: 'units.view',
     },
     {
       to: { name: 'inventory.units' },
-      label: 'Units',
+      label: t('nav.units'),
       icon: 'pi pi-th-large',
       permission: 'units.view',
     },

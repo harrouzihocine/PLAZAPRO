@@ -4,7 +4,7 @@ import BaseInput from '@/components/base/BaseInput.vue'
 import BaseMultiSelect from '@/components/base/BaseMultiSelect.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import MoneyInput from '@/components/base/MoneyInput.vue'
-import { useDynamicList } from '@/composables/useDynamicList'
+import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { boxesApi, locationsApi, unitsApi } from '@/features/inventory/api'
 import { formatMoney } from '@/features/payments/money'
 import UnitBoxPicker from '@/features/inventory/components/UnitBoxPicker.vue'
@@ -188,7 +188,7 @@ function setBoxIds(index, boxIds) {
           <button
             type="button"
             class="text-mute hover:text-danger"
-            aria-label="Remove property"
+:aria-label="$t('inventory.removeProperty')"
             @click="remove(i)"
           >
             <i class="pi pi-times text-[10px]" aria-hidden="true" />
@@ -200,7 +200,7 @@ function setBoxIds(index, boxIds) {
           class="mt-2 border-t border-primary-200/60 pt-2 dark:border-primary-500/20"
         >
           <p class="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-mute">
-            Boxes with this apartment
+            {{ $t('calls.boxesWithApartment') }}
           </p>
           <UnitBoxPicker
             :unit-id="p.shortlistable_id"
@@ -218,8 +218,8 @@ function setBoxIds(index, boxIds) {
       <BaseSelect
         v-model="locationId"
         class="min-w-0 flex-1"
-        label="Project"
-        placeholder="Pick a project"
+:label="$t('inventory.project')"
+        :placeholder="$t('inventory.pickProject')"
         :options="locations.map((l) => ({ value: l.id, label: `${l.code} · ${l.name}` }))"
       />
       <button
@@ -229,7 +229,7 @@ function setBoxIds(index, boxIds) {
         @click="showFilters = !showFilters"
       >
         <i class="pi pi-sliders-h text-[10px]" aria-hidden="true" />
-        Filters
+        {{ $t('common.filters') }}
       </button>
     </div>
 
@@ -240,39 +240,39 @@ function setBoxIds(index, boxIds) {
     >
       <BaseMultiSelect
         v-model="filters.floor_id"
-        label="Floor"
-        :options="floors.map((f) => ({ value: f.id, label: f.label }))"
+:label="$t('inventory.floor')"
+        :options="floors.map((f) => ({ value: f.id, label: itemLabel(f) }))"
         @update:model-value="loadCandidates()"
       />
       <div class="grid grid-cols-2 gap-2">
         <MoneyInput
           v-model="filters.min_price"
-          label="Min price"
+:label="$t('inventory.minPrice')"
           @update:model-value="loadCandidatesDebounced()"
         />
         <MoneyInput
           v-model="filters.max_price"
-          label="Max price"
+:label="$t('inventory.maxPrice')"
           @update:model-value="loadCandidatesDebounced()"
         />
       </div>
       <div class="grid grid-cols-2 gap-2 sm:col-start-1">
         <BaseInput
           v-model="filters.min_area"
-          label="Min m²"
+:label="$t('inventory.minArea')"
           type="number"
           @change="loadCandidates()"
         />
         <BaseInput
           v-model="filters.max_area"
-          label="Max m²"
+:label="$t('inventory.maxArea')"
           type="number"
           @change="loadCandidates()"
         />
       </div>
     </div>
 
-    <p v-if="loading" class="text-xs text-mute">Loading available properties…</p>
+    <p v-if="loading" class="text-xs text-mute">{{ $t('inventory.loadingProperties') }}</p>
     <div v-else-if="locationId" class="flex flex-wrap gap-1.5">
       <button
         v-for="c in candidates"
@@ -294,7 +294,7 @@ function setBoxIds(index, boxIds) {
         {{ c.label }}
       </button>
       <p v-if="!candidates.length" class="text-xs text-mute">
-        No available properties match in this project.
+        {{ $t('inventory.noPropertiesMatch') }}
       </p>
     </div>
   </div>

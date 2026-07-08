@@ -18,10 +18,11 @@ import OfflineStamp from '@/components/ui/OfflineStamp.vue'
 import { useNativePhone } from '@/composables/useNativeMode'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { confirmAction } from '@/composables/useConfirm'
+import { t } from '@/i18n'
 import { useAutoFilter } from '@/composables/useAutoFilter'
-import { useDynamicList } from '@/composables/useDynamicList'
+import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { useWilayas, useCommunes } from '@/composables/useGeography'
-import { GTM_PRIORITIES } from '@/features/inventory/api'
+import { gtmPriorityOptions } from '@/features/inventory/api'
 import GtmPriorityBadge from '@/features/inventory/components/GtmPriorityBadge.vue'
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
 import { useLocationsStore } from '@/features/inventory/locationsStore'
@@ -50,9 +51,9 @@ const locationName = computed(() => Object.fromEntries(locations.items.map((l) =
 
 // { value, label } option lists for the multi-select filters.
 const roomNumberOptions = computed(() =>
-  roomNumbers.value.map((r) => ({ value: r.id, label: r.label })),
+  roomNumbers.value.map((r) => ({ value: r.id, label: itemLabel(r) })),
 )
-const floorOptions = computed(() => floors.value.map((f) => ({ value: f.id, label: f.label })))
+const floorOptions = computed(() => floors.value.map((f) => ({ value: f.id, label: itemLabel(f) })))
 const wilayaOptions = computed(() =>
   wilayas.value.map((w) => ({ value: w.id, label: `${w.code} · ${w.name}` })),
 )
@@ -99,14 +100,14 @@ useAutoFilter(
 function onPage(e) {
   units.goToPage({ page: e.page + 1, rows: e.rows })
 }
-const statusOptions = [
-  { value: 'available', label: 'Available' },
-  { value: 'interested', label: 'Interested' },
-  { value: 'reserved', label: 'Reserved' },
-  { value: 'sold', label: 'Sold' },
-]
+const statusOptions = computed(() => [
+  { value: 'available', label: t('status.available') },
+  { value: 'interested', label: t('status.interested') },
+  { value: 'reserved', label: t('status.reserved') },
+  { value: 'sold', label: t('status.sold') },
+])
 // GTM priority filter options (shared source of truth).
-const priorityOptions = GTM_PRIORITIES
+const priorityOptions = computed(() => gtmPriorityOptions())
 
 const showAdvanced = ref(false)
 const activeFilterCount = computed(() => countActiveFilters(units.filters))
@@ -219,9 +220,9 @@ async function submitCorrection() {
 async function removeUnit(u) {
   if (
     await confirmAction({
-      title: `Cancel unit "${u.reference}"?`,
-      text: 'The record is kept but marked cancelled. Only available units (not interested, reserved, or sold) can be cancelled.',
-      confirmText: 'Cancel unit',
+      title: t('inventory.cancelUnitTitle', { ref: u.reference }),
+      text: t('inventory.cancelUnitText'),
+      confirmText: t('inventory.cancelUnit'),
       danger: true,
     })
   ) {
@@ -232,7 +233,7 @@ async function removeUnit(u) {
 
 <template>
   <div>
-    <PageHeader title="Units" subtitle="All apartments and lots across projects." />
+    <PageHeader :title="$t('nav.units')" :subtitle="$t('inventory.unitsSubtitle')" />
     <OfflineStamp :at="units.offlineAt" />
 
     <SectionCard flush class="mb-5">
@@ -240,37 +241,37 @@ async function removeUnit(u) {
       <div class="flex flex-wrap items-end gap-2 px-4 py-3 sm:px-5">
         <BaseSelect
           v-model="units.filters.location_id"
-          placeholder="All projects"
-          aria-label="Filter by project"
+:placeholder="$t('inventory.allProjects')"
+          :aria-label="$t('inventory.filterByProject')"
           class="w-full sm:w-44"
           :options="projectOptions"
         />
         <BaseMultiSelect
           v-model="units.filters.room_number_id"
-          placeholder="Rooms"
+:placeholder="$t('inventory.rooms')"
           class="w-full sm:w-36"
           :options="roomNumberOptions"
         />
         <BaseMultiSelect
           v-model="units.filters.floor_id"
-          placeholder="Floor"
+:placeholder="$t('inventory.floor')"
           class="w-full sm:w-36"
           :options="floorOptions"
         />
         <BaseMultiSelect
           v-model="units.filters.sale_status"
-          placeholder="Status"
+:placeholder="$t('common.status')"
           class="w-full sm:w-36"
           :options="statusOptions"
         />
         <BaseMultiSelect
           v-model="units.filters.priority"
-          placeholder="Priority"
+:placeholder="$t('tasks.priority')"
           class="w-full sm:w-36"
           :options="priorityOptions"
         />
         <Button
-          :label="showAdvanced ? 'Less filters' : 'More filters'"
+          :label="showAdvanced ? $t('inventory.lessFilters') : $t('inventory.moreFilters')"
           :icon="showAdvanced ? 'pi pi-chevron-up' : 'pi pi-sliders-h'"
           text
           size="small"
@@ -282,7 +283,7 @@ async function removeUnit(u) {
             icon="pi pi-filter-slash"
             text
             severity="secondary"
-            aria-label="Reset filters"
+:aria-label="$t('common.resetFilters')"
             @click="reset"
           />
         </span>
@@ -294,19 +295,19 @@ async function removeUnit(u) {
       >
         <BaseMultiSelect
           v-model="units.filters.wilaya_id"
-          label="Wilaya"
+:label="$t('geo.wilaya')"
           :options="wilayaOptions"
         />
         <BaseMultiSelect
           v-model="units.filters.commune_id"
-          label="Commune"
+:label="$t('geo.commune')"
           :options="communeOptions"
-          placeholder="Select a wilaya first"
+          :placeholder="$t('inventory.selectWilayaFirst')"
         />
-        <BaseInput v-model="units.filters.min_area" label="Min area (m²)" type="number" />
-        <BaseInput v-model="units.filters.max_area" label="Max area (m²)" type="number" />
-        <MoneyInput v-model="units.filters.min_price" label="Min price" />
-        <MoneyInput v-model="units.filters.max_price" label="Max price" />
+        <BaseInput v-model="units.filters.min_area" :label="$t('inventory.minArea')" type="number" />
+        <BaseInput v-model="units.filters.max_area" :label="$t('inventory.maxArea')" type="number" />
+        <MoneyInput v-model="units.filters.min_price" :label="$t('inventory.minPrice')" />
+        <MoneyInput v-model="units.filters.max_price" :label="$t('inventory.maxPrice')" />
       </div>
       </FilterPanel>
     </SectionCard>
@@ -323,8 +324,8 @@ async function removeUnit(u) {
         :total="units.total"
         clickable
         empty-icon="pi pi-th-large"
-        empty-title="No units match"
-        empty-body="Loosen the filters to see more inventory."
+:empty-title="$t('inventory.noUnitsMatch')"
+        :empty-body="$t('inventory.loosenFilters')"
         @page="onPage"
         @item-click="(u) => openUnit({ data: u })"
       >
@@ -370,17 +371,17 @@ async function removeUnit(u) {
         <template #empty>
           <EmptyState
             icon="pi pi-th-large"
-            title="No units match"
-            body="Loosen the filters to see more inventory."
+:title="$t('inventory.noUnitsMatch')"
+            :body="$t('inventory.loosenFilters')"
           />
         </template>
 
-        <Column header="Reference">
+        <Column :header="$t('inventory.reference')">
           <template #body="{ data }">
             <span class="font-medium text-ink">{{ data.reference }}</span>
           </template>
         </Column>
-        <Column header="Wilaya">
+        <Column :header="$t('geo.wilaya')">
           <template #body="{ data }">
             {{ data.location?.wilaya || '—' }}
             <span v-if="data.location?.commune" class="text-mute">
@@ -388,7 +389,7 @@ async function removeUnit(u) {
             >
           </template>
         </Column>
-        <Column header="Project">
+        <Column :header="$t('inventory.project')">
           <template #body="{ data }">
             <RouterLink
               :to="{ name: 'inventory.location', params: { id: data.location_id } }"
@@ -402,31 +403,31 @@ async function removeUnit(u) {
             </span>
           </template>
         </Column>
-        <Column header="Project type">
+        <Column :header="$t('inventory.projectType')">
           <template #body="{ data }">{{ data.location?.type || '—' }}</template>
         </Column>
-        <Column header="Rooms">
+        <Column :header="$t('inventory.rooms')">
           <template #body="{ data }">{{ data.room_number || '—' }}</template>
         </Column>
-        <Column header="Floor">
+        <Column :header="$t('inventory.floor')">
           <template #body="{ data }">{{ data.floor || '—' }}</template>
         </Column>
-        <Column header="Area">
+        <Column :header="$t('desire.area')">
           <template #body="{ data }">
             <span class="num">{{ data.area_sqm ? `${data.area_sqm} m²` : '—' }}</span>
           </template>
         </Column>
-        <Column header="Price">
+        <Column :header="$t('inventory.price')">
           <template #body="{ data }">
             <span class="num">{{ formatMoney(data.price) }}</span>
           </template>
         </Column>
-        <Column header="Status">
+        <Column :header="$t('common.status')">
           <template #body="{ data }">
             <SaleStatusBadge :status="data.sale_status" :interested-count="data.interested_count" />
           </template>
         </Column>
-        <Column header="Priority">
+        <Column :header="$t('tasks.priority')">
           <template #body="{ data }">
             <GtmPriorityBadge v-if="data.gtm_priority" :priority="data.gtm_priority" />
             <span v-else class="text-mute">—</span>
@@ -441,7 +442,7 @@ async function removeUnit(u) {
                 rounded
                 size="small"
                 severity="secondary"
-                aria-label="Edit unit"
+:aria-label="$t('inventory.editUnit')"
                 @click="openEdit(data)"
               />
               <Button
@@ -450,7 +451,7 @@ async function removeUnit(u) {
                 rounded
                 size="small"
                 severity="secondary"
-                aria-label="Correct price / status"
+:aria-label="$t('inventory.correctAria')"
                 @click="openCorrect(data)"
               />
               <Button
@@ -459,7 +460,7 @@ async function removeUnit(u) {
                 rounded
                 size="small"
                 severity="danger"
-                aria-label="Cancel unit"
+:aria-label="$t('inventory.cancelUnit')"
                 @click="removeUnit(data)"
               />
             </span>
@@ -471,42 +472,42 @@ async function removeUnit(u) {
     <!-- Edit unit specs -->
     <BaseModal
       v-if="mode === 'edit' && canManage"
-      title="Edit unit"
+:title="$t('inventory.editUnit')"
       size="max-w-3xl"
       @close="mode = null"
     >
       <form class="space-y-4" @submit.prevent="submitEdit">
         <div class="grid gap-3 sm:grid-cols-3">
-          <BaseInput v-model="form.reference" label="Reference" required />
+          <BaseInput v-model="form.reference" :label="$t('inventory.reference')" required />
           <BaseSelect
             v-model="form.room_number_id"
-            label="Room number"
-            placeholder="— none —"
-            :options="roomNumbers.map((r) => ({ value: r.id, label: r.label }))"
+:label="$t('inventory.roomNumber')"
+            :placeholder="$t('common.none')"
+            :options="roomNumbers.map((r) => ({ value: r.id, label: itemLabel(r) }))"
           />
           <BaseSelect
             v-model="form.floor_id"
-            label="Floor"
-            placeholder="— none —"
-            :options="floors.map((f) => ({ value: f.id, label: f.label }))"
+:label="$t('inventory.floor')"
+            :placeholder="$t('common.none')"
+            :options="floors.map((f) => ({ value: f.id, label: itemLabel(f) }))"
           />
-          <BaseInput v-model="form.area_sqm" label="Area (m²)" type="number" />
-          <BaseInput v-model="form.block" label="Block" />
-          <BaseInput v-model="form.stack_floor" label="Stack floor" type="number" />
-          <BaseInput v-model="form.position" label="Position" type="number" />
+          <BaseInput v-model="form.area_sqm" :label="$t('inventory.areaSqm')" type="number" />
+          <BaseInput v-model="form.block" :label="$t('inventory.block')" />
+          <BaseInput v-model="form.stack_floor" :label="$t('inventory.stackFloor')" type="number" />
+          <BaseInput v-model="form.position" :label="$t('inventory.position')" type="number" />
           <BaseSelect
             v-model="form.gtm_priority"
-            label="GTM priority"
+:label="$t('inventory.gtmPriority')"
             :clearable="false"
-            :options="GTM_PRIORITIES"
+            :options="gtmPriorityOptions()"
           />
         </div>
         <p class="text-xs text-mute">
-          To change price or sale status, use “Correct” (keeps the old version).
+          {{ $t('inventory.useCorrectHint') }}
         </p>
         <div class="flex gap-2">
-          <Button type="submit" label="Save" icon="pi pi-check" :loading="units.saving" />
-          <Button type="button" label="Cancel" severity="secondary" outlined @click="mode = null" />
+          <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="units.saving" />
+          <Button type="button" :label="$t('common.cancel')" severity="secondary" outlined @click="mode = null" />
         </div>
       </form>
     </BaseModal>
@@ -514,36 +515,36 @@ async function removeUnit(u) {
     <!-- Correction (price / sale status) via versioning -->
     <BaseModal
       v-if="mode === 'correct' && canManage"
-      title="Correct price / status"
+:title="$t('inventory.correctTitle')"
       size="max-w-2xl"
       @close="mode = null"
     >
       <form class="space-y-4" @submit.prevent="submitCorrection">
         <div class="grid gap-3 sm:grid-cols-3">
-          <MoneyInput v-model="correction.price" label="Price" />
+          <MoneyInput v-model="correction.price" :label="$t('inventory.price')" />
           <BaseSelect
             v-model="correction.sale_status"
-            label="Sale status"
+:label="$t('inventory.saleStatus')"
             :clearable="false"
             :options="[
-              { value: 'available', label: 'Available' },
-              { value: 'interested', label: 'Interested' },
-              { value: 'sold', label: 'Sold' },
+              { value: 'available', label: $t('status.available') },
+              { value: 'interested', label: $t('status.interested') },
+              { value: 'sold', label: $t('status.sold') },
             ]"
           />
-          <BaseInput v-model="correction.reason" label="Reason" required />
+          <BaseInput v-model="correction.reason" :label="$t('calls.reason')" required />
         </div>
         <p class="text-xs text-mute">
-          This cancels the current row and creates a linked new version — the old value is kept.
+          {{ $t('inventory.correctHint') }}
         </p>
         <div class="flex gap-2">
           <Button
             type="submit"
-            label="Apply correction"
+:label="$t('inventory.applyCorrection')"
             icon="pi pi-check"
             :loading="units.saving"
           />
-          <Button type="button" label="Cancel" severity="secondary" outlined @click="mode = null" />
+          <Button type="button" :label="$t('common.cancel')" severity="secondary" outlined @click="mode = null" />
         </div>
       </form>
     </BaseModal>

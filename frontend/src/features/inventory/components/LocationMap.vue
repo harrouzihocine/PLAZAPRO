@@ -6,6 +6,7 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import BaseButton from '@/components/base/BaseButton.vue'
+import { t } from '@/i18n'
 
 // Leaflet ships its marker images with relative URLs that break under a bundler.
 // Point the default icon at the assets Vite has fingerprinted for us.
@@ -103,7 +104,7 @@ async function search() {
   geoError.value = ''
   results.value = []
   if (!q) {
-    geoError.value = 'Type an address first, or click the map.'
+    geoError.value = t('inventory.geoTypeFirst')
     return
   }
   searching.value = true
@@ -114,7 +115,7 @@ async function search() {
     )
     const data = await res.json()
     if (!Array.isArray(data) || !data.length) {
-      geoError.value = 'No matches found for that address.'
+      geoError.value = t('inventory.geoNoMatches')
     } else if (data.length === 1) {
       pick(data[0])
     } else {
@@ -241,7 +242,7 @@ onBeforeUnmount(() => {
           :disabled="searching || tilesUnavailable"
           @click="search"
         >
-          {{ searching ? 'Searching…' : 'Search this address' }}
+          {{ searching ? $t('search.searching') : $t('inventory.searchAddress') }}
         </BaseButton>
         <span class="text-xs opacity-60">
           {{ tilesUnavailable ? 'Address search needs internet' : 'or click the map / drag the marker' }}
@@ -306,7 +307,7 @@ onBeforeUnmount(() => {
       <button
         type="button"
         class="absolute end-2 top-2 z-[1000] flex items-center justify-center rounded-lg border border-line bg-card p-2 text-ink shadow-card hover:opacity-90"
-        :aria-label="expanded ? 'Close full-screen map' : 'Expand map'"
+        :aria-label="expanded ? $t('inventory.closeMap') : $t('inventory.expandMap')"
         :title="expanded ? 'Close' : 'Expand map'"
         @click="toggleExpanded()"
       >
@@ -352,7 +353,7 @@ onBeforeUnmount(() => {
         <template v-if="hasCoords()">
           📍 {{ Number(latitude).toFixed(5) }}, {{ Number(longitude).toFixed(5) }}
         </template>
-        <template v-else>No point selected yet.</template>
+        <template v-else>{{ $t('inventory.noPointSelected') }}</template>
       </span>
       <button v-if="hasCoords()" type="button" class="text-danger hover:underline" @click="clear">
         Clear

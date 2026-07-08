@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { toastError } from '@/composables/useConfirm'
 import { MEDIA_MAX_BYTES, mediaApi } from '@/features/inventory/api'
+import { t } from '@/i18n'
 
 // Reject files over the media ceiling before uploading, so the user gets an
 // instant, clear message instead of a stalled upload that PHP kills with a 413.
@@ -54,7 +55,7 @@ export const useMediaStore = defineStore('media', {
       try {
         return await fn()
       } catch (e) {
-        this.error = e.response?.data?.message ?? 'Action failed.'
+        this.error = e.response?.data?.message ?? t('common.actionFailed')
         toastError(this.error)
         throw e
       } finally {

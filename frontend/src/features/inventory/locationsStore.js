@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { toastError } from '@/composables/useConfirm'
 import { locationsApi } from '@/features/inventory/api'
 import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
+import { t } from '@/i18n'
 
 // State for the Locations (projects) screen. Network lives in api.js; every write
 // refetches so the list reflects the server (status filters, cancel guards, ...).
@@ -66,7 +67,7 @@ export const useLocationsStore = defineStore('locations', {
         await this.fetch()
         return result
       } catch (e) {
-        this.error = e.response?.data?.message ?? 'Action failed.'
+        this.error = e.response?.data?.message ?? t('common.actionFailed')
         toastError(this.error)
         throw e
       } finally {

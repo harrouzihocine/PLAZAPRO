@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
+import { t } from '@/i18n'
 
 // Colour-coded commercial state, reused by the units table and the stacking
 // plan. Thin alias over the shared StatusTag so every page renders it the same.
@@ -13,10 +14,10 @@ const props = defineProps({
 
 const label = computed(() => {
   if (props.status === 'interested' && props.interestedCount > 1) {
-    return `Interested ${props.interestedCount}`
+    return `${t('status.interested')} ${props.interestedCount}`
   }
   if (props.status === 'reserved' && props.interestedCount > 1) {
-    return `Reserved +${props.interestedCount - 1}`
+    return `${t('status.reserved')} +${props.interestedCount - 1}`
   }
   return null // fall back to the shared status map label
 })

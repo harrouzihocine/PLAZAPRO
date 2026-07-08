@@ -21,8 +21,8 @@ import StatCard from '@/components/ui/StatCard.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ActivityTimeline from '@/components/ui/ActivityTimeline.vue'
-import { useDynamicList } from '@/composables/useDynamicList'
-import { GTM_PRIORITIES, locationsApi, mediaFileUrl, reservationsApi } from '@/features/inventory/api'
+import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
+import { gtmPriorityOptions, locationsApi, mediaFileUrl, reservationsApi } from '@/features/inventory/api'
 import BoxesPanel from '@/features/inventory/components/BoxesPanel.vue'
 import GtmPriorityBadge from '@/features/inventory/components/GtmPriorityBadge.vue'
 import LocationMap from '@/features/inventory/components/LocationMap.vue'
@@ -38,6 +38,7 @@ import { confirmAction } from '@/composables/useConfirm'
 import { formatDate } from '@/utils/format'
 import { isNativeApp } from '@/utils/nativeApp'
 import { formatMoney } from '@/features/payments/money'
+import { t } from '@/i18n'
 import FeedbackPanel from '@/features/analytics/components/FeedbackPanel.vue'
 
 // One project's workspace, organised in tabs so nothing drowns: Overview
@@ -87,7 +88,7 @@ async function afterHold(fn) {
     await fn()
     await Promise.all([stackingRef.value?.reload(), units.fetchForLocation(props.id)])
   } catch (e) {
-    units.error = e.response?.data?.message ?? 'Action failed.'
+    units.error = e.response?.data?.message ?? t('common.actionFailed')
   } finally {
     holdBusy.value = false
   }
@@ -199,9 +200,9 @@ async function submitCorrection() {
 async function remove(u) {
   if (
     await confirmAction({
-      title: `Cancel unit "${u.reference}"?`,
-      text: 'The record is kept but marked cancelled.',
-      confirmText: 'Cancel unit',
+      title: t('inventory.cancelUnitTitle', { ref: u.reference }),
+      text: t('project.removeText'),
+      confirmText: t('inventory.cancelUnit'),
       danger: true,
     })
   ) {
@@ -242,7 +243,7 @@ async function remove(u) {
       </div>
 
       <PageHeader :title="locations.current.name" :back="{ name: 'inventory.locations' }">
-        <template #back-label>Projects</template>
+        <template #back-label>{{ $t('inventory.projects') }}</template>
         <template #badges>
           <GtmPriorityBadge
             v-if="locations.current.gtm_priority"
@@ -262,7 +263,7 @@ async function remove(u) {
         <template #actions>
           <Button
             v-if="canManage"
-            label="Add unit"
+:label="$t('inventory.addUnit')"
             icon="pi pi-plus"
             class="native-fab"
             @click="openCreate"
@@ -273,28 +274,28 @@ async function remove(u) {
       <!-- Commercial pulse of the project -->
       <div class="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard
-          label="Units"
+:label="$t('nav.units')"
           :value="units.items.length"
           icon="pi pi-th-large"
           :loading="units.loading"
         />
         <StatCard
-          label="Available"
+:label="$t('status.available')"
           :value="statusCounts.available"
           icon="pi pi-check-circle"
           tone="success"
           :loading="units.loading"
         />
         <StatCard
-          label="Interested"
+:label="$t('status.interested')"
           :value="statusCounts.interested"
           icon="pi pi-thumbs-up"
           tone="warning"
-          :hint="statusCounts.reserved ? `${statusCounts.reserved} reserved` : ''"
+          :hint="statusCounts.reserved ? $t('inventory.nReserved', { n: statusCounts.reserved }) : ''"
           :loading="units.loading"
         />
         <StatCard
-          label="Sold"
+:label="$t('status.sold')"
           :value="statusCounts.sold"
           icon="pi pi-flag-fill"
           tone="info"
@@ -308,28 +309,28 @@ async function remove(u) {
       <Tabs value="overview" scrollable lazy>
         <TabList>
           <Tab value="overview"
-            ><i class="pi pi-info-circle me-2" aria-hidden="true" />Overview</Tab
+            ><i class="pi pi-info-circle me-2" aria-hidden="true" />{{ $t('inventory.tabOverview') }}</Tab
           >
           <Tab value="performance"
-            ><i class="pi pi-chart-line me-2" aria-hidden="true" />Performance</Tab
+            ><i class="pi pi-chart-line me-2" aria-hidden="true" />{{ $t('inventory.tabPerformance') }}</Tab
           >
           <Tab v-if="canSeeFeedback" value="feedback"
-            ><i class="pi pi-comments me-2" aria-hidden="true" />Voice of Client</Tab
+            ><i class="pi pi-comments me-2" aria-hidden="true" />{{ $t('inventory.tabVoiceOfClient') }}</Tab
           >
-          <Tab value="stacking"><i class="pi pi-table me-2" aria-hidden="true" />Stacking plan</Tab>
-          <Tab value="units"><i class="pi pi-th-large me-2" aria-hidden="true" />Units</Tab>
-          <Tab value="boxes"><i class="pi pi-car me-2" aria-hidden="true" />Boxes</Tab>
-          <Tab value="media"><i class="pi pi-images me-2" aria-hidden="true" />Media</Tab>
-          <Tab value="activity"><i class="pi pi-clock me-2" aria-hidden="true" />Activity</Tab>
+          <Tab value="stacking"><i class="pi pi-table me-2" aria-hidden="true" />{{ $t('inventory.tabStacking') }}</Tab>
+          <Tab value="units"><i class="pi pi-th-large me-2" aria-hidden="true" />{{ $t('nav.units') }}</Tab>
+          <Tab value="boxes"><i class="pi pi-car me-2" aria-hidden="true" />{{ $t('inventory.tabBoxes') }}</Tab>
+          <Tab value="media"><i class="pi pi-images me-2" aria-hidden="true" />{{ $t('inventory.tabMedia') }}</Tab>
+          <Tab value="activity"><i class="pi pi-clock me-2" aria-hidden="true" />{{ $t('inventory.tabActivity') }}</Tab>
         </TabList>
         <TabPanels class="!px-0 !pt-5">
           <!-- ── Overview ── -->
           <TabPanel value="overview">
             <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
-              <SectionCard title="Details" icon="pi pi-info-circle">
+              <SectionCard :title="$t('project.details')" icon="pi pi-info-circle">
                 <dl class="space-y-2.5 text-sm">
                   <div class="flex justify-between gap-3">
-                    <dt class="text-mute">Address</dt>
+                    <dt class="text-mute">{{ $t('common.address') }}</dt>
                     <dd class="text-end text-ink">
                       {{ locations.current.address || '—' }}
                       <template v-if="mapsUrl">
@@ -340,14 +341,14 @@ async function remove(u) {
                           class="ms-1 text-primary-600 hover:underline dark:text-primary-400"
                         >
                           <i class="pi pi-external-link text-xs" aria-hidden="true" />
-                          Maps
+                          {{ $t('inventory.maps') }}
                         </a>
                         <button
                           type="button"
-                          title="Copy Maps link"
-                          aria-label="Copy Maps link"
+:title="$t('pipeline.copyMapsLink')"
+                          :aria-label="$t('pipeline.copyMapsLink')"
                           class="ms-1 text-primary-600 hover:underline dark:text-primary-400"
-                          @click="copyToClipboard(mapsUrl, 'Maps link copied')"
+                          @click="copyToClipboard(mapsUrl, $t('pipeline.mapsLinkCopied'))"
                         >
                           <i class="pi pi-copy text-xs" aria-hidden="true" />
                         </button>
@@ -356,8 +357,8 @@ async function remove(u) {
                           :href="whatsappMapsUrl"
                           target="_blank"
                           rel="noopener"
-                          title="Send via WhatsApp"
-                          aria-label="Send address via WhatsApp"
+:title="$t('inventory.sendWhatsApp')"
+                          :aria-label="$t('inventory.sendWhatsAppAria')"
                           class="ms-1 text-emerald-600 dark:text-emerald-400"
                         >
                           <i class="pi pi-whatsapp text-xs" aria-hidden="true" />
@@ -366,17 +367,17 @@ async function remove(u) {
                     </dd>
                   </div>
                   <div class="flex justify-between gap-3">
-                    <dt class="text-mute">Expected delivery</dt>
+                    <dt class="text-mute">{{ $t('inventory.expectedDelivery') }}</dt>
                     <dd class="text-ink">
                       {{ formatDate(locations.current.expected_delivery_date) }}
                     </dd>
                   </div>
                   <div class="flex justify-between gap-3">
-                    <dt class="text-mute">Contract type</dt>
+                    <dt class="text-mute">{{ $t('inventory.contractType') }}</dt>
                     <dd class="text-ink">{{ locations.current.contract_type || '—' }}</dd>
                   </div>
                   <div class="flex justify-between gap-3">
-                    <dt class="shrink-0 text-mute">Payment methods</dt>
+                    <dt class="shrink-0 text-mute">{{ $t('inventory.paymentMethods') }}</dt>
                     <dd class="text-end text-ink">
                       <span
                         v-if="locations.current.payment_methods?.length"
@@ -394,7 +395,7 @@ async function remove(u) {
                     </dd>
                   </div>
                   <div class="flex justify-between gap-3">
-                    <dt class="text-mute">GTM priority</dt>
+                    <dt class="text-mute">{{ $t('inventory.gtmPriority') }}</dt>
                     <dd>
                       <GtmPriorityBadge
                         v-if="locations.current.gtm_priority"
@@ -404,7 +405,7 @@ async function remove(u) {
                     </dd>
                   </div>
                   <div class="flex justify-between gap-3">
-                    <dt class="text-mute">Status</dt>
+                    <dt class="text-mute">{{ $t('common.status') }}</dt>
                     <dd><StatusTag :value="locations.current.status" /></dd>
                   </div>
                 </dl>
@@ -418,7 +419,7 @@ async function remove(u) {
 
               <SectionCard
                 v-if="locations.current.latitude != null && locations.current.longitude != null"
-                title="Map"
+:title="$t('inventory.map')"
                 icon="pi pi-map"
                 flush
               >
@@ -433,40 +434,40 @@ async function remove(u) {
           <!-- ── Performance (funnel, pipeline, revenue) ── -->
           <TabPanel value="performance">
             <div v-if="insights" class="space-y-5">
-              <SectionCard title="Inventory funnel" icon="pi pi-filter">
+              <SectionCard :title="$t('inventory.funnel')" icon="pi pi-filter">
                 <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-                  <StatCard label="Units" :value="insights.units.total" icon="pi pi-th-large" />
-                  <StatCard label="Available" :value="insights.units.available" icon="pi pi-check-circle" tone="success" />
-                  <StatCard label="Interested" :value="insights.units.interested" icon="pi pi-thumbs-up" tone="warning" />
-                  <StatCard label="Sold" :value="insights.units.sold" icon="pi pi-flag-fill" tone="info" />
+                  <StatCard :label="$t('nav.units')" :value="insights.units.total" icon="pi pi-th-large" />
+                  <StatCard :label="$t('status.available')" :value="insights.units.available" icon="pi pi-check-circle" tone="success" />
+                  <StatCard :label="$t('status.interested')" :value="insights.units.interested" icon="pi pi-thumbs-up" tone="warning" />
+                  <StatCard :label="$t('status.sold')" :value="insights.units.sold" icon="pi pi-flag-fill" tone="info" />
                 </div>
                 <div v-if="insights.boxes.total" class="mt-3 grid grid-cols-3 gap-3 sm:gap-4">
-                  <StatCard label="Boxes" :value="insights.boxes.total" icon="pi pi-car" />
-                  <StatCard label="Boxes available" :value="insights.boxes.available" icon="pi pi-check-circle" tone="success" />
-                  <StatCard label="Boxes sold" :value="insights.boxes.sold" icon="pi pi-flag-fill" tone="info" />
+                  <StatCard :label="$t('inventory.tabBoxes')" :value="insights.boxes.total" icon="pi pi-car" />
+                  <StatCard :label="$t('inventory.boxesAvailable')" :value="insights.boxes.available" icon="pi pi-check-circle" tone="success" />
+                  <StatCard :label="$t('inventory.boxesSold')" :value="insights.boxes.sold" icon="pi pi-flag-fill" tone="info" />
                 </div>
               </SectionCard>
 
-              <SectionCard title="Pipeline" icon="pi pi-briefcase">
+              <SectionCard :title="$t('nav.pipeline')" icon="pi pi-briefcase">
                 <div class="grid grid-cols-3 gap-3 sm:gap-4">
-                  <StatCard label="Active projects" :value="insights.pipeline.active_projects" icon="pi pi-users" />
-                  <StatCard label="Won" :value="insights.pipeline.won" icon="pi pi-trophy" tone="success" />
-                  <StatCard label="Lost" :value="insights.pipeline.lost" icon="pi pi-times-circle" tone="danger" />
+                  <StatCard :label="$t('inventory.activeProjects')" :value="insights.pipeline.active_projects" icon="pi pi-users" />
+                  <StatCard :label="$t('status.won')" :value="insights.pipeline.won" icon="pi pi-trophy" tone="success" />
+                  <StatCard :label="$t('status.lost')" :value="insights.pipeline.lost" icon="pi pi-times-circle" tone="danger" />
                 </div>
               </SectionCard>
 
-              <SectionCard v-if="insights.revenue" title="Revenue" icon="pi pi-money-bill">
+              <SectionCard v-if="insights.revenue" :title="$t('inventory.revenue')" icon="pi pi-money-bill">
                 <div class="grid grid-cols-2 gap-3 sm:gap-4">
-                  <StatCard label="Collected" :value="formatMoney(insights.revenue.collected)" icon="pi pi-wallet" tone="success" />
-                  <StatCard label="Sold value" :value="formatMoney(insights.revenue.sold_value)" icon="pi pi-chart-line" tone="info" />
+                  <StatCard :label="$t('inventory.collected')" :value="formatMoney(insights.revenue.collected)" icon="pi pi-wallet" tone="success" />
+                  <StatCard :label="$t('inventory.soldValue')" :value="formatMoney(insights.revenue.sold_value)" icon="pi pi-chart-line" tone="info" />
                 </div>
               </SectionCard>
             </div>
             <EmptyState
               v-else
               icon="pi pi-chart-line"
-              title="No performance data"
-              body="Performance figures will appear once the project has inventory and activity."
+:title="$t('inventory.noPerformanceTitle')"
+              :body="$t('inventory.noPerformanceBody')"
             />
           </TabPanel>
 
@@ -481,7 +482,7 @@ async function remove(u) {
               <template v-if="canMarkInterest" #actions="{ unit }">
                 <Button
                   v-if="unit.sale_status === 'available'"
-                  label="Mark interested (48h)"
+:label="$t('inventory.markInterested')"
                   icon="pi pi-thumbs-up"
                   size="small"
                   :disabled="holdBusy"
@@ -492,14 +493,14 @@ async function remove(u) {
                   class="flex gap-1.5"
                 >
                   <Button
-                    label="Convert to sale"
+:label="$t('inventory.convertToSale')"
                     icon="pi pi-flag"
                     size="small"
                     :disabled="holdBusy"
                     @click="convertHold(unit)"
                   />
                   <Button
-                    label="Release"
+:label="$t('deal.release')"
                     size="small"
                     severity="secondary"
                     outlined
@@ -518,11 +519,11 @@ async function remove(u) {
                 <template #empty>
                   <EmptyState
                     icon="pi pi-th-large"
-                    title="No units yet"
-                    :body="canManage ? 'Add the first unit to start selling.' : undefined"
+:title="$t('inventory.noUnitsTitle')"
+                    :body="canManage ? $t('inventory.noUnitsBody') : undefined"
                   />
                 </template>
-                <Column header="Reference">
+                <Column :header="$t('inventory.reference')">
                   <template #body="{ data }">
                     <RouterLink
                       :to="{ name: 'inventory.unit', params: { id: data.id } }"
@@ -532,28 +533,28 @@ async function remove(u) {
                     </RouterLink>
                   </template>
                 </Column>
-                <Column header="Type">
+                <Column :header="$t('inventory.type')">
                   <template #body="{ data }">{{ data.type || '—' }}</template>
                 </Column>
-                <Column header="Floor">
+                <Column :header="$t('inventory.floor')">
                   <template #body="{ data }">{{ data.floor || '—' }}</template>
                 </Column>
-                <Column header="Area">
+                <Column :header="$t('desire.area')">
                   <template #body="{ data }">
                     <span class="num">{{ data.area_sqm ? `${data.area_sqm} m²` : '—' }}</span>
                   </template>
                 </Column>
-                <Column header="Price">
+                <Column :header="$t('inventory.price')">
                   <template #body="{ data }">
                     <span class="num">{{ formatMoney(data.price) }}</span>
                   </template>
                 </Column>
-                <Column header="Status">
+                <Column :header="$t('common.status')">
                   <template #body="{ data }"
                     ><SaleStatusBadge :status="data.sale_status"
                   /></template>
                 </Column>
-                <Column header="Priority">
+                <Column :header="$t('tasks.priority')">
                   <template #body="{ data }">
                     <GtmPriorityBadge v-if="data.gtm_priority" :priority="data.gtm_priority" />
                     <span v-else class="text-mute">—</span>
@@ -568,7 +569,7 @@ async function remove(u) {
                         rounded
                         size="small"
                         severity="secondary"
-                        aria-label="Edit unit"
+:aria-label="$t('inventory.editUnit')"
                         @click="openEdit(data)"
                       />
                       <Button
@@ -577,7 +578,7 @@ async function remove(u) {
                         rounded
                         size="small"
                         severity="secondary"
-                        aria-label="Correct price / status"
+:aria-label="$t('inventory.correctAria')"
                         @click="openCorrect(data)"
                       />
                       <Button
@@ -586,7 +587,7 @@ async function remove(u) {
                         rounded
                         size="small"
                         severity="danger"
-                        aria-label="Cancel unit"
+:aria-label="$t('inventory.cancelUnit')"
                         @click="remove(data)"
                       />
                     </span>
@@ -612,7 +613,7 @@ async function remove(u) {
 
           <!-- ── The record's full audit history ── -->
           <TabPanel value="activity">
-            <SectionCard title="Activity log" icon="pi pi-clock">
+            <SectionCard :title="$t('inventory.activityLog')" icon="pi pi-clock">
               <ActivityTimeline :id="Number(props.id)" type="location" />
             </SectionCard>
           </TabPanel>
@@ -623,59 +624,59 @@ async function remove(u) {
     <!-- Create / edit unit specs -->
     <BaseModal
       v-if="(mode === 'create' || mode === 'edit') && canManage"
-      :title="mode === 'edit' ? 'Edit unit' : 'New unit'"
+      :title="mode === 'edit' ? $t('inventory.editUnit') : $t('inventory.newUnit')"
       size="max-w-3xl"
       @close="mode = null"
     >
       <form class="space-y-4" @submit.prevent="submit">
         <div class="grid gap-3 sm:grid-cols-3">
-          <BaseInput v-model="form.reference" label="Reference" required />
+          <BaseInput v-model="form.reference" :label="$t('inventory.reference')" required />
           <!-- Project type is a project attribute the unit inherits — shown
                read-only for context (edit it on the project). -->
           <div>
-            <label class="mb-1 block text-sm font-medium text-mute">Project type</label>
+            <label class="mb-1 block text-sm font-medium text-mute">{{ $t('inventory.projectType') }}</label>
             <p class="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink">
               {{ locations.current?.type || '—' }}
             </p>
           </div>
           <BaseSelect
             v-model="form.room_number_id"
-            label="Room number"
-            placeholder="— none —"
-            :options="roomNumbers.map((r) => ({ value: r.id, label: r.label }))"
+:label="$t('inventory.roomNumber')"
+            :placeholder="$t('common.none')"
+            :options="roomNumbers.map((r) => ({ value: r.id, label: itemLabel(r) }))"
           />
           <BaseSelect
             v-model="form.floor_id"
-            label="Floor"
-            placeholder="— none —"
-            :options="floors.map((f) => ({ value: f.id, label: f.label }))"
+:label="$t('inventory.floor')"
+            :placeholder="$t('common.none')"
+            :options="floors.map((f) => ({ value: f.id, label: itemLabel(f) }))"
           />
-          <BaseInput v-model="form.area_sqm" label="Area (m²)" type="number" />
+          <BaseInput v-model="form.area_sqm" :label="$t('inventory.areaSqm')" type="number" />
           <!-- Contract type is a project attribute the unit inherits — shown
                read-only for context (edit it on the project). -->
           <div>
-            <label class="mb-1 block text-sm font-medium text-mute">Contract type</label>
+            <label class="mb-1 block text-sm font-medium text-mute">{{ $t('inventory.contractType') }}</label>
             <p class="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink">
               {{ locations.current?.contract_type || '—' }}
             </p>
           </div>
-          <MoneyInput v-if="mode === 'create'" v-model="form.price" label="Price" required />
-          <BaseInput v-model="form.block" label="Block" />
-          <BaseInput v-model="form.stack_floor" label="Stack floor" type="number" />
-          <BaseInput v-model="form.position" label="Position" type="number" />
+          <MoneyInput v-if="mode === 'create'" v-model="form.price" :label="$t('inventory.price')" required />
+          <BaseInput v-model="form.block" :label="$t('inventory.block')" />
+          <BaseInput v-model="form.stack_floor" :label="$t('inventory.stackFloor')" type="number" />
+          <BaseInput v-model="form.position" :label="$t('inventory.position')" type="number" />
           <BaseSelect
             v-model="form.gtm_priority"
-            label="GTM priority"
+:label="$t('inventory.gtmPriority')"
             :clearable="false"
-            :options="GTM_PRIORITIES"
+            :options="gtmPriorityOptions()"
           />
         </div>
         <p v-if="mode === 'edit'" class="text-xs text-mute">
-          To change price or sale status, use “Correct” (keeps the old version).
+          {{ $t('inventory.useCorrectHint') }}
         </p>
         <div class="flex gap-2">
-          <Button type="submit" label="Save" icon="pi pi-check" :loading="units.saving" />
-          <Button type="button" label="Cancel" severity="secondary" outlined @click="mode = null" />
+          <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="units.saving" />
+          <Button type="button" :label="$t('common.cancel')" severity="secondary" outlined @click="mode = null" />
         </div>
       </form>
     </BaseModal>
@@ -683,36 +684,36 @@ async function remove(u) {
     <!-- Correction (price / sale status) via versioning -->
     <BaseModal
       v-if="mode === 'correct' && canManage"
-      title="Correct price / status"
+:title="$t('inventory.correctTitle')"
       size="max-w-2xl"
       @close="mode = null"
     >
       <form class="space-y-4" @submit.prevent="submitCorrection">
         <div class="grid gap-3 sm:grid-cols-3">
-          <MoneyInput v-model="correction.price" label="Price" />
+          <MoneyInput v-model="correction.price" :label="$t('inventory.price')" />
           <BaseSelect
             v-model="correction.sale_status"
-            label="Sale status"
+:label="$t('inventory.saleStatus')"
             :clearable="false"
             :options="[
-              { value: 'available', label: 'Available' },
-              { value: 'interested', label: 'Interested' },
-              { value: 'sold', label: 'Sold' },
+              { value: 'available', label: $t('status.available') },
+              { value: 'interested', label: $t('status.interested') },
+              { value: 'sold', label: $t('status.sold') },
             ]"
           />
-          <BaseInput v-model="correction.reason" label="Reason" required />
+          <BaseInput v-model="correction.reason" :label="$t('calls.reason')" required />
         </div>
         <p class="text-xs text-mute">
-          This cancels the current row and creates a linked new version — the old value is kept.
+          {{ $t('inventory.correctHint') }}
         </p>
         <div class="flex gap-2">
           <Button
             type="submit"
-            label="Apply correction"
+:label="$t('inventory.applyCorrection')"
             icon="pi pi-check"
             :loading="units.saving"
           />
-          <Button type="button" label="Cancel" severity="secondary" outlined @click="mode = null" />
+          <Button type="button" :label="$t('common.cancel')" severity="secondary" outlined @click="mode = null" />
         </div>
       </form>
     </BaseModal>

@@ -14,9 +14,9 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import FilterPanel from '@/components/ui/FilterPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { useAutoFilter } from '@/composables/useAutoFilter'
-import { useDynamicList } from '@/composables/useDynamicList'
+import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { useWilayas, useCommunes } from '@/composables/useGeography'
-import { GTM_PRIORITIES } from '@/features/inventory/api'
+import { gtmPriorityOptions } from '@/features/inventory/api'
 import { countActiveFilters } from '@/utils/format'
 import CoverImageUpload from '@/features/inventory/components/CoverImageUpload.vue'
 import LocationCard from '@/features/inventory/components/LocationCard.vue'
@@ -27,6 +27,7 @@ import { todayInput } from '@/utils/format'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction } from '@/composables/useConfirm'
 import { copyToClipboard } from '@/composables/useClipboard'
+import { t, isRTL } from '@/i18n'
 
 const store = useLocationsStore()
 const auth = useAuthStore()
@@ -159,9 +160,9 @@ async function submit() {
 async function archive(loc) {
   if (
     await confirmAction({
-      title: `Archive project "${loc.name}"?`,
-      text: 'This archives the project and all its units and boxes. You can reactivate it later.',
-      confirmText: 'Archive',
+      title: t('inventory.archiveProjectTitle', { name: loc.name }),
+      text: t('inventory.archiveProjectText'),
+      confirmText: t('project.archive'),
     })
   ) {
     store.archive(loc.id)
@@ -176,9 +177,9 @@ function reactivate(loc) {
 async function remove(loc) {
   if (
     await confirmAction({
-      title: `Remove project "${loc.name}"?`,
-      text: 'This removes the project and everything inside it. The records are kept but marked cancelled.',
-      confirmText: 'Remove',
+      title: t('inventory.removeProjectTitle', { name: loc.name }),
+      text: t('inventory.removeProjectText'),
+      confirmText: t('common.remove'),
       danger: true,
     })
   ) {
@@ -194,11 +195,11 @@ function toggleArchived() {
 
 <template>
   <div>
-    <PageHeader title="Projects" subtitle="Real-estate projects, buildings and sites.">
+    <PageHeader :title="$t('inventory.projects')" :subtitle="$t('inventory.projectsSubtitle')">
       <template #actions>
         <Button
           v-if="canManage"
-          label="New project"
+:label="$t('clients.newProject')"
           icon="pi pi-plus"
           class="native-fab"
           @click="openCreate"
@@ -216,31 +217,31 @@ function toggleArchived() {
         />
         <InputText
           v-model="store.filters.q"
-          placeholder="Search name or code…"
+:placeholder="$t('inventory.searchNameCode')"
           class="w-full !ps-9"
         />
       </div>
       <BaseSelect
         v-model="store.filters.wilaya_id"
-        placeholder="All wilayas"
-        aria-label="Filter by wilaya"
+:placeholder="$t('inventory.allWilayas')"
+        :aria-label="$t('inventory.filterByWilaya')"
         class="w-full sm:w-52"
         :options="wilayas.map((w) => ({ value: w.id, label: `${w.code} · ${w.name}` }))"
       />
       <BaseSelect
         v-model="store.filters.commune_id"
-        placeholder="All communes"
-        aria-label="Filter by commune"
+:placeholder="$t('inventory.allCommunes')"
+        :aria-label="$t('inventory.filterByCommune')"
         class="w-full sm:w-48"
         :disabled="!store.filters.wilaya_id"
         :options="filterCommunes.map((c) => ({ value: c.id, label: c.name }))"
       />
       <BaseSelect
         v-model="store.filters.priority"
-        placeholder="All priorities"
-        aria-label="Filter by GTM priority"
+:placeholder="$t('tasks.allPriorities')"
+        :aria-label="$t('inventory.filterByPriority')"
         class="w-full sm:w-44"
-        :options="GTM_PRIORITIES"
+        :options="gtmPriorityOptions()"
       />
     </div>
     </FilterPanel>
@@ -253,12 +254,8 @@ function toggleArchived() {
     <SectionCard v-else-if="!store.items.length">
       <EmptyState
         icon="pi pi-building"
-        title="No projects yet"
-        :body="
-          canManage
-            ? 'Create the first project to start loading inventory.'
-            : 'Projects will appear here.'
-        "
+:title="$t('inventory.noProjectsTitle')"
+        :body="canManage ? $t('inventory.noProjectsBodyManage') : $t('inventory.noProjectsBody')"
       />
     </SectionCard>
 
@@ -277,7 +274,7 @@ function toggleArchived() {
     <!-- Archived projects: hidden by default, reactivatable one by one. -->
     <div v-if="canManage" class="mt-6">
       <Button
-        :label="`${showArchived ? 'Hide' : 'Show'} archived projects`"
+        :label="showArchived ? $t('inventory.hideArchived') : $t('inventory.showArchived')"
         :icon="showArchived ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
         text
         size="small"
@@ -296,10 +293,10 @@ function toggleArchived() {
               {{ loc.code }}<template v-if="loc.wilaya"> · {{ loc.wilaya.name }}</template
               ><template v-if="loc.commune"> ({{ loc.commune.name }})</template>
             </span>
-            <span class="ms-2 text-xs uppercase text-mute">archived</span>
+            <span class="ms-2 text-xs uppercase text-mute">{{ $t('status.archived').toLowerCase() }}</span>
           </div>
           <Button
-            label="Reactivate"
+:label="$t('project.reactivate')"
             icon="pi pi-undo"
             size="small"
             outlined
@@ -307,7 +304,7 @@ function toggleArchived() {
           />
         </div>
         <p v-if="!store.archivedItems.length" class="py-2 text-center text-sm text-mute">
-          No archived projects.
+          {{ $t('inventory.noArchivedProjects') }}
         </p>
       </div>
     </div>
@@ -315,48 +312,48 @@ function toggleArchived() {
     <!-- Create / edit drawer -->
     <Drawer
       v-model:visible="showForm"
-      position="right"
+:position="isRTL() ? 'left' : 'right'"
       class="!w-full sm:!w-[540px]"
-      :header="editingId ? 'Edit project' : 'New project'"
+      :header="editingId ? $t('inventory.editProject') : $t('clients.newProject')"
     >
       <form v-if="canManage" class="space-y-4" @submit.prevent="submit">
         <div class="grid gap-3 sm:grid-cols-2">
-          <BaseInput v-model="form.name" label="Name" required />
-          <BaseInput v-model="form.code" label="Code" required />
+          <BaseInput v-model="form.name" :label="$t('common.name')" required />
+          <BaseInput v-model="form.code" :label="$t('inventory.code')" required />
           <BaseSelect
             v-model="form.wilaya_id"
-            label="Wilaya"
-            placeholder="— none —"
+:label="$t('geo.wilaya')"
+            :placeholder="$t('common.none')"
             :options="wilayas.map((w) => ({ value: w.id, label: `${w.code} · ${w.name}` }))"
           />
           <BaseSelect
             v-model="form.commune_id"
-            label="Commune"
-            placeholder="— none —"
+:label="$t('geo.commune')"
+            :placeholder="$t('common.none')"
             :disabled="!form.wilaya_id"
             :options="formCommunes.map((c) => ({ value: c.id, label: c.name }))"
           />
           <BaseSelect
             v-model="form.type_id"
-            label="Project type"
-            placeholder="— none —"
-            :options="projectTypes.map((t) => ({ value: t.id, label: t.label }))"
+:label="$t('inventory.projectType')"
+            :placeholder="$t('common.none')"
+            :options="projectTypes.map((t) => ({ value: t.id, label: itemLabel(t) }))"
           />
           <BaseSelect
             v-model="form.contract_type_id"
-            label="Contract type"
-            placeholder="— none —"
-            :options="contractTypes.map((t) => ({ value: t.id, label: t.label }))"
+:label="$t('inventory.contractType')"
+            :placeholder="$t('common.none')"
+            :options="contractTypes.map((t) => ({ value: t.id, label: itemLabel(t) }))"
           />
           <BaseMultiSelect
             v-model="form.payment_method_ids"
-            label="Payment methods offered"
-            placeholder="— none —"
+:label="$t('inventory.paymentMethodsOffered')"
+            :placeholder="$t('common.none')"
             class="sm:col-span-2"
-            :options="projectPaymentMethods.map((m) => ({ value: m.id, label: m.label }))"
+            :options="projectPaymentMethods.map((m) => ({ value: m.id, label: itemLabel(m) }))"
           />
           <div>
-            <BaseInput v-model="form.address" label="Address" />
+            <BaseInput v-model="form.address" :label="$t('common.address')" />
             <div v-if="mapsUrl" class="mt-1 flex items-center gap-3">
               <a
                 :href="mapsUrl"
@@ -365,14 +362,14 @@ function toggleArchived() {
                 class="inline-flex items-center gap-1 text-sm text-primary-600 hover:underline dark:text-primary-400"
               >
                 <i class="pi pi-map-marker text-xs" aria-hidden="true" />
-                Open in Google Maps
+                {{ $t('inventory.openInMaps') }}
               </a>
               <button
                 type="button"
-                title="Copy Maps link"
-                aria-label="Copy Maps link"
+:title="$t('pipeline.copyMapsLink')"
+                :aria-label="$t('pipeline.copyMapsLink')"
                 class="inline-flex items-center text-primary-600 hover:underline dark:text-primary-400"
-                @click="copyToClipboard(mapsUrl, 'Maps link copied')"
+                @click="copyToClipboard(mapsUrl, $t('pipeline.mapsLinkCopied'))"
               >
                 <i class="pi pi-copy text-xs" aria-hidden="true" />
               </button>
@@ -380,15 +377,15 @@ function toggleArchived() {
           </div>
           <BaseInput
             v-model="form.expected_delivery_date"
-            label="Expected delivery date"
+:label="$t('inventory.expectedDelivery')"
             type="date"
             :min="todayInput()"
           />
           <BaseSelect
             v-model="form.gtm_priority"
-            label="GTM priority"
+:label="$t('inventory.gtmPriority')"
             :clearable="false"
-            :options="GTM_PRIORITIES"
+            :options="gtmPriorityOptions()"
           />
         </div>
         <CoverImageUpload
@@ -401,7 +398,7 @@ function toggleArchived() {
         <div class="space-y-2">
           <Button
             type="button"
-            :label="showMap ? 'Hide map' : 'Pick location on map'"
+            :label="showMap ? $t('inventory.hideMap') : $t('inventory.pickOnMap')"
             icon="pi pi-map"
             text
             size="small"
@@ -415,12 +412,12 @@ function toggleArchived() {
             editable
           />
         </div>
-        <BaseTextarea v-model="form.description" label="Description" :rows="3" />
+        <BaseTextarea v-model="form.description" :label="$t('common.description')" :rows="3" />
         <div class="flex gap-2 pt-1">
-          <Button type="submit" label="Save" icon="pi pi-check" :loading="store.saving" />
+          <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="store.saving" />
           <Button
             type="button"
-            label="Cancel"
+:label="$t('common.cancel')"
             severity="secondary"
             outlined
             @click="showForm = false"

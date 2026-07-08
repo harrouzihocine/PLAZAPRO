@@ -120,7 +120,7 @@ function end() {
           icon="pi pi-times"
           size="small"
           severity="secondary"
-          aria-label="Remove cover"
+          :aria-label="$t('inventory.removeCover')"
           @click="clearCover"
         />
       </div>

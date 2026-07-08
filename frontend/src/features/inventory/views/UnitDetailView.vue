@@ -26,6 +26,8 @@ import { useUnitsStore } from '@/features/inventory/unitsStore'
 import { useAuthStore } from '@/features/settings/store'
 import { formatDate } from '@/utils/format'
 import { formatMoney } from '@/features/payments/money'
+import { t } from '@/i18n'
+import { statusMeta } from '@/utils/status'
 
 // One unit's page: commercial status up top, how it has moved through the
 // pipeline (stats), the money collected against it (payments), the full spec
@@ -44,8 +46,8 @@ const canSeeFeedback = auth.can('reports.view')
 const saleHint = computed(() => {
   const s = insights.value?.stats
   if (!s) return ''
-  if (s.sale_status === 'reserved') return 'Reserved (deposit paid)'
-  if (s.interested_count > 1) return `${s.interested_count} projects`
+  if (s.sale_status === 'reserved') return t('inventory.reservedDeposit')
+  if (s.interested_count > 1) return t('inventory.nProjects', { n: s.interested_count })
   return ''
 })
 
@@ -76,14 +78,14 @@ useRefreshable(load) // pull-to-refresh (APK)
 
     <template v-else>
       <PageHeader
-        :title="`Unit ${units.current.reference}`"
+        :title="$t('search.unitTitle', { ref: units.current.reference })"
         :back="
           units.current.location_id
             ? { name: 'inventory.location', params: { id: units.current.location_id } }
             : { name: 'inventory.units' }
         "
       >
-        <template #back-label>{{ units.current.location?.name || 'Units' }}</template>
+        <template #back-label>{{ units.current.location?.name || $t('nav.units') }}</template>
         <template #badges>
           <SaleStatusBadge
             :status="units.current.sale_status"
@@ -111,22 +113,22 @@ useRefreshable(load) // pull-to-refresh (APK)
             v-if="auth.can('chat.use')"
             subject-type="unit"
             :subject-id="Number(id)"
-            label="Share"
+:label="$t('project.share')"
           />
         </template>
       </PageHeader>
 
       <!-- The numbers a seller quotes first -->
       <div class="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <StatCard label="Price" :value="formatMoney(units.current.price)" icon="pi pi-money-bill" />
+        <StatCard :label="$t('inventory.price')" :value="formatMoney(units.current.price)" icon="pi pi-money-bill" />
         <StatCard
-          label="Area"
+:label="$t('desire.area')"
           :value="units.current.area_sqm ? `${units.current.area_sqm} m²` : '—'"
           icon="pi pi-expand"
           tone="info"
         />
-        <StatCard label="Project type" :value="units.current.location?.type || '—'" icon="pi pi-home" />
-        <StatCard label="Floor" :value="units.current.floor || '—'" icon="pi pi-building" />
+        <StatCard :label="$t('inventory.projectType')" :value="units.current.location?.type || '—'" icon="pi pi-home" />
+        <StatCard :label="$t('inventory.floor')" :value="units.current.floor || '—'" icon="pi pi-building" />
       </div>
 
       <!-- Insights failed to load: say so rather than silently dropping the block. -->
@@ -135,23 +137,23 @@ useRefreshable(load) // pull-to-refresh (APK)
         class="mb-5 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
       >
         <i class="pi pi-exclamation-triangle" aria-hidden="true" />
-        Couldn't load this unit's stats and payments. Try refreshing the page.
+        {{ $t('inventory.unitInsightsFailed') }}
       </div>
 
       <!-- How the unit has moved: interest holds, shortlists, deals -->
       <div v-if="insights" class="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard
-          label="Interest holds"
+:label="$t('inventory.interestHolds')"
           :value="insights.stats.reservations"
           icon="pi pi-thumbs-up"
           :tone="insights.stats.has_active_hold ? 'warning' : 'default'"
-          :hint="insights.stats.has_active_hold ? 'Active hold' : ''"
+          :hint="insights.stats.has_active_hold ? $t('inventory.activeHold') : ''"
         />
-        <StatCard label="Times shortlisted" :value="insights.stats.times_shortlisted" icon="pi pi-star" tone="info" />
-        <StatCard label="In deals" :value="insights.stats.deals" icon="pi pi-briefcase" />
+        <StatCard :label="$t('inventory.timesShortlisted')" :value="insights.stats.times_shortlisted" icon="pi pi-star" tone="info" />
+        <StatCard :label="$t('inventory.inDeals')" :value="insights.stats.deals" icon="pi pi-briefcase" />
         <StatCard
-          label="Sale status"
-          :value="insights.stats.sale_status || '—'"
+:label="$t('inventory.saleStatus')"
+          :value="insights.stats.sale_status ? statusMeta(insights.stats.sale_status).label : '—'"
           icon="pi pi-tag"
           :tone="
             insights.stats.sale_status === 'sold'
@@ -166,11 +168,11 @@ useRefreshable(load) // pull-to-refresh (APK)
 
       <Tabs value="overview" scrollable lazy>
         <TabList>
-          <Tab value="overview">Overview</Tab>
-          <Tab v-if="insights?.payments" value="payments">Payments</Tab>
-          <Tab v-if="canSeeFeedback" value="feedback">Voice of Client</Tab>
-          <Tab value="project-logs">Project logs</Tab>
-          <Tab value="activity">Activity</Tab>
+          <Tab value="overview">{{ $t('inventory.tabOverview') }}</Tab>
+          <Tab v-if="insights?.payments" value="payments">{{ $t('nav.payments') }}</Tab>
+          <Tab v-if="canSeeFeedback" value="feedback">{{ $t('inventory.tabVoiceOfClient') }}</Tab>
+          <Tab value="project-logs">{{ $t('inventory.projectLogs') }}</Tab>
+          <Tab value="activity">{{ $t('inventory.tabActivity') }}</Tab>
         </TabList>
         <TabPanels>
           <!-- Overview: media, spec sheet, parent project -->
@@ -183,30 +185,30 @@ useRefreshable(load) // pull-to-refresh (APK)
                   :can-manage="auth.can('media.manage')"
                 />
 
-                <SectionCard title="Specifications" icon="pi pi-list">
+                <SectionCard :title="$t('inventory.specifications')" icon="pi pi-list">
                   <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
                     <div>
-                      <dt class="text-xs text-mute">Reference</dt>
+                      <dt class="text-xs text-mute">{{ $t('inventory.reference') }}</dt>
                       <dd class="mt-0.5 font-medium text-ink">{{ units.current.reference }}</dd>
                     </div>
                     <div v-if="units.current.room_number">
-                      <dt class="text-xs text-mute">Room number</dt>
+                      <dt class="text-xs text-mute">{{ $t('inventory.roomNumber') }}</dt>
                       <dd class="mt-0.5 text-ink">{{ units.current.room_number }}</dd>
                     </div>
                     <div v-if="units.current.block">
-                      <dt class="text-xs text-mute">Block</dt>
+                      <dt class="text-xs text-mute">{{ $t('inventory.block') }}</dt>
                       <dd class="mt-0.5 text-ink">{{ units.current.block }}</dd>
                     </div>
                     <div v-if="units.current.stack_floor != null">
-                      <dt class="text-xs text-mute">Stack floor</dt>
+                      <dt class="text-xs text-mute">{{ $t('inventory.stackFloor') }}</dt>
                       <dd class="num mt-0.5 text-ink">{{ units.current.stack_floor }}</dd>
                     </div>
                     <div v-if="units.current.position != null">
-                      <dt class="text-xs text-mute">Position</dt>
+                      <dt class="text-xs text-mute">{{ $t('inventory.position') }}</dt>
                       <dd class="num mt-0.5 text-ink">{{ units.current.position }}</dd>
                     </div>
                     <div>
-                      <dt class="text-xs text-mute">Created</dt>
+                      <dt class="text-xs text-mute">{{ $t('clients.created') }}</dt>
                       <dd class="mt-0.5 text-ink">{{ formatDate(units.current.created_at) }}</dd>
                     </div>
                   </dl>
@@ -214,7 +216,7 @@ useRefreshable(load) // pull-to-refresh (APK)
               </div>
 
               <div class="space-y-5">
-                <SectionCard v-if="units.current.location" title="Project" icon="pi pi-building">
+                <SectionCard v-if="units.current.location" :title="$t('inventory.project')" icon="pi pi-building">
                   <RouterLink
                     :to="{ name: 'inventory.location', params: { id: units.current.location_id } }"
                     class="font-medium text-ink hover:underline"
@@ -226,20 +228,20 @@ useRefreshable(load) // pull-to-refresh (APK)
                       v-if="units.current.location.contract_type"
                       class="flex justify-between gap-3"
                     >
-                      <dt class="text-mute">Contract</dt>
+                      <dt class="text-mute">{{ $t('inventory.contract') }}</dt>
                       <dd class="text-ink">{{ units.current.location.contract_type }}</dd>
                     </div>
                     <div
                       v-if="units.current.location.expected_delivery_date"
                       class="flex justify-between gap-3"
                     >
-                      <dt class="text-mute">Delivery</dt>
+                      <dt class="text-mute">{{ $t('inventory.delivery') }}</dt>
                       <dd class="text-ink">
                         {{ formatDate(units.current.location.expected_delivery_date) }}
                       </dd>
                     </div>
                     <div v-if="units.current.location.gtm_priority" class="flex justify-between gap-3">
-                      <dt class="text-mute">Priority</dt>
+                      <dt class="text-mute">{{ $t('tasks.priority') }}</dt>
                       <dd><GtmPriorityBadge :priority="units.current.location.gtm_priority" /></dd>
                     </div>
                   </dl>
@@ -254,24 +256,24 @@ useRefreshable(load) // pull-to-refresh (APK)
               <!-- At-a-glance totals -->
               <div class="mb-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
                 <StatCard
-                  label="Collected"
+:label="$t('inventory.collected')"
                   :value="formatMoney(insights.payments.collected)"
                   icon="pi pi-money-bill"
                   tone="success"
                 />
                 <StatCard
-                  label="Scheduled"
+:label="$t('status.scheduled')"
                   :value="formatMoney(insights.payments.schedule_total)"
                   icon="pi pi-calendar"
                 />
                 <StatCard
-                  label="Paid"
+:label="$t('status.paid')"
                   :value="formatMoney(insights.payments.schedule_paid)"
                   icon="pi pi-check-circle"
                   tone="info"
                 />
                 <StatCard
-                  label="Balance"
+:label="$t('inventory.balance')"
                   :value="formatMoney(insights.payments.balance)"
                   icon="pi pi-hourglass"
                   :tone="Number(insights.payments.balance) > 0 ? 'warning' : 'default'"
@@ -299,14 +301,14 @@ useRefreshable(load) // pull-to-refresh (APK)
                 class="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:underline"
               >
                 <i class="pi pi-external-link text-xs" aria-hidden="true" />
-                {{ insights.payments.client_name || 'Open the buying project' }}
+                {{ insights.payments.client_name || $t('inventory.openBuyingProject') }}
               </RouterLink>
             </template>
-            <SectionCard v-else title="Payments" icon="pi pi-wallet">
+            <SectionCard v-else :title="$t('nav.payments')" icon="pi pi-wallet">
               <EmptyState
                 icon="pi pi-wallet"
-                title="No payments yet"
-                body="This unit has not been sold, so no payments are recorded against it."
+:title="$t('inventory.noPaymentsTitle')"
+                :body="$t('inventory.noPaymentsBody')"
               />
             </SectionCard>
           </TabPanel>
@@ -324,7 +326,7 @@ useRefreshable(load) // pull-to-refresh (APK)
 
           <!-- The record's full audit history: price corrections, status flips, holds. -->
           <TabPanel value="activity">
-            <SectionCard title="History" icon="pi pi-clock">
+            <SectionCard :title="$t('project.history')" icon="pi pi-clock">
               <ActivityTimeline :id="Number(props.id)" type="unit" />
             </SectionCard>
           </TabPanel>

@@ -1,4 +1,5 @@
 import { useApi } from '@/composables/useApi'
+import { t } from '@/i18n'
 
 // Network calls for the Inventory feature. State lives in the feature stores;
 // these functions are the only place Inventory talks to the API (via useApi).
@@ -6,11 +7,12 @@ import { useApi } from '@/composables/useApi'
 // GTM (sales) priority degrees, mirroring App\Modules\Inventory\Enums\GtmPriority
 // (the single source of truth). Ordered high→low for the pickers; `value` is the
 // stored API value, `label` the caption.
-export const GTM_PRIORITIES = [
-  { value: 'critical', label: 'Critical' },
-  { value: 'high', label: 'High' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'low', label: 'Low' },
+// Function, not a constant: labels must re-resolve when the language changes.
+export const gtmPriorityOptions = () => [
+  { value: 'critical', label: t('status.critical') },
+  { value: 'high', label: t('status.high') },
+  { value: 'medium', label: t('status.medium') },
+  { value: 'low', label: t('status.low') },
 ]
 
 // Locations (projects). `list` also feeds location pickers elsewhere.
@@ -167,14 +169,8 @@ export const mediaDownloadUrl = (id) => `/api/v1/media/${id}/download`
 
 // The media tabs, mirroring the backend MediaCollection enum (the single source
 // of truth). `key` is the stored `collection` value; `label` is the tab caption.
-export const MEDIA_COLLECTIONS = [
-  { key: 'photos', label: 'Photos' },
-  { key: 'videos', label: 'Videos' },
-  { key: 'plans', label: 'Plans' },
-  { key: 'presentations', label: 'Presentations' },
-  { key: 'documents', label: 'Documents' },
-  { key: 'others', label: 'Others' },
-]
+export const MEDIA_COLLECTIONS = ['photos', 'videos', 'plans', 'presentations', 'documents', 'others']
+export const mediaCollectionLabel = (key) => t(`media.${key}`)
 
 // Largest file the media library accepts, mirroring the UploadMediaRequest
 // 'max' rule (200 MB) and the PHP upload_max_filesize in docker/php/uploads.ini.

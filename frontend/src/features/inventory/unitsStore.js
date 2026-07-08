@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { toastError } from '@/composables/useConfirm'
 import { unitsApi } from '@/features/inventory/api'
 import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
+import { t } from '@/i18n'
 
 // State for the Units screens (the global filterable table and the per-location
 // list on a project detail). Network lives in api.js; writes refetch the current
@@ -125,7 +126,7 @@ export const useUnitsStore = defineStore('units', {
         await this.refresh()
         return result
       } catch (e) {
-        this.error = e.response?.data?.message ?? 'Action failed.'
+        this.error = e.response?.data?.message ?? t('common.actionFailed')
         toastError(this.error)
         throw e
       } finally {

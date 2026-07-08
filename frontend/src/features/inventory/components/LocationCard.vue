@@ -79,7 +79,7 @@ defineEmits(['edit', 'archive', 'remove'])
           rounded
           size="small"
           severity="secondary"
-          aria-label="Edit project"
+          :aria-label="$t('inventory.editProject')"
           @click.prevent="$emit('edit', loc)"
         />
         <Button
@@ -88,7 +88,7 @@ defineEmits(['edit', 'archive', 'remove'])
           rounded
           size="small"
           severity="secondary"
-          aria-label="Archive project"
+          :aria-label="$t('inventory.archiveProject')"
           @click.prevent="$emit('archive', loc)"
         />
         <Button
@@ -97,7 +97,7 @@ defineEmits(['edit', 'archive', 'remove'])
           rounded
           size="small"
           severity="danger"
-          aria-label="Remove project"
+          :aria-label="$t('inventory.removeProject')"
           @click.prevent="$emit('remove', loc)"
         />
       </div>

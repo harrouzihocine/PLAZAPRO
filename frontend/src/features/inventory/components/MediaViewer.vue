@@ -97,14 +97,14 @@ watch(() => props.media?.id, resetZoom)
             <button
               class="flex min-h-[44px] min-w-[44px] items-center justify-center text-mute hover:text-ink disabled:opacity-30"
               :disabled="zoom <= ZOOM_MIN"
-              aria-label="Zoom out"
+              :aria-label="$t('media.zoomOut')"
               @click="zoomOut"
             >
               <i class="pi pi-search-minus" aria-hidden="true" />
             </button>
             <button
               class="num min-h-[44px] px-1 text-xs text-mute hover:text-ink"
-              aria-label="Reset zoom"
+              :aria-label="$t('media.resetZoom')"
               @click="resetZoom"
             >
               {{ Math.round(zoom * 100) }}%
@@ -112,7 +112,7 @@ watch(() => props.media?.id, resetZoom)
             <button
               class="flex min-h-[44px] min-w-[44px] items-center justify-center text-mute hover:text-ink disabled:opacity-30"
               :disabled="zoom >= ZOOM_MAX"
-              aria-label="Zoom in"
+              :aria-label="$t('media.zoomIn')"
               @click="zoomIn"
             >
               <i class="pi pi-search-plus" aria-hidden="true" />
@@ -128,7 +128,7 @@ watch(() => props.media?.id, resetZoom)
           </a>
           <button
             class="flex min-h-[44px] min-w-[44px] items-center justify-center text-mute hover:text-ink"
-            aria-label="Close"
+            :aria-label="$t('common.close')"
             @click="$emit('close')"
           >
             <i class="pi pi-times" aria-hidden="true" />
@@ -140,14 +140,14 @@ watch(() => props.media?.id, resetZoom)
       <template v-if="canNavigate">
         <button
           class="absolute start-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white active:bg-black/60"
-          aria-label="Previous"
+          :aria-label="$t('media.previous')"
           @click.stop="go(-1)"
         >
           <i class="pi pi-chevron-left" aria-hidden="true" />
         </button>
         <button
           class="absolute end-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white active:bg-black/60"
-          aria-label="Next"
+          :aria-label="$t('media.next')"
           @click.stop="go(1)"
         >
           <i class="pi pi-chevron-right" aria-hidden="true" />
@@ -186,7 +186,7 @@ watch(() => props.media?.id, resetZoom)
           v-else-if="media.type === 'pdf'"
           :src="mediaFileUrl(media.id)"
           class="h-[80vh] w-full"
-          title="Document preview"
+          :title="$t('media.documentPreview')"
         ></iframe>
 
         <!-- Office docs (presentations, Word, spreadsheets) are shown via their
@@ -196,7 +196,7 @@ watch(() => props.media?.id, resetZoom)
             v-if="media.preview_status === 'ready'"
             :src="mediaPreviewUrl(media.id)"
             class="h-[80vh] w-full"
-            title="Document preview"
+            :title="$t('media.documentPreview')"
           ></iframe>
           <p v-else-if="media.preview_status === 'pending'" class="p-8 text-center opacity-70">
             Converting document for preview… check back shortly.

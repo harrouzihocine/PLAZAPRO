@@ -5,6 +5,7 @@ import Button from 'primevue/button'
 import { useAnnouncementsStore } from '@/features/inventory/announcementsStore'
 import { formatMoney } from '@/features/payments/money'
 import { initials } from '@/utils/format'
+import { t } from '@/i18n'
 
 // The full-screen "congratulations" that fires for EVERY logged-in user the
 // moment a unit is sold (driven by the announcements store's celebration state).
@@ -27,9 +28,9 @@ const others = computed(() => sale.value?.other_agents ?? [])
 
 const creditGroups = computed(() =>
   [
-    { icon: 'pi pi-megaphone', label: 'Marketing', names: marketing.value, tone: 'tone-sale' },
-    { icon: 'pi pi-map-marker', label: 'In-site', names: insite.value, tone: 'tone-insite' },
-    { icon: 'pi pi-users', label: 'Others', names: others.value, tone: 'tone-other' },
+    { icon: 'pi pi-megaphone', label: t('celebration.marketing'), names: marketing.value, tone: 'tone-sale' },
+    { icon: 'pi pi-map-marker', label: t('celebration.insite'), names: insite.value, tone: 'tone-insite' },
+    { icon: 'pi pi-users', label: t('deal.others'), names: others.value, tone: 'tone-other' },
   ].filter((g) => g.names.length),
 )
 
@@ -69,7 +70,7 @@ function openUnit() {
         class="celebration-overlay"
         role="dialog"
         aria-modal="true"
-        aria-label="Unit sold"
+        :aria-label="$t('celebration.unitSold')"
       >
         <span
           v-for="(c, i) in confetti"
@@ -92,8 +93,8 @@ function openUnit() {
 
           <div class="card">
             <div class="emoji">🎉</div>
-            <p class="eyebrow">CONGRATULATIONS</p>
-            <h2 class="headline">Unit sold!</h2>
+            <p class="eyebrow">{{ $t('celebration.congrats') }}</p>
+            <h2 class="headline">{{ $t('celebration.headline') }}</h2>
 
             <p class="unit-ref">{{ sale.reference }}</p>
             <p v-if="sale.location || sale.address" class="unit-place">
@@ -128,9 +129,9 @@ function openUnit() {
             </div>
 
             <div class="actions">
-              <Button label="See the unit" icon="pi pi-external-link" rounded @click="openUnit" />
+              <Button :label="$t('celebration.seeUnit')" icon="pi pi-external-link" rounded @click="openUnit" />
               <Button
-                label="Close"
+:label="$t('common.close')"
                 icon="pi pi-times"
                 rounded
                 severity="secondary"

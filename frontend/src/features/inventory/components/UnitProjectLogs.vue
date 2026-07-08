@@ -49,14 +49,14 @@ onMounted(async () => {
       class="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
     >
       <i class="pi pi-exclamation-triangle" aria-hidden="true" />
-      Couldn't load the project logs for this unit. Try refreshing the page.
+      {{ $t('inventory.projectLogsFailed') }}
     </div>
 
-    <SectionCard v-else-if="!groups.length" title="Project logs" icon="pi pi-history">
+    <SectionCard v-else-if="!groups.length" :title="$t('inventory.projectLogs')" icon="pi pi-history">
       <EmptyState
         icon="pi pi-history"
-        title="No project logs yet"
-        body="No client project has logged a call or a visit on this unit."
+:title="$t('inventory.projectLogsEmptyTitle')"
+        :body="$t('inventory.projectLogsEmptyBody')"
       />
     </SectionCard>
 
@@ -85,8 +85,8 @@ onMounted(async () => {
 
       <LogTimeline
         :entries="entriesFor(g)"
-        empty-title="No calls or visits yet"
-        empty-body="This project has no logged calls or visits on this unit."
+:empty-title="$t('pipeline.emptyAll')"
+        :empty-body="$t('inventory.projectLogsUnitEmpty')"
       />
     </SectionCard>
   </div>
