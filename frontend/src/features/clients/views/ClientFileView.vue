@@ -13,8 +13,11 @@ import StatusTag from '@/components/ui/StatusTag.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ActivityTimeline from '@/components/ui/ActivityTimeline.vue'
 import ClientFormDrawer from '@/features/clients/components/ClientFormDrawer.vue'
+import SendToPhoneButton from '@/features/clients/components/SendToPhoneButton.vue'
 import CallLogForm from '@/features/pipeline/components/CallLogForm.vue'
 import { useClientsStore } from '@/features/clients/clientsStore'
+import { pipelineApi } from '@/features/pipeline/api'
+import { toastInfo } from '@/composables/useConfirm'
 import { useAuthStore } from '@/features/settings/store'
 import { formatPhone } from '@/data/countryCodes'
 import { formatDate, formatDateTime, humanize, initials, unitLine as formatUnitLine } from '@/utils/format'
@@ -30,6 +33,7 @@ const props = defineProps({ id: { type: [String, Number], required: true } })
 const store = useClientsStore()
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 // Client ownership (assigned agent + who created it/when) is back-office-only,
 // gated by clients.manage (super-admin / admin / manager).
@@ -47,6 +51,12 @@ const editOpen = ref(false)
 
 const activeProjects = computed(() => store.projects)
 const closedProjects = computed(() => store.archivedProjects)
+
+// A pending click-to-call reminder rides along to whichever project door the
+// agent opens — TimelinePanel there consumes ?logcall and opens the modal.
+const projectCardQuery = computed(() =>
+  route.query.logcall ? { logcall: route.query.logcall } : {},
+)
 
 const unitLine = formatUnitLine
 
@@ -75,6 +85,18 @@ onMounted(async () => {
     store.loadProjects(props.id),
     store.loadArchivedProjects(props.id),
   ])
+
+  // ?logcall=<id> (click-to-call reminder): the client had no single active
+  // project to deep-link into. No project at all → a new call IS a new project,
+  // so open that modal; several projects → the agent picks the door themselves
+  // (the card links carry ?logcall through so the timeline finishes the flow).
+  if (route.query.logcall && auth.can('calls.log')) {
+    if (!store.projects.length && canCreateProject()) {
+      newProjectOpen.value = true
+    } else if (store.projects.length > 1) {
+      toastInfo('Pick the project to log this call on.')
+    }
+  }
 })
 // pull-to-refresh (APK)
 useRefreshable(() => Promise.all([refresh(), store.loadDesire(props.id)]))
@@ -83,7 +105,6 @@ useRefreshable(() => Promise.all([refresh(), store.loadDesire(props.id)]))
 const newProjectOpen = ref(false)
 
 // ?resume=<key> (drafts indicator): reopen the new-project call modal.
-const route = useRoute()
 if (route.query.resume === `call-log:new-project:${props.id}`) newProjectOpen.value = true
 
 async function submitNewProject(callPayload) {
@@ -91,6 +112,11 @@ async function submitNewProject(callPayload) {
     const project = await store.createProject(props.id)
     await store.logCall(props.id, { ...callPayload, client_project_id: project.id })
     newProjectOpen.value = false
+    // The click-to-call reminder that led here is answered — best-effort close
+    // (other open sessions drop their prompt too).
+    if (route.query.logcall) {
+      pipelineApi.closeCallRequest(route.query.logcall, 'logged').catch(() => {})
+    }
     router.push({ name: 'clients.project', params: { id: props.id, projectId: project.id } })
   } catch {
     /* toast raised by the store; an empty project (if created) can be removed */
@@ -121,6 +147,7 @@ async function submitNewProject(callPayload) {
         <template #subtitle>
           <span v-if="canSeeDetails()" class="inline-flex flex-wrap items-center gap-x-2">
             <span class="num">{{ formatPhone(store.current.phone) }}</span>
+            <SendToPhoneButton :client-id="store.current.id" />
             <a
               :href="whatsappLink(store.current.phone)"
               target="_blank"
@@ -168,6 +195,7 @@ async function submitNewProject(callPayload) {
                 <p class="truncate font-semibold text-ink">{{ store.current.full_name }}</p>
                 <p v-if="canSeeDetails()" class="flex items-center gap-1.5 text-sm text-mute">
                   <span class="num truncate">{{ formatPhone(store.current.phone) }}</span>
+                  <SendToPhoneButton :client-id="store.current.id" size="sm" />
                   <a
                     :href="whatsappLink(store.current.phone)"
                     target="_blank"
@@ -316,6 +344,7 @@ async function submitNewProject(callPayload) {
                 :to="{
                   name: 'clients.project',
                   params: { id: store.current.id, projectId: p.id },
+                  query: projectCardQuery,
                 }"
                 class="group flex items-center gap-3 rounded-xl border border-line p-3 transition-colors hover:border-primary-300 hover:bg-surface-50 dark:hover:bg-surface-800"
               >

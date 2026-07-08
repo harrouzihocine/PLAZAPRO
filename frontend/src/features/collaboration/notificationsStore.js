@@ -6,6 +6,7 @@ import { useChatDockStore } from '@/features/collaboration/chatDockStore'
 import { playNotificationSound } from '@/utils/notificationSound'
 import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
 import { queueable } from '@/features/offline/apiOrQueue'
+import { closeCallLogPrompt, promptCallLog } from '@/features/pipeline/callPrompt'
 
 // In-app notification feed backing the AppShell bell. Loads the latest page over
 // HTTP and keeps the unread badge live over Reverb (the user's private channel).
@@ -150,6 +151,17 @@ export const useNotificationsStore = defineStore('notifications', {
       if (payload.kind === 'account_locked') {
         toastInfo(`${payload.title} — ${payload.body}`)
       }
+      // Click-to-call: the phone reported the dialer opened — ask (on every
+      // open session) whether to log the call. The bell entry above keeps the
+      // link for anyone who dismisses the dialog.
+      if (payload.kind === 'call_log_prompt') {
+        promptCallLog({
+          id: payload.subject_id,
+          title: payload.title,
+          body: payload.body,
+          link: payload.link,
+        })
+      }
     },
 
     // Subscribe to the current user's private channel for live notifications.
@@ -157,7 +169,11 @@ export const useNotificationsStore = defineStore('notifications', {
       if (this.subscribed || !userId) return
       const echo = getEcho()
       if (!echo) return // real-time not configured — HTTP fetch still works
-      echo.private(`users.${userId}`).notification((payload) => this.pushLive(payload))
+      echo
+        .private(`users.${userId}`)
+        .notification((payload) => this.pushLive(payload))
+        // A "log this call?" prompt answered on another device closes here too.
+        .listen('.call-request.closed', (e) => closeCallLogPrompt(e.callRequestId))
       this.subscribed = true
     },
   },

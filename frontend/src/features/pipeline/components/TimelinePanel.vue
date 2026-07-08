@@ -1,6 +1,6 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Badge from 'primevue/badge'
 import Tab from 'primevue/tab'
@@ -15,10 +15,11 @@ import CallLogForm from '@/features/pipeline/components/CallLogForm.vue'
 import CompleteVisitForm from '@/features/pipeline/components/CompleteVisitForm.vue'
 import LogTimeline from '@/features/pipeline/components/LogTimeline.vue'
 import NextActionFields from '@/features/pipeline/components/NextActionFields.vue'
+import { pipelineApi } from '@/features/pipeline/api'
 import { actionEntries, byNewest, callEntries, visitEntries } from '@/features/pipeline/timeline'
 import { useAuthStore } from '@/features/settings/store'
 import { useDynamicList } from '@/composables/useDynamicList'
-import { toastSuccess } from '@/composables/useConfirm'
+import { toastInfo, toastSuccess } from '@/composables/useConfirm'
 import { dateInputValue, formatDate, formatTimeIfSet, humanize, timeInputValue } from '@/utils/format'
 
 // The interaction timeline — scoped to ONE project when projectId is set (its
@@ -126,11 +127,52 @@ const entries = computed(() => TABS.value.find((t) => t.value === tab.value)?.en
 // Draft identities for the two modal forms; ?resume=<key> (from the drafts
 // indicator) reopens the right modal with its draft restored.
 const route = useRoute()
+const router = useRouter()
 const callDraftKey = computed(() => `call-log:${props.clientId}:${props.projectId ?? 'client'}`)
 const completeDraftKey = (visit) => `complete-visit:${visit.id}`
 
+// Click-to-call (?logcall=<id>): the switch-then-log handshake — when the plan
+// on file is not a call, the reason form comes first and the call modal opens
+// right after it is saved.
+const logcallSwitch = ref(false)
+
+// ?logcall=<id> (the click-to-call reminder): open the log-call modal. The
+// pipeline's one-pending-log rule stands — a planned visit is not silently
+// bulldozed; the agent first switches the plan to a call, with a reason.
+function handleLogcall() {
+  if (!route.query.logcall || !canLogCall() || props.frozen) return
+  // Guard against a route transition away from this panel's own page: the
+  // global route may already carry another client's params while we unmount.
+  if (String(route.params.id ?? props.clientId) !== String(props.clientId)) return
+
+  if (pendingIsCall.value) {
+    showCall.value = true
+  } else {
+    // Order matters: openEditNa resets the handshake flag (a manual pencil
+    // edit must never inherit it), so arm it after.
+    openEditNa(pending.value)
+    editNa.form.type = 'call'
+    logcallSwitch.value = true
+    toastInfo(
+      `The planned next action is a ${humanize(pending.value.type)} — pick a reason to switch it to a call first.`,
+    )
+  }
+}
+
+// The prompt's "Log the call" may land on a page that is ALREADY open (the
+// agent was reading this project on the PC while dialing) — only the query
+// changes then, no remount, so onMounted alone would miss it.
+watch(
+  () => route.query.logcall,
+  (v) => {
+    if (v) handleLogcall()
+  },
+)
+
 onMounted(async () => {
   await store.loadTimeline(props.clientId, props.projectId)
+
+  handleLogcall()
 
   const resume = route.query.resume
   if (!resume) return
@@ -150,6 +192,12 @@ async function submitCall(payload) {
   if (props.projectId) payload.client_project_id = props.projectId
   await store.logCall(props.clientId, payload)
   showCall.value = false
+  // The click-to-call reminder that led here is answered — best-effort close
+  // (other open sessions drop their prompt too), and the param is spent.
+  if (route.query.logcall) {
+    pipelineApi.closeCallRequest(route.query.logcall, 'logged').catch(() => {})
+    router.replace({ query: { ...route.query, logcall: undefined } })
+  }
   // A call can conclude into THE deal — surface it in the deal panel right away.
   if (payload.closure?.type === 'deal' && props.projectId) {
     await store.loadDeals(props.projectId)
@@ -184,6 +232,7 @@ async function submitAddUnit(payload) {
 
 // --- Edit the open next action (change type/when/assignee) with a reason ---
 function openEditNa(na) {
+  logcallSwitch.value = false // a manual edit is not the click-to-call handshake
   editNa.open = true
   editNa.id = na.id
   editNa.reasonId = null
@@ -196,6 +245,13 @@ function openEditNa(na) {
   })
 }
 
+// Declining the switch (Cancel) ends the handshake — without this the flag
+// stays latched and a LATER unrelated correction would pop the call modal.
+function closeEditNa() {
+  editNa.open = false
+  logcallSwitch.value = false
+}
+
 async function submitEditNa() {
   if (!editNa.reasonId || !nextActionReady(editNa.form)) return
   await store.correctNextAction(props.clientId, editNa.id, {
@@ -205,6 +261,11 @@ async function submitEditNa() {
   })
   editNa.open = false
   emit('changed')
+  // Click-to-call handshake: the plan is now a call — straight into logging it.
+  if (logcallSwitch.value) {
+    logcallSwitch.value = false
+    showCall.value = true
+  }
 }
 </script>
 
@@ -349,7 +410,7 @@ async function submitEditNa() {
               size="small"
               severity="secondary"
               outlined
-              @click="editNa.open = false"
+              @click="closeEditNa"
             />
           </div>
         </form>

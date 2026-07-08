@@ -12,6 +12,7 @@ declare(strict_types=1);
 */
 
 use App\Modules\Pipeline\Http\Controllers\CallController;
+use App\Modules\Pipeline\Http\Controllers\CallRequestController;
 use App\Modules\Pipeline\Http\Controllers\DispatchController;
 use App\Modules\Pipeline\Http\Controllers\NextActionController;
 use App\Modules\Pipeline\Http\Controllers\TaskController;
@@ -40,6 +41,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/clients/{client}/calls', [CallController::class, 'store'])->middleware('idempotent');
         Route::post('/calls/{call}/correct', [CallController::class, 'correct']);
         Route::post('/next-actions/{nextAction}/correct', [NextActionController::class, 'correct']);
+
+        // Click-to-call: the web app pushes a client's number to the agent's
+        // phone; the shell reports the dial; the log prompt closes the loop.
+        Route::post('/clients/{client}/call-requests', [CallRequestController::class, 'store']);
+        Route::post('/call-requests/{callRequest}/dialed', [CallRequestController::class, 'dialed']);
+        Route::post('/call-requests/{callRequest}/close', [CallRequestController::class, 'close']);
     });
 
     // Planning a standalone next action ("Plan next action") has its own grant,

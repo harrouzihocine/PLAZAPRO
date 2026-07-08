@@ -26,7 +26,12 @@ public class PlazaMessagingService extends FirebaseMessagingService {
     @Override
     public void onMessageReceived(@NonNull RemoteMessage message) {
         if (message.getData().isEmpty()) return;
-        if (MainActivity.isInForeground()) return;
+
+        // Click-to-call is the one kind that must ring even in the foreground:
+        // its tap opens the DIALER, which the page itself cannot do — without
+        // the tray entry a foregrounded phone would swallow the PC's click.
+        boolean isCallRequest = "call_request".equals(message.getData().get("kind"));
+        if (MainActivity.isInForeground() && !isCallRequest) return;
 
         PlazaPush.show(this, message.getData());
     }

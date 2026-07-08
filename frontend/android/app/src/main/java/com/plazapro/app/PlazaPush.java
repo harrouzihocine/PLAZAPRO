@@ -36,6 +36,7 @@ import java.util.Map;
  */
 final class PlazaPush {
     static final String CHANNEL_MESSAGES = "messages";
+    static final String CHANNEL_CALLS = "calls";
     static final String CHANNEL_GENERAL = "general";
     static final String EXTRA_LINK = "plaza_link";
     static final String EXTRA_CONVERSATION_ID = "plaza_conversation_id";
@@ -59,6 +60,12 @@ final class PlazaPush {
         messages.enableVibration(true);
         manager.createNotificationChannel(messages);
 
+        NotificationChannel calls = new NotificationChannel(
+                CHANNEL_CALLS, "Click-to-call", NotificationManager.IMPORTANCE_HIGH);
+        calls.setDescription("Call requests sent from the web app — tap to dial");
+        calls.enableVibration(true);
+        manager.createNotificationChannel(calls);
+
         NotificationChannel general = new NotificationChannel(
                 CHANNEL_GENERAL, "Notifications", NotificationManager.IMPORTANCE_DEFAULT);
         general.setDescription("Visits, payments, reminders and other updates");
@@ -78,6 +85,14 @@ final class PlazaPush {
             String conversationId = value(data, "subject_id",
                     tag.startsWith("chat-") ? tag.substring("chat-".length()) : "");
             showChatMessage(context, tag, conversationId, title, body, false);
+            return;
+        }
+
+        if ("call_request".equals(kind)) {
+            // Click-to-call from the web app: heads-up entry whose tap opens
+            // the dialer with the number pre-filled (CallTrampolineActivity).
+            showCallRequest(context, tag, title, body,
+                    value(data, "phone", ""), value(data, "call_request_id", ""));
             return;
         }
 
@@ -186,6 +201,46 @@ final class PlazaPush {
         try {
             manager.notify(tag + ":fail", NOTIFICATION_ID, failure.build());
         } catch (SecurityException ignored) {
+        }
+    }
+
+    /**
+     * The click-to-call entry (kind=call_request): one tap opens the default
+     * dialer with the number pre-filled and reports the dial to the backend,
+     * which then raises the "log this call?" prompt on every device. High
+     * importance so it heads-up over whatever the phone is showing — the user
+     * just clicked the icon on their PC and is waiting for it.
+     */
+    private static void showCallRequest(Context context, String tag, String title,
+                                        String body, String phone, String requestId) {
+        NotificationManagerCompat manager = NotificationManagerCompat.from(context);
+        if (!manager.areNotificationsEnabled()) return;
+
+        Intent intent = new Intent(context, CallTrampolineActivity.class);
+        // Unique data URI per tag → distinct PendingIntents (same trick as
+        // contentIntent); FLAG_UPDATE_CURRENT refreshes phone/id on a re-click.
+        intent.setData(Uri.parse("plazapro://call/" + Uri.encode(tag)));
+        intent.putExtra(CallTrampolineActivity.EXTRA_PHONE, phone);
+        intent.putExtra(CallTrampolineActivity.EXTRA_CALL_REQUEST_ID, requestId);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+        PendingIntent tap = PendingIntent.getActivity(
+                context, tag.hashCode(), intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_CALLS)
+                .setSmallIcon(R.drawable.ic_stat_notify)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setAutoCancel(true)
+                .setContentIntent(tap)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_CALL);
+
+        try {
+            manager.notify(tag, NOTIFICATION_ID, builder.build());
+        } catch (SecurityException ignored) {
+            // POST_NOTIFICATIONS revoked between the check and the call — drop it.
         }
     }
 

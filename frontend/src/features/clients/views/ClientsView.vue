@@ -17,6 +17,7 @@ import FilterPanel from '@/components/ui/FilterPanel.vue'
 import OfflineStamp from '@/components/ui/OfflineStamp.vue'
 import { useNativePhone } from '@/composables/useNativeMode'
 import ClientFormDrawer from '@/features/clients/components/ClientFormDrawer.vue'
+import SendToPhoneButton from '@/features/clients/components/SendToPhoneButton.vue'
 import { formatPhone } from '@/data/countryCodes'
 import { useAutoFilter } from '@/composables/useAutoFilter'
 import { useDynamicList } from '@/composables/useDynamicList'
@@ -116,6 +117,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
           v-if="canCreate"
           label="New client"
           icon="pi pi-plus"
+          class="native-fab"
           data-testid="new-client"
           @click="openCreate"
         />
@@ -285,7 +287,23 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
 
         <Column v-if="canSeeDetails" header="Phone">
           <template #body="{ data }">
-            <span class="num whitespace-nowrap">{{ formatPhone(data.phone) }}</span>
+            <span class="flex items-center gap-1.5 whitespace-nowrap">
+              <span class="num">{{ formatPhone(data.phone) }}</span>
+              <template v-if="data.phone">
+                <SendToPhoneButton :client-id="data.id" size="sm" />
+                <a
+                  :href="whatsappLink(data.phone)"
+                  target="_blank"
+                  rel="noopener"
+                  class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-emerald-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
+                  :aria-label="`WhatsApp ${data.full_name}`"
+                  title="Message on WhatsApp"
+                  @click.stop
+                >
+                  <i class="pi pi-whatsapp text-sm" aria-hidden="true" />
+                </a>
+              </template>
+            </span>
           </template>
         </Column>
 

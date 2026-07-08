@@ -40,6 +40,21 @@ export const pipelineApi = {
     return data.data
   },
 
+  // Click-to-call: push this client's number to the agent's own phone (the
+  // Android shell pops a "Call …" notification that opens the dialer). 422s
+  // with a friendly message when no device is registered.
+  async sendCallRequest(clientId) {
+    const { data } = await useApi().post(`/clients/${clientId}/call-requests`)
+    return data.data // { id, status, link }
+  },
+
+  // Answer the "log this call?" prompt: 'logged' (a call log was created) or
+  // 'dismissed' ("not now"). Other open sessions drop their prompt over Reverb.
+  async closeCallRequest(callRequestId, status) {
+    const { data } = await useApi().post(`/call-requests/${callRequestId}/close`, { status })
+    return data.data
+  },
+
   // Corrections — every edit is a cancel + new version, so a reason is required.
   async correctCall(callId, payload) {
     const { data } = await useApi().post(`/calls/${callId}/correct`, payload)

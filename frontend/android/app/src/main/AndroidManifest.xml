@@ -36,6 +36,17 @@
             android:name=".ReplyReceiver"
             android:exported="false" />
 
+        <!-- Click-to-call trampoline: notification tap → default dialer with
+             the number pre-filled + the "dialed" report to the backend. An
+             invisible activity (Theme.NoDisplay) — Android 12+ forbids
+             notification trampolines through receivers/services. -->
+        <activity
+            android:name=".CallTrampolineActivity"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
