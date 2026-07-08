@@ -59,6 +59,13 @@ const modalOpen = ref(false)
 const groupMode = ref(false)
 const groupTitle = ref('')
 const groupPicks = ref([])
+const contactQuery = ref('')
+
+const filteredContacts = computed(() => {
+  const q = contactQuery.value.trim().toLowerCase()
+  if (!q) return store.contacts
+  return store.contacts.filter((u) => u.name?.toLowerCase().includes(q))
+})
 
 async function startDirect(userId) {
   const id = await store.startDirect(userId)
@@ -78,6 +85,7 @@ function resetModal() {
   groupMode.value = false
   groupTitle.value = ''
   groupPicks.value = []
+  contactQuery.value = ''
 }
 </script>
 
@@ -183,15 +191,31 @@ function resetModal() {
 
     <template v-if="groupMode">
       <BaseInput v-model="groupTitle" label="Group name" required />
+      <div class="relative mt-4">
+        <i
+          class="pi pi-search pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-mute"
+          aria-hidden="true"
+        />
+        <input
+          v-model="contactQuery"
+          type="search"
+          placeholder="Search people…"
+          aria-label="Search people"
+          class="w-full rounded-full border border-line bg-ground py-2 pl-9 pr-3.5 text-sm text-ink outline-none transition-colors focus:border-primary native:py-2.5"
+        />
+      </div>
       <div class="my-4 max-h-60 space-y-0.5 overflow-y-auto">
         <label
-          v-for="u in store.contacts"
+          v-for="u in filteredContacts"
           :key="u.id"
           class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-ink hover:bg-surface-100 dark:hover:bg-surface-800"
         >
           <Checkbox v-model="groupPicks" :value="u.id" />
           {{ u.name }}
         </label>
+        <p v-if="!filteredContacts.length" class="px-2 py-3 text-center text-sm text-mute">
+          {{ contactQuery ? 'No one matches your search.' : 'No contacts available.' }}
+        </p>
       </div>
       <div class="flex gap-2">
         <Button
@@ -205,8 +229,21 @@ function resetModal() {
     </template>
 
     <template v-else>
+      <div class="relative mb-3">
+        <i
+          class="pi pi-search pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-mute"
+          aria-hidden="true"
+        />
+        <input
+          v-model="contactQuery"
+          type="search"
+          placeholder="Search people…"
+          aria-label="Search people"
+          class="w-full rounded-full border border-line bg-ground py-2 pl-9 pr-3.5 text-sm text-ink outline-none transition-colors focus:border-primary native:py-2.5"
+        />
+      </div>
       <ul class="max-h-72 divide-y divide-line overflow-y-auto">
-        <li v-for="u in store.contacts" :key="u.id">
+        <li v-for="u in filteredContacts" :key="u.id">
           <button
             type="button"
             class="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm text-ink transition-colors hover:bg-surface-100 dark:hover:bg-surface-800"
@@ -221,7 +258,11 @@ function resetModal() {
           </button>
         </li>
       </ul>
-      <EmptyState v-if="!store.contacts.length" icon="pi pi-users" title="No contacts available" />
+      <EmptyState
+        v-if="!filteredContacts.length"
+        icon="pi pi-users"
+        :title="contactQuery ? 'No one matches your search' : 'No contacts available'"
+      />
     </template>
   </Dialog>
 </template>
