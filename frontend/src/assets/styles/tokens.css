@@ -20,6 +20,11 @@
   --color-success: var(--app-success);
   --color-warning: var(--app-warning);
   --radius: 10px;
+
+  /* My own chat bubble — the brand NAVY (Messenger-style), not the gold
+     primary: a wall of gold read as "yellow" and drowned the accent. */
+  --chat-own-bubble: #1e214b;
+  --chat-own-text: #ffffff;
 }
 
 [data-theme='dark'] {
@@ -35,4 +40,8 @@
   --color-primary: #d8b254;
   --color-on-primary: #37270c;
   --color-border: #2b2a24;
+
+  /* Same navy family, lifted so the bubble reads on the near-black ground. */
+  --chat-own-bubble: #454e8f;
+  --chat-own-text: #ffffff;
 }

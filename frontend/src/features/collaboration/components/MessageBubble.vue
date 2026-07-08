@@ -190,7 +190,7 @@ function act(action) {
         :class="[
           m.is_mine
             ? [
-                'bg-primary text-primary-contrast',
+                'bg-chat-own text-chat-own-contrast',
                 !isNative || groupLast
                   ? 'rounded-br-md native:rounded-br-[0.4rem]'
                   : 'native:rounded-br-[1.25rem]',
@@ -229,7 +229,7 @@ function act(action) {
           class="mb-1.5 block w-full rounded-lg border-l-4 px-2.5 py-1.5 text-left text-xs"
           :class="
             m.is_mine
-              ? 'border-white/60 bg-white/15 text-primary-contrast/90'
+              ? 'border-white/60 bg-white/15 text-chat-own-contrast/90'
               : 'border-primary bg-highlight text-ink'
           "
           @click="emit('jump', m.reply_to.id)"

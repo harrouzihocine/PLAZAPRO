@@ -23,6 +23,9 @@ export default {
         bg: 'var(--app-ground)',
         border: 'var(--p-content-border-color)',
         'on-primary': 'var(--p-primary-contrast-color)',
+        // My own chat bubble (brand navy — see tokens.css).
+        'chat-own': 'var(--chat-own-bubble)',
+        'chat-own-contrast': 'var(--chat-own-text)',
       },
       borderRadius: { token: 'var(--radius)' },
       fontFamily: {
