@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { mediaDownloadUrl, mediaFileUrl, mediaPreviewUrl } from '@/features/inventory/api'
 import { isNativeApp } from '@/utils/nativeApp'
 
@@ -21,6 +21,13 @@ function go(delta) {
   const n = props.items[(index.value + delta + props.items.length) % props.items.length]
   emit('navigate', n)
 }
+
+// Escape closes — also how the shell's hardware back dismisses the viewer.
+function onKey(e) {
+  if (e.key === 'Escape') emit('close')
+}
+onMounted(() => window.addEventListener('keydown', onKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 let touchStartX = null
 function onTouchStart(e) {
@@ -71,10 +78,12 @@ watch(() => props.media?.id, resetZoom)
 </script>
 
 <template>
-  <!-- data-gesture-surface: owns its photo-swipe — the nav drawer swipe stands down. -->
+  <!-- data-gesture-surface: owns its photo-swipe — the nav drawer swipe stands
+       down. data-app-overlay: hardware back closes it (via Escape) first. -->
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 backdrop-blur-sm sm:p-6"
     data-gesture-surface
+    data-app-overlay
     @click.self="$emit('close')"
   >
     <div

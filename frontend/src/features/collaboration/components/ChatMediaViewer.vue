@@ -75,11 +75,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 <template>
   <Teleport to="body">
-    <!-- data-gesture-surface: owns its photo-swipe — the nav drawer swipe stands down. -->
+    <!-- data-gesture-surface: owns its photo-swipe — the nav drawer swipe stands
+         down. data-app-overlay: hardware back closes it (via Escape) first. -->
     <div
       v-if="open && current"
       class="fixed inset-0 z-[80] flex flex-col bg-black/95"
       data-gesture-surface
+      data-app-overlay
       role="dialog"
       aria-label="Image viewer"
     >

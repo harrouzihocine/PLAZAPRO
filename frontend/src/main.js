@@ -13,6 +13,7 @@ import 'sweetalert2/dist/sweetalert2.min.css'
 import '@/assets/styles/swal.css'
 import '@/assets/styles/native.css'
 import { initNativeMode } from '@/utils/nativeApp'
+import { initAppBack } from '@/utils/appBack'
 import { installAppRecovery } from '@/utils/appRecovery'
 
 // APK-only design layer: stamp <html class="native"> before the first paint so
@@ -23,6 +24,10 @@ initNativeMode()
 // Blank-page recovery: reload once when a deploy strands this session on dead
 // chunk URLs, and toast when a view's mount-time fetch dies silently.
 installAppRecovery()
+
+// Hardware back inside the shell (v1.4.0+ asks the page): close the top
+// overlay → step back toward the dashboard → double-press to leave the app.
+initAppBack(router)
 
 const app = createApp(App)
 

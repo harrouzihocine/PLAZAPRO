@@ -5,7 +5,7 @@
 // parent wires each `pick` kind to a hidden <input type="file"> (capture=
 // opens the camera app; image/video accepts open Android's photo-picker grid,
 // which IS the Messenger-style multi-select).
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -15,6 +15,13 @@ const props = defineProps({
   kinds: { type: Array, default: null },
 })
 const emit = defineEmits(['close', 'pick'])
+
+// Escape closes — also how the shell's hardware back dismisses the sheet.
+function onKey(e) {
+  if (e.key === 'Escape' && props.open) emit('close')
+}
+onMounted(() => window.addEventListener('keydown', onKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 const SOURCES = [
   { kind: 'camera-photo', label: 'Camera', icon: 'pi pi-camera', bg: 'bg-rose-500' },
@@ -32,6 +39,7 @@ const shown = computed(() =>
     <div
       v-if="open"
       class="fixed inset-0 z-[70] flex items-end justify-center bg-black/40"
+      data-app-overlay
       @click.self="emit('close')"
     >
       <div

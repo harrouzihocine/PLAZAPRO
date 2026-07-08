@@ -7,6 +7,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.webkit.WebView;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -43,6 +44,40 @@ public class MainActivity extends BridgeActivity {
         requestNotificationPermission();
         fetchPushToken(pushSupported);
         stashLink(getIntent());
+
+        // Hardware back, Facebook-style (Capacitor 7 ships no handling at all,
+        // so without this the first press killed the activity from anywhere).
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                dispatchBackToWeb();
+            }
+        });
+    }
+
+    /**
+     * Ask the page first (utils/appBack.js): it closes the top overlay, steps
+     * the router back toward the dashboard, or arms the double-press exit.
+     * 'exit' — and any page that cannot answer and has no history — backgrounds
+     * the app (moveTaskToBack) instead of finishing it, so reopening is warm.
+     */
+    private void dispatchBackToWeb() {
+        WebView webView = getBridge().getWebView();
+        if (webView == null) {
+            moveTaskToBack(true);
+            return;
+        }
+        webView.evaluateJavascript(
+                "typeof window.__plazaHandleBack === 'function' ? window.__plazaHandleBack() : 'unhandled'",
+                result -> {
+                    if ("\"exit\"".equals(result)) {
+                        moveTaskToBack(true);
+                    } else if (!"\"handled\"".equals(result)) {
+                        // Boot splash or a stranded page: plain history, then out.
+                        if (webView.canGoBack()) webView.goBack();
+                        else moveTaskToBack(true);
+                    }
+                });
     }
 
     @Override

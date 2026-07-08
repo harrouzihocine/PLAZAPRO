@@ -23,6 +23,29 @@ html.native * {
   -webkit-overflow-scrolling: touch;
 }
 
+/* "Press back again to exit" pill (utils/appBack.js), floating above the
+   bottom tab bar. Colors invert with the theme automatically. */
+html.native .app-exit-hint {
+  position: fixed;
+  bottom: 5.75rem;
+  left: 50%;
+  z-index: 70;
+  transform: translateX(-50%);
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  background: var(--p-text-color);
+  color: var(--p-content-background);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+html.native .app-exit-hint-show {
+  opacity: 0.92;
+}
+
 /* ══ Phones only (below Tailwind md) ═══════════════════════════════════ */
 
 @media (max-width: 767px) {

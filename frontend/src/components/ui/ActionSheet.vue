@@ -1,14 +1,23 @@
 <script setup>
+import { onBeforeUnmount, onMounted } from 'vue'
+
 // Generic bottom action sheet (modeled on AttachSheet): a grab handle, an
 // optional title, and a stack of large touch actions. Used by the chat inbox
 // long-press menu and anywhere else a native context menu is needed.
-defineProps({
+const props = defineProps({
   open: { type: Boolean, default: false },
   title: { type: String, default: null },
   // [{ key, label, icon, danger?, hint? }]
   actions: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['close', 'pick'])
+
+// Escape closes — also how the shell's hardware back dismisses the sheet.
+function onKey(e) {
+  if (e.key === 'Escape' && props.open) emit('close')
+}
+onMounted(() => window.addEventListener('keydown', onKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <template>
@@ -16,6 +25,7 @@ const emit = defineEmits(['close', 'pick'])
     <div
       v-if="open"
       class="fixed inset-0 z-[70] flex items-end justify-center bg-black/40"
+      data-app-overlay
       @click.self="emit('close')"
     >
       <div
