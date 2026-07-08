@@ -60,6 +60,16 @@ export const versementsApi = {
     const { data } = await useApi().post(`/versements/${versementId}/refund`, payload)
     return data.data
   },
+
+  // Move the back-to-market deadline of a unit this project holds — the
+  // deposit-modal hold edit, no payment recorded.
+  async updateReservedUntil(projectId, unitId, reservedUntil) {
+    const { data } = await useApi().patch(
+      `/projects/${projectId}/units/${unitId}/reserved-until`,
+      { reserved_until: reservedUntil },
+    )
+    return data.data
+  },
 }
 
 // Branded documents (receipts). Generation renders on the queue worker; the file

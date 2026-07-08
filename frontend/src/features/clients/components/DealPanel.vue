@@ -60,11 +60,18 @@ const depositFlow = ref({
 // two deposits without this.
 const depositSubmitting = ref(false)
 
-// Only the deposit that flips the unit to Reserved sets the back-to-market
-// deadline — a later payment on an already-Reserved unit never moves it
-// (matching the backend), so the picker hides then.
+// The deposit that flips the unit to Reserved arms the back-to-market
+// deadline. On a unit OUR project already holds, the same modal doubles as
+// the hold editor: the picker prefills with the current deadline and moving
+// it (with or without another payment) updates the hold.
 const depositArmsReservation = computed(
   () => depositFlow.value.unit && depositFlow.value.unit.sale_status !== 'reserved',
+)
+const depositEditsHold = computed(
+  () =>
+    depositFlow.value.unit &&
+    depositFlow.value.unit.sale_status === 'reserved' &&
+    depositFlow.value.unit.reserved_by_this_project,
 )
 
 // The global window (app setting) seeds the deadline so the agent sees the
@@ -89,9 +96,14 @@ function openDeposit(unit) {
     amount: '',
     paid_on: todayInput(),
     method_id: '',
-    back_date: '',
-    back_time: '',
+    // Already on hold for us → show the PREVIOUS deadline, editable.
+    back_date: dateInputValue(unit.reserved_expires_at),
+    back_time: timeInputValue(unit.reserved_expires_at),
   }
+  // Remember what was shown so an untouched deadline is never re-sent (an
+  // unchanged near-expiry value would fail the backend's after:now rule).
+  const f = depositFlow.value
+  f.initial_back = `${f.back_date} ${f.back_time}`
   if (unit.sale_status !== 'reserved') {
     defaultReservedDeadline().then((d) => {
       const f = depositFlow.value
@@ -110,26 +122,39 @@ async function submitDeposit() {
     return
   }
   const f = depositFlow.value
-  if (!f.amount || !f.method_id) {
+  const deadline = f.back_date ? `${f.back_date} ${f.back_time || '00:00'}` : null
+  const deadlineChanged = `${f.back_date} ${f.back_time}` !== f.initial_back
+  // Hold edit with no payment: only the deadline moves (dedicated endpoint).
+  const deadlineOnly = depositEditsHold.value && !f.amount && !f.method_id
+  if (!deadlineOnly && (!f.amount || !f.method_id)) {
     toastError(t('deal.depositMissingFields'))
+    return
+  }
+  if (deadlineOnly && (!deadline || !deadlineChanged)) {
+    toastError(t('deal.deadlineUnchanged'))
     return
   }
   if (depositSubmitting.value) return
   depositSubmitting.value = true
   try {
-    await versementsApi.record(props.projectId, {
-      unit_id: f.unit.id,
-      amount: f.amount,
-      paid_on: f.paid_on,
-      method_id: f.method_id,
-      // Per-deal Reserved window (only meaningful on the arming deposit);
-      // omitted = the global default window.
-      ...(depositArmsReservation.value && f.back_date
-        ? { reserved_until: `${f.back_date} ${f.back_time || '00:00'}` }
-        : {}),
-    })
+    if (deadlineOnly) {
+      await versementsApi.updateReservedUntil(props.projectId, f.unit.id, deadline)
+      toastSuccess(t('deal.holdUpdated', { ref: f.unit.reference }))
+    } else {
+      await versementsApi.record(props.projectId, {
+        unit_id: f.unit.id,
+        amount: f.amount,
+        paid_on: f.paid_on,
+        method_id: f.method_id,
+        // Per-deal Reserved window: the arming deposit always sends what is
+        // shown; on an edited hold only a CHANGED deadline rides along.
+        ...(deadline && (depositArmsReservation.value || (depositEditsHold.value && deadlineChanged))
+          ? { reserved_until: deadline }
+          : {}),
+      })
+      toastSuccess(t('deal.depositRecorded', { ref: f.unit.reference }))
+    }
     depositFlow.value.open = false
-    toastSuccess(t('deal.depositRecorded', { ref: f.unit.reference }))
     // Reload the deals so the apartment card shows the deposit + Reserved state.
     await store.loadDeals(props.projectId)
     emit('changed')
@@ -558,9 +583,13 @@ async function saveBoxes() {
                 outlined
                 @click="openBoxEditor(deal, u)"
               />
+              <!-- Hidden when another project holds the unit — a deposit there
+                   can only be rejected. On our own hold it becomes the editor. -->
               <Button
-                v-if="canRecord()"
-:label="$t('deal.deposit')"
+                v-if="canRecord() && (u.sale_status !== 'reserved' || u.reserved_by_this_project)"
+                :label="
+                  u.sale_status === 'reserved' ? $t('deal.depositOrHold') : $t('deal.deposit')
+                "
                 icon="pi pi-wallet"
                 size="small"
                 severity="secondary"
@@ -672,23 +701,29 @@ async function saveBoxes() {
       @close="depositFlow.open = false"
     >
       <p class="mb-3 text-sm text-mute">
-        {{ $t('deal.depositModalBody') }}
+        {{ depositEditsHold ? $t('deal.editHoldBody') : $t('deal.depositModalBody') }}
       </p>
       <div class="grid gap-3 sm:grid-cols-2">
-        <MoneyInput v-model="depositFlow.amount" :label="$t('deal.depositAmount')" required />
+        <MoneyInput
+          v-model="depositFlow.amount"
+          :label="$t('deal.depositAmount')"
+          :required="!depositEditsHold"
+        />
         <BaseInput v-model="depositFlow.paid_on" type="date" :label="$t('deal.paidOn')" required />
         <BaseSelect
           v-model="depositFlow.method_id"
 :label="$t('deal.method')"
-          required
+          :required="!depositEditsHold"
           :options="methods.map((m) => ({ value: m.id, label: itemLabel(m) }))"
           class="sm:col-span-2"
         />
 
         <!-- Per-deal Reserved window: when the apartment goes back to the
              market (or to the next in line) if the sale doesn't finalize.
-             Prefilled with the company default; empty also means default. -->
-        <div v-if="depositArmsReservation" class="sm:col-span-2">
+             Arming: prefilled with the company default (empty also = default).
+             Already on OUR hold: shows the current deadline — change it to
+             move the hold. -->
+        <div v-if="depositArmsReservation || depositEditsHold" class="sm:col-span-2">
           <span class="mb-1.5 block text-sm font-medium text-ink">
             {{ $t('deal.backToMarketLabel') }}
           </span>
@@ -705,19 +740,18 @@ async function saveBoxes() {
               class="w-32"
             />
           </div>
-          <p class="mt-1 text-xs text-mute">{{ $t('deal.backToMarketHint') }}</p>
+          <p class="mt-1 text-xs text-mute">
+            {{ depositEditsHold ? $t('deal.editHoldHint') : $t('deal.backToMarketHint') }}
+          </p>
         </div>
-        <p v-else class="text-xs text-mute sm:col-span-2">
-          {{
-            $t('deal.alreadyReservedNote', {
-              date: formatDateTime(depositFlow.unit.reserved_expires_at),
-            })
-          }}
-        </p>
       </div>
       <div class="mt-4 flex gap-2">
         <Button
-:label="$t('deal.recordDeposit')"
+          :label="
+            depositEditsHold && !depositFlow.amount
+              ? $t('deal.updateHold')
+              : $t('deal.recordDeposit')
+          "
           icon="pi pi-check"
           :loading="depositSubmitting"
           :disabled="depositSubmitting"

@@ -431,6 +431,7 @@ export default {
     pickProject: 'Pick a project',
     loadingProperties: 'Loading available properties…',
     noPropertiesMatch: 'No available properties match in this project.',
+    filtersNarrowProjects: 'Only projects with at least one matching property are listed.',
     noBoxesToLink: 'No box is linked to this apartment and none is free to link.',
     geoNoMatches: 'No matches found for that address.',
     geoTypeFirst: 'Type an address first, or click the map.',
@@ -588,8 +589,13 @@ export default {
     backToMarketLabel: 'Back to the market on',
     backToMarketHint:
       'If the sale is not finalized by then, the apartment returns to the market — or moves to the next client in line. Prefilled with the company default window.',
-    alreadyReservedNote:
-      'Already reserved until {date} — recording another payment does not move the deadline.',
+    depositOrHold: 'Deposit / hold…',
+    editHoldBody:
+      'This apartment is already on hold for this client. Record another deposit payment, move the back-to-market deadline, or both.',
+    editHoldHint: 'This is the current deadline — change it to move the hold.',
+    updateHold: 'Update deadline',
+    holdUpdated: 'Hold deadline updated for {ref}.',
+    deadlineUnchanged: 'Nothing to save — set an amount or change the deadline.',
     boxesModalTitle: 'Boxes with {ref}',
     boxesModalBody: "Tap to add / release boxes with this apartment. Only its linked boxes and the project's unlinked ones are offered — picking an unlinked box links it here.",
     saveBoxes: 'Save boxes',

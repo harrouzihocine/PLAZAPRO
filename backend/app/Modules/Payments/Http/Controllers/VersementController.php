@@ -5,21 +5,26 @@ declare(strict_types=1);
 namespace App\Modules\Payments\Http\Controllers;
 
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Inventory\Models\Unit;
 use App\Modules\Payments\Actions\CorrectVersement;
 use App\Modules\Payments\Actions\GenerateVersementDocument;
 use App\Modules\Payments\Actions\RecordVersement;
 use App\Modules\Payments\Actions\RefundVersement;
+use App\Modules\Payments\Actions\UpdateReservedWindow;
 use App\Modules\Payments\Http\Requests\CorrectVersementRequest;
 use App\Modules\Payments\Http\Requests\GenerateDocumentRequest;
 use App\Modules\Payments\Http\Requests\RecordVersementRequest;
 use App\Modules\Payments\Http\Requests\RefundVersementRequest;
+use App\Modules\Payments\Http\Requests\UpdateReservedWindowRequest;
 use App\Modules\Payments\Http\Resources\DocumentResource;
 use App\Modules\Payments\Http\Resources\VersementResource;
 use App\Modules\Payments\Models\Versement;
 use App\Modules\Payments\Support\Money;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Carbon;
 
 /**
  * Recorded instalment payments on a deal. Reading needs versements.view; recording
@@ -62,6 +67,23 @@ class VersementController extends Controller
             ->load(['method', 'recorder']);
 
         return new VersementResource($versement);
+    }
+
+    /**
+     * Move the back-to-market deadline of a unit this project holds — the
+     * hold-edit half of the deposit modal, no payment recorded.
+     */
+    public function updateReservedWindow(
+        UpdateReservedWindowRequest $request,
+        ClientProject $project,
+        Unit $unit,
+        UpdateReservedWindow $action,
+    ): JsonResponse {
+        $unit = $action->handle($project, $unit, Carbon::parse($request->validated('reserved_until')));
+
+        return response()->json(['data' => [
+            'reserved_expires_at' => $unit->reserved_expires_at?->toIso8601String(),
+        ]]);
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Payments;
 
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Inventory\Models\Unit;
 use App\Modules\Payments\Enums\ScheduleState;
 use App\Modules\Payments\Models\PaymentSchedule;
 use App\Modules\Payments\Models\Versement;
@@ -96,6 +97,66 @@ class VersementTest extends TestCase
             'method_id' => $this->method()->id,
             'reserved_until' => now()->subHour()->toDateTimeString(),
         ])->assertUnprocessable()->assertJsonValidationErrors('reserved_until');
+    }
+
+    public function test_the_holder_can_move_its_hold_deadline_without_a_payment(): void
+    {
+        $project = ClientProject::factory()->create();
+        $unit = Unit::factory()->create([
+            'sale_status' => 'reserved',
+            'reserved_project_id' => $project->id,
+            'reserved_expires_at' => now()->addHours(6),
+        ]);
+        Sanctum::actingAs($this->cashier());
+
+        $moved = now()->addDays(2)->startOfMinute();
+        $this->patchJson("/api/v1/projects/{$project->id}/units/{$unit->id}/reserved-until", [
+            'reserved_until' => $moved->toDateTimeString(),
+        ])->assertOk();
+
+        $this->assertTrue($moved->equalTo($unit->fresh()->reserved_expires_at));
+    }
+
+    public function test_a_hold_deadline_cannot_be_moved_by_another_project(): void
+    {
+        $holder = ClientProject::factory()->create();
+        $other = ClientProject::factory()->create();
+        $unit = Unit::factory()->create([
+            'sale_status' => 'reserved',
+            'reserved_project_id' => $holder->id,
+            'reserved_expires_at' => now()->addHours(6),
+        ]);
+        Sanctum::actingAs($this->cashier());
+
+        $this->patchJson("/api/v1/projects/{$other->id}/units/{$unit->id}/reserved-until", [
+            'reserved_until' => now()->addDays(2)->toDateTimeString(),
+        ])->assertUnprocessable();
+    }
+
+    public function test_a_hold_deadline_needs_a_reserved_unit(): void
+    {
+        $project = ClientProject::factory()->create();
+        $unit = Unit::factory()->create(['sale_status' => 'available']);
+        Sanctum::actingAs($this->cashier());
+
+        $this->patchJson("/api/v1/projects/{$project->id}/units/{$unit->id}/reserved-until", [
+            'reserved_until' => now()->addDays(2)->toDateTimeString(),
+        ])->assertUnprocessable();
+    }
+
+    public function test_moving_a_hold_deadline_requires_versements_record(): void
+    {
+        $project = ClientProject::factory()->create();
+        $unit = Unit::factory()->create([
+            'sale_status' => 'reserved',
+            'reserved_project_id' => $project->id,
+            'reserved_expires_at' => now()->addHours(6),
+        ]);
+        Sanctum::actingAs($this->userWithPermissions(['versements.view']));
+
+        $this->patchJson("/api/v1/projects/{$project->id}/units/{$unit->id}/reserved-until", [
+            'reserved_until' => now()->addDays(2)->toDateTimeString(),
+        ])->assertForbidden();
     }
 
     public function test_the_running_balance_is_computed_server_side(): void

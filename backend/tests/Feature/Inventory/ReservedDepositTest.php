@@ -99,7 +99,7 @@ class ReservedDepositTest extends TestCase
         $this->assertTrue($frozen->copy()->addHours(10)->equalTo($unit->fresh()->reserved_expires_at));
     }
 
-    public function test_a_later_payment_never_moves_the_deadline(): void
+    public function test_a_later_payment_without_a_time_keeps_the_deadline(): void
     {
         $agent = User::factory()->create();
         $unit = Unit::factory()->create(['sale_status' => 'available']);
@@ -108,10 +108,26 @@ class ReservedDepositTest extends TestCase
 
         $deadline = now()->addHours(6)->startOfMinute();
         $this->deposit($project, $unit, $agent, '50000.00', $deadline->toDateTimeString());
-        // A second instalment tries a later window — the armed deadline stands.
-        $this->deposit($project, $unit, $agent, '10000.00', now()->addDays(30)->toDateTimeString());
+        // A plain further instalment — the armed deadline stands.
+        $this->deposit($project, $unit, $agent, '10000.00');
 
         $this->assertTrue($deadline->equalTo($unit->fresh()->reserved_expires_at));
+    }
+
+    public function test_a_later_payment_with_an_explicit_time_moves_the_deadline(): void
+    {
+        $agent = User::factory()->create();
+        $unit = Unit::factory()->create(['sale_status' => 'available']);
+        $project = ClientProject::factory()->create();
+        $this->reserve($unit, $project, $agent);
+
+        $this->deposit($project, $unit, $agent, '50000.00', now()->addHours(6)->toDateTimeString());
+        // The deposit modal doubles as the hold editor: an explicitly picked
+        // time on a further payment MOVES the deadline.
+        $moved = now()->addDays(3)->startOfMinute();
+        $this->deposit($project, $unit, $agent, '10000.00', $moved->toDateTimeString());
+
+        $this->assertTrue($moved->equalTo($unit->fresh()->reserved_expires_at));
     }
 
     public function test_a_backup_can_reserve_but_not_deposit_on_a_held_unit(): void

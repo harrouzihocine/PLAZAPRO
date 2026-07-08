@@ -53,8 +53,11 @@ class DealResource extends JsonResource
                     'sale_status' => $i->unit->sale_status?->value,
                     // Reserved deposit context: when the client paid a holding
                     // deposit on this apartment it shows Reserved with the money
-                    // collected so far and, if held, the deadline.
+                    // collected so far and, if held, the deadline. Whether the
+                    // hold is OURS gates the deposit/hold-edit button — a unit
+                    // reserved by another project can only reject a deposit.
                     'reserved_expires_at' => $i->unit->reserved_expires_at,
+                    'reserved_by_this_project' => (int) $i->unit->reserved_project_id === (int) $this->client_project_id,
                     'collected' => (string) Versement::query()->active()
                         ->where('client_project_id', $this->client_project_id)
                         ->where('unit_id', $i->unit_id)

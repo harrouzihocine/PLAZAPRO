@@ -34,6 +34,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('can:versements.record')->group(function () {
         Route::put('/projects/{project}/schedule', [PaymentScheduleController::class, 'save']);
         Route::post('/projects/{project}/versements', [VersementController::class, 'store']);
+        // Move the back-to-market deadline of a unit this project holds
+        // (deposit-modal hold edit — no payment recorded).
+        Route::patch('/projects/{project}/units/{unit}/reserved-until', [VersementController::class, 'updateReservedWindow']);
     });
 
     // Correct a recorded versement — cancel-and-duplicate, never an edit — or

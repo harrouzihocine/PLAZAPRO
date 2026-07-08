@@ -36,8 +36,9 @@ class RecordVersementRequest extends FormRequest
             ],
             // Per-deal Reserved window: the moment the unit goes back to the
             // market (or to the next in line) if the sale doesn't finalize.
-            // Only honored by the deposit that arms the Reserved lock; empty
-            // falls back to the global reserved_hold_hours window.
+            // Empty on the arming deposit = the global reserved_hold_hours
+            // window; explicit on a unit this project already holds = the
+            // deadline MOVES (the deposit modal doubles as the hold editor).
             'reserved_until' => ['nullable', 'date', 'after:now'],
         ];
     }

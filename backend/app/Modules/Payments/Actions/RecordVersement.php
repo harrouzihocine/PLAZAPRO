@@ -96,12 +96,13 @@ class RecordVersement
      * Reserves it for this project (available/interested → reserved) and starts
      * the expiry timer. Nobody else can buy it until it sells or the deposit
      * window lapses, though other projects may still queue as interested
-     * backups. Recording further payments while already reserved does NOT reset
-     * the timer, and a payment can never steal a unit held by another project.
+     * backups. A payment can never steal a unit held by another project.
      *
      * The deadline is per-deal: the agent picks it when filling the deposit
      * ($reservedUntil); left empty, the global reserved_hold_hours window
-     * applies.
+     * applies. On a unit this project already holds, an explicit time MOVES
+     * the deadline (the deposit modal doubles as the hold editor) — a further
+     * payment without one leaves it untouched.
      */
     private function placeReservedLock(ClientProject $project, int $unitId, User $actor, ?Carbon $reservedUntil = null): void
     {
@@ -137,8 +138,10 @@ class RecordVersement
             ]);
         }
 
-        // Only the available/interested → reserved transition arms the timer; a later
-        // instalment on an already-held unit leaves the deadline untouched.
+        // The available/interested → reserved transition arms the timer. On a
+        // unit already held (by this project — the abort above guarantees it),
+        // only an explicitly picked time moves the deadline; a plain further
+        // instalment leaves it untouched.
         if ($unit->sale_status !== SaleStatus::Reserved) {
             $unit->update([
                 'sale_status' => SaleStatus::Reserved->value,
@@ -146,6 +149,8 @@ class RecordVersement
                 'reserved_expires_at' => $reservedUntil
                     ?? now()->addHours(AppSetting::integer('reserved_hold_hours', 72)),
             ]);
+        } elseif ($reservedUntil !== null) {
+            $unit->update(['reserved_expires_at' => $reservedUntil]);
         }
     }
 }

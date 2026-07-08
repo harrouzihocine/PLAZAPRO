@@ -430,6 +430,7 @@ export default {
     pickProject: 'Choisir un projet',
     loadingProperties: 'Chargement des biens disponibles…',
     noPropertiesMatch: 'Aucun bien disponible ne correspond dans ce projet.',
+    filtersNarrowProjects: 'Seuls les projets ayant au moins un bien correspondant sont listés.',
     noBoxesToLink: "Aucun box n'est lié à cet appartement et aucun n'est libre à lier.",
     geoNoMatches: 'Aucun résultat pour cette adresse.',
     geoTypeFirst: "Saisissez d'abord une adresse, ou cliquez sur la carte.",
@@ -587,8 +588,13 @@ export default {
     backToMarketLabel: 'Retour au marché le',
     backToMarketHint:
       "Si la vente n'est pas finalisée d'ici là, l'appartement revient sur le marché — ou passe au client suivant dans la file. Prérempli avec la fenêtre par défaut de l'entreprise.",
-    alreadyReservedNote:
-      "Déjà réservé jusqu'au {date} — enregistrer un autre paiement ne déplace pas l'échéance.",
+    depositOrHold: 'Acompte / réservation…',
+    editHoldBody:
+      "Cet appartement est déjà réservé pour ce client. Enregistrez un autre versement d'acompte, déplacez l'échéance de retour au marché, ou les deux.",
+    editHoldHint: "Voici l'échéance actuelle — modifiez-la pour déplacer la réservation.",
+    updateHold: "Mettre à jour l'échéance",
+    holdUpdated: 'Échéance de la réservation mise à jour pour {ref}.',
+    deadlineUnchanged: "Rien à enregistrer — saisissez un montant ou modifiez l'échéance.",
     boxesModalTitle: 'Boxes avec {ref}',
     boxesModalBody: "Touchez pour ajouter / libérer des boxes avec cet appartement. Seuls ses boxes liés et ceux non liés du projet sont proposés — choisir un box non lié le lie ici.",
     saveBoxes: 'Enregistrer les boxes',
