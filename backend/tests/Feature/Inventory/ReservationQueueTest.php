@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Inventory;
 
+use App\Modules\Clients\Actions\CloseDeal;
 use App\Modules\Clients\Actions\CloseDealUnit;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Clients\Models\Deal;
@@ -23,6 +24,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 /**
@@ -198,6 +200,44 @@ class ReservationQueueTest extends TestCase
             fn (DomainNotification $n) => $n->kind === 'reservation_cancelled'
                 && (int) $n->params['position'] === 3,
         );
+    }
+
+    public function test_an_aborted_bulk_close_sends_no_phantom_notifications(): void
+    {
+        $agent = User::factory()->create();
+        $blocker = User::factory()->create();
+        $project = ClientProject::factory()->create(['created_by' => $agent->id]);
+        $unit1 = Unit::factory()->create(['sale_status' => 'available']);
+        $unit2 = Unit::factory()->create(['sale_status' => 'available']);
+
+        // unit2 is deposit-locked by ANOTHER project, so a bulk win on both
+        // apartments succeeds on unit1 then aborts on unit2 and rolls back.
+        $other = ClientProject::factory()->create(['created_by' => $blocker->id]);
+        $this->reserve($unit2, $other, $blocker);
+        $this->deposit($other, $unit2, $blocker);
+
+        $deal = Deal::factory()->create(['client_project_id' => $project->id]);
+        $item1 = DealItem::factory()->create(['deal_id' => $deal->id, 'unit_id' => $unit1->id])->refresh();
+        $item2 = DealItem::factory()->create(['deal_id' => $deal->id, 'unit_id' => $unit2->id])->refresh();
+
+        // Fake AFTER the setup so only the close's own sends would register.
+        Notification::fake();
+
+        try {
+            app(CloseDeal::class)->handle($deal, 'won', [
+                ['item_id' => $item1->id, 'agreed_price' => '900000.00'],
+                ['item_id' => $item2->id, 'agreed_price' => '800000.00'],
+            ]);
+            $this->fail('Expected the bulk close to abort on the reserved apartment.');
+        } catch (HttpException $e) {
+            $this->assertSame(422, $e->getStatusCode());
+        }
+
+        // The whole close rolled back — nothing sold, no phantom fan-out
+        // (unit1's interim "won" ran inside the aborted outer transaction).
+        $this->assertSame(SaleStatus::Available, $unit1->fresh()->sale_status);
+        $this->assertSame('open', $item1->fresh()->state->value);
+        Notification::assertNothingSent();
     }
 
     public function test_the_queues_endpoint_requires_units_view(): void

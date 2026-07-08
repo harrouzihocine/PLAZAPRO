@@ -36,9 +36,14 @@ class CloseDeal
         abort_if($deal->state->isClosed(), 422, 'This deal is already closed.');
 
         return DB::transaction(function () use ($deal, $outcome, $items, $resolution, $note) {
+            // Hand each item its parent: CloseDealUnit reads $item->deal, and a
+            // multi-item collection arms the lazy-load tripwire (single-model
+            // hydrations never do) — without this, closing a deal with 2+ open
+            // apartments 500s wherever preventLazyLoading is armed.
             $open = $deal->unitItems()->active()
                 ->where('state', DealState::Open->value)
-                ->get();
+                ->get()
+                ->each->setRelation('deal', $deal);
 
             abort_if($open->isEmpty(), 422, 'The deal has no open apartment left to close.');
 

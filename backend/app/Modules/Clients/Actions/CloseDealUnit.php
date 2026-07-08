@@ -86,49 +86,55 @@ class CloseDealUnit
             return $deal->fresh();
         });
 
-        // Post-commit fan-outs (never fire on a rolled-back close). The
+        // Post-commit fan-outs. DB::afterCommit (not plain "after the
+        // transaction above"): CloseDeal closes apartments in a loop inside an
+        // OUTER transaction, and with the redis queue (after_commit=false) a
+        // dispatch here would hit the workers while that outer close can still
+        // roll back — phantom sold/cancelled notifications. afterCommit defers
+        // to the outermost commit and is dropped on rollback; with no open
+        // transaction (the single-apartment endpoint) it runs immediately. The
         // status-change broadcast rides the Unit model hook automatically.
-        if ($outcome === 'won' && $cancelledBackups !== []) {
-            // Each queued project just lost its reservation to this sale.
-            BackupHoldsCancelled::dispatch($item->unit, $cancelledBackups);
-        }
-        if ($releasedReservedLock) {
-            // This project's deposit lock is gone — promote the next in line.
-            ReservedReleased::dispatch($item->unit, (int) $deal->client_project_id);
-        }
+        DB::afterCommit(function () use ($item, $deal, $outcome, $agreedPrice, $credits, $cancelledBackups, $releasedReservedLock): void {
+            if ($outcome === 'won' && $cancelledBackups !== []) {
+                // Each queued project just lost its reservation to this sale.
+                BackupHoldsCancelled::dispatch($item->unit, $cancelledBackups);
+            }
+            if ($releasedReservedLock) {
+                // This project's deposit lock is gone — promote the next in line.
+                ReservedReleased::dispatch($item->unit, (int) $deal->client_project_id);
+            }
 
-        // Celebration + all-users bell (after commit, so it never fires on a
-        // rolled-back sale). The status-change broadcast is fired by the Unit
-        // model hook automatically for every transition above.
-        if ($outcome === 'won') {
-            $item->loadMissing([
-                'unit.location.type', 'unit.location.wilaya', 'unit.location.commune',
-                'unit.floor', 'unit.roomNumber', 'deal.creator',
-            ]);
-            $names = $this->creditedNames($credits);
-            $unit = $item->unit;
-            // Broadcast the UNIT (+ its spec) and the credited agents to everyone;
-            // the client's identity is deliberately left out (it goes to all
-            // staff, and the name-hiding / anti-poaching rules apply to clients).
-            UnitSold::dispatch(
-                (int) $item->unit_id,
-                (string) $unit?->reference,
-                $unit?->location?->name,
-                null,
-                $item->deal->creator?->name,
-                $agreedPrice,
-                $names['sale'],
-                $names['insite'],
-                $names['other'],
-                [
-                    'type' => $unit?->location?->type?->label,
-                    'room_number' => $unit?->roomNumber?->label,
-                    'floor' => $unit?->floor?->label,
-                    'area_sqm' => $unit?->area_sqm !== null ? (string) $unit->area_sqm : null,
-                    'address' => $this->composeAddress($unit),
-                ],
-            );
-        }
+            // Celebration + all-users bell.
+            if ($outcome === 'won') {
+                $item->loadMissing([
+                    'unit.location.type', 'unit.location.wilaya', 'unit.location.commune',
+                    'unit.floor', 'unit.roomNumber', 'deal.creator',
+                ]);
+                $names = $this->creditedNames($credits);
+                $unit = $item->unit;
+                // Broadcast the UNIT (+ its spec) and the credited agents to everyone;
+                // the client's identity is deliberately left out (it goes to all
+                // staff, and the name-hiding / anti-poaching rules apply to clients).
+                UnitSold::dispatch(
+                    (int) $item->unit_id,
+                    (string) $unit?->reference,
+                    $unit?->location?->name,
+                    null,
+                    $item->deal->creator?->name,
+                    $agreedPrice,
+                    $names['sale'],
+                    $names['insite'],
+                    $names['other'],
+                    [
+                        'type' => $unit?->location?->type?->label,
+                        'room_number' => $unit?->roomNumber?->label,
+                        'floor' => $unit?->floor?->label,
+                        'area_sqm' => $unit?->area_sqm !== null ? (string) $unit->area_sqm : null,
+                        'address' => $this->composeAddress($unit),
+                    ],
+                );
+            }
+        });
 
         return $deal;
     }
