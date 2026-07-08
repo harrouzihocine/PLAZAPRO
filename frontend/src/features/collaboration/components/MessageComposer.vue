@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import VoiceRecorder from '@/features/collaboration/components/VoiceRecorder.vue'
 import AttachSheet from '@/components/ui/AttachSheet.vue'
 import { messagePreview } from '@/features/collaboration/preview'
@@ -30,6 +30,20 @@ const emit = defineEmits([
 
 const text = ref('')
 const fileInput = ref(null)
+const textInput = ref(null)
+
+// Messenger-style auto-grow: the textarea tracks its content height up to the
+// max-h-32 CSS cap, after which it scrolls. Watching `text` (with nextTick, so
+// the DOM value is in) also covers programmatic changes — clearing after send,
+// prefilling on edit — not just keystrokes.
+const MAX_INPUT_HEIGHT = 128 // keep in sync with max-h-32 on the textarea
+function autogrow() {
+  const el = textInput.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${Math.min(el.scrollHeight, MAX_INPUT_HEIGHT)}px`
+}
+watch(text, () => nextTick(autogrow))
 
 // While a voice note is being held down, the recorder takes over the whole
 // composer row (timer + slide-to-cancel), Messenger-style.
@@ -181,6 +195,7 @@ const replyExcerpt = messagePreview
 
     <textarea
       v-show="!recordingVoice"
+      ref="textInput"
       v-model="text"
       rows="1"
       placeholder="Message…"
