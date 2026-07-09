@@ -90,10 +90,11 @@ function resetModal() {
 </script>
 
 <template>
-  <!-- Single root, on purpose: AppShell renders routed views inside a
-       <Transition mode="out-in">, which cannot animate a fragment root —
-       leaving this page would hang the swap and blank the next view. -->
   <div>
+    <!-- Single root (this wrapper), on purpose: AppShell renders routed views
+         inside a <Transition mode="out-in">, which cannot animate a fragment
+         root — leaving this page would hang the swap and blank the next view.
+         Even a comment BESIDE the root element re-creates the fragment. -->
     <!-- Native tablet: two-pane (inbox | thread), WhatsApp-style -->
     <div
       v-if="twoPane"

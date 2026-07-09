@@ -23,6 +23,14 @@ class MarkConversationRead
         $updated = $conversation->participants()->updateExistingPivot($user->id, ['last_read_at' => $now]);
 
         if ($updated > 0) {
+            // Reading the thread consumes its bell entries too — the
+            // chat_first_message row (and any pre-split chat_message rows), so
+            // a notification tapped on one device reads as done on all of them.
+            $user->unreadNotifications()
+                ->where('data->subject_type', 'conversation')
+                ->where('data->subject_id', $conversation->id)
+                ->update(['read_at' => $now]);
+
             ConversationRead::dispatch($conversation->id, $user->id, $now->toIso8601String());
         }
     }

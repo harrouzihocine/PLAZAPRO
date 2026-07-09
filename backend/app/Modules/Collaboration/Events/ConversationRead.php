@@ -32,7 +32,13 @@ class ConversationRead implements ShouldBroadcast
      */
     public function broadcastOn(): array
     {
-        return [new PrivateChannel('conversation.'.$this->conversationId)];
+        return [
+            new PrivateChannel('conversation.'.$this->conversationId),
+            // The reader's own channel too: their OTHER devices/tabs clear the
+            // thread's badges (dock head, Chat-tab counter, bell rows) the
+            // moment any one device reads it — WhatsApp-style read sync.
+            new PrivateChannel('users.'.$this->userId),
+        ];
     }
 
     public function broadcastAs(): string

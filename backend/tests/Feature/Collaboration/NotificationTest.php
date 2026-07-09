@@ -60,6 +60,33 @@ class NotificationTest extends TestCase
             ->assertJsonPath('unread_count', 1);
     }
 
+    public function test_the_feed_hides_chat_message_rows_from_the_list_and_the_count(): void
+    {
+        $me = $this->userWithPermissions(['notifications.view']);
+        $me->notify(new DomainNotification('reminder', 'Call back Sofiane'));
+        // A pre-split legacy row: chat traffic used to land in the bell too.
+        $me->notifications()->create([
+            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'type' => DomainNotification::class,
+            'data' => [
+                'kind' => 'chat_message',
+                'title' => 'Amine',
+                'body' => 'salam',
+                'link' => '/chat/7',
+                'subject_type' => 'conversation',
+                'subject_id' => 7,
+            ],
+        ]);
+
+        Sanctum::actingAs($me);
+
+        $this->getJson('/api/v1/notifications')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.kind', 'reminder')
+            ->assertJsonPath('unread_count', 1);
+    }
+
     public function test_the_feed_is_paginated_ten_per_page(): void
     {
         $me = $this->userWithPermissions(['notifications.view']);

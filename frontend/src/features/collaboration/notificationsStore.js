@@ -3,6 +3,7 @@ import { notificationsApi } from '@/features/collaboration/api'
 import { getEcho } from '@/composables/useEcho'
 import { toastInfo } from '@/composables/useConfirm'
 import { useChatDockStore } from '@/features/collaboration/chatDockStore'
+import { useChatStore } from '@/features/collaboration/chatStore'
 import { playNotificationSound } from '@/utils/notificationSound'
 import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
 import { queueable } from '@/features/offline/apiOrQueue'
@@ -127,6 +128,14 @@ export const useNotificationsStore = defineStore('notifications', {
 
     // Prepend a notification that arrived live over the websocket.
     pushLive(payload) {
+      // Routine chat traffic never enters the bell — the dock (heads + pop
+      // sound on the web) and the tray + Chat-tab badge (app) own it end to
+      // end. Only its first-contact companion (chat_first_message) lands as a
+      // bell row, below.
+      if (payload.kind === 'chat_message') {
+        useChatDockStore().noteIncoming(payload)
+        return
+      }
       this.items.unshift({
         id: payload.id,
         kind: payload.kind,
@@ -139,13 +148,9 @@ export const useNotificationsStore = defineStore('notifications', {
         created_at: payload.created_at ?? new Date().toISOString(),
       })
       this.unreadCount += 1
-      // Chat messages get the dock treatment (head + pop sound, suppressed when
-      // the thread is open); everything else chimes the bell.
-      if (payload.kind === 'chat_message') {
-        useChatDockStore().noteIncoming(payload)
-      } else {
-        playNotificationSound()
-      }
+      // First-contact chat entries arrive silently: the dock pop above already
+      // chimed for the very same message.
+      if (payload.kind !== 'chat_first_message') playNotificationSound()
       // Security alert: an account locked itself out — flash it so whoever can
       // unlock (this notification only goes to them) sees it without opening
       // the bell.
@@ -165,6 +170,22 @@ export const useNotificationsStore = defineStore('notifications', {
       }
     },
 
+    // I read a conversation on SOME device (this one included — the server
+    // echoes my own read back). Clear its unread badge in the chat store (dock
+    // head, launcher badge, Chat-tab counter) and retire any bell rows tied to
+    // that thread — the server already marked them read.
+    applyConversationRead(conversationId) {
+      const id = Number(conversationId)
+      const convo = useChatStore().conversation(id)
+      if (convo) convo.unread_count = 0
+      for (const n of this.items) {
+        if (!n.read_at && n.subject_type === 'conversation' && Number(n.subject_id) === id) {
+          n.read_at = new Date().toISOString()
+          this.unreadCount = Math.max(0, this.unreadCount - 1)
+        }
+      }
+    },
+
     // Subscribe to the current user's private channel for live notifications.
     subscribe(userId) {
       if (this.subscribed || !userId) return
@@ -175,6 +196,10 @@ export const useNotificationsStore = defineStore('notifications', {
         .notification((payload) => this.pushLive(payload))
         // A "log this call?" prompt answered on another device closes here too.
         .listen('.call-request.closed', (e) => closeCallLogPrompt(e.callRequestId))
+        // My read cursor moved (any device) — sync every badge here at once.
+        .listen('.conversation.read', (e) => {
+          if (e.user_id === userId) this.applyConversationRead(e.conversation_id)
+        })
       this.subscribed = true
     },
   },

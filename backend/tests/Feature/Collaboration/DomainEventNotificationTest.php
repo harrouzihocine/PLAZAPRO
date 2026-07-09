@@ -53,20 +53,18 @@ class DomainEventNotificationTest extends TestCase
         $clientA = Client::factory()->create(['assigned_agent_id' => $agentA->id]);
         Desire::factory()->create([
             'client_id' => $clientA->id,
-            'type_id' => $type->id,
             'budget_max' => '500000',
-        ]);
+        ])->types()->attach($type->id);
 
         $agentB = User::factory()->agent()->create();
         $clientB = Client::factory()->create(['assigned_agent_id' => $agentB->id]);
         Desire::factory()->create([
             'client_id' => $clientB->id,
-            'type_id' => DynamicListItem::factory()->create()->id, // different type
-        ]);
+        ])->types()->attach(DynamicListItem::factory()->create()->id); // different type
 
         app(CreateUnit::class)->handle($location, [
             'reference' => 'A-101',
-            'price' => '300000',
+            'price_semi_fini' => '300000',
         ]);
 
         // Filter to the desire-match notification — every user also gets the
@@ -83,12 +81,12 @@ class DomainEventNotificationTest extends TestCase
 
         foreach (range(1, 2) as $i) {
             $client = Client::factory()->create(['assigned_agent_id' => $agent->id]);
-            Desire::factory()->create(['client_id' => $client->id, 'type_id' => $type->id]);
+            Desire::factory()->create(['client_id' => $client->id])->types()->attach($type->id);
         }
 
         app(CreateUnit::class)->handle($location, [
             'reference' => 'B-1',
-            'price' => '100000',
+            'price_semi_fini' => '100000',
         ]);
 
         // One match notification for the agent, not one per matching client
@@ -99,7 +97,7 @@ class DomainEventNotificationTest extends TestCase
     public function test_editing_a_units_specs_notifies_every_active_user(): void
     {
         $location = Location::factory()->create();
-        $unit = app(CreateUnit::class)->handle($location, ['reference' => 'D-1', 'price' => '100000']);
+        $unit = app(CreateUnit::class)->handle($location, ['reference' => 'D-1', 'price_semi_fini' => '100000']);
 
         // Two staff besides the (implicit) editor — everyone should hear about it.
         $watcherA = User::factory()->create();
@@ -115,7 +113,7 @@ class DomainEventNotificationTest extends TestCase
     public function test_saving_a_unit_edit_with_no_changes_notifies_nobody(): void
     {
         $location = Location::factory()->create();
-        $unit = app(CreateUnit::class)->handle($location, ['reference' => 'E-1', 'price' => '100000']);
+        $unit = app(CreateUnit::class)->handle($location, ['reference' => 'E-1', 'price_semi_fini' => '100000']);
         $watcher = User::factory()->create();
 
         // Re-submitting the same reference changes nothing → no bell.
@@ -127,10 +125,10 @@ class DomainEventNotificationTest extends TestCase
     public function test_correcting_a_units_price_notifies_every_active_user(): void
     {
         $location = Location::factory()->create();
-        $unit = app(CreateUnit::class)->handle($location, ['reference' => 'F-1', 'price' => '100000']);
+        $unit = app(CreateUnit::class)->handle($location, ['reference' => 'F-1', 'price_semi_fini' => '100000']);
         $watcher = User::factory()->create();
 
-        app(CorrectUnit::class)->handle($unit, ['price' => '90000', 'reason' => 'Price drop']);
+        app(CorrectUnit::class)->handle($unit, ['price_semi_fini' => '90000', 'reason' => 'Price drop']);
 
         $this->assertSame(1, $watcher->notifications()->where('data->kind', 'unit_updated')->count());
     }
@@ -173,19 +171,18 @@ class DomainEventNotificationTest extends TestCase
         $client = Client::factory()->create(['assigned_agent_id' => $agent->id]);
         Desire::factory()->create([
             'client_id' => $client->id,
-            'type_id' => $type->id,
             'budget_max' => '200000',
-        ]);
+        ])->types()->attach($type->id);
 
         // Created above budget → no match yet.
         $unit = app(CreateUnit::class)->handle($location, [
             'reference' => 'C-9',
-            'price' => '300000',
+            'price_semi_fini' => '300000',
         ]);
         $this->assertSame(0, $agent->notifications()->where('data->kind', 'unit_match')->count());
 
         // Repriced into budget → now matches (repricing raises no new-unit alert).
-        app(CorrectUnit::class)->handle($unit, ['price' => '180000', 'reason' => 'Price drop']);
+        app(CorrectUnit::class)->handle($unit, ['price_semi_fini' => '180000', 'reason' => 'Price drop']);
 
         $this->assertSame(1, $agent->notifications()->where('data->kind', 'unit_match')->count());
         $this->assertSame(

@@ -33,7 +33,7 @@ class DomainNotification extends Notification implements ShouldQueue
         'visits' => ['visit_assigned', 'visit_agent_assigned', 'office_visit_scheduled', 'dispatch_request'],
         'payments' => ['payment', 'reserved_lapsed', 'reservation_next', 'reservation_cancelled'],
         'reminders' => ['reminder', 'upcoming_digest'],
-        'listings' => ['unit_published', 'unit_updated', 'unit_sold', 'unit_status', 'unit_match', 'box_published', 'box_updated'],
+        'listings' => ['unit_published', 'unit_updated', 'unit_sold', 'unit_status', 'unit_match', 'box_published', 'box_updated', 'units_imported'],
         'workflow' => ['project', 'desire_assigned', 'duplicate', 'work_transferred'],
     ];
 
@@ -64,6 +64,12 @@ class DomainNotification extends Notification implements ShouldQueue
         // where one instance serves users with different languages.
         public ?string $key = null,
         public array $params = [],
+        // Per-send channel routing (subset of 'database' | 'broadcast' | 'fcm';
+        // null = all three). Chat traffic uses it: the routine chat_message is
+        // broadcast+fcm only (dock / tray / tab badge — never a bell row), while
+        // its first-contact companion is database+broadcast (a bell row with no
+        // second tray ping). 'fcm' stays subject to the runtime gates in via().
+        public ?array $channels = null,
     ) {}
 
     private function resolvedParams(): array
@@ -96,13 +102,15 @@ class DomainNotification extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        $channels = ['database', 'broadcast'];
+        $wanted = $this->channels ?? ['database', 'broadcast', 'fcm'];
+        $channels = array_values(array_intersect(['database', 'broadcast'], $wanted));
 
         // System-tray push (Android shell): only when FCM is configured, the
         // user has a registered device, and they haven't muted this kind's
         // category — an optional layer, never a dependency. The bell and the
         // live broadcast above are deliberately not gated.
-        if (config('services.fcm.credentials')
+        if (in_array('fcm', $wanted, true)
+            && config('services.fcm.credentials')
             && method_exists($notifiable, 'deviceTokens')
             && $notifiable->deviceTokens()->exists()
             && (! method_exists($notifiable, 'wantsPushFor') || $notifiable->wantsPushFor($this->kind))) {
