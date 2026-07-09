@@ -110,10 +110,9 @@ class DesireAssignmentTest extends TestCase
         $client = Client::factory()->create(['assigned_agent_id' => null]);
         Desire::factory()->create([
             'client_id' => $client->id, 'client_project_id' => null,
-            'budget_min' => null, 'budget_max' => null, 'type_id' => null,
-            'wilaya_id' => null, 'commune_id' => null,
+            'budget_min' => null, 'budget_max' => null,
         ]);
-        Unit::factory()->create(['price' => '1000.00', 'sale_status' => 'available']);
+        Unit::factory()->create(['price_semi_fini' => '1000.00', 'sale_status' => 'available']);
 
         // The oversight board shows the waiting client while it is still unassigned.
         Sanctum::actingAs($manager);

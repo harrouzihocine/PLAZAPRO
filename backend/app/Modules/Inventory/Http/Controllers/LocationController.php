@@ -12,6 +12,7 @@ use App\Modules\Inventory\Actions\ReactivateLocation;
 use App\Modules\Inventory\Actions\UpdateLocation;
 use App\Modules\Inventory\Http\Requests\StoreLocationRequest;
 use App\Modules\Inventory\Http\Requests\UpdateLocationRequest;
+use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Http\Resources\LocationResource;
 use App\Modules\Inventory\Models\Location;
 use Illuminate\Http\JsonResponse;
@@ -30,6 +31,20 @@ class LocationController extends Controller
         // view; ?status=all returns every lifecycle state (removed included).
         $status = $request->query('status');
 
+        // unit_* params (the property picker's pre-filters): keep only projects
+        // that still have a purchasable (non-sold) unit matching the unit-level
+        // refinements, so the project dropdown narrows BEFORE one is chosen.
+        // Multi-select ids arrive as either a value or a list, like UnitController.
+        $asList = fn (string $key) => array_values(array_filter(
+            (array) $request->query($key),
+            fn ($v) => $v !== '' && $v !== null,
+        ));
+        $unitRoomIds = $asList('unit_room_number_id');
+        $unitFloorIds = $asList('unit_floor_id');
+        $hasUnitFilters = $unitRoomIds !== [] || $unitFloorIds !== []
+            || $request->filled('unit_min_price') || $request->filled('unit_max_price')
+            || $request->filled('unit_min_area') || $request->filled('unit_max_area');
+
         $locations = Location::query()
             ->with(['wilaya', 'commune', 'type', 'contractType', 'paymentMethods'])
             ->when($status === 'archived', fn ($q) => $q->archived())
@@ -41,6 +56,26 @@ class LocationController extends Controller
                 fn ($w) => $w->where('name', 'like', '%'.$request->query('q').'%')
                     ->orWhere('code', 'like', '%'.$request->query('q').'%')
             ))
+            ->when($hasUnitFilters, fn ($q) => $q->whereHas('units', fn ($u) => $u
+                ->active()
+                ->where('sale_status', '!=', SaleStatus::Sold->value)
+                ->when($unitRoomIds !== [], fn ($w) => $w->whereIn('room_number_id', $unitRoomIds))
+                ->when($unitFloorIds !== [], fn ($w) => $w->whereIn('floor_id', $unitFloorIds))
+                // Either finish price may satisfy the window — but both bounds
+                // must hold on the SAME price (mirrors UnitController's browse).
+                ->when(
+                    $request->filled('unit_min_price') || $request->filled('unit_max_price'),
+                    fn ($w) => $w->where(function ($outer) use ($request) {
+                        foreach (['price_semi_fini', 'price_fini'] as $column) {
+                            $outer->orWhere(fn ($price) => $price
+                                ->whereNotNull($column)
+                                ->when($request->filled('unit_min_price'), fn ($p) => $p->where($column, '>=', $request->query('unit_min_price')))
+                                ->when($request->filled('unit_max_price'), fn ($p) => $p->where($column, '<=', $request->query('unit_max_price'))));
+                        }
+                    }),
+                )
+                ->when($request->filled('unit_min_area'), fn ($w) => $w->where('area_sqm', '>=', $request->query('unit_min_area')))
+                ->when($request->filled('unit_max_area'), fn ($w) => $w->where('area_sqm', '<=', $request->query('unit_max_area')))))
             // Highest GTM priority first so the vente team sees what to push on top.
             ->orderByRaw("FIELD(gtm_priority, 'critical', 'high', 'medium', 'low')")
             ->orderBy('name')

@@ -15,6 +15,7 @@ const props = defineProps({
   placeholder: { type: String, default: null }, // null → localized "All"
   // 'auto' shows the search box only once the list is long enough to need it.
   searchable: { type: [Boolean, String], default: 'auto' },
+  disabled: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -36,6 +37,7 @@ const showFilter = computed(() =>
       option-label="label"
       option-value="value"
       :placeholder="placeholderText"
+      :disabled="disabled"
       :filter="showFilter"
       :max-selected-labels="1"
       selected-items-label="{0} selected"

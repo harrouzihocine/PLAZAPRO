@@ -28,7 +28,11 @@ class CancelWilaya
 
         abort_if(
             DB::table('locations')->where('wilaya_id', $wilaya->id)->where('status', $active)->exists()
-            || DB::table('desires')->where('wilaya_id', $wilaya->id)->where('status', $active)->exists(),
+            || DB::table('desire_wilayas')
+                ->join('desires', 'desires.id', '=', 'desire_wilayas.desire_id')
+                ->where('desire_wilayas.wilaya_id', $wilaya->id)
+                ->where('desires.status', $active)
+                ->exists(),
             422,
             'This wilaya is still used by active locations or desires.',
         );

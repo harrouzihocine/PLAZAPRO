@@ -45,17 +45,27 @@ into `clients` for a lean v1, but the guide's `versements.client_project_id` imp
 | `id` | PK | |
 | `client_id` | FK → clients | |
 | `client_project_id` | FK → client_projects, nullable | |
-| `area_id` | FK → dynamic_list_items (`areas`), nullable | desired area |
-| `type_id` | FK → dynamic_list_items (`unit_types`), nullable | desired type |
-| `floor_pref` | string, nullable | e.g. "high floor" |
+| `floor_pref` | string, nullable | legacy free text, e.g. "high floor" |
+| `area_min` / `area_max` | decimal(10,2), nullable | surface range (m²) |
 | `rooms_min` | tinyint, nullable | |
 | `budget_min` / `budget_max` | decimal(12,2), nullable | budget range |
-| `notes` | text, nullable | |
+| `notes` | text | required — the story behind the numbers |
 | *(base columns)* | | |
 
-> **Desire matching** (Phase 3): the `MatchDesireToInventory` Action queries `units` where
-> `sale_status = available` and `location.area`, `type`, `price BETWEEN budget_min/max`, `rooms >=
-> rooms_min` fit the desire — ranked by closeness. This is a **key rule to test** (next‑action match).
+Every structured criterion is **multi-valued** ("F2 OR F3", "Hydra OR Kouba") and lives in a
+pivot with "no rows = no preference" semantics:
+
+| Pivot | Columns | Criterion |
+|-------|---------|-----------|
+| `desire_wilayas` | `desire_id`, `wilaya_id` | acceptable wilayas |
+| `desire_communes` | `desire_id`, `commune_id` | acceptable communes |
+| `desire_list_items` | `desire_id`, `item_id` (FK dynamic_list_items), `field` | `type` / `room_number` / `contract_type` / `floor` |
+| `desire_locations` | `desire_id`, `location_id` | preferred sites (projects) |
+
+> **Desire matching** (Phase 3): the `MatchDesireToInventory` Action queries `units` that are
+> not sold and whose value for every SET criterion is ANY of the picked ones (`price BETWEEN
+> budget_min/max`, `area_sqm` in range) — ranked by closeness to budget. This is a **key rule
+> to test** (next‑action match).
 
 ## Pipeline — the interaction chain
 

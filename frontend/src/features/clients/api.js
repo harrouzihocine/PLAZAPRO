@@ -262,6 +262,14 @@ export const dealsApi = {
     return data.data
   },
 
+  // Switch the finish (semi_fini | fini) an OPEN apartment is taken at.
+  async setItemFinish(dealId, itemId, finishType) {
+    const { data } = await useApi().patch(`/deals/${dealId}/items/${itemId}/finish`, {
+      finish_type: finishType,
+    })
+    return data.data
+  },
+
   async syncUnitBoxes(dealId, itemId, boxIds) {
     const { data } = await useApi().put(`/deals/${dealId}/items/${itemId}/boxes`, {
       box_ids: boxIds,

@@ -25,41 +25,30 @@ class DesireResource extends JsonResource
             'budget_min' => $this->budget_min,
             'budget_max' => $this->budget_max,
             'notes' => $this->notes,
-            'floor' => $this->whenLoaded('floor', fn () => $this->floor ? [
-                'id' => $this->floor->id,
-                'label' => $this->floor->localizedLabel(),
-            ] : null),
+            // Every criterion is multi-valued: labelled entries for display, plus
+            // the raw id lists so the edit form can pre-select without lookups.
+            'floors' => $this->whenLoaded('floors', fn () => $this->floors
+                ->map(fn ($f) => ['id' => $f->id, 'label' => $f->localizedLabel()])->all()),
+            'floor_ids' => $this->whenLoaded('floors', fn () => $this->floors->pluck('id')->all()),
             // The preferred sites (projects) the client would buy into.
             'locations' => $this->whenLoaded('locations', fn () => $this->locations
                 ->map(fn ($l) => ['id' => $l->id, 'name' => $l->name])->all()),
             'location_ids' => $this->whenLoaded('locations', fn () => $this->locations->pluck('id')->all()),
-            'wilaya' => $this->whenLoaded('wilaya', fn () => $this->wilaya ? [
-                'id' => $this->wilaya->id,
-                'name' => $this->wilaya->name,
-            ] : null),
-            'commune' => $this->whenLoaded('commune', fn () => $this->commune ? [
-                'id' => $this->commune->id,
-                'name' => $this->commune->name,
-            ] : null),
-            'type' => $this->whenLoaded('type', fn () => $this->type ? [
-                'id' => $this->type->id,
-                'label' => $this->type->localizedLabel(),
-            ] : null),
-            'room_number' => $this->whenLoaded('roomNumber', fn () => $this->roomNumber ? [
-                'id' => $this->roomNumber->id,
-                'label' => $this->roomNumber->localizedLabel(),
-            ] : null),
-            'contract_type' => $this->whenLoaded('contractType', fn () => $this->contractType ? [
-                'id' => $this->contractType->id,
-                'label' => $this->contractType->localizedLabel(),
-            ] : null),
-            // Raw ids too, so the edit form can pre-select without extra lookups.
-            'wilaya_id' => $this->wilaya_id,
-            'commune_id' => $this->commune_id,
-            'type_id' => $this->type_id,
-            'room_number_id' => $this->room_number_id,
-            'contract_type_id' => $this->contract_type_id,
-            'floor_id' => $this->floor_id,
+            'wilayas' => $this->whenLoaded('wilayas', fn () => $this->wilayas
+                ->map(fn ($w) => ['id' => $w->id, 'name' => $w->name])->all()),
+            'wilaya_ids' => $this->whenLoaded('wilayas', fn () => $this->wilayas->pluck('id')->all()),
+            'communes' => $this->whenLoaded('communes', fn () => $this->communes
+                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->all()),
+            'commune_ids' => $this->whenLoaded('communes', fn () => $this->communes->pluck('id')->all()),
+            'types' => $this->whenLoaded('types', fn () => $this->types
+                ->map(fn ($t) => ['id' => $t->id, 'label' => $t->localizedLabel()])->all()),
+            'type_ids' => $this->whenLoaded('types', fn () => $this->types->pluck('id')->all()),
+            'room_numbers' => $this->whenLoaded('roomNumbers', fn () => $this->roomNumbers
+                ->map(fn ($r) => ['id' => $r->id, 'label' => $r->localizedLabel()])->all()),
+            'room_number_ids' => $this->whenLoaded('roomNumbers', fn () => $this->roomNumbers->pluck('id')->all()),
+            'contract_types' => $this->whenLoaded('contractTypes', fn () => $this->contractTypes
+                ->map(fn ($c) => ['id' => $c->id, 'label' => $c->localizedLabel()])->all()),
+            'contract_type_ids' => $this->whenLoaded('contractTypes', fn () => $this->contractTypes->pluck('id')->all()),
             'updated_at' => $this->updated_at,
         ];
     }

@@ -43,7 +43,7 @@ class BuildDesireMatches
         $perPage = max(1, min(50, (int) ($filters['per_page'] ?? self::PER_PAGE)));
 
         $desires = $this->matchableDesiresQuery($agentId, $filters)
-            ->with(['client.assignedAgent', 'wilaya', 'commune', 'type', 'roomNumber', 'contractType', 'floor', 'locations'])
+            ->with(['client.assignedAgent', 'wilayas', 'communes', 'types', 'roomNumbers', 'contractTypes', 'floors', 'locations'])
             // Waiting-longest first — the order the unpaginated board showed, now
             // explicit because pagination needs a stable sort.
             ->orderBy('desires.id')
@@ -202,7 +202,8 @@ class BuildDesireMatches
         return [
             'id' => $unit->id,
             'reference' => $unit->reference,
-            'price' => $unit->price,
+            'price_semi_fini' => $unit->price_semi_fini,
+            'price_fini' => $unit->price_fini,
             'area_sqm' => $unit->area_sqm,
             'sale_status' => $unit->sale_status?->value,
             'reserved_expires_at' => $unit->reserved_expires_at?->toIso8601String(),

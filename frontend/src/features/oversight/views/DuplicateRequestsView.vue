@@ -61,7 +61,12 @@ async function share(req, project) {
     text: t('dup.shareText', { finder }),
     confirmText: t('dup.shareConfirm'),
   })
-  if (ok) resolve(req, { action: 'share_project', project_id: project.id, share_details: true }, t('dup.shared'))
+  if (ok)
+    resolve(
+      req,
+      { action: 'share_project', project_id: project.id, share_details: true },
+      t('dup.shared'),
+    )
 }
 
 async function fork(req, project) {
@@ -87,19 +92,12 @@ async function deny(req) {
 
 <template>
   <div>
-    <PageHeader
-:title="$t('dup.title')"
-      :subtitle="$t('dup.subtitle')"
-    />
+    <PageHeader :title="$t('dup.title')" :subtitle="$t('dup.subtitle')" />
 
     <p v-if="loading" class="py-6 text-center text-sm text-mute">{{ $t('common.loading') }}</p>
 
     <SectionCard v-else-if="!items.length">
-      <EmptyState
-        icon="pi pi-users"
-:title="$t('dup.emptyTitle')"
-        :body="$t('dup.emptyBody')"
-      />
+      <EmptyState icon="pi pi-users" :title="$t('dup.emptyTitle')" :body="$t('dup.emptyBody')" />
     </SectionCard>
 
     <div v-else class="space-y-3">
@@ -114,12 +112,14 @@ async function deny(req) {
             <p class="mt-1 text-sm text-mute">
               {{ $t('dup.existingClient') }}
               <span class="font-medium text-ink">{{ req.existing_client?.name }}</span>
-              <span v-if="req.existing_client?.phone" class="num"> · {{ req.existing_client.phone }}</span>
+              <span v-if="req.existing_client?.phone" class="num">
+                · <span class="ltr-data">{{ req.existing_client.phone }}</span></span
+              >
             </p>
             <p class="mt-0.5 text-xs text-mute">{{ formatDateTime(req.created_at) }}</p>
           </div>
           <Button
-:label="$t('dup.deny')"
+            :label="$t('dup.deny')"
             icon="pi pi-times"
             size="small"
             severity="danger"

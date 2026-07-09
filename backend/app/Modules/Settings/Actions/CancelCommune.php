@@ -21,7 +21,11 @@ class CancelCommune
 
         abort_if(
             DB::table('locations')->where('commune_id', $commune->id)->where('status', $active)->exists()
-            || DB::table('desires')->where('commune_id', $commune->id)->where('status', $active)->exists(),
+            || DB::table('desire_communes')
+                ->join('desires', 'desires.id', '=', 'desire_communes.desire_id')
+                ->where('desire_communes.commune_id', $commune->id)
+                ->where('desires.status', $active)
+                ->exists(),
             422,
             'This commune is still used by active locations or desires.',
         );

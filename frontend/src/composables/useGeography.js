@@ -51,6 +51,17 @@ export function invalidateWilayas() {
 
 const communeCache = new Map() // wilayaId -> commune[]
 
+// One wilaya's communes, memoised app-wide (each entry annotated with its
+// wilaya_id so multi-wilaya callers can group / prune).
+async function fetchCommunes(wilayaId) {
+  if (communeCache.has(wilayaId)) return communeCache.get(wilayaId)
+
+  const { data } = await useApi().get(`/wilayas/${wilayaId}/communes`)
+  const list = (data.data ?? []).map((c) => ({ ...c, wilaya_id: c.wilaya_id ?? wilayaId }))
+  communeCache.set(wilayaId, list)
+  return list
+}
+
 // A per-component dependent commune list. Call load(wilayaId) whenever the chosen
 // wilaya changes; the result is memoised across components by wilaya id.
 export function useCommunes() {
@@ -62,18 +73,37 @@ export function useCommunes() {
       communes.value = []
       return communes.value
     }
-    if (communeCache.has(wilayaId)) {
-      communes.value = communeCache.get(wilayaId)
+
+    loading.value = true
+    try {
+      communes.value = await fetchCommunes(wilayaId)
+      return communes.value
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return { communes, loading, load }
+}
+
+// The multi-wilaya form: load([ids]) unions the selected wilayas' communes (in
+// the given wilaya order), for multi-select commune pickers.
+export function useCommunesByWilayas() {
+  const communes = ref([])
+  const loading = ref(false)
+
+  async function load(wilayaIds) {
+    const ids = (wilayaIds ?? []).filter(Boolean)
+    if (!ids.length) {
+      communes.value = []
       return communes.value
     }
 
     loading.value = true
     try {
-      const { data } = await useApi().get(`/wilayas/${wilayaId}/communes`)
-      const list = data.data ?? []
-      communeCache.set(wilayaId, list)
-      communes.value = list
-      return list
+      const lists = await Promise.all(ids.map(fetchCommunes))
+      communes.value = lists.flat()
+      return communes.value
     } finally {
       loading.value = false
     }

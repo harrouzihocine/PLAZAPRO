@@ -63,7 +63,7 @@ class DuplicateRequestController extends Controller
             ->loadCount(['calls', 'visits', 'shortlistItems', 'deals']);
 
         $desire = $duplicateRequest->existingClient?->desire()
-            ->with(['type', 'roomNumber', 'wilaya', 'commune'])
+            ->with(['types', 'roomNumbers', 'wilayas', 'communes'])
             ->first();
 
         return response()->json(['data' => [
@@ -82,11 +82,12 @@ class DuplicateRequestController extends Controller
                 'shortlist' => $project->shortlist_items_count,
                 'deals' => $project->deals_count,
             ],
+            // Multi-valued criteria flattened for the preview chip line.
             'desire' => $desire ? [
-                'type' => $desire->type?->label,
-                'rooms' => $desire->roomNumber?->label,
-                'wilaya' => $desire->wilaya?->name,
-                'commune' => $desire->commune?->name,
+                'type' => $desire->types->map(fn ($t) => $t->localizedLabel())->join(', ') ?: null,
+                'rooms' => $desire->roomNumbers->map(fn ($r) => $r->localizedLabel())->join(', ') ?: null,
+                'wilaya' => $desire->wilayas->pluck('name')->join(', ') ?: null,
+                'commune' => $desire->communes->pluck('name')->join(', ') ?: null,
                 'budget_min' => $desire->budget_min,
                 'budget_max' => $desire->budget_max,
                 'area_min' => $desire->area_min,

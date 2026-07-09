@@ -16,17 +16,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 /**
  * What a client is looking for. One client-level desire per client (upserted);
  * the nullable client_project_id leaves room for per-deal desires later. Matched
- * to inventory by MatchDesireToInventory. The structured fields mirror the unit
- * form (type / floor / area / budget) plus the preferred sites (locations pivot);
- * notes are required — the story behind the numbers.
+ * to inventory by MatchDesireToInventory. Every structured criterion is
+ * multi-valued ("F2 OR F3", "Hydra OR Kouba"): the dynamic-list criteria share
+ * the desire_list_items pivot (a `field` discriminator per criterion), wilayas /
+ * communes / preferred sites have their own pivots. No rows = no preference.
+ * Notes are required — the story behind the numbers.
  */
 class Desire extends BaseModel
 {
     use HasFactory;
 
     protected $fillable = [
-        'client_id', 'client_project_id', 'wilaya_id', 'commune_id', 'type_id',
-        'room_number_id', 'contract_type_id', 'floor_id', 'floor_pref',
+        'client_id', 'client_project_id', 'floor_pref',
         'area_min', 'area_max', 'rooms_min', 'budget_min', 'budget_max', 'notes',
     ];
 
@@ -46,41 +47,55 @@ class Desire extends BaseModel
         return $this->belongsTo(Client::class);
     }
 
-    public function wilaya(): BelongsTo
+    public function wilayas(): BelongsToMany
     {
-        return $this->belongsTo(Wilaya::class);
+        return $this->belongsToMany(Wilaya::class, 'desire_wilayas')->withTimestamps();
     }
 
-    public function commune(): BelongsTo
+    public function communes(): BelongsToMany
     {
-        return $this->belongsTo(Commune::class);
+        return $this->belongsToMany(Commune::class, 'desire_communes')->withTimestamps();
     }
 
-    public function type(): BelongsTo
+    /** Acceptable project types (`project_types` items). */
+    public function types(): BelongsToMany
     {
-        return $this->belongsTo(DynamicListItem::class, 'type_id');
+        return $this->listItems('type');
     }
 
-    /** Preferred number of rooms (a `room_numbers` item), e.g. F2 / F3. */
-    public function roomNumber(): BelongsTo
+    /** Acceptable numbers of rooms (`room_numbers` items), e.g. F2 / F3. */
+    public function roomNumbers(): BelongsToMany
     {
-        return $this->belongsTo(DynamicListItem::class, 'room_number_id');
+        return $this->listItems('room_number');
     }
 
-    /** Preferred sale contract (a `contract_types` item), e.g. VEFA / turnkey. */
-    public function contractType(): BelongsTo
+    /** Acceptable sale contracts (`contract_types` items), e.g. VEFA / turnkey. */
+    public function contractTypes(): BelongsToMany
     {
-        return $this->belongsTo(DynamicListItem::class, 'contract_type_id');
+        return $this->listItems('contract_type');
     }
 
-    public function floor(): BelongsTo
+    /** Acceptable floors (`floors` items). */
+    public function floors(): BelongsToMany
     {
-        return $this->belongsTo(DynamicListItem::class, 'floor_id');
+        return $this->listItems('floor');
     }
 
     /** The sites (projects) the client would like to buy into. */
     public function locations(): BelongsToMany
     {
         return $this->belongsToMany(Location::class, 'desire_locations')->withTimestamps();
+    }
+
+    /**
+     * One dynamic-list criterion's slice of the shared desire_list_items pivot.
+     * withPivotValue both scopes reads to the criterion and stamps `field` on
+     * attach/sync, so callers just sync ids.
+     */
+    private function listItems(string $field): BelongsToMany
+    {
+        return $this->belongsToMany(DynamicListItem::class, 'desire_list_items', 'desire_id', 'item_id')
+            ->withPivotValue('field', $field)
+            ->withTimestamps();
     }
 }

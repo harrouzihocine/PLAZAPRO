@@ -8,15 +8,23 @@ import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { boxesApi, locationsApi, unitsApi } from '@/features/inventory/api'
 import { formatMoney } from '@/features/payments/money'
 import UnitBoxPicker from '@/features/inventory/components/UnitBoxPicker.vue'
+import FinishToggle from '@/features/inventory/components/FinishToggle.vue'
+import { t } from '@/i18n'
 
 // The property picker used across the workflow (call log, office-visit shortlist,
 // deal creation): pick a project (location), refine with the same filters as the
 // inventory units screen (type / floor / price / area), then tap available units
 // (and boxes, unless units-only) to multi-select them. Each candidate shows the
 // FULL property card (reference · type · floor · area · price), not just its code.
+// The refinements can also be set BEFORE a project is picked: they then narrow
+// the project dropdown itself to projects that still have a purchasable unit
+// matching them (server-side unit_* params on /locations).
 //
 // v-model is a list of { shortlistable_type: 'unit'|'box', shortlistable_id,
-// label, location_id, box_ids? }. `exclude` hides properties already elsewhere
+// label, location_id, box_ids?, finish_type?, price_semi_fini?, price_fini? }
+// — units carry the finish the client is offered (semi_fini | fini; defaults
+// to semi-fini when the unit quotes both) and both raw prices so the toggle
+// can render without refetching. `exclude` hides properties already elsewhere
 // (e.g. on the saved shortlist). With `with-boxes`, every selected apartment
 // offers ITS boxes: the ones linked to it plus the location's unlinked pool
 // (picking one links it) — never a box belonging to another apartment. Deal
@@ -54,9 +62,35 @@ const filters = reactive({
   max_area: '',
 })
 
-onMounted(async () => {
-  locations.value = await locationsApi.list()
-})
+const hasUnitFilters = computed(
+  () =>
+    filters.room_number_id.length > 0 ||
+    filters.floor_id.length > 0 ||
+    ['min_price', 'max_price', 'min_area', 'max_area'].some(
+      (k) => filters[k] !== '' && filters[k] != null,
+    ),
+)
+
+// The refinements narrow the PROJECT list itself (unit_* params): only projects
+// with at least one purchasable unit matching them stay in the dropdown.
+async function loadLocations() {
+  const params = {}
+  if (filters.room_number_id.length) params.unit_room_number_id = filters.room_number_id
+  if (filters.floor_id.length) params.unit_floor_id = filters.floor_id
+  for (const k of ['min_price', 'max_price', 'min_area', 'max_area']) {
+    if (filters[k] !== '' && filters[k] != null) params[`unit_${k}`] = filters[k]
+  }
+  locations.value = await locationsApi.list(params)
+  // The picked project can drop out of the narrowed list — clear it so the
+  // candidates never show units of a project the dropdown no longer offers.
+  if (locationId.value && !locationOptions.value.some((o) => o.value === locationId.value)) {
+    locationId.value = ''
+    units.value = []
+    boxes.value = []
+  }
+}
+
+onMounted(loadLocations)
 
 const locationOptions = computed(() =>
   locations.value
@@ -102,11 +136,18 @@ async function loadCandidates() {
   }
 }
 
+// A filter change refreshes both the narrowed project list and, once a project
+// is picked, its candidate units.
+function applyFilters() {
+  loadLocations()
+  loadCandidates()
+}
+
 // The Mil-scaled price fields emit on every keystroke, so debounce their reload.
 let priceTimer = null
-function loadCandidatesDebounced() {
+function applyFiltersDebounced() {
   clearTimeout(priceTimer)
-  priceTimer = setTimeout(loadCandidates, 400)
+  priceTimer = setTimeout(applyFilters, 400)
 }
 
 watch(locationId, () => {
@@ -127,12 +168,21 @@ const locationName = (id) => locations.value.find((l) => l.id === id)?.name ?? n
 // code. The project (location) name rides in the label so a selection kept
 // across project switches stays unambiguous.
 function unitLabel(u) {
+  // Both finish offers ride in the label — "Semi 145 / Fini 178" — so the
+  // agent quotes the right number without opening the unit.
+  const prices = [
+    u.price_semi_fini != null
+      ? `${t('inventory.finishSemiShort')} ${formatMoney(u.price_semi_fini)}`
+      : null,
+    u.price_fini != null ? `${t('inventory.finishFiniShort')} ${formatMoney(u.price_fini)}` : null,
+  ].filter(Boolean)
+
   return [
     u.reference,
     u.location?.name ?? locationName(u.location_id),
     u.floor,
     u.area_sqm ? `${u.area_sqm} m²` : null,
-    u.price ? formatMoney(u.price) : null,
+    prices.length ? prices.join(' / ') : null,
   ]
     .filter(Boolean)
     .join(' · ')
@@ -155,6 +205,8 @@ const candidates = computed(() => {
       // the client "you would be Nth in line".
       saleStatus: ['reserved', 'interested'].includes(u.sale_status) ? u.sale_status : null,
       queueCount: u.interested_count ?? 0,
+      priceSemiFini: u.price_semi_fini ?? null,
+      priceFini: u.price_fini ?? null,
     })),
     ...boxes.value.map((b) => ({
       type: 'box',
@@ -182,6 +234,15 @@ function toggle(candidate) {
         label: candidate.label,
         location_id: candidate.locationId,
         ...(props.withBoxes && candidate.type === 'unit' ? { box_ids: [] } : {}),
+        // The finish proposed to the client — semi-fini first when both are
+        // quoted; the FinishToggle on the selected card switches it.
+        ...(candidate.type === 'unit'
+          ? {
+              finish_type: candidate.priceSemiFini != null ? 'semi_fini' : 'fini',
+              price_semi_fini: candidate.priceSemiFini,
+              price_fini: candidate.priceFini,
+            }
+          : {}),
       },
     ])
   }
@@ -197,6 +258,11 @@ function remove(index) {
 
 function setBoxIds(index, boxIds) {
   const next = props.modelValue.map((p, i) => (i === index ? { ...p, box_ids: boxIds } : p))
+  emit('update:modelValue', next)
+}
+
+function setFinish(index, finish) {
+  const next = props.modelValue.map((p, i) => (i === index ? { ...p, finish_type: finish } : p))
   emit('update:modelValue', next)
 }
 </script>
@@ -228,6 +294,18 @@ function setBoxIds(index, boxIds) {
             <i class="pi pi-times text-[10px]" aria-hidden="true" />
           </button>
         </span>
+        <!-- Both finishes quoted → the client picks which offer applies. -->
+        <div
+          v-if="p.shortlistable_type === 'unit' && p.price_semi_fini != null && p.price_fini != null"
+          class="mt-2"
+        >
+          <FinishToggle
+            :model-value="p.finish_type ?? 'semi_fini'"
+            :semi-fini="p.price_semi_fini"
+            :fini="p.price_fini"
+            @update:model-value="setFinish(i, $event)"
+          />
+        </div>
         <!-- The apartment's boxes: its linked ones + the unlinked pool to link. -->
         <div
           v-if="withBoxes && p.shortlistable_type === 'unit'"
@@ -265,9 +343,9 @@ function setBoxIds(index, boxIds) {
         :options="locationOptions"
       />
       <button
-        v-if="locationId"
         type="button"
-        class="rounded-md border border-line px-3 py-2.5 text-xs text-mute transition-colors hover:border-primary hover:text-ink"
+        class="rounded-md border px-3 py-2.5 text-xs transition-colors hover:border-primary hover:text-ink"
+        :class="hasUnitFilters ? 'border-primary text-ink' : 'border-line text-mute'"
         @click="showFilters = !showFilters"
       >
         <i class="pi pi-sliders-h text-[10px]" aria-hidden="true" />
@@ -275,33 +353,31 @@ function setBoxIds(index, boxIds) {
       </button>
     </div>
 
-    <!-- The same refinements as Inventory → Units, compacted. -->
-    <div
-      v-if="showFilters && locationId"
-      class="grid gap-3 rounded-xl border border-line p-3 sm:grid-cols-3"
-    >
+    <!-- The same refinements as Inventory → Units, compacted. Usable before a
+         project is picked — they then narrow the project dropdown itself. -->
+    <div v-if="showFilters" class="grid gap-3 rounded-xl border border-line p-3 sm:grid-cols-3">
       <BaseMultiSelect
         v-model="filters.room_number_id"
         :label="$t('inventory.rooms')"
         :options="roomNumbers.map((r) => ({ value: r.id, label: itemLabel(r) }))"
-        @update:model-value="loadCandidates()"
+        @update:model-value="applyFilters()"
       />
       <BaseMultiSelect
         v-model="filters.floor_id"
 :label="$t('inventory.floor')"
         :options="floors.map((f) => ({ value: f.id, label: itemLabel(f) }))"
-        @update:model-value="loadCandidates()"
+        @update:model-value="applyFilters()"
       />
       <div class="grid grid-cols-2 gap-2">
         <MoneyInput
           v-model="filters.min_price"
 :label="$t('inventory.minPrice')"
-          @update:model-value="loadCandidatesDebounced()"
+          @update:model-value="applyFiltersDebounced()"
         />
         <MoneyInput
           v-model="filters.max_price"
 :label="$t('inventory.maxPrice')"
-          @update:model-value="loadCandidatesDebounced()"
+          @update:model-value="applyFiltersDebounced()"
         />
       </div>
       <div class="grid grid-cols-2 gap-2 sm:col-start-1">
@@ -309,15 +385,19 @@ function setBoxIds(index, boxIds) {
           v-model="filters.min_area"
 :label="$t('inventory.minArea')"
           type="number"
-          @change="loadCandidates()"
+          @change="applyFilters()"
         />
         <BaseInput
           v-model="filters.max_area"
 :label="$t('inventory.maxArea')"
           type="number"
-          @change="loadCandidates()"
+          @change="applyFilters()"
         />
       </div>
+      <p v-if="hasUnitFilters" class="text-xs text-mute sm:col-span-3">
+        <i class="pi pi-info-circle text-[10px]" aria-hidden="true" />
+        {{ $t('inventory.filtersNarrowProjects') }}
+      </p>
     </div>
 
     <p v-if="loading" class="text-xs text-mute">{{ $t('inventory.loadingProperties') }}</p>

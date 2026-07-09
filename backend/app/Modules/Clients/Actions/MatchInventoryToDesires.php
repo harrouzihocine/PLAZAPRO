@@ -11,11 +11,12 @@ use Illuminate\Support\Collection;
 
 /**
  * The inverse of MatchDesireToInventory: given a unit, return the active desires
- * whose criteria it satisfies (wilaya / commune / type / floor / area / budget /
+ * whose criteria it satisfies (wilayas / communes / types / floors / area / budget /
  * preferred sites), eager-loading each desire's client + assigned agent so the
  * caller can notify. Only criteria the client actually set are applied — the
- * mirror image of the forward matcher. A SOLD unit matches nothing; an
- * interested or reserved one still does (it can be taken as a backup / 2nd
+ * mirror image of the forward matcher; every criterion is multi-valued (the
+ * unit's value must be ANY of the picked ones). A SOLD unit matches nothing;
+ * an interested or reserved one still does (it can be taken as a backup / 2nd
  * place).
  */
 class MatchInventoryToDesires
@@ -36,37 +37,27 @@ class MatchInventoryToDesires
         $projectTypeId = $unit->location?->type_id;
         $contractTypeId = $unit->location?->contract_type_id;
 
-        // A criterion the client set only matches when the unit actually has that
-        // attribute; when the unit's value is null, only desires that left the
-        // criterion open (null) match — so we skip the comparison branch entirely
-        // (passing null into a <=/>= comparison is an illegal SQL combination).
+        // A pivot criterion the client set (rows exist) only matches when the
+        // unit actually has that attribute and it's one of the picked values;
+        // no rows = no preference. Range criteria: when the unit's value is
+        // null, only desires that left the bound open (null) match — we skip
+        // the comparison branch entirely (null in a <=/>= is illegal SQL).
+        $anyOf = function ($q, string $relation, string $ownerKey, ?int $value): void {
+            $q->whereDoesntHave($relation);
+            if ($value !== null) {
+                $q->orWhereHas($relation, fn ($r) => $r->where($ownerKey, $value));
+            }
+        };
+
         return Desire::query()
             ->active()
             ->with(['client.assignedAgent'])
-            ->where(function ($q) use ($projectTypeId) {
-                $q->whereNull('type_id');
-                if ($projectTypeId !== null) {
-                    $q->orWhere('type_id', $projectTypeId);
-                }
-            })
-            ->where(function ($q) use ($unit) {
-                $q->whereNull('room_number_id');
-                if ($unit->room_number_id !== null) {
-                    $q->orWhere('room_number_id', $unit->room_number_id);
-                }
-            })
-            ->where(function ($q) use ($contractTypeId) {
-                $q->whereNull('contract_type_id');
-                if ($contractTypeId !== null) {
-                    $q->orWhere('contract_type_id', $contractTypeId);
-                }
-            })
-            ->where(function ($q) use ($unit) {
-                $q->whereNull('floor_id');
-                if ($unit->floor_id !== null) {
-                    $q->orWhere('floor_id', $unit->floor_id);
-                }
-            })
+            ->where(fn ($q) => $anyOf($q, 'types', 'dynamic_list_items.id', $projectTypeId))
+            ->where(fn ($q) => $anyOf($q, 'roomNumbers', 'dynamic_list_items.id', $unit->room_number_id))
+            ->where(fn ($q) => $anyOf($q, 'contractTypes', 'dynamic_list_items.id', $contractTypeId))
+            ->where(fn ($q) => $anyOf($q, 'floors', 'dynamic_list_items.id', $unit->floor_id))
+            ->where(fn ($q) => $anyOf($q, 'wilayas', 'wilayas.id', $wilayaId))
+            ->where(fn ($q) => $anyOf($q, 'communes', 'communes.id', $communeId))
             ->where(function ($q) use ($unit) {
                 $q->whereNull('area_min');
                 if ($unit->area_sqm !== null) {
@@ -85,28 +76,19 @@ class MatchInventoryToDesires
                 $q->whereDoesntHave('locations')
                     ->orWhereHas('locations', fn ($l) => $l->where('locations.id', $unit->location_id));
             })
+            // Budget: EITHER finish price may fit the desire's window, but both
+            // bounds must hold on the SAME price — so min and max are checked
+            // together per price, not as independent clauses.
             ->where(function ($q) use ($unit) {
-                $q->whereNull('budget_min');
-                if ($unit->price !== null) {
-                    $q->orWhere('budget_min', '<=', $unit->price);
-                }
-            })
-            ->where(function ($q) use ($unit) {
-                $q->whereNull('budget_max');
-                if ($unit->price !== null) {
-                    $q->orWhere('budget_max', '>=', $unit->price);
-                }
-            })
-            ->where(function ($q) use ($wilayaId) {
-                $q->whereNull('wilaya_id');
-                if ($wilayaId !== null) {
-                    $q->orWhere('wilaya_id', $wilayaId);
-                }
-            })
-            ->where(function ($q) use ($communeId) {
-                $q->whereNull('commune_id');
-                if ($communeId !== null) {
-                    $q->orWhere('commune_id', $communeId);
+                $q->where(fn ($w) => $w->whereNull('budget_min')->whereNull('budget_max'));
+
+                foreach ([$unit->price_semi_fini, $unit->price_fini] as $price) {
+                    if ($price === null) {
+                        continue;
+                    }
+                    $q->orWhere(fn ($w) => $w
+                        ->where(fn ($m) => $m->whereNull('budget_min')->orWhere('budget_min', '<=', $price))
+                        ->where(fn ($m) => $m->whereNull('budget_max')->orWhere('budget_max', '>=', $price)));
                 }
             })
             ->get();

@@ -116,7 +116,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
       <template #actions>
         <Button
           v-if="canCreate"
-:label="$t('clients.newClient')"
+          :label="$t('clients.newClient')"
           icon="pi pi-plus"
           class="native-fab"
           data-testid="new-client"
@@ -128,51 +128,51 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
     <SectionCard flush>
       <!-- Filter toolbar -->
       <FilterPanel :active-count="activeFilterCount">
-      <div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
-        <div class="relative w-full sm:w-72">
-          <i
-            class="pi pi-search absolute start-3 top-1/2 -translate-y-1/2 text-sm text-mute"
-            aria-hidden="true"
+        <div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
+          <div class="relative w-full sm:w-72">
+            <i
+              class="pi pi-search absolute start-3 top-1/2 -translate-y-1/2 text-sm text-mute"
+              aria-hidden="true"
+            />
+            <InputText
+              v-model="store.filters.search"
+              :placeholder="$t('clients.searchPlaceholder')"
+              class="w-full !ps-9"
+            />
+          </div>
+          <BaseSelect
+            v-if="canSeeOwnership"
+            v-model="store.filters.assigned_agent_id"
+            :placeholder="$t('clients.allAgents')"
+            :aria-label="$t('clients.filterByAgent')"
+            class="w-full sm:w-44"
+            :options="store.followUpAgents.map((a) => ({ value: a.id, label: a.name }))"
           />
-          <InputText
-            v-model="store.filters.search"
-:placeholder="$t('clients.searchPlaceholder')"
-            class="w-full !ps-9"
+          <BaseSelect
+            v-if="canSeeDetails"
+            v-model="store.filters.source_id"
+            :placeholder="$t('clients.allSources')"
+            :aria-label="$t('clients.filterBySource')"
+            class="w-full sm:w-44"
+            :options="sources.map((s) => ({ value: s.id, label: s.label, icon: s.meta?.icon }))"
+          />
+          <BaseSelect
+            v-if="canSeeDetails"
+            v-model="store.filters.rating_id"
+            :placeholder="$t('clients.allRatings')"
+            :aria-label="$t('clients.filterByRating')"
+            class="w-full sm:w-40"
+            :options="ratings.map((r) => ({ value: r.id, label: r.label }))"
+          />
+          <Button
+            v-if="hasFilters"
+            icon="pi pi-filter-slash"
+            text
+            severity="secondary"
+            :aria-label="$t('common.resetFilters')"
+            @click="resetFilters"
           />
         </div>
-        <BaseSelect
-          v-if="canSeeOwnership"
-          v-model="store.filters.assigned_agent_id"
-:placeholder="$t('clients.allAgents')"
-          :aria-label="$t('clients.filterByAgent')"
-          class="w-full sm:w-44"
-          :options="store.followUpAgents.map((a) => ({ value: a.id, label: a.name }))"
-        />
-        <BaseSelect
-          v-if="canSeeDetails"
-          v-model="store.filters.source_id"
-:placeholder="$t('clients.allSources')"
-          :aria-label="$t('clients.filterBySource')"
-          class="w-full sm:w-44"
-          :options="sources.map((s) => ({ value: s.id, label: s.label, icon: s.meta?.icon }))"
-        />
-        <BaseSelect
-          v-if="canSeeDetails"
-          v-model="store.filters.rating_id"
-:placeholder="$t('clients.allRatings')"
-          :aria-label="$t('clients.filterByRating')"
-          class="w-full sm:w-40"
-          :options="ratings.map((r) => ({ value: r.id, label: r.label }))"
-        />
-        <Button
-          v-if="hasFilters"
-          icon="pi pi-filter-slash"
-          text
-          severity="secondary"
-:aria-label="$t('common.resetFilters')"
-          @click="resetFilters"
-        />
-      </div>
       </FilterPanel>
 
       <!-- APK phones: card list, one client per card, tap to open the file. -->
@@ -185,7 +185,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
         :total="store.total"
         clickable
         empty-icon="pi pi-users"
-:empty-title="$t('clients.emptyTitle')"
+        :empty-title="$t('clients.emptyTitle')"
         :empty-body="$t('clients.emptyBody')"
         @page="onPage"
         @item-click="(c) => openFile({ data: c })"
@@ -201,7 +201,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
             <div class="min-w-0 flex-1">
               <p class="truncate font-medium text-ink">{{ item.full_name }}</p>
               <p v-if="canSeeDetails && item.phone" class="num mt-0.5 text-sm text-mute">
-                {{ formatPhone(item.phone) }}
+                <span class="ltr-data">{{ formatPhone(item.phone) }}</span>
               </p>
               <p
                 v-if="canSeeDetails && (item.source || item.rating)"
@@ -263,7 +263,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
         <template #empty>
           <EmptyState
             icon="pi pi-users"
-:title="$t('clients.emptyTitle')"
+            :title="$t('clients.emptyTitle')"
             :body="$t('clients.emptyBody')"
           />
         </template>
@@ -289,7 +289,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
         <Column v-if="canSeeDetails" :header="$t('common.phone')">
           <template #body="{ data }">
             <span class="flex items-center gap-1.5 whitespace-nowrap">
-              <span class="num">{{ formatPhone(data.phone) }}</span>
+              <span class="num ltr-data">{{ formatPhone(data.phone) }}</span>
               <template v-if="data.phone">
                 <SendToPhoneButton :client-id="data.id" size="sm" />
                 <a
@@ -349,7 +349,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
                 rounded
                 severity="secondary"
                 size="small"
-:aria-label="$t('clients.editAria')"
+                :aria-label="$t('clients.editAria')"
                 @click.stop="openEdit(data)"
               />
               <Button
@@ -358,7 +358,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
                 rounded
                 severity="danger"
                 size="small"
-:aria-label="$t('clients.cancelConfirm')"
+                :aria-label="$t('clients.cancelConfirm')"
                 @click.stop="removeClient(data)"
               />
             </span>

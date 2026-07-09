@@ -1,16 +1,17 @@
 // The desire form ↔ API payload mapping, shared by every place the profile is
-// captured (call log Branch A, shift-to-desire). '' selections become nulls;
-// numbers are cast; notes are trimmed (they are required server-side).
+// captured (call log Branch A, shift-to-desire). Every selector is
+// multi-valued (id arrays; empty array = no preference); numbers are cast;
+// notes are trimmed (they are required server-side).
 export function desirePayload(form) {
   const num = (v) => (v === '' || v === null || v === undefined ? null : Number(v))
 
   return {
-    wilaya_id: form.wilaya_id || null,
-    commune_id: form.commune_id || null,
-    type_id: form.type_id || null,
-    room_number_id: form.room_number_id || null,
-    contract_type_id: form.contract_type_id || null,
-    floor_id: form.floor_id || null,
+    wilaya_ids: form.wilaya_ids ?? [],
+    commune_ids: form.commune_ids ?? [],
+    type_ids: form.type_ids ?? [],
+    room_number_ids: form.room_number_ids ?? [],
+    contract_type_ids: form.contract_type_ids ?? [],
+    floor_ids: form.floor_ids ?? [],
     area_min: num(form.area_min),
     area_max: num(form.area_max),
     rooms_min: num(form.rooms_min),
@@ -24,12 +25,12 @@ export function desirePayload(form) {
 // A fresh form, optionally prefilled from a saved desire resource.
 export function desireForm(desire = null) {
   return {
-    wilaya_id: desire?.wilaya_id ?? '',
-    commune_id: desire?.commune_id ?? '',
-    type_id: desire?.type_id ?? '',
-    room_number_id: desire?.room_number_id ?? '',
-    contract_type_id: desire?.contract_type_id ?? '',
-    floor_id: desire?.floor_id ?? '',
+    wilaya_ids: desire?.wilaya_ids ?? [],
+    commune_ids: desire?.commune_ids ?? [],
+    type_ids: desire?.type_ids ?? [],
+    room_number_ids: desire?.room_number_ids ?? [],
+    contract_type_ids: desire?.contract_type_ids ?? [],
+    floor_ids: desire?.floor_ids ?? [],
     area_min: desire?.area_min ?? '',
     area_max: desire?.area_max ?? '',
     rooms_min: desire?.rooms_min ?? '',

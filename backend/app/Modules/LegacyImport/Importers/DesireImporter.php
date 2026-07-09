@@ -38,6 +38,15 @@ class DesireImporter extends BaseImporter
     /** @var array<int, int> legacy client id → best legacy project id (§5.9 attachment) */
     private array $bestProject = [];
 
+    /**
+     * The current row's resolved criteria (map() fills it, afterSync() writes the
+     * pivots once the target desire id exists). Keys: wilaya_id, commune_id,
+     * type, room_number, contract_type, floor — null means "not captured".
+     *
+     * @var array<string, ?int>
+     */
+    private array $pendingCriteria = [];
+
     /** @var array<string, array{id: int, wilaya_id: ?int}> normalized commune name → target commune */
     private array $communesByName = [];
 
@@ -108,15 +117,21 @@ class DesireImporter extends BaseImporter
             $this->ctx->warn('desire_budget_overflow', "Desire #{$row->id}: legacy price {$row->price} ×multiplier overflows budget_max — kept raw in notes.");
         }
 
+        // The structured criteria live in pivots now (desire_wilayas /
+        // desire_communes / desire_list_items) — written in afterSync once the
+        // target desire id is known.
+        $this->pendingCriteria = [
+            'wilaya_id' => $commune['wilaya_id'] ?? null,
+            'commune_id' => $commune['id'] ?? null,
+            'type' => $this->lists->resolve('project_types', $row->residence_type !== null ? ($this->residenceTypes[$row->residence_type] ?? null) : null),
+            'room_number' => $this->lists->resolve('room_numbers', $row->rooms_number !== null ? ($this->rooms[$row->rooms_number] ?? null) : null),
+            'contract_type' => $this->lists->resolve('contract_types', $row->contract_type !== null ? ($this->contractTypes[$row->contract_type] ?? null) : null),
+            'floor' => $floorId,
+        ];
+
         return [
             'client_id' => $this->ctx->requireMapId('clients', $row->client_id),
             'client_project_id' => $this->projectFor((int) $row->client_id),
-            'wilaya_id' => $commune['wilaya_id'] ?? null,
-            'commune_id' => $commune['id'] ?? null,
-            'type_id' => $this->lists->resolve('project_types', $row->residence_type !== null ? ($this->residenceTypes[$row->residence_type] ?? null) : null),
-            'room_number_id' => $this->lists->resolve('room_numbers', $row->rooms_number !== null ? ($this->rooms[$row->rooms_number] ?? null) : null),
-            'contract_type_id' => $this->lists->resolve('contract_types', $row->contract_type !== null ? ($this->contractTypes[$row->contract_type] ?? null) : null),
-            'floor_id' => $floorId,
             'floor_pref' => $floorId === null && $floorLabel !== null ? $floorLabel : null,
             'area_min' => $row->area,
             'budget_max' => $budget,
@@ -130,6 +145,49 @@ class DesireImporter extends BaseImporter
             'created_at' => $this->t->legacyTs($row->created_at),
             'updated_at' => $this->t->legacyTs($row->updated_at),
         ];
+    }
+
+    protected function afterSync(object $row, int $targetId, string $mode, array $payload): void
+    {
+        $this->writeCriteria($targetId, $this->pendingCriteria);
+        $this->pendingCriteria = [];
+    }
+
+    /**
+     * Idempotently attach one desire's multi-valued criteria (insert-if-missing,
+     * like LocationImporter's payment-method pivot — re-runs never duplicate).
+     *
+     * @param  array<string, ?int>  $criteria
+     */
+    private function writeCriteria(int $desireId, array $criteria): void
+    {
+        if ($this->ctx->dryRun || $desireId < 0) {
+            return;
+        }
+
+        if (($criteria['wilaya_id'] ?? null) !== null) {
+            $this->insertPivot('desire_wilayas', ['desire_id' => $desireId, 'wilaya_id' => $criteria['wilaya_id']]);
+        }
+        if (($criteria['commune_id'] ?? null) !== null) {
+            $this->insertPivot('desire_communes', ['desire_id' => $desireId, 'commune_id' => $criteria['commune_id']]);
+        }
+        foreach (['type', 'room_number', 'contract_type', 'floor'] as $field) {
+            if (($criteria[$field] ?? null) !== null) {
+                $this->insertPivot('desire_list_items', ['desire_id' => $desireId, 'item_id' => $criteria[$field], 'field' => $field]);
+            }
+        }
+    }
+
+    /** @param  array<string, int|string>  $attrs */
+    private function insertPivot(string $table, array $attrs): void
+    {
+        if ($this->ctx->target->table($table)->where($attrs)->exists()) {
+            return;
+        }
+
+        $now = now()->format('Y-m-d H:i:s');
+        $this->ctx->insert($table, $attrs + ['created_at' => $now, 'updated_at' => $now]);
+        $this->ctx->count($this->phase(), 'pivots');
     }
 
     protected function afterRun(): void
@@ -150,15 +208,27 @@ class DesireImporter extends BaseImporter
                     $payload = [
                         'client_id' => $this->ctx->requireMapId('clients', $clientId),
                         'client_project_id' => $this->projectFor((int) $clientId),
-                        'room_number_id' => $labels->count() === 1
-                            ? $this->lists->resolve('room_numbers', $labels->first())
-                            : null,
                         'notes' => 'Intérêts (legacy): '.$labels->implode(', '),
                         'status' => 'active',
                         'created_at' => $this->t->legacyTs($rows->min('created_at')),
                         'updated_at' => $this->t->legacyTs($rows->max('updated_at')),
                     ];
-                    $this->sync('synth:desire_interests', (int) $clientId, 'desires', $payload);
+                    [$desireId] = $this->sync('synth:desire_interests', (int) $clientId, 'desires', $payload);
+
+                    // Multi-valued room_number pivots carry EVERY legacy interest
+                    // now — the old single column had to drop 2+ room types.
+                    if (! $this->ctx->dryRun && $desireId >= 0) {
+                        foreach ($labels as $label) {
+                            // "#id" = unmapped legacy room id — resolve() would
+                            // mint a bogus list item for it; keep it notes-only.
+                            $roomId = str_starts_with((string) $label, '#')
+                                ? null
+                                : $this->lists->resolve('room_numbers', $label);
+                            if ($roomId !== null) {
+                                $this->insertPivot('desire_list_items', ['desire_id' => $desireId, 'item_id' => $roomId, 'field' => 'room_number']);
+                            }
+                        }
+                    }
                 }
             });
         }

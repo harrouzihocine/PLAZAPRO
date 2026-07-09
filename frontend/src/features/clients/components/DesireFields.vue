@@ -1,26 +1,25 @@
 <script setup>
-import { onMounted, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseMultiSelect from '@/components/base/BaseMultiSelect.vue'
 import MoneyInput from '@/components/base/MoneyInput.vue'
-import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
-import { useWilayas, useCommunes } from '@/composables/useGeography'
+import { useWilayas, useCommunesByWilayas } from '@/composables/useGeography'
 import { useLocationsStore } from '@/features/inventory/locationsStore'
 
 // The desire-profile fieldset (Branch A — no matching inventory), shared by the
 // call-log form and the shift-to-desire modal. Max detail, mirroring the unit
-// form: type + floor selectors, area and budget ranges, preferred sites.
-// Notes are REQUIRED — the story behind the numbers. Emits a merged object so
-// the parent owns the value: { wilaya_id, commune_id, type_id, room_number_id,
-// contract_type_id, floor_id, area_min, area_max, rooms_min, budget_min,
-// budget_max, location_ids, notes }.
+// form — but every selector is MULTI-valued ("F2 OR F3", "Hydra OR Kouba"):
+// empty selection = no preference. Notes are REQUIRED — the story behind the
+// numbers. Emits a merged object so the parent owns the value: { wilaya_ids,
+// commune_ids, type_ids, room_number_ids, contract_type_ids, floor_ids,
+// area_min, area_max, rooms_min, budget_min, budget_max, location_ids, notes }.
 const props = defineProps({ modelValue: { type: Object, required: true } })
 const emit = defineEmits(['update:modelValue'])
 
 const { wilayas } = useWilayas()
-const { communes, load: loadCommunes } = useCommunes()
+const { communes, load: loadCommunes } = useCommunesByWilayas()
 const { items: projectTypes } = useDynamicList('project_types')
 const { items: roomNumbers } = useDynamicList('room_numbers')
 const { items: contractTypes } = useDynamicList('contract_types')
@@ -35,36 +34,55 @@ function update(field, value) {
   emit('update:modelValue', { ...props.modelValue, [field]: value })
 }
 
-// A USER wilaya change clears the picked commune (the list is about to change);
-// programmatic fills (loading a saved desire) go through the watcher below, which
-// only loads the commune list and keeps the saved commune selected.
-function updateWilaya(value) {
-  emit('update:modelValue', { ...props.modelValue, wilaya_id: value, commune_id: '' })
+// A USER wilaya change prunes picked communes down to the wilayas still
+// selected (the option list is about to shrink); programmatic fills (loading a
+// saved desire) go through the watcher below, which only loads the commune
+// union and keeps the saved communes selected.
+async function updateWilayas(value) {
+  const loaded = await loadCommunes(value)
+  const keep = new Set(loaded.map((c) => c.id))
+  emit('update:modelValue', {
+    ...props.modelValue,
+    wilaya_ids: value,
+    commune_ids: (props.modelValue.commune_ids ?? []).filter((id) => keep.has(id)),
+  })
 }
 
 watch(
-  () => props.modelValue.wilaya_id,
-  (id) => loadCommunes(id),
-  { immediate: true },
+  () => props.modelValue.wilaya_ids,
+  (ids) => loadCommunes(ids),
+  { immediate: true, deep: true },
+)
+
+// Several wilayas selected → disambiguate homonym communes with their wilaya.
+const wilayaName = (id) => wilayas.value.find((w) => w.id === id)?.name ?? ''
+const communeOptions = computed(() =>
+  communes.value.map((c) => ({
+    value: c.id,
+    label:
+      (props.modelValue.wilaya_ids ?? []).length > 1
+        ? `${c.name} — ${wilayaName(c.wilaya_id)}`
+        : c.name,
+  })),
 )
 </script>
 
 <template>
   <div class="grid gap-3 sm:grid-cols-2">
-    <BaseSelect
+    <BaseMultiSelect
       :label="$t('geo.wilaya')"
       :placeholder="$t('common.any')"
-      :model-value="modelValue.wilaya_id"
+      :model-value="modelValue.wilaya_ids ?? []"
       :options="wilayas.map((w) => ({ value: w.id, label: `${w.code} · ${w.name}` }))"
-      @change="updateWilaya"
+      @update:model-value="updateWilayas"
     />
-    <BaseSelect
+    <BaseMultiSelect
       :label="$t('geo.commune')"
       :placeholder="$t('common.any')"
-      :disabled="!modelValue.wilaya_id"
-      :model-value="modelValue.commune_id"
-      :options="communes.map((c) => ({ value: c.id, label: c.name }))"
-      @change="(v) => update('commune_id', v)"
+      :disabled="!(modelValue.wilaya_ids ?? []).length"
+      :model-value="modelValue.commune_ids ?? []"
+      :options="communeOptions"
+      @update:model-value="(v) => update('commune_ids', v)"
     />
     <BaseMultiSelect
       class="sm:col-span-2"
@@ -74,33 +92,33 @@ watch(
       :options="locations.items.map((l) => ({ value: l.id, label: l.name }))"
       @update:model-value="(v) => update('location_ids', v)"
     />
-    <BaseSelect
+    <BaseMultiSelect
       :label="$t('inventory.projectType')"
       :placeholder="$t('common.any')"
-      :model-value="modelValue.type_id"
+      :model-value="modelValue.type_ids ?? []"
       :options="projectTypes.map((t) => ({ value: t.id, label: itemLabel(t) }))"
-      @change="(v) => update('type_id', v)"
+      @update:model-value="(v) => update('type_ids', v)"
     />
-    <BaseSelect
+    <BaseMultiSelect
       :label="$t('inventory.roomNumber')"
       :placeholder="$t('common.any')"
-      :model-value="modelValue.room_number_id"
+      :model-value="modelValue.room_number_ids ?? []"
       :options="roomNumbers.map((r) => ({ value: r.id, label: itemLabel(r) }))"
-      @change="(v) => update('room_number_id', v)"
+      @update:model-value="(v) => update('room_number_ids', v)"
     />
-    <BaseSelect
+    <BaseMultiSelect
       :label="$t('inventory.contractType')"
       :placeholder="$t('common.any')"
-      :model-value="modelValue.contract_type_id"
+      :model-value="modelValue.contract_type_ids ?? []"
       :options="contractTypes.map((c) => ({ value: c.id, label: itemLabel(c) }))"
-      @change="(v) => update('contract_type_id', v)"
+      @update:model-value="(v) => update('contract_type_ids', v)"
     />
-    <BaseSelect
+    <BaseMultiSelect
       :label="$t('inventory.floor')"
       :placeholder="$t('common.any')"
-      :model-value="modelValue.floor_id"
+      :model-value="modelValue.floor_ids ?? []"
       :options="floors.map((f) => ({ value: f.id, label: itemLabel(f) }))"
-      @change="(v) => update('floor_id', v)"
+      @update:model-value="(v) => update('floor_ids', v)"
     />
     <BaseInput
       :model-value="modelValue.area_min"

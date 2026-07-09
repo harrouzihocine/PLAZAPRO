@@ -40,7 +40,9 @@ watch(
 const visibleItems = computed(() => (props.data.items ?? []).slice(0, shown.value))
 const hiddenCount = computed(() => Math.max(0, (props.data.items?.length ?? 0) - shown.value))
 // The server ships at most its cap; anything beyond it is reachable by filtering.
-const cappedCount = computed(() => Math.max(0, (props.data.total ?? 0) - (props.data.items?.length ?? 0)))
+const cappedCount = computed(() =>
+  Math.max(0, (props.data.total ?? 0) - (props.data.items?.length ?? 0)),
+)
 
 function openRow(item) {
   const to = props.rowTo?.(item)
@@ -97,7 +99,7 @@ function isNum(col) {
               class="py-2 pe-3 text-ink"
               :class="{ num: isNum(c) }"
             >
-              {{ cell(item, c) }}
+              <span :class="{ 'ltr-data': isNum(c) }">{{ cell(item, c) }}</span>
             </td>
             <td v-if="$slots.action" class="py-1 text-end" @click.stop>
               <slot name="action" :item="item" />
@@ -119,10 +121,16 @@ function isNum(col) {
           @click="shown += STEP"
         />
         <span v-else-if="cappedCount" class="text-xs text-mute">
-          Showing the latest {{ data.items.length }} of {{ data.total }} — narrow with the filters to see the rest.
+          Showing the latest {{ data.items.length }} of {{ data.total }} — narrow with the filters
+          to see the rest.
         </span>
       </div>
     </div>
-    <EmptyState v-else icon="pi pi-check-circle" :title="$t('oversight.allClear')" :body="emptyText ?? $t('oversight.nothingToFollow')" />
+    <EmptyState
+      v-else
+      icon="pi pi-check-circle"
+      :title="$t('oversight.allClear')"
+      :body="emptyText ?? $t('oversight.nothingToFollow')"
+    />
   </SectionCard>
 </template>

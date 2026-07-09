@@ -9,6 +9,7 @@ use App\Modules\Clients\Models\Desire;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Pipeline\Models\Call;
+use App\Modules\Settings\Models\Commune;
 use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
@@ -83,22 +84,38 @@ class DesireTest extends TestCase
     {
         $client = Client::factory()->create();
         Call::factory()->create(['client_id' => $client->id]); // call-first rule
-        $floor = DynamicListItem::factory()->create();
+        $floors = DynamicListItem::factory()->count(2)->create();
+        $rooms = DynamicListItem::factory()->count(2)->create();
         $site = Location::factory()->create();
         Sanctum::actingAs($this->agent());
 
+        // Every selector is multi-valued — "2nd OR 3rd floor, F2 OR F3".
         $this->putJson("/api/v1/clients/{$client->id}/desire", [
-            'floor_id' => $floor->id,
+            'floor_ids' => $floors->pluck('id')->all(),
+            'room_number_ids' => $rooms->pluck('id')->all(),
             'area_min' => 80, 'area_max' => 120, 'rooms_min' => 3,
             'location_ids' => [$site->id],
-            'notes' => 'F3+, 80-120sqm, prefers this site',
+            'notes' => 'F2/F3, 80-120sqm, prefers this site',
         ])
             ->assertOk()
-            ->assertJsonPath('data.floor_id', $floor->id)
+            ->assertJsonPath('data.floor_ids.0', $floors[0]->id)
+            ->assertJsonPath('data.floor_ids.1', $floors[1]->id)
             ->assertJsonPath('data.rooms_min', 3)
             ->assertJsonPath('data.location_ids.0', $site->id);
 
         $this->assertDatabaseHas('desire_locations', ['location_id' => $site->id]);
+        $this->assertDatabaseHas('desire_list_items', ['item_id' => $floors[0]->id, 'field' => 'floor']);
+        $this->assertDatabaseHas('desire_list_items', ['item_id' => $rooms[1]->id, 'field' => 'room_number']);
+
+        // Re-sending a shorter list re-syncs (removals stick).
+        $this->putJson("/api/v1/clients/{$client->id}/desire", [
+            'floor_ids' => [$floors[0]->id],
+            'notes' => 'Second floor only after all',
+        ])
+            ->assertOk()
+            ->assertJsonCount(1, 'data.floor_ids');
+
+        $this->assertDatabaseMissing('desire_list_items', ['item_id' => $floors[1]->id, 'field' => 'floor']);
     }
 
     public function test_matching_respects_area_floor_and_preferred_sites(): void
@@ -111,18 +128,19 @@ class DesireTest extends TestCase
 
         $match = Unit::factory()->for($site)->create([
             'reference' => 'OK', 'sale_status' => 'available',
-            'floor_id' => $floor->id, 'area_sqm' => 100, 'price' => 5000000,
+            'floor_id' => $floor->id, 'area_sqm' => 100, 'price_semi_fini' => 5000000,
         ]);
         // Wrong floor / too small / wrong site — all excluded.
-        Unit::factory()->for($site)->create(['reference' => 'X-floor', 'sale_status' => 'available', 'area_sqm' => 100, 'price' => 5000000]);
-        Unit::factory()->for($site)->create(['reference' => 'X-small', 'sale_status' => 'available', 'floor_id' => $floor->id, 'area_sqm' => 50, 'price' => 5000000]);
-        Unit::factory()->for($otherSite)->create(['reference' => 'X-site', 'sale_status' => 'available', 'floor_id' => $floor->id, 'area_sqm' => 100, 'price' => 5000000]);
+        Unit::factory()->for($site)->create(['reference' => 'X-floor', 'sale_status' => 'available', 'area_sqm' => 100, 'price_semi_fini' => 5000000]);
+        Unit::factory()->for($site)->create(['reference' => 'X-small', 'sale_status' => 'available', 'floor_id' => $floor->id, 'area_sqm' => 50, 'price_semi_fini' => 5000000]);
+        Unit::factory()->for($otherSite)->create(['reference' => 'X-site', 'sale_status' => 'available', 'floor_id' => $floor->id, 'area_sqm' => 100, 'price_semi_fini' => 5000000]);
 
         $client = Client::factory()->create();
         $desire = Desire::factory()->create([
-            'client_id' => $client->id, 'type_id' => $type->id,
-            'floor_id' => $floor->id, 'area_min' => 80, 'area_max' => 120,
+            'client_id' => $client->id, 'area_min' => 80, 'area_max' => 120,
         ]);
+        $desire->types()->attach($type->id);
+        $desire->floors()->attach($floor->id);
         $desire->locations()->sync([$site->id]);
 
         Sanctum::actingAs($this->agent());
@@ -147,20 +165,21 @@ class DesireTest extends TestCase
 
         // The one true match.
         $match = Unit::factory()->for($location)->create([
-            'reference' => 'M-1', 'sale_status' => 'available', 'price' => 5000000,
+            'reference' => 'M-1', 'sale_status' => 'available', 'price_semi_fini' => 5000000,
         ]);
         // Excluded for various reasons.
-        Unit::factory()->for($location)->create(['reference' => 'X-sold', 'sale_status' => 'sold', 'price' => 5000000]);
-        Unit::factory()->for($location)->create(['reference' => 'X-pricey', 'sale_status' => 'available', 'price' => 99000000]);
-        Unit::factory()->for($otherTypeLocation)->create(['reference' => 'X-type', 'sale_status' => 'available', 'price' => 5000000]);
-        Unit::factory()->for($otherLocation)->create(['reference' => 'X-wilaya', 'sale_status' => 'available', 'price' => 5000000]);
+        Unit::factory()->for($location)->create(['reference' => 'X-sold', 'sale_status' => 'sold', 'price_semi_fini' => 5000000]);
+        Unit::factory()->for($location)->create(['reference' => 'X-pricey', 'sale_status' => 'available', 'price_semi_fini' => 99000000]);
+        Unit::factory()->for($otherTypeLocation)->create(['reference' => 'X-type', 'sale_status' => 'available', 'price_semi_fini' => 5000000]);
+        Unit::factory()->for($otherLocation)->create(['reference' => 'X-wilaya', 'sale_status' => 'available', 'price_semi_fini' => 5000000]);
 
         $client = Client::factory()->create();
-        Desire::factory()->create([
+        $desire = Desire::factory()->create([
             'client_id' => $client->id,
-            'wilaya_id' => $wilaya->id, 'type_id' => $type->id,
             'budget_min' => 1000000, 'budget_max' => 10000000,
         ]);
+        $desire->wilayas()->attach($wilaya->id);
+        $desire->types()->attach($type->id);
 
         Sanctum::actingAs($this->agent());
 
@@ -170,20 +189,46 @@ class DesireTest extends TestCase
             ->assertJsonPath('data.0.id', $match->id);
     }
 
+    public function test_multi_valued_criteria_match_any_of_the_picked_values(): void
+    {
+        $floorA = DynamicListItem::factory()->create();
+        $floorB = DynamicListItem::factory()->create();
+        $floorC = DynamicListItem::factory()->create();
+        $site = Location::factory()->create();
+
+        // One unit per floor — the desire picks floors A OR B, so C is out.
+        $onA = Unit::factory()->for($site)->create(['reference' => 'A', 'sale_status' => 'available', 'floor_id' => $floorA->id, 'price_semi_fini' => 5000000]);
+        $onB = Unit::factory()->for($site)->create(['reference' => 'B', 'sale_status' => 'available', 'floor_id' => $floorB->id, 'price_semi_fini' => 5000000]);
+        Unit::factory()->for($site)->create(['reference' => 'C', 'sale_status' => 'available', 'floor_id' => $floorC->id, 'price_semi_fini' => 5000000]);
+
+        $client = Client::factory()->create();
+        $desire = Desire::factory()->create(['client_id' => $client->id]);
+        $desire->floors()->attach([$floorA->id, $floorB->id]);
+
+        Sanctum::actingAs($this->agent());
+
+        $response = $this->getJson("/api/v1/clients/{$client->id}/matches")
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
+
+        $ids = collect($response->json('data'))->pluck('id');
+        $this->assertEqualsCanonicalizing([$onA->id, $onB->id], $ids->all());
+    }
+
     public function test_matches_are_ranked_by_closeness_to_budget(): void
     {
         $type = DynamicListItem::factory()->create();
         $location = Location::factory()->create(['type_id' => $type->id]);
 
         // Budget 2M–6M → midpoint 4M. The unit nearest 4M should rank first.
-        $near = Unit::factory()->for($location)->create(['reference' => 'N', 'sale_status' => 'available', 'price' => 4100000]);
-        Unit::factory()->for($location)->create(['reference' => 'F', 'sale_status' => 'available', 'price' => 5900000]);
+        $near = Unit::factory()->for($location)->create(['reference' => 'N', 'sale_status' => 'available', 'price_semi_fini' => 4100000]);
+        Unit::factory()->for($location)->create(['reference' => 'F', 'sale_status' => 'available', 'price_semi_fini' => 5900000]);
 
         $client = Client::factory()->create();
         Desire::factory()->create([
-            'client_id' => $client->id, 'type_id' => $type->id,
+            'client_id' => $client->id,
             'budget_min' => 2000000, 'budget_max' => 6000000,
-        ]);
+        ])->types()->attach($type->id);
 
         Sanctum::actingAs($this->agent());
 
@@ -191,6 +236,30 @@ class DesireTest extends TestCase
             ->assertOk()
             ->assertJsonCount(2, 'data')
             ->assertJsonPath('data.0.id', $near->id);
+    }
+
+    public function test_every_picked_commune_must_belong_to_a_picked_wilaya(): void
+    {
+        $client = Client::factory()->create();
+        Call::factory()->create(['client_id' => $client->id]); // call-first rule
+        $wilaya = Wilaya::factory()->create();
+        $other = Wilaya::factory()->create();
+        $commune = Commune::factory()->create(['wilaya_id' => $other->id]);
+        Sanctum::actingAs($this->agent());
+
+        $this->putJson("/api/v1/clients/{$client->id}/desire", [
+            'wilaya_ids' => [$wilaya->id],
+            'commune_ids' => [$commune->id],
+            'notes' => 'Commune outside the picked wilayas',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('commune_ids');
+
+        $this->putJson("/api/v1/clients/{$client->id}/desire", [
+            'wilaya_ids' => [$wilaya->id, $other->id],
+            'commune_ids' => [$commune->id],
+            'notes' => 'Now its wilaya is picked too',
+        ])->assertOk();
     }
 
     public function test_matches_require_units_view(): void

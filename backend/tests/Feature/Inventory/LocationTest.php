@@ -6,6 +6,7 @@ namespace Tests\Feature\Inventory;
 
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Media;
+use App\Modules\Inventory\Models\Unit;
 use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
@@ -91,6 +92,40 @@ class LocationTest extends TestCase
             ->assertOk()
             ->assertJsonFragment(['code' => 'HIGH-1'])
             ->assertJsonMissing(['code' => 'LOW-1']);
+    }
+
+    public function test_unit_filters_narrow_the_project_list_to_matching_inventory(): void
+    {
+        Sanctum::actingAs($this->manager());
+
+        $floorA = DynamicListItem::factory()->create();
+        $floorB = DynamicListItem::factory()->create();
+
+        $withMatch = Location::factory()->create(['code' => 'HIT-1']);
+        Unit::factory()->for($withMatch)->create(['sale_status' => 'available', 'floor_id' => $floorA->id, 'price_semi_fini' => 5000000]);
+
+        // Right floor but SOLD — not purchasable, so the project drops out.
+        $soldOnly = Location::factory()->create(['code' => 'SOLD-1']);
+        Unit::factory()->for($soldOnly)->create(['sale_status' => 'sold', 'floor_id' => $floorA->id, 'price_semi_fini' => 5000000]);
+
+        $wrongFloor = Location::factory()->create(['code' => 'MISS-1']);
+        Unit::factory()->for($wrongFloor)->create(['sale_status' => 'available', 'floor_id' => $floorB->id, 'price_semi_fini' => 5000000]);
+
+        $this->getJson('/api/v1/locations?unit_floor_id[]='.$floorA->id)
+            ->assertOk()
+            ->assertJsonFragment(['code' => 'HIT-1'])
+            ->assertJsonMissing(['code' => 'SOLD-1'])
+            ->assertJsonMissing(['code' => 'MISS-1']);
+
+        // A price band on top of the floor filter — the unit falls below it.
+        $this->getJson('/api/v1/locations?unit_floor_id[]='.$floorA->id.'&unit_min_price=6000000')
+            ->assertOk()
+            ->assertJsonMissing(['code' => 'HIT-1']);
+
+        // No unit_* params → the full list, sold-only projects included.
+        $this->getJson('/api/v1/locations')
+            ->assertOk()
+            ->assertJsonFragment(['code' => 'SOLD-1']);
     }
 
     public function test_gtm_priority_must_be_a_valid_degree(): void

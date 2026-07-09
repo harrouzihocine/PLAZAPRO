@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Clients\Http\Requests;
 
 use App\Modules\Clients\Http\Requests\Concerns\ValidatesDesireFields;
-use App\Modules\Settings\Http\Requests\Concerns\ValidatesCommuneBelongsToWilaya;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -16,7 +15,6 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class ShiftProjectToDesireRequest extends FormRequest
 {
-    use ValidatesCommuneBelongsToWilaya;
     use ValidatesDesireFields;
 
     public function authorize(): bool
@@ -34,7 +32,7 @@ class ShiftProjectToDesireRequest extends FormRequest
 
     public function withValidator(Validator $validator): void
     {
-        $this->validateCommuneMatchesWilaya($validator);
+        $this->validateDesireCommunesMatchWilayas($validator);
         $this->validateDesireRanges($validator);
     }
 }

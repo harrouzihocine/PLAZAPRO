@@ -6,7 +6,6 @@ namespace App\Modules\Clients\Http\Requests;
 
 use App\Modules\Clients\Http\Requests\Concerns\RequiresFirstCall;
 use App\Modules\Clients\Http\Requests\Concerns\ValidatesDesireFields;
-use App\Modules\Settings\Http\Requests\Concerns\ValidatesCommuneBelongsToWilaya;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -18,7 +17,6 @@ use Illuminate\Foundation\Http\FormRequest;
 class UpsertDesireRequest extends FormRequest
 {
     use RequiresFirstCall;
-    use ValidatesCommuneBelongsToWilaya;
     use ValidatesDesireFields;
 
     public function authorize(): bool
@@ -36,7 +34,7 @@ class UpsertDesireRequest extends FormRequest
 
     public function withValidator(Validator $validator): void
     {
-        $this->validateCommuneMatchesWilaya($validator);
+        $this->validateDesireCommunesMatchWilayas($validator);
 
         // Requirements are captured during (or after) the qualifying call.
         $this->requireFirstCall($validator, $this->route('client'), "capturing the client's requirements");

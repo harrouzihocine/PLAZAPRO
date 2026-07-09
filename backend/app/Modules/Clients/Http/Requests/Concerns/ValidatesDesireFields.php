@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Clients\Http\Requests\Concerns;
 
+use App\Modules\Settings\Models\Commune;
 use Illuminate\Contracts\Validation\Validator;
 
 /**
  * The desire-profile fields, shared by every request that captures what a
  * client wants (upsert, shift-to-desire, the call log's Branch A). Notes are
  * REQUIRED — a desire without the story behind it is unusable for matching.
- * The structured fields mirror the unit form: type + floor from the dynamic
- * lists, area range, budget range, preferred locations (sites).
+ * The structured fields mirror the unit form but every selector is
+ * multi-valued ("F2 OR F3"): type / room number / contract type / floor from
+ * the dynamic lists, wilayas + communes, area range, budget range, preferred
+ * locations (sites).
  */
 trait ValidatesDesireFields
 {
@@ -27,12 +30,18 @@ trait ValidatesDesireFields
         $notesRule = $prefix === '' ? 'required' : 'required_with:'.$prefix;
 
         return [
-            $p.'wilaya_id' => ['nullable', 'integer', 'exists:wilayas,id'],
-            $p.'commune_id' => ['nullable', 'integer', 'exists:communes,id'],
-            $p.'type_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
-            $p.'room_number_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
-            $p.'contract_type_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
-            $p.'floor_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
+            $p.'wilaya_ids' => ['nullable', 'array'],
+            $p.'wilaya_ids.*' => ['integer', 'distinct', 'exists:wilayas,id'],
+            $p.'commune_ids' => ['nullable', 'array'],
+            $p.'commune_ids.*' => ['integer', 'distinct', 'exists:communes,id'],
+            $p.'type_ids' => ['nullable', 'array'],
+            $p.'type_ids.*' => ['integer', 'distinct', 'exists:dynamic_list_items,id'],
+            $p.'room_number_ids' => ['nullable', 'array'],
+            $p.'room_number_ids.*' => ['integer', 'distinct', 'exists:dynamic_list_items,id'],
+            $p.'contract_type_ids' => ['nullable', 'array'],
+            $p.'contract_type_ids.*' => ['integer', 'distinct', 'exists:dynamic_list_items,id'],
+            $p.'floor_ids' => ['nullable', 'array'],
+            $p.'floor_ids.*' => ['integer', 'distinct', 'exists:dynamic_list_items,id'],
             $p.'floor_pref' => ['nullable', 'string', 'max:255'],
             $p.'area_min' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
             $p.'area_max' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
@@ -43,6 +52,35 @@ trait ValidatesDesireFields
             $p.'location_ids.*' => ['integer', 'distinct', 'exists:locations,id'],
             $p.'notes' => [$notesRule, 'string', 'max:5000'],
         ];
+    }
+
+    /**
+     * The multi-select mirror of ValidatesCommuneBelongsToWilaya: every picked
+     * commune must belong to one of the picked wilayas (and communes can't be
+     * sent without their wilayas).
+     */
+    protected function validateDesireCommunesMatchWilayas(Validator $validator, string $prefix = ''): void
+    {
+        $p = $prefix === '' ? '' : $prefix.'.';
+
+        $validator->after(function (Validator $v) use ($p) {
+            $communeIds = array_filter((array) $this->input($p.'commune_ids', []));
+
+            if ($communeIds === []) {
+                return;
+            }
+
+            $wilayaIds = array_filter((array) $this->input($p.'wilaya_ids', []));
+
+            $allBelong = $wilayaIds !== []
+                && Commune::whereIn('id', $communeIds)
+                    ->whereIn('wilaya_id', $wilayaIds)
+                    ->count() === count($communeIds);
+
+            if (! $allBelong) {
+                $v->errors()->add($p.'commune_ids', 'Every selected commune must belong to one of the chosen wilayas.');
+            }
+        });
     }
 
     /** Enforce min ≤ max on the budget and area ranges (only when both sent). */

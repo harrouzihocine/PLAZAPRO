@@ -10,6 +10,8 @@ use App\Modules\Clients\Models\Desire;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Pipeline\Models\Call;
+use App\Modules\Settings\Models\Commune;
+use App\Modules\Settings\Models\Wilaya;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
@@ -47,12 +49,30 @@ class DesireFlexTest extends TestCase
         $this->assertDatabaseHas('desires', ['client_id' => $client->id, 'budget_max' => '3000000.00']);
     }
 
+    public function test_shift_to_desire_rejects_a_commune_outside_the_picked_wilayas(): void
+    {
+        $client = Client::factory()->create();
+        $project = ClientProject::factory()->create(['client_id' => $client->id]);
+        $wilaya = Wilaya::factory()->create();
+        $other = Wilaya::factory()->create();
+        $commune = Commune::factory()->create(['wilaya_id' => $other->id]);
+        Sanctum::actingAs($this->userWith(['clients.view', 'projects.manage', 'clients.create']));
+
+        $this->postJson("/api/v1/projects/{$project->id}/shift-to-desire", [
+            'wilaya_ids' => [$wilaya->id],
+            'commune_ids' => [$commune->id],
+            'notes' => 'Commune outside the picked wilayas',
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('commune_ids');
+    }
+
     public function test_the_board_paginates_and_filters_server_side(): void
     {
         // The board can carry thousands of waiting clients — it pages (lazy
         // loading on the frontend) and filters search/unassigned on the server.
         $agent = $this->userWith(['clients.view'], isAgent: true);
-        Unit::factory()->create(['price' => '1000.00', 'sale_status' => 'available']);
+        Unit::factory()->create(['price_semi_fini' => '1000.00', 'sale_status' => 'available']);
 
         $waiting = [
             ['first_name' => 'Amine', 'phone' => '0551000001', 'assigned_agent_id' => $agent->id],
@@ -63,8 +83,7 @@ class DesireFlexTest extends TestCase
             $client = Client::factory()->create($attrs);
             Desire::factory()->create([
                 'client_id' => $client->id, 'client_project_id' => null,
-                'budget_min' => null, 'budget_max' => '2000.00', 'type_id' => null,
-                'wilaya_id' => null, 'commune_id' => null,
+                'budget_min' => null, 'budget_max' => '2000.00',
             ]);
         }
 
@@ -121,10 +140,9 @@ class DesireFlexTest extends TestCase
         $client = Client::factory()->create(['assigned_agent_id' => $agent->id]);
         Desire::factory()->create([
             'client_id' => $client->id, 'client_project_id' => null,
-            'budget_min' => null, 'budget_max' => '2000.00', 'type_id' => null,
-            'wilaya_id' => null, 'commune_id' => null,
+            'budget_min' => null, 'budget_max' => '2000.00',
         ]);
-        Unit::factory()->create(['price' => '1000.00', 'sale_status' => 'available']);
+        Unit::factory()->create(['price_semi_fini' => '1000.00', 'sale_status' => 'available']);
 
         // The oversight board lists every waiting client with a match, whoever owns it.
         Sanctum::actingAs($overseer);
@@ -144,10 +162,9 @@ class DesireFlexTest extends TestCase
         $client = Client::factory()->create();
         Desire::factory()->create([
             'client_id' => $client->id, 'client_project_id' => null,
-            'budget_min' => null, 'budget_max' => '2000.00', 'type_id' => null,
-            'wilaya_id' => null, 'commune_id' => null,
+            'budget_min' => null, 'budget_max' => '2000.00',
         ]);
-        Unit::factory()->create(['price' => '1000.00', 'sale_status' => 'available']);
+        Unit::factory()->create(['price_semi_fini' => '1000.00', 'sale_status' => 'available']);
 
         // The oversight badge counts every waiting client with a match, company-wide.
         Sanctum::actingAs($overseer);
@@ -164,10 +181,9 @@ class DesireFlexTest extends TestCase
         $client = Client::factory()->create(['assigned_agent_id' => $agent->id]);
         Desire::factory()->create([
             'client_id' => $client->id, 'client_project_id' => null,
-            'budget_min' => null, 'budget_max' => null, 'type_id' => null,
-            'wilaya_id' => null, 'commune_id' => null, 'notes' => 'Wants something nice',
+            'budget_min' => null, 'budget_max' => null, 'notes' => 'Wants something nice',
         ]);
-        $unit = Unit::factory()->create(['price' => '1000.00', 'sale_status' => 'available', 'area_sqm' => 75]);
+        $unit = Unit::factory()->create(['price_semi_fini' => '1000.00', 'sale_status' => 'available', 'area_sqm' => 75]);
 
         Sanctum::actingAs($agent);
 
@@ -193,7 +209,7 @@ class DesireFlexTest extends TestCase
 
         $this->postJson("/api/v1/projects/{$project->id}/shift-to-desire", ['notes' => 'Wants something cheaper'])
             ->assertSuccessful();
-        Unit::factory()->create(['price' => '1000.00', 'sale_status' => 'available']);
+        Unit::factory()->create(['price_semi_fini' => '1000.00', 'sale_status' => 'available']);
 
         // A desire shifted off a project points back to it — the board's link.
         $this->getJson('/api/v1/desires/matches')
@@ -205,8 +221,7 @@ class DesireFlexTest extends TestCase
         $freshClient = Client::factory()->create(['assigned_agent_id' => $agent->id]);
         Desire::factory()->create([
             'client_id' => $freshClient->id, 'client_project_id' => null,
-            'budget_min' => null, 'budget_max' => null, 'type_id' => null,
-            'wilaya_id' => null, 'commune_id' => null,
+            'budget_min' => null, 'budget_max' => null,
         ]);
         $this->getJson('/api/v1/desires/matches')
             ->assertOk()
@@ -286,10 +301,9 @@ class DesireFlexTest extends TestCase
         $client = Client::factory()->create(['assigned_agent_id' => $agent->id]);
         Desire::factory()->create([
             'client_id' => $client->id, 'client_project_id' => null,
-            'budget_min' => null, 'budget_max' => null, 'type_id' => null,
-            'wilaya_id' => null, 'commune_id' => null,
+            'budget_min' => null, 'budget_max' => null,
         ]);
-        $unit = Unit::factory()->create(['price' => '1000.00', 'sale_status' => 'available']);
+        $unit = Unit::factory()->create(['price_semi_fini' => '1000.00', 'sale_status' => 'available']);
         Sanctum::actingAs($agent);
 
         $this->getJson('/api/v1/desires/matches')->assertOk()->assertJsonCount(1, 'data.items');
