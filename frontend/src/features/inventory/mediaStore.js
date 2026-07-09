@@ -49,6 +49,17 @@ export const useMediaStore = defineStore('media', {
       }
     },
 
+    // Silent re-fetch (no loading flash) — used by the gallery's optimization
+    // poll to surface thumbnails/posters as the pipeline finishes them.
+    async refresh() {
+      if (!this.mediableType || !this.mediableId) return
+      try {
+        this.items = await mediaApi.list(this.mediableType, this.mediableId)
+      } catch {
+        // transient — the next poll tick will retry
+      }
+    },
+
     async run(fn) {
       this.busy = true
       this.error = ''

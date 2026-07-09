@@ -75,6 +75,20 @@ return [
             'after_commit' => false,
         ],
 
+        // Long-running media transcodes (OptimizeMedia): a 4K video can take
+        // many minutes of ffmpeg, so retry_after must comfortably exceed the
+        // job timeout or a second worker would re-grab the job mid-encode.
+        // Served by its own worker (compose `media-queue` service) — never by
+        // the default workers, whose 120 s timeout would kill it.
+        'media' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue' => 'media',
+            'retry_after' => 4000,
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
         'deferred' => [
             'driver' => 'deferred',
         ],

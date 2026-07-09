@@ -3,9 +3,12 @@ FROM php:8.3-fpm-alpine
 
 # System deps for common Laravel extensions + image handling.
 # linux-headers provides <linux/sock_diag.h>, required to compile the sockets ext.
+# vips-tools (vipsthumbnail) + ffmpeg power the media-optimization pipeline
+# (OptimizeMedia job): WebP re-encode for photos, 1080p H.264 for videos.
 RUN apk add --no-cache \
       git curl zip unzip icu-dev oniguruma-dev libzip-dev \
       libpng-dev libjpeg-turbo-dev freetype-dev mysql-client linux-headers tzdata \
+      vips-tools ffmpeg \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     # pcntl: signal handling for `queue:work --timeout` and the Reverb server's
     # graceful shutdown. sockets: transport for the Reverb websocket loop.

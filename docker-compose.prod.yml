@@ -206,6 +206,20 @@ services:
       mysql: { condition: service_healthy }
       redis: { condition: service_healthy }
 
+  media-queue: # media optimization worker — long ffmpeg/vips encodes (OptimizeMedia)
+    <<: *php-base
+    # Dedicated `media` connection (config/queue.php: retry_after 4000 s) so a
+    # 4K transcode is never re-grabbed mid-encode. --tries=1: a failed encode
+    # marks the row failed and keeps serving the original — no point re-burning
+    # minutes of CPU. --max-time recycles the worker every 4 h (memory hygiene,
+    # only between jobs — never mid-encode).
+    command: php artisan queue:work media --queue=media --tries=1 --timeout=3600 --max-time=14400 --sleep=3
+    user: "${UID:-1000}:${GID:-1000}"
+    depends_on:
+      app: { condition: service_started }
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
   scheduler: # cron schedule (routes/console.php)
     <<: *php-base
     command: php artisan schedule:work

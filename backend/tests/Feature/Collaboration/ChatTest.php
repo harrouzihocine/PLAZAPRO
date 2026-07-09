@@ -12,6 +12,7 @@ use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -145,10 +146,16 @@ class ChatTest extends TestCase
         Sanctum::actingAs($me);
         $this->postJson("/api/v1/conversations/{$conversation->id}/messages", ['body' => 'Ping'])->assertCreated();
 
+        // First-ever contact from me → one bell row (chat_first_message).
+        // Routine chat traffic itself never lands in the bell feed.
         $this->assertSame(1, $other->notifications()->count());
-        $this->assertSame('chat_message', $other->notifications()->first()->data['kind']);
+        $this->assertSame('chat_first_message', $other->notifications()->first()->data['kind']);
         // The author is not notified about their own message.
         $this->assertSame(0, $me->notifications()->count());
+
+        // A second message adds no bell row — the dock / tray / tab badge own it.
+        $this->postJson("/api/v1/conversations/{$conversation->id}/messages", ['body' => 'Again'])->assertCreated();
+        $this->assertSame(1, $other->notifications()->count());
     }
 
     public function test_a_deleted_message_is_redacted_not_removed(): void
@@ -209,6 +216,27 @@ class ChatTest extends TestCase
         $this->assertSame(4200, $attachment->duration_ms);
         $this->assertMatchesRegularExpression('#attachments/\d{4}/\d{2}/[0-9a-f-]{36}#', $attachment->path);
         Storage::disk('chat')->assertExists($attachment->path);
+        // Voice notes never enter the image-optimization pipeline.
+        $this->assertNull($attachment->optimize_status);
+    }
+
+    public function test_an_image_attachment_is_queued_for_inplace_optimization(): void
+    {
+        Storage::fake('chat');
+        Queue::fake();
+        $me = $this->userWith();
+        $other = $this->userWith();
+        $conversation = $this->directBetween($me, $other);
+
+        Sanctum::actingAs($me);
+        $this->post(
+            "/api/v1/conversations/{$conversation->id}/messages",
+            ['attachment' => UploadedFile::fake()->image('plan.jpg')],
+            ['Accept' => 'application/json'],
+        )->assertCreated()->assertJsonPath('data.type', 'image');
+
+        $this->assertSame('pending', MessageAttachment::first()->optimize_status);
+        Queue::assertPushed(\App\Modules\Collaboration\Jobs\OptimizeAttachment::class);
     }
 
     public function test_attachment_streaming_is_participant_gated(): void

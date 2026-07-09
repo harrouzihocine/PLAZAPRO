@@ -1,9 +1,9 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import { MEDIA_COLLECTIONS, mediaCollectionLabel, mediaDownloadUrl, mediaFileUrl } from '@/features/inventory/api'
+import { MEDIA_COLLECTIONS, mediaCollectionLabel, mediaDownloadUrl } from '@/features/inventory/api'
 import MediaViewer from '@/features/inventory/components/MediaViewer.vue'
 import AttachSheet from '@/components/ui/AttachSheet.vue'
 import { useMediaStore } from '@/features/inventory/mediaStore'
@@ -68,6 +68,27 @@ const activeLabel = computed(() => mediaCollectionLabel(activeTab.value))
 const countFor = (key) => (media.byCollection[key] ?? []).length
 
 onMounted(() => media.load(props.mediableType, props.mediableId))
+
+// While anything is still in the optimization pipeline (a 4K video can encode
+// for a few minutes), refresh gently so posters/thumbnails appear on their own.
+const hasPending = computed(() => media.items.some((m) => m.optimize_status === 'pending'))
+let pollTimer = null
+watch(
+  hasPending,
+  (pending) => {
+    clearInterval(pollTimer)
+    if (pending) pollTimer = setInterval(() => media.refresh(), 10000)
+  },
+  { immediate: true },
+)
+onBeforeUnmount(() => clearInterval(pollTimer))
+
+// mm:ss duration badge for optimized videos.
+function formatDuration(seconds) {
+  const m = Math.floor(seconds / 60)
+  const s = String(seconds % 60).padStart(2, '0')
+  return `${m}:${s}`
+}
 
 function onDrop(e) {
   dragging.value = false
@@ -204,22 +225,57 @@ async function remove(item) {
       >
         <button
           type="button"
-          class="flex aspect-video w-full items-center justify-center bg-surface-100 dark:bg-surface-800"
+          class="relative flex aspect-video w-full items-center justify-center bg-surface-100 dark:bg-surface-800"
           @click="viewing = item"
         >
+          <!-- Photos stream the WebP thumbnail (server falls back to the
+               original until the optimization job has produced one). thumb_url
+               carries a version param, so when optimization finishes the poll
+               swaps in the small file automatically. -->
           <img
             v-if="item.type === 'photo'"
-            :src="mediaFileUrl(item.id)"
+            :src="item.thumb_url"
             :alt="item.original_name"
             loading="lazy"
             class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
-          <i
-            v-else
-            :class="typeIcon[item.type] ?? 'pi pi-file'"
-            class="text-3xl text-mute"
-            :aria-label="item.type"
-          />
+          <!-- Videos show their poster frame + play overlay once optimized. -->
+          <template v-else-if="item.type === 'video' && item.thumb_url">
+            <img
+              :src="item.thumb_url"
+              :alt="item.original_name"
+              loading="lazy"
+              class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+            <span
+              class="absolute inset-0 flex items-center justify-center"
+              aria-hidden="true"
+            >
+              <span class="flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white">
+                <i class="pi pi-play ms-0.5" />
+              </span>
+            </span>
+            <span
+              v-if="item.duration_seconds"
+              class="num absolute bottom-1 end-1 rounded bg-black/60 px-1.5 py-0.5 text-[11px] text-white"
+            >
+              {{ formatDuration(item.duration_seconds) }}
+            </span>
+          </template>
+          <template v-else>
+            <i
+              :class="typeIcon[item.type] ?? 'pi pi-file'"
+              class="text-3xl text-mute"
+              :aria-label="item.type"
+            />
+            <span
+              v-if="item.optimize_status === 'pending'"
+              class="absolute bottom-1 start-1 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[11px] text-white"
+            >
+              <i class="pi pi-spin pi-spinner text-[10px]" aria-hidden="true" />
+              {{ $t('media.optimizing') }}
+            </span>
+          </template>
         </button>
         <div class="flex items-center justify-between gap-1 px-2 py-1.5">
           <span class="truncate text-xs text-ink" :title="item.original_name">

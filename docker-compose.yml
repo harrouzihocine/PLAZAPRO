@@ -44,6 +44,27 @@ services:
     restart: unless-stopped
     networks: [plaza-net]
 
+  media-queue: # media optimization worker — long ffmpeg/vips encodes on their own connection
+    build:
+      context: ./docker/php
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    # Dedicated `media` connection (config/queue.php: retry_after 4000 s) so a
+    # 4K transcode is never re-grabbed mid-encode, and the default workers'
+    # 120 s timeout never touches it. queue:listen for the same per-job code
+    # reload as the main dev worker.
+    command: php artisan queue:listen media --queue=media --tries=1 --timeout=3600
+    environment: { TZ: Africa/Algiers }
+    user: "${UID:-1000}:${GID:-1000}" # write storage/ as the host UID, not root
+    volumes: ["./backend:/var/www/html"]
+    depends_on:
+      app: { condition: service_started }
+      mysql: { condition: service_healthy }
+      redis: { condition: service_started }
+    restart: unless-stopped
+    networks: [plaza-net]
+
   scheduler: # runs the cron schedule (routes/console.php) — same image as app
     build:
       context: ./docker/php

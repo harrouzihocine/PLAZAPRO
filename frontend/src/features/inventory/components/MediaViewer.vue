@@ -178,6 +178,7 @@ watch(() => props.media?.id, resetZoom)
         <video
           v-else-if="media.type === 'video'"
           :src="mediaFileUrl(media.id)"
+          :poster="media.thumb_url ?? undefined"
           controls
           class="max-h-[80vh] max-w-full"
         ></video>

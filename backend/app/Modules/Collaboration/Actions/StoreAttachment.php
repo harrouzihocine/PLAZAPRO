@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Collaboration\Actions;
 
 use App\Modules\Collaboration\Enums\AttachmentKind;
+use App\Modules\Collaboration\Jobs\OptimizeAttachment;
 use App\Modules\Collaboration\Models\Message;
 use App\Modules\Collaboration\Models\MessageAttachment;
 use Illuminate\Http\UploadedFile;
@@ -36,7 +37,12 @@ class StoreAttachment
 
         [$width, $height] = $this->dimensions($kind, $file);
 
-        return $message->attachments()->create([
+        // Photos get an async in-place WebP re-encode (animated GIFs excluded —
+        // OptimizeAttachment marks them skipped). Voice notes and PDFs are
+        // already tight formats and are stored verbatim.
+        $optimizes = $kind === AttachmentKind::Image && $file->getMimeType() !== 'image/gif';
+
+        $attachment = $message->attachments()->create([
             'kind' => $kind->value,
             'disk' => 'chat',
             'path' => $path,
@@ -45,7 +51,16 @@ class StoreAttachment
             'duration_ms' => $kind === AttachmentKind::Voice ? $durationMs : null,
             'width' => $width,
             'height' => $height,
+            'optimize_status' => $optimizes ? 'pending' : null,
         ]);
+
+        if ($optimizes) {
+            // afterCommit: SendMessage wraps this in a transaction — the worker
+            // must not race it and find no row.
+            OptimizeAttachment::dispatch($attachment->id)->afterCommit();
+        }
+
+        return $attachment;
     }
 
     /**

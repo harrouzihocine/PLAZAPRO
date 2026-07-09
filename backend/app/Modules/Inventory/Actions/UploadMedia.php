@@ -7,6 +7,7 @@ namespace App\Modules\Inventory\Actions;
 use App\Modules\Inventory\Enums\MediaCollection;
 use App\Modules\Inventory\Enums\MediaType;
 use App\Modules\Inventory\Jobs\MakeMediaPreview;
+use App\Modules\Inventory\Jobs\OptimizeMedia;
 use App\Modules\Inventory\Models\Media;
 use App\Modules\Settings\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -54,12 +55,19 @@ class UploadMedia
                 'size_bytes' => $file->getSize(),
                 'sort_order' => $nextSort,
                 'preview_status' => $type->needsPreview() ? 'pending' : null,
+                'optimize_status' => $type->needsOptimization() ? 'pending' : null,
             ]);
             $media->uploaded_by = $user->id; // privileged field, set by the Action
             $media->save();
 
             if ($type->needsPreview()) {
                 MakeMediaPreview::dispatch($media->id);
+            }
+
+            // afterCommit: the media worker is a separate process — don't let it
+            // race the transaction and find no row.
+            if ($type->needsOptimization()) {
+                OptimizeMedia::dispatch($media->id)->afterCommit();
             }
 
             return $media;

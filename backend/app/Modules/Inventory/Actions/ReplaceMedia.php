@@ -6,6 +6,7 @@ namespace App\Modules\Inventory\Actions;
 
 use App\Modules\Inventory\Enums\MediaType;
 use App\Modules\Inventory\Jobs\MakeMediaPreview;
+use App\Modules\Inventory\Jobs\OptimizeMedia;
 use App\Modules\Inventory\Models\Media;
 use App\Modules\Settings\Models\User;
 use Illuminate\Http\UploadedFile;
@@ -15,7 +16,8 @@ use Illuminate\Support\Str;
 /**
  * Replace a media file with a new version: store the new file, insert a new
  * media row (version + 1, linked via supersedes_id) at the same position, and
- * cancel the old row. The old file is never deleted.
+ * cancel the old row. The old version's file is kept (history stays viewable;
+ * only OptimizeMedia ever swaps a row's own bytes for the smaller re-encode).
  */
 class ReplaceMedia
 {
@@ -43,6 +45,7 @@ class ReplaceMedia
                 'size_bytes' => $file->getSize(),
                 'sort_order' => $media->sort_order,
                 'preview_status' => $type->needsPreview() ? 'pending' : null,
+                'optimize_status' => $type->needsOptimization() ? 'pending' : null,
             ]);
             $replacement->mediable_type = $media->mediable_type;
             $replacement->mediable_id = $media->mediable_id;
@@ -55,6 +58,11 @@ class ReplaceMedia
 
             if ($type->needsPreview()) {
                 MakeMediaPreview::dispatch($replacement->id);
+            }
+
+            // afterCommit: the media worker must not race the transaction.
+            if ($type->needsOptimization()) {
+                OptimizeMedia::dispatch($replacement->id)->afterCommit();
             }
 
             return $replacement;

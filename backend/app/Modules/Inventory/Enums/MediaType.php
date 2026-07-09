@@ -51,6 +51,15 @@ enum MediaType: string
     }
 
     /**
+     * Photos and videos go through the OptimizeMedia pipeline (WebP / 1080p
+     * H.264 re-encode + grid derivative). Documents are stored verbatim.
+     */
+    public function needsOptimization(): bool
+    {
+        return in_array($this, [self::Photo, self::Video], true);
+    }
+
+    /**
      * The server-side mime allow-list. Anything not here (e.g. executables) is
      * rejected at validation — the extension is never trusted.
      *

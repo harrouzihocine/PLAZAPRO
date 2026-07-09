@@ -20,6 +20,8 @@ class MessageAttachment extends BaseModel
     protected $fillable = [
         'kind', 'disk', 'path', 'mime_type', 'size_bytes',
         'duration_ms', 'width', 'height', 'meta',
+        // Optimization pipeline (OptimizeAttachment): in-place WebP re-encode.
+        'optimize_status', 'original_size_bytes',
     ];
 
     protected function casts(): array
