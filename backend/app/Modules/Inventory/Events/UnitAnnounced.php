@@ -48,7 +48,7 @@ class UnitAnnounced implements ShouldBroadcast
             'unit_id' => $this->unit->id,
             'reference' => $this->unit->reference,
             'location' => $this->unit->location?->name,
-            'price' => (string) $this->unit->price,
+            'price' => (string) $this->unit->displayPrice(),
         ];
     }
 }

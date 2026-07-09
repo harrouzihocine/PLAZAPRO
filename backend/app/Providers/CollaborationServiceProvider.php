@@ -10,6 +10,7 @@ use App\Modules\Collaboration\Listeners\AnnounceBoxEdited;
 use App\Modules\Collaboration\Listeners\AnnounceNewBox;
 use App\Modules\Collaboration\Listeners\AnnounceNewUnit;
 use App\Modules\Collaboration\Listeners\AnnounceUnitEdited;
+use App\Modules\Collaboration\Listeners\AnnounceUnitsImported;
 use App\Modules\Collaboration\Listeners\AnnounceUnitSold;
 use App\Modules\Collaboration\Listeners\AnnounceUnitStatusChange;
 use App\Modules\Collaboration\Listeners\NotifyAgentsOfMatchingUnit;
@@ -29,6 +30,7 @@ use App\Modules\Inventory\Events\ReservedReleased;
 use App\Modules\Inventory\Events\UnitEdited;
 use App\Modules\Inventory\Events\UnitPublished;
 use App\Modules\Inventory\Events\UnitRepriced;
+use App\Modules\Inventory\Events\UnitsImported;
 use App\Modules\Inventory\Events\UnitSold;
 use App\Modules\Inventory\Events\UnitStatusChanged;
 use App\Modules\Payments\Events\VersementRecorded;
@@ -59,6 +61,7 @@ class CollaborationServiceProvider extends ServiceProvider
         UnitPublished::class => [NotifyAgentsOfMatchingUnit::class, AnnounceNewUnit::class],
         UnitEdited::class => [AnnounceUnitEdited::class],
         UnitRepriced::class => [NotifyAgentsOfMatchingUnit::class],
+        UnitsImported::class => [AnnounceUnitsImported::class],
         BoxPublished::class => [AnnounceNewBox::class],
         BoxEdited::class => [AnnounceBoxEdited::class],
         UnitSold::class => [AnnounceUnitSold::class],

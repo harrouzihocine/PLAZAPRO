@@ -149,5 +149,15 @@ export const useUnitsStore = defineStore('units', {
     cancel(id) {
       return this.mutate(() => unitsApi.cancel(id))
     },
+
+    // Multi-select cancel; resolves to the server's { cancelled, skipped } summary.
+    bulkCancel(ids, reason = null) {
+      return this.mutate(() => unitsApi.bulkCancel(ids, reason))
+    },
+
+    // CSV import; resolves to { created, updated, errors } after refreshing.
+    importCsv(file) {
+      return this.mutate(() => unitsApi.importCsv(file))
+    },
   },
 })

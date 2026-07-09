@@ -108,6 +108,27 @@ export const unitsApi = {
   cancel(id) {
     return useApi().delete(`/units/${id}`)
   },
+
+  // Multi-select cancel — returns { cancelled, skipped: [{ id, reference, reason }] }.
+  async bulkCancel(ids, reason = null) {
+    const { data } = await useApi().post('/units/bulk-cancel', { ids, reason })
+    return data.data
+  },
+
+  // The current browse as a CSV blob (same filters as list) — the fast-edit
+  // round-trip: export, fix in Excel, re-import.
+  async exportCsv(params = {}) {
+    const { data } = await useApi().get('/units/export', { params, responseType: 'blob' })
+    return data
+  },
+
+  // Returns { created, updated, errors: [{ line, message }] }.
+  async importCsv(file) {
+    const form = new FormData()
+    form.append('file', file)
+    const { data } = await useApi().post('/units/import', form)
+    return data.data
+  },
 }
 
 // The visual stacking plan: a location's units grouped by block/floor/position.
@@ -169,6 +190,8 @@ export const boxesApi = {
 // endpoints — never public URLs. Because the API is same-origin (Vite proxy) and
 // uses cookie auth, these relative URLs authenticate in <img>/<video>/<iframe>.
 export const mediaFileUrl = (id) => `/api/v1/media/${id}/file`
+// Grid derivatives (WebP thumbnail / video poster) are consumed via the
+// resource's `thumb_url` — it carries a cache-busting version param.
 export const mediaPreviewUrl = (id) => `/api/v1/media/${id}/preview`
 // Forces an attachment download (original file + name). Same-origin cookie auth,
 // so a plain <a href download> authenticates.

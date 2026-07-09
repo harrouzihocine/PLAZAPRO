@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { RouterLink } from 'vue-router'
 import Button from 'primevue/button'
@@ -24,6 +24,7 @@ import ActivityTimeline from '@/components/ui/ActivityTimeline.vue'
 import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { gtmPriorityOptions, locationsApi, mediaFileUrl, reservationsApi } from '@/features/inventory/api'
 import BoxesPanel from '@/features/inventory/components/BoxesPanel.vue'
+import FinishPrices from '@/features/inventory/components/FinishPrices.vue'
 import GtmPriorityBadge from '@/features/inventory/components/GtmPriorityBadge.vue'
 import LocationMap from '@/features/inventory/components/LocationMap.vue'
 import MediaGallery from '@/features/inventory/components/MediaGallery.vue'
@@ -33,6 +34,8 @@ import { googleMapsUrl } from '@/features/inventory/googleMaps'
 import { copyToClipboard } from '@/composables/useClipboard'
 import { useLocationsStore } from '@/features/inventory/locationsStore'
 import { useUnitsStore } from '@/features/inventory/unitsStore'
+import { buildUnitRef, dedupeRef } from '@/features/inventory/unitRef'
+import { useUnitBulkTools } from '@/features/inventory/useUnitBulkTools'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction } from '@/composables/useConfirm'
 import { formatDate } from '@/utils/format'
@@ -103,16 +106,70 @@ const blank = {
   room_number_id: '',
   floor_id: '',
   area_sqm: '',
-  price: '',
+  price_semi_fini: '',
+  price_fini: '',
   block: '',
   stack_floor: '',
   position: '',
   gtm_priority: 'medium',
 }
 const form = reactive({ ...blank })
-const mode = ref(null) // 'create' | 'edit' | 'correct' | null
+const mode = ref(null) // 'create' | 'duplicate' | 'edit' | 'correct' | null
 const editingId = ref(null)
-const correction = reactive({ price: '', sale_status: '', reason: '' })
+const correction = reactive({ price_semi_fini: '', price_fini: '', sale_status: '', reason: '' })
+
+// Row multi-select cancel + CSV export/import of THIS project's units
+// (shared engine with the global browse).
+const {
+  selected,
+  exporting,
+  importInput,
+  cancelSelected,
+  exportCsv,
+  pickImportFile,
+  onImportFile,
+} = useUnitBulkTools(units, () => ({ location_id: props.id }))
+
+// A reload replaces the row objects — drop any stale selection with it.
+watch(
+  () => units.items,
+  () => (selected.value = []),
+)
+
+// ── Auto-written reference (create / duplicate) ─────────────────────────
+// The reference writes itself from the specs + the project (buildUnitRef)
+// and gets a -2/-3 suffix when taken; stops once the user hand-edits it.
+const refAuto = ref(true)
+let lastAutoRef = null
+
+function applyAutoRef() {
+  if (!['create', 'duplicate'].includes(mode.value) || !refAuto.value) return
+  // Base (untranslated) labels so the reference is language-stable.
+  const base = buildUnitRef(locations.current, {
+    roomsLabel: roomNumbers.value.find((r) => r.id === Number(form.room_number_id))?.label,
+    floorLabel: floors.value.find((f) => f.id === Number(form.floor_id))?.label,
+    block: form.block,
+    stackFloor: form.stack_floor,
+    position: form.position,
+  })
+  lastAutoRef = dedupeRef(
+    base,
+    units.items.map((u) => u.reference),
+  )
+  form.reference = lastAutoRef
+}
+
+watch(
+  () => [form.room_number_id, form.floor_id, form.block, form.stack_floor, form.position],
+  applyAutoRef,
+)
+// A reference the auto-writer didn't produce means the user typed — hands off.
+watch(
+  () => form.reference,
+  (v) => {
+    if (['create', 'duplicate'].includes(mode.value) && v !== lastAutoRef) refAuto.value = false
+  },
+)
 
 function load() {
   // The three reads are independent — fire them together instead of chaining
@@ -130,7 +187,30 @@ useRefreshable(load) // pull-to-refresh (APK)
 function openCreate() {
   Object.assign(form, blank)
   editingId.value = null
+  refAuto.value = true
   mode.value = 'create'
+  applyAutoRef()
+}
+
+// Duplicate (fast insert): the create form prefilled from an existing unit,
+// with a fresh auto-written reference.
+function openDuplicate(u) {
+  Object.assign(form, {
+    reference: '',
+    room_number_id: u.room_number_id ?? '',
+    floor_id: u.floor_id ?? '',
+    area_sqm: u.area_sqm ?? '',
+    price_semi_fini: u.price_semi_fini ?? '',
+    price_fini: u.price_fini ?? '',
+    block: u.block ?? '',
+    stack_floor: u.stack_floor ?? '',
+    position: u.position ?? '',
+    gtm_priority: u.gtm_priority ?? 'medium',
+  })
+  editingId.value = null
+  refAuto.value = true
+  mode.value = 'duplicate'
+  applyAutoRef()
 }
 
 function openEdit(u) {
@@ -139,7 +219,8 @@ function openEdit(u) {
     room_number_id: u.room_number_id ?? '',
     floor_id: u.floor_id ?? '',
     area_sqm: u.area_sqm ?? '',
-    price: u.price ?? '',
+    price_semi_fini: u.price_semi_fini ?? '',
+    price_fini: u.price_fini ?? '',
     block: u.block ?? '',
     stack_floor: u.stack_floor ?? '',
     position: u.position ?? '',
@@ -150,7 +231,8 @@ function openEdit(u) {
 }
 
 function openCorrect(u) {
-  correction.price = u.price
+  correction.price_semi_fini = u.price_semi_fini
+  correction.price_fini = u.price_fini
   correction.sale_status = u.sale_status
   correction.reason = ''
   editingId.value = u.id
@@ -176,7 +258,11 @@ async function submit() {
     if (mode.value === 'edit') {
       await units.update(editingId.value, specs)
     } else {
-      await units.create(props.id, { ...specs, price: num(form.price) })
+      await units.create(props.id, {
+        ...specs,
+        price_semi_fini: num(form.price_semi_fini),
+        price_fini: num(form.price_fini),
+      })
     }
     mode.value = null
   } catch {
@@ -187,7 +273,8 @@ async function submit() {
 async function submitCorrection() {
   try {
     await units.correct(editingId.value, {
-      price: num(correction.price),
+      price_semi_fini: num(correction.price_semi_fini),
+      price_fini: num(correction.price_fini),
       sale_status: correction.sale_status,
       reason: correction.reason.trim(),
     })
@@ -261,6 +348,34 @@ async function remove(u) {
           >
         </template>
         <template #actions>
+          <template v-if="!isNative">
+            <Button
+              :label="$t('inventory.exportCsv')"
+              icon="pi pi-download"
+              severity="secondary"
+              outlined
+              size="small"
+              :loading="exporting"
+              @click="exportCsv"
+            />
+            <Button
+              v-if="canManage"
+              :label="$t('inventory.importCsv')"
+              icon="pi pi-upload"
+              severity="secondary"
+              outlined
+              size="small"
+              :loading="units.saving"
+              @click="pickImportFile"
+            />
+            <input
+              ref="importInput"
+              type="file"
+              accept=".csv,text/csv,.txt"
+              class="hidden"
+              @change="onImportFile"
+            />
+          </template>
           <Button
             v-if="canManage"
 :label="$t('inventory.addUnit')"
@@ -515,7 +630,39 @@ async function remove(u) {
           <!-- ── Units ── -->
           <TabPanel value="units">
             <SectionCard flush>
-              <DataTable :value="units.items" :loading="units.loading" data-key="id">
+              <!-- Multi-select toolbar: appears once rows are ticked. -->
+              <div
+                v-if="selected.length"
+                class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2 sm:px-5"
+              >
+                <span class="text-sm font-medium text-ink">
+                  {{ $t('inventory.selectedCount', selected.length) }}
+                </span>
+                <Button
+                  :label="$t('inventory.cancelSelected')"
+                  icon="pi pi-ban"
+                  severity="danger"
+                  outlined
+                  size="small"
+                  :loading="units.saving"
+                  @click="cancelSelected"
+                />
+                <Button
+                  :label="$t('common.clear')"
+                  text
+                  size="small"
+                  severity="secondary"
+                  @click="selected = []"
+                />
+              </div>
+
+              <DataTable
+                v-model:selection="selected"
+                :value="units.items"
+                :loading="units.loading"
+                data-key="id"
+              >
+                <Column v-if="canManage" selection-mode="multiple" class="w-10" />
                 <template #empty>
                   <EmptyState
                     icon="pi pi-th-large"
@@ -546,7 +693,7 @@ async function remove(u) {
                 </Column>
                 <Column :header="$t('inventory.price')">
                   <template #body="{ data }">
-                    <span class="num">{{ formatMoney(data.price) }}</span>
+                    <FinishPrices :semi-fini="data.price_semi_fini" :fini="data.price_fini" />
                   </template>
                 </Column>
                 <Column :header="$t('common.status')">
@@ -560,7 +707,7 @@ async function remove(u) {
                     <span v-else class="text-mute">—</span>
                   </template>
                 </Column>
-                <Column v-if="canManage" header="" class="w-28">
+                <Column v-if="canManage" header="" class="w-36">
                   <template #body="{ data }">
                     <span class="flex justify-end gap-1">
                       <Button
@@ -580,6 +727,15 @@ async function remove(u) {
                         severity="secondary"
 :aria-label="$t('inventory.correctAria')"
                         @click="openCorrect(data)"
+                      />
+                      <Button
+                        icon="pi pi-clone"
+                        text
+                        rounded
+                        size="small"
+                        severity="secondary"
+                        :aria-label="$t('inventory.duplicateUnit')"
+                        @click="openDuplicate(data)"
                       />
                       <Button
                         icon="pi pi-ban"
@@ -621,10 +777,16 @@ async function remove(u) {
       </Tabs>
     </template>
 
-    <!-- Create / edit unit specs -->
+    <!-- Create / duplicate / edit unit specs -->
     <BaseModal
-      v-if="(mode === 'create' || mode === 'edit') && canManage"
-      :title="mode === 'edit' ? $t('inventory.editUnit') : $t('inventory.newUnit')"
+      v-if="(mode === 'create' || mode === 'duplicate' || mode === 'edit') && canManage"
+      :title="
+        mode === 'edit'
+          ? $t('inventory.editUnit')
+          : mode === 'duplicate'
+            ? $t('inventory.duplicateUnit')
+            : $t('inventory.newUnit')
+      "
       size="max-w-3xl"
       @close="mode = null"
     >
@@ -660,7 +822,16 @@ async function remove(u) {
               {{ locations.current?.contract_type || '—' }}
             </p>
           </div>
-          <MoneyInput v-if="mode === 'create'" v-model="form.price" :label="$t('inventory.price')" required />
+          <MoneyInput
+            v-if="mode === 'create' || mode === 'duplicate'"
+            v-model="form.price_semi_fini"
+            :label="$t('inventory.priceSemiFini')"
+          />
+          <MoneyInput
+            v-if="mode === 'create' || mode === 'duplicate'"
+            v-model="form.price_fini"
+            :label="$t('inventory.priceFini')"
+          />
           <BaseInput v-model="form.block" :label="$t('inventory.block')" />
           <BaseInput v-model="form.stack_floor" :label="$t('inventory.stackFloor')" type="number" />
           <BaseInput v-model="form.position" :label="$t('inventory.position')" type="number" />
@@ -671,8 +842,9 @@ async function remove(u) {
             :options="gtmPriorityOptions()"
           />
         </div>
-        <p v-if="mode === 'edit'" class="text-xs text-mute">
-          {{ $t('inventory.useCorrectHint') }}
+        <p class="text-xs text-mute">
+          {{ mode === 'edit' ? $t('inventory.useCorrectHint') : $t('inventory.refAutoHint') }}
+          <template v-if="mode !== 'edit'"> {{ $t('inventory.atLeastOnePrice') }}</template>
         </p>
         <div class="flex gap-2">
           <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="units.saving" />
@@ -690,7 +862,8 @@ async function remove(u) {
     >
       <form class="space-y-4" @submit.prevent="submitCorrection">
         <div class="grid gap-3 sm:grid-cols-3">
-          <MoneyInput v-model="correction.price" :label="$t('inventory.price')" />
+          <MoneyInput v-model="correction.price_semi_fini" :label="$t('inventory.priceSemiFini')" />
+          <MoneyInput v-model="correction.price_fini" :label="$t('inventory.priceFini')" />
           <BaseSelect
             v-model="correction.sale_status"
 :label="$t('inventory.saleStatus')"
