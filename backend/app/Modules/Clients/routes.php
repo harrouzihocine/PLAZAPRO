@@ -140,6 +140,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // A WON apartment can be released after the fact (the sale fell through) —
     // it returns to the market; recorded payments stay as refundable history.
     Route::post('/deals/{deal}/items/{item}/release', [DealController::class, 'releaseItem']);
+    // Switch which finish (semi-fini / fini) the client takes an OPEN apartment
+    // at — flips the price the win dialog prefills.
+    Route::patch('/deals/{deal}/items/{item}/finish', [DealController::class, 'updateItemFinish']);
     Route::put('/deals/{deal}/items/{item}/boxes', [DealController::class, 'syncUnitBoxes']);
     // …and it can take MORE boxes later (the client comes back for a parking
     // box): sold + linked right onto the won apartment, agreed price grows.

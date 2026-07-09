@@ -17,7 +17,7 @@ class CreateUnit
     {
         $attributes = Arr::only($data, [
             'reference', 'room_number_id', 'floor_id', 'area_sqm',
-            'price', 'sale_status', 'block', 'stack_floor', 'position', 'gtm_priority',
+            'price_semi_fini', 'price_fini', 'sale_status', 'block', 'stack_floor', 'position', 'gtm_priority',
         ]);
 
         // A new unit starts available at medium GTM priority unless explicitly

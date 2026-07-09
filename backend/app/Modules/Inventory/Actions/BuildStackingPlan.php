@@ -29,7 +29,7 @@ class BuildStackingPlan
             ->orderByDesc('stack_floor')
             ->orderBy('position')
             ->orderBy('reference')
-            ->get(['id', 'reference', 'sale_status', 'price', 'block', 'stack_floor', 'position', 'reserved_expires_at']);
+            ->get(['id', 'reference', 'sale_status', 'price_semi_fini', 'price_fini', 'block', 'stack_floor', 'position', 'reserved_expires_at']);
 
         return $units
             ->groupBy(fn ($unit) => $unit->block ?? 'Unassigned')
@@ -43,7 +43,8 @@ class BuildStackingPlan
                             'id' => $unit->id,
                             'reference' => $unit->reference,
                             'sale_status' => $unit->sale_status?->value,
-                            'price' => $unit->price,
+                            // Compact grid: one number — semi-fini first.
+                            'price' => $unit->displayPrice(),
                             'position' => $unit->position,
                             'reservation_id' => $unit->activeReservation?->id,
                             // Interest-hold countdown, or the deposit

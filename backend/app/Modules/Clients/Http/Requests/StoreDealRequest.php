@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Clients\Http\Requests;
 
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Inventory\Enums\FinishType;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rules\Enum;
 
 /**
  * Open the deal on a project from the properties the client wants. The visiting
@@ -40,6 +42,10 @@ class StoreDealRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:5000'],
             'units' => ['required', 'array', 'min:1'],
             'units.*.unit_id' => ['required', 'integer', 'exists:units,id'],
+            // The finish the client commits to (semi_fini | fini). Omitted →
+            // the shortlist proposal, else the unit's default; that the unit
+            // offers it is enforced in CreateDeal.
+            'units.*.finish_type' => ['nullable', new Enum(FinishType::class)],
             // Boxes ride along per apartment: the SPECIFIC boxes to take (each
             // is linked to the apartment — CreateDeal enforces the link rules).
             'units.*.box_ids' => ['nullable', 'array'],

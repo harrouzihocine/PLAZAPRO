@@ -35,7 +35,9 @@ class StoreUnitRequest extends FormRequest
             'room_number_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
             'floor_id' => ['nullable', 'integer', 'exists:dynamic_list_items,id'],
             'area_sqm' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
-            'price' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
+            // Two finish-level prices — a unit must quote at least one.
+            'price_semi_fini' => ['nullable', 'required_without:price_fini', 'numeric', 'min:0', 'max:9999999999.99'],
+            'price_fini' => ['nullable', 'required_without:price_semi_fini', 'numeric', 'min:0', 'max:9999999999.99'],
             'sale_status' => ['sometimes', new Enum(SaleStatus::class)],
             'block' => ['nullable', 'string', 'max:255'],
             'stack_floor' => ['nullable', 'integer'],

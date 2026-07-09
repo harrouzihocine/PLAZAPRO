@@ -13,6 +13,7 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { dealsApi, staffApi } from '@/features/clients/api'
 import { useClientsStore } from '@/features/clients/clientsStore'
+import FinishToggle from '@/features/inventory/components/FinishToggle.vue'
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
 import UnitBoxPicker from '@/features/inventory/components/UnitBoxPicker.vue'
 import { useAuthStore } from '@/features/settings/store'
@@ -184,6 +185,27 @@ const suggestedFor = (deal, unit) =>
   [unit, ...boxesOf(deal, unit)].reduce((sum, p) => sum + Number(p.price ?? 0), 0)
 
 const openUnits = (deal) => (deal.units ?? []).filter((u) => u.state === 'open')
+
+// --- Switch the finish (semi-fini / fini) an OPEN apartment is taken at ----
+// Only offered while the item is open AND the unit quotes both prices; the win
+// dialog then prefills the switched price (u.price follows the finish).
+const canSwitchFinish = (deal, u) =>
+  canEditBoxes() &&
+  deal.state === 'open' &&
+  u.state === 'open' &&
+  u.price_semi_fini != null &&
+  u.price_fini != null
+
+async function switchFinish(deal, u, finish) {
+  if (finish === u.finish_type) return
+  try {
+    await dealsApi.setItemFinish(deal.id, u.item_id, finish)
+    await store.loadDeals(props.projectId)
+    emit('changed')
+  } catch (e) {
+    toastError(e.response?.data?.message ?? t('deal.finishSwitchFailed'))
+  }
+}
 const wonUnits = (deal) => (deal.units ?? []).filter((u) => u.state === 'won')
 
 onMounted(() => store.loadDeals(props.projectId))
@@ -475,8 +497,23 @@ async function saveBoxes() {
                 class="num shrink-0 text-xs"
                 :class="u.agreed_price ? 'font-semibold text-ink' : 'text-mute'"
               >
+                <!-- List price is the CHOSEN finish's — name it when the unit
+                     quotes a fini offer so the number is never ambiguous. -->
+                <template v-if="!u.agreed_price && u.price_fini != null">
+                  {{ u.finish_type === 'fini' ? $t('inventory.finishFiniShort') : $t('inventory.finishSemiShort') }}
+                </template>
                 {{ formatMoney(u.agreed_price ?? u.price) }}
               </span>
+            </div>
+
+            <!-- Both finishes quoted → the client can still switch while open. -->
+            <div v-if="canSwitchFinish(deal, u)" class="mt-1.5">
+              <FinishToggle
+                :model-value="u.finish_type"
+                :semi-fini="u.price_semi_fini"
+                :fini="u.price_fini"
+                @update:model-value="switchFinish(deal, u, $event)"
+              />
             </div>
 
             <!-- Holding deposit collected for this apartment (pre-sale). -->

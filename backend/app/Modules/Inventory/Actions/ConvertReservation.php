@@ -60,7 +60,7 @@ class ConvertReservation
                 $project->update([
                     'stage' => ClientProjectStage::Won->value,
                     'unit_id' => $reservation->unit_id,
-                    'total_price' => $unit->price,
+                    'total_price' => $unit->displayPrice(),
                 ]);
             }
 

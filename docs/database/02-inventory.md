@@ -33,7 +33,8 @@ columns from [`00-schema-overview.md`](00-schema-overview.md).
 | `floor_id` | FK → dynamic_list_items (`floors`), nullable | (or `floor` int) |
 | `area_sqm` | decimal(8,2), nullable | surface |
 | `rooms` | tinyint, nullable | |
-| `price` | decimal(12,2) | list price |
+| `price_semi_fini` | decimal(12,2), nullable | semi-finished list price (the historical `price` column) |
+| `price_fini` | decimal(12,2), nullable | finished / turnkey list price; **at least one of the two prices is set** (DB check `chk_units_one_price`). When both exist the client picks the finish — `finish_type` on `shortlist_items` (proposal) and `deal_items` (commitment) |
 | `sale_status` | enum | `available` \| `reserved` \| `sold` (distinct from the base `status`) |
 | **stacking plan** | | |
 | `block` | string, nullable | building/block label |

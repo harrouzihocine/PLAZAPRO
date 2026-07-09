@@ -11,7 +11,9 @@ use App\Modules\Pipeline\Enums\VisitType;
 use App\Modules\Pipeline\Http\Requests\Concerns\ValidatesClosure;
 use App\Modules\Pipeline\Http\Requests\Concerns\ValidatesNextAction;
 use App\Modules\Pipeline\Models\Visit;
+use App\Modules\Inventory\Enums\FinishType;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rules\Enum;
 
 class CompleteVisitRequest extends FormRequest
 {
@@ -80,6 +82,7 @@ class CompleteVisitRequest extends FormRequest
             'shortlist.*.shortlistable_type' => ['required', 'in:unit,box'],
             'shortlist.*.shortlistable_id' => ['required', 'integer'],
             'shortlist.*.note' => ['nullable', 'string', 'max:1000'],
+            'shortlist.*.finish_type' => ['nullable', new Enum(FinishType::class)],
         ], $this->nextActionRules(), $this->closureRules(), $this->desireFieldRules('closure.desire'));
 
         // An interim in-site visit (the project still has open sibling visits)

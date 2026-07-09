@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Pipeline\Http\Requests\Concerns;
 
+use App\Modules\Inventory\Enums\FinishType;
+use Illuminate\Validation\Rules\Enum;
+
 /**
  * Every concluded interaction (a call, a completed visit) must resolve: either
  * it schedules a `next_action`, or it carries a `closure` that ends the thread.
@@ -35,6 +38,8 @@ trait ValidatesClosure
             // each gets linked to its apartment; CreateDeal enforces the rules).
             'closure.units' => ['required_if:closure.type,deal', 'array', 'min:1'],
             'closure.units.*.unit_id' => ['required_with:closure.units', 'integer', 'exists:units,id'],
+            // The finish the client commits to (offered-check in CreateDeal).
+            'closure.units.*.finish_type' => ['nullable', new Enum(FinishType::class)],
             'closure.units.*.box_ids' => ['nullable', 'array'],
             'closure.units.*.box_ids.*' => ['integer', 'distinct', 'exists:boxes,id'],
             'closure.notes' => ['nullable', 'string', 'max:2000'],

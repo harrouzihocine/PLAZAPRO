@@ -39,7 +39,8 @@ class BuildUnitInsights
         $data = [
             'stats' => [
                 'sale_status' => $unit->sale_status?->value,
-                'price' => $unit->price,
+                'price_semi_fini' => $unit->price_semi_fini,
+                'price_fini' => $unit->price_fini,
                 'area_sqm' => $unit->area_sqm,
                 'reservations' => (clone $reservations)->count(),
                 'has_active_hold' => (clone $reservations)->where('hold_status', 'active')->exists(),

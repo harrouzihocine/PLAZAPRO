@@ -34,6 +34,16 @@ final class Money
         return self::normalize(bcsub($a, $b, self::SCALE));
     }
 
+    /** a ÷ b at 2 dp — returns '0.00' when b is zero (safe average/ratio). */
+    public static function div(string $a, string $b, int $scale = self::SCALE): string
+    {
+        if (bccomp($b, '0', self::SCALE) === 0) {
+            return self::normalize('0');
+        }
+
+        return self::normalize(bcdiv($a, $b, $scale));
+    }
+
     /** -1 if a<b, 0 if equal, 1 if a>b — compared at 2 dp. */
     public static function compare(string $a, string $b): int
     {

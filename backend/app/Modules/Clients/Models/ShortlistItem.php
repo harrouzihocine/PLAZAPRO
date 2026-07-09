@@ -7,6 +7,7 @@ namespace App\Modules\Clients\Models;
 use App\Core\Models\BaseModel;
 use App\Modules\Clients\Enums\DealState;
 use App\Modules\Clients\Enums\ShortlistState;
+use App\Modules\Inventory\Enums\FinishType;
 use App\Modules\Inventory\Models\Box;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Pipeline\Models\Call;
@@ -28,13 +29,15 @@ class ShortlistItem extends BaseModel
 
     protected $fillable = [
         'client_project_id', 'office_visit_id', 'call_id',
-        'shortlistable_type', 'shortlistable_id', 'state', 'note',
+        'shortlistable_type', 'shortlistable_id', 'state', 'note', 'finish_type',
     ];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
             'state' => ShortlistState::class,
+            // The finish proposed to the client (units only; null on boxes).
+            'finish_type' => FinishType::class,
         ]);
     }
 

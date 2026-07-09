@@ -56,16 +56,25 @@ const statusOptions = () => [
   { value: 'interested', label: t('status.interested') },
 ]
 
-const unitLine = (u) =>
-  [
+const unitLine = (u) => {
+  // Both finish offers, tagged, so the quoted number is never ambiguous.
+  const prices = [
+    u.price_semi_fini != null
+      ? `${t('inventory.finishSemiShort')} ${formatMoney(u.price_semi_fini)}`
+      : null,
+    u.price_fini != null ? `${t('inventory.finishFiniShort')} ${formatMoney(u.price_fini)}` : null,
+  ].filter(Boolean)
+
+  return [
     u.location?.name,
     u.room_number,
     u.floor,
     u.area_sqm ? `${u.area_sqm} m²` : null,
-    u.price ? formatMoney(u.price) : null,
+    prices.length ? prices.join(' / ') : null,
   ]
     .filter(Boolean)
     .join(' · ')
+}
 </script>
 
 <template>

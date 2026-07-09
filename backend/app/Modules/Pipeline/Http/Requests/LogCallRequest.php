@@ -10,6 +10,7 @@ use App\Modules\Pipeline\Enums\CallDirection;
 use App\Modules\Pipeline\Http\Requests\Concerns\ValidatesClosure;
 use App\Modules\Pipeline\Http\Requests\Concerns\ValidatesNextAction;
 use Illuminate\Contracts\Validation\Validator;
+use App\Modules\Inventory\Enums\FinishType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -72,6 +73,7 @@ class LogCallRequest extends FormRequest
             'properties.*.shortlistable_type' => ['required', 'in:unit,box'],
             'properties.*.shortlistable_id' => ['required', 'integer'],
             'properties.*.note' => ['nullable', 'string', 'max:1000'],
+            'properties.*.finish_type' => ['nullable', new Enum(FinishType::class)],
             // Branch A — no matching inventory: capture the desire profile in the
             // same call (shared field set — notes required when the branch is used).
             'desire' => ['nullable', 'array'],

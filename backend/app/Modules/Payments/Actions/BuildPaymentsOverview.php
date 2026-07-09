@@ -39,7 +39,7 @@ class BuildPaymentsOverview
             ->where('sale_status', SaleStatus::Reserved->value)
             ->with(['location:id,name', 'reservedProject:id,client_id'])
             ->orderBy('reserved_expires_at')
-            ->get(['id', 'reference', 'price', 'location_id', 'reserved_expires_at', 'reserved_project_id'])
+            ->get(['id', 'reference', 'price_semi_fini', 'price_fini', 'location_id', 'reserved_expires_at', 'reserved_project_id'])
             ->map(function (Unit $unit) {
                 // The open deal item lets the page declare the sale from
                 // here (the same win path the deal panel uses).
@@ -49,7 +49,8 @@ class BuildPaymentsOverview
                     'id' => $unit->id,
                     'reference' => $unit->reference,
                     'location' => $unit->location?->name,
-                    'price' => (string) $unit->price,
+                    // The finish the open deal committed to prices the follow-up.
+                    'price' => (string) $unit->priceFor($item?->finish_type ?? $unit->defaultFinish()),
                     'project_id' => $unit->reserved_project_id,
                     'client_id' => $unit->reservedProject?->client_id,
                     'deal_id' => $item?->deal_id,
@@ -64,12 +65,12 @@ class BuildPaymentsOverview
             ->where('sale_status', SaleStatus::Interested->value)
             ->with(['location:id,name', 'activeReservations:id,unit_id,client_project_id'])
             ->orderBy('reference')
-            ->get(['id', 'reference', 'price', 'location_id'])
+            ->get(['id', 'reference', 'price_semi_fini', 'price_fini', 'location_id'])
             ->map(fn (Unit $unit) => [
                 'id' => $unit->id,
                 'reference' => $unit->reference,
                 'location' => $unit->location?->name,
-                'price' => (string) $unit->price,
+                'price' => (string) $unit->displayPrice(),
                 'interested_count' => $unit->activeReservations
                     ->pluck('client_project_id')->filter()->unique()->count(),
             ])

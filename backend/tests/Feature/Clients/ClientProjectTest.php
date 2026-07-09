@@ -93,7 +93,7 @@ class ClientProjectTest extends TestCase
     {
         $client = Client::factory()->create();
         $project = ClientProject::factory()->stage(ClientProjectStage::Deal)->create(['client_id' => $client->id]);
-        $unit = Unit::factory()->create(['sale_status' => 'available', 'price' => 4500000]);
+        $unit = Unit::factory()->create(['sale_status' => 'available', 'price_semi_fini' => 4500000]);
         Sanctum::actingAs($this->manager());
 
         $reservationId = $this->postJson("/api/v1/units/{$unit->id}/interest", [

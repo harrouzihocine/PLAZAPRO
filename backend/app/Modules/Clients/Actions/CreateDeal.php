@@ -12,6 +12,7 @@ use App\Modules\Clients\Models\Deal;
 use App\Modules\Clients\Models\DealItem;
 use App\Modules\Clients\Models\ShortlistItem;
 use App\Modules\Inventory\Actions\ReserveUnit;
+use App\Modules\Inventory\Enums\FinishType;
 use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Models\Box;
 use App\Modules\Inventory\Models\Unit;
@@ -49,7 +50,7 @@ class CreateDeal
     ) {}
 
     /**
-     * @param  array{visit_id?: int|null, call_id?: int|null, notes?: string|null, units: list<array{unit_id: int, box_ids?: list<int>}>}  $data
+     * @param  array{visit_id?: int|null, call_id?: int|null, notes?: string|null, units: list<array{unit_id: int, box_ids?: list<int>, finish_type?: string|null}>}  $data
      */
     public function handle(ClientProject $project, array $data, User $actor): Deal
     {
@@ -105,7 +106,13 @@ class CreateDeal
                     $actor,
                 );
 
-                $unitItem = DealItem::create(['deal_id' => $deal->id, 'unit_id' => $unit->id]);
+                $unitItem = DealItem::create([
+                    'deal_id' => $deal->id,
+                    'unit_id' => $unit->id,
+                    // The finish the client commits to — explicit choice, else
+                    // the shortlist proposal, else the unit's default.
+                    'finish_type' => $this->finishFor($project, $unit, $entry['finish_type'] ?? null),
+                ]);
 
                 $this->attachBoxes($unitItem, $unit, array_map(intval(...), $entry['box_ids'] ?? []));
             }
@@ -127,6 +134,38 @@ class CreateDeal
 
             return $deal;
         });
+    }
+
+    /**
+     * The finish this apartment enters the deal at: the explicit choice
+     * (guarded against finishes the unit doesn't offer), else the shortlist
+     * proposal when still offered, else the unit's default (semi-fini first).
+     * The shortlist row mirrors the outcome so proposal and commitment agree.
+     */
+    private function finishFor(ClientProject $project, Unit $unit, ?string $explicit): string
+    {
+        $shortlisted = ShortlistItem::query()->active()
+            ->where('client_project_id', $project->id)
+            ->where('shortlistable_type', 'unit')
+            ->where('shortlistable_id', $unit->id)
+            ->first();
+
+        if ($explicit !== null) {
+            $finish = FinishType::from($explicit);
+            abort_if(
+                $unit->priceFor($finish) === null,
+                422,
+                "Unit {$unit->reference} has no {$finish->value} price.",
+            );
+        } elseif ($shortlisted?->finish_type !== null && $unit->priceFor($shortlisted->finish_type) !== null) {
+            $finish = $shortlisted->finish_type;
+        } else {
+            $finish = $unit->defaultFinish();
+        }
+
+        $shortlisted?->update(['finish_type' => $finish->value]);
+
+        return $finish->value;
     }
 
     /**

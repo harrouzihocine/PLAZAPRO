@@ -120,7 +120,19 @@ useRefreshable(load) // pull-to-refresh (APK)
 
       <!-- The numbers a seller quotes first -->
       <div class="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <StatCard :label="$t('inventory.price')" :value="formatMoney(units.current.price)" icon="pi pi-money-bill" />
+        <StatCard
+          v-if="units.current.price_semi_fini != null"
+          :label="$t('inventory.priceSemiFini')"
+          :value="formatMoney(units.current.price_semi_fini)"
+          icon="pi pi-money-bill"
+        />
+        <StatCard
+          v-if="units.current.price_fini != null"
+          :label="$t('inventory.priceFini')"
+          :value="formatMoney(units.current.price_fini)"
+          icon="pi pi-money-bill"
+          tone="success"
+        />
         <StatCard
 :label="$t('desire.area')"
           :value="units.current.area_sqm ? `${units.current.area_sqm} m²` : '—'"

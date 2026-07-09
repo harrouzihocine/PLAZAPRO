@@ -8,6 +8,7 @@ import StatusTag from '@/components/ui/StatusTag.vue'
 import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { toastError } from '@/composables/useConfirm'
 import { shortlistApi } from '@/features/clients/api'
+import FinishToggle from '@/features/inventory/components/FinishToggle.vue'
 import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPicker.vue'
 import UnitBoxPicker from '@/features/inventory/components/UnitBoxPicker.vue'
 import DesireFields from '@/features/clients/components/DesireFields.vue'
@@ -127,8 +128,22 @@ const shortlist = ref([])
 const additions = ref([])
 const dealUnits = ref([]) // [{ unit_id, label, location_id, include, box_ids }]
 
-const propertyLabel = (p) =>
-  p ? unitLine(p, { price: p.price ? formatMoney(p.price) : null }) : null
+// `p.price` is the PROPOSED finish's price — name the finish whenever the
+// unit quotes a fini offer, so the quoted number is never ambiguous.
+const priceText = (p, finish) => {
+  if (!p?.price) return null
+  const tag =
+    p.price_fini != null && p.price_semi_fini != null
+      ? finish === 'fini'
+        ? t('inventory.finishFiniShort')
+        : t('inventory.finishSemiShort')
+      : p.price_fini != null
+        ? t('inventory.finishFiniShort')
+        : null
+  return [tag, formatMoney(p.price)].filter(Boolean).join(' ')
+}
+const propertyLabel = (p, finish) =>
+  p ? unitLine(p, { price: priceText(p, finish) }) : null
 
 onMounted(async () => {
   if (isOffice.value && hasDeal.value) {
@@ -138,10 +153,13 @@ onMounted(async () => {
       .map((i) => ({
         shortlistable_type: i.shortlistable_type,
         shortlistable_id: i.shortlistable_id,
-        label: propertyLabel(i.property) ?? `${i.shortlistable_type} #${i.shortlistable_id}`,
+        label: propertyLabel(i.property, i.finish_type) ?? `${i.shortlistable_type} #${i.shortlistable_id}`,
         state: i.state,
         location_id: i.property?.location_id ?? null,
         locked_reason: i.locked_reason ?? null,
+        finish_type: i.finish_type ?? null,
+        price_semi_fini: i.property?.price_semi_fini ?? null,
+        price_fini: i.property?.price_fini ?? null,
       }))
   }
 })
@@ -158,14 +176,26 @@ const eligibleDealUnits = computed(() => {
   if (isOffice.value) {
     return [...shortlist.value, ...additions.value]
       .filter((i) => i.shortlistable_type === 'unit' && i.state !== 'visited_not_interested')
-      .map((i) => ({ unit_id: i.shortlistable_id, label: i.label, location_id: i.location_id }))
+      .map((i) => ({
+        unit_id: i.shortlistable_id,
+        label: i.label,
+        location_id: i.location_id,
+        finish_type: i.finish_type ?? null,
+        price_semi_fini: i.price_semi_fini ?? null,
+        price_fini: i.price_fini ?? null,
+      }))
   }
   if (!insiteInterested.value || !props.visit.unit) return []
+  // finish_type stays null here: the backend falls back to the shortlist
+  // proposal (or the unit's default) when the deal doesn't say.
   return [
     {
       unit_id: props.visit.unit.id,
       label: propertyLabel(props.visit.unit) ?? props.visit.unit.reference,
       location_id: props.visit.unit.location_id ?? null,
+      finish_type: null,
+      price_semi_fini: props.visit.unit.price_semi_fini ?? null,
+      price_fini: props.visit.unit.price_fini ?? null,
     },
   ]
 })
@@ -176,7 +206,12 @@ const canOpenDeal = computed(() => eligibleDealUnits.value.length > 0)
 watch(eligibleDealUnits, (units) => {
   dealUnits.value = units.map((u) => {
     const prev = dealUnits.value.find((d) => d.unit_id === u.unit_id)
-    return { ...u, include: prev?.include ?? !isOffice.value, box_ids: prev?.box_ids ?? [] }
+    return {
+      ...u,
+      include: prev?.include ?? !isOffice.value,
+      box_ids: prev?.box_ids ?? [],
+      finish_type: prev?.finish_type ?? u.finish_type ?? null,
+    }
   })
 })
 
@@ -270,10 +305,13 @@ function submit() {
     payload.visited_at = `${visitedDate.value} ${visitedTime.value}`
   }
   if (isOffice.value && hasDeal.value) {
-    payload.shortlist = finalShortlist.value.map(({ shortlistable_type, shortlistable_id }) => ({
-      shortlistable_type,
-      shortlistable_id,
-    }))
+    payload.shortlist = finalShortlist.value.map(
+      ({ shortlistable_type, shortlistable_id, finish_type }) => ({
+        shortlistable_type,
+        shortlistable_id,
+        finish_type: finish_type ?? null,
+      }),
+    )
   }
 
   // Not the last in-site visit: record the result — plus, when the client
@@ -282,7 +320,11 @@ function submit() {
     if (interimDeal.value && includedDealUnits.value.length) {
       payload.closure = {
         type: 'deal',
-        units: includedDealUnits.value.map((u) => ({ unit_id: u.unit_id, box_ids: u.box_ids ?? [] })),
+        units: includedDealUnits.value.map((u) => ({
+          unit_id: u.unit_id,
+          box_ids: u.box_ids ?? [],
+          finish_type: u.finish_type ?? null,
+        })),
       }
     }
     draft?.complete()
@@ -297,7 +339,11 @@ function submit() {
   } else if (conclusion.value === 'deal') {
     payload.closure = {
       type: 'deal',
-      units: includedDealUnits.value.map((u) => ({ unit_id: u.unit_id, box_ids: u.box_ids ?? [] })),
+      units: includedDealUnits.value.map((u) => ({
+        unit_id: u.unit_id,
+        box_ids: u.box_ids ?? [],
+        finish_type: u.finish_type ?? null,
+      })),
     }
   } else if (conclusion.value === 'desire') {
     payload.closure = { type: 'desire', desire: desirePayload(desireForm.value) }
@@ -475,6 +521,15 @@ function submit() {
       </label>
       <div v-if="interimDeal" class="mt-2 space-y-2 border-t border-line pt-2">
         <div v-for="u in dealUnits" :key="u.unit_id" class="text-xs">
+          <!-- Both finishes quoted → pick which offer the client takes. -->
+          <div v-if="u.price_semi_fini != null && u.price_fini != null" class="mb-2">
+            <FinishToggle
+              :model-value="u.finish_type ?? 'semi_fini'"
+              :semi-fini="u.price_semi_fini"
+              :fini="u.price_fini"
+              @update:model-value="u.finish_type = $event"
+            />
+          </div>
           <p class="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-mute">
             {{ $t('calls.boxesWithApartment') }}
           </p>
@@ -527,6 +582,15 @@ function submit() {
             </span>
           </label>
           <div v-if="u.include" class="mt-2 border-t border-line pt-2">
+            <!-- Both finishes quoted → pick which offer the client takes. -->
+            <div v-if="u.price_semi_fini != null && u.price_fini != null" class="mb-2">
+              <FinishToggle
+                :model-value="u.finish_type ?? 'semi_fini'"
+                :semi-fini="u.price_semi_fini"
+                :fini="u.price_fini"
+                @update:model-value="u.finish_type = $event"
+              />
+            </div>
             <p class="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-mute">
               {{ $t('calls.boxesWithApartment') }}
             </p>

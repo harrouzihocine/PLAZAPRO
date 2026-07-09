@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Clients\Http\Requests;
 
+use App\Modules\Inventory\Enums\FinishType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Enum;
 
 /**
  * Set a project's property shortlist from the standalone shortlist panel. At
@@ -34,6 +36,9 @@ class SyncShortlistRequest extends FormRequest
             'items.*.shortlistable_type' => ['required', 'in:unit,box'],
             'items.*.shortlistable_id' => ['required', 'integer'],
             'items.*.note' => ['nullable', 'string', 'max:1000'],
+            // The finish proposed to the client (units only; SyncShortlist
+            // checks the unit actually offers it and defaults when omitted).
+            'items.*.finish_type' => ['nullable', new Enum(FinishType::class)],
         ];
     }
 }

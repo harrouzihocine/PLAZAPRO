@@ -84,7 +84,7 @@ class UnitImporter extends BaseImporter
             'room_number_id' => $this->lists->resolve('room_numbers', $roomLabel),
             'floor_id' => $this->lists->resolve('floors', $floorLabel),
             'area_sqm' => $row->area,
-            'price' => $price,
+            'price_semi_fini' => $price,
             'sale_status' => 'available',
             'block' => $this->block($note),
             'stack_floor' => $this->stackFloor($floorLabel),

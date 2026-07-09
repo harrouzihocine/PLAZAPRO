@@ -42,7 +42,7 @@ class UnitTest extends TestCase
 
         $this->postJson("/api/v1/locations/{$location->id}/units", [
             'reference' => 'A-101',
-            'price' => 250000,
+            'price_semi_fini' => 250000,
         ])
             ->assertCreated()
             ->assertJsonPath('data.reference', 'A-101')
@@ -59,7 +59,7 @@ class UnitTest extends TestCase
         Sanctum::actingAs($this->manager());
 
         $this->postJson("/api/v1/locations/{$location->id}/units", [
-            'reference' => 'A-101', 'price' => 250000,
+            'reference' => 'A-101', 'price_semi_fini' => 250000,
         ])
             ->assertCreated()
             ->assertJsonPath('data.gtm_priority', 'medium');
@@ -71,7 +71,7 @@ class UnitTest extends TestCase
         Sanctum::actingAs($this->manager());
 
         $response = $this->postJson("/api/v1/locations/{$location->id}/units", [
-            'reference' => 'A-101', 'price' => 250000, 'gtm_priority' => 'high',
+            'reference' => 'A-101', 'price_semi_fini' => 250000, 'gtm_priority' => 'high',
         ])
             ->assertCreated()
             ->assertJsonPath('data.gtm_priority', 'high');
@@ -102,7 +102,7 @@ class UnitTest extends TestCase
         Sanctum::actingAs($this->manager());
 
         $this->postJson("/api/v1/locations/{$location->id}/units", [
-            'reference' => 'A-101', 'price' => 1, 'gtm_priority' => 'sky-high',
+            'reference' => 'A-101', 'price_semi_fini' => 1, 'gtm_priority' => 'sky-high',
         ])
             ->assertStatus(422)
             ->assertJsonValidationErrorFor('gtm_priority');
@@ -114,7 +114,7 @@ class UnitTest extends TestCase
         Unit::factory()->for($location)->create(['reference' => 'A-101']);
         Sanctum::actingAs($this->manager());
 
-        $this->postJson("/api/v1/locations/{$location->id}/units", ['reference' => 'A-101', 'price' => 1])
+        $this->postJson("/api/v1/locations/{$location->id}/units", ['reference' => 'A-101', 'price_semi_fini' => 1])
             ->assertStatus(422)
             ->assertJsonValidationErrorFor('reference');
     }
@@ -126,19 +126,19 @@ class UnitTest extends TestCase
         Unit::factory()->for($a)->create(['reference' => 'A-101']);
         Sanctum::actingAs($this->manager());
 
-        $this->postJson("/api/v1/locations/{$b->id}/units", ['reference' => 'A-101', 'price' => 1])
+        $this->postJson("/api/v1/locations/{$b->id}/units", ['reference' => 'A-101', 'price_semi_fini' => 1])
             ->assertCreated();
     }
 
     public function test_correcting_price_creates_a_new_version_and_keeps_the_old(): void
     {
-        $unit = Unit::factory()->create(['price' => 200000, 'reference' => 'A-101']);
+        $unit = Unit::factory()->create(['price_semi_fini' => 200000, 'reference' => 'A-101']);
         Sanctum::actingAs($this->manager());
 
         $this->postJson("/api/v1/units/{$unit->id}/correct", [
-            'price' => 220000,
+            'price_semi_fini' => 220000,
             'reason' => 'Price list update',
-        ])->assertOk()->assertJsonPath('data.price', '220000.00');
+        ])->assertOk()->assertJsonPath('data.price_semi_fini', '220000.00');
 
         // Old row cancelled, kept; new active version links back via supersedes_id.
         $this->assertDatabaseHas('units', ['id' => $unit->id, 'status' => 'cancelled']);
@@ -152,8 +152,8 @@ class UnitTest extends TestCase
     public function test_index_filters_by_sale_status_and_price_range(): void
     {
         $location = Location::factory()->create();
-        Unit::factory()->for($location)->create(['sale_status' => 'available', 'price' => 100000, 'reference' => 'A-1']);
-        Unit::factory()->for($location)->sold()->create(['price' => 500000, 'reference' => 'A-2']);
+        Unit::factory()->for($location)->create(['sale_status' => 'available', 'price_semi_fini' => 100000, 'reference' => 'A-1']);
+        Unit::factory()->for($location)->sold()->create(['price_semi_fini' => 500000, 'reference' => 'A-2']);
         Sanctum::actingAs($this->manager());
 
         $this->getJson('/api/v1/units?sale_status=available')
@@ -219,7 +219,7 @@ class UnitTest extends TestCase
         $location = Location::factory()->create();
         Sanctum::actingAs($this->userWithPermissions(['units.view']));
 
-        $this->postJson("/api/v1/locations/{$location->id}/units", ['reference' => 'X', 'price' => 1])
+        $this->postJson("/api/v1/locations/{$location->id}/units", ['reference' => 'X', 'price_semi_fini' => 1])
             ->assertForbidden();
     }
 

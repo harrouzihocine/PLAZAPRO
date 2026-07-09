@@ -41,7 +41,10 @@ class UnitResource extends JsonResource
             'floor_id' => $this->floor_id,
             'floor' => $this->whenLoaded('floor', fn () => $this->floor?->localizedLabel()),
             'area_sqm' => $this->area_sqm,
-            'price' => $this->price,
+            // Finish-level prices: semi-fini and/or fini — at least one is set.
+            // What the unit can be offered as is derived from which are non-null.
+            'price_semi_fini' => $this->price_semi_fini,
+            'price_fini' => $this->price_fini,
             'sale_status' => $this->sale_status?->value,
             // How many distinct client projects hold this unit — the "Interested
             // N" counter. Reserved adds its deposit timer + holder project id.

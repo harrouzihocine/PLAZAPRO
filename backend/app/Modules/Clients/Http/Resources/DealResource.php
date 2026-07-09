@@ -49,7 +49,14 @@ class DealResource extends JsonResource
                     'type' => $i->unit->location?->type?->localizedLabel(),
                     'floor' => $i->unit->floor?->localizedLabel(),
                     'area_sqm' => $i->unit->area_sqm,
-                    'price' => $i->unit->price,
+                    // The finish the client committed to (pre-dual-price items
+                    // fall back to the unit's default) and ITS price — what the
+                    // win dialog prefills. Both raw prices ride along so the UI
+                    // can offer the toggle only when the unit quotes both.
+                    'finish_type' => ($i->finish_type ?? $i->unit->defaultFinish())->value,
+                    'price' => $i->unit->priceFor($i->finish_type ?? $i->unit->defaultFinish()),
+                    'price_semi_fini' => $i->unit->price_semi_fini,
+                    'price_fini' => $i->unit->price_fini,
                     'sale_status' => $i->unit->sale_status?->value,
                     // Reserved deposit context: when the client paid a holding
                     // deposit on this apartment it shows Reserved with the money

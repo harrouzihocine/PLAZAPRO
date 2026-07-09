@@ -9,6 +9,7 @@ import { shortlistApi } from '@/features/clients/api'
 import { queueable } from '@/features/offline/apiOrQueue'
 import { formatMoney } from '@/features/payments/money'
 import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPicker.vue'
+import FinishToggle from '@/features/inventory/components/FinishToggle.vue'
 import { useAuthStore } from '@/features/settings/store'
 import { t } from '@/i18n'
 
@@ -25,31 +26,60 @@ const route = useRoute()
 // office-visit completion picker or "Add unit to visit" (visits.propose).
 const canEdit = () => auth.can('shortlist.manage')
 
-const items = ref([]) // working copy: { shortlistable_type, shortlistable_id, state, property }
+const items = ref([]) // working copy: { shortlistable_type, shortlistable_id, state, finish_type, property }
 const additions = ref([]) // ProjectUnitsPicker v-model: properties to add on save
 const saving = ref(false)
+const touched = ref(false) // a finish toggle / removal marks the list dirty
 
 // The full property card, not just the code.
 const propertyLine = (it) => {
   const p = it.property
   if (!p) return `${it.shortlistable_type} #${it.shortlistable_id}`
+  // `p.price` is already the PROPOSED finish's price; name the finish as soon
+  // as the unit quotes a fini offer, so the number is never ambiguous.
+  const priceText = p.price
+    ? [
+        it.finish_type === 'fini' || (p.price_fini != null && p.price_semi_fini == null)
+          ? t('inventory.finishFiniShort')
+          : p.price_fini != null
+            ? t('inventory.finishSemiShort')
+            : null,
+        formatMoney(p.price),
+      ]
+        .filter(Boolean)
+        .join(' ')
+    : null
+
   return [
     p.reference,
     p.property_type,
     p.floor,
     p.area_sqm ? `${p.area_sqm} m²` : null,
-    p.price ? formatMoney(p.price) : null,
+    priceText,
     p.location,
   ]
     .filter(Boolean)
     .join(' · ')
 }
 
+// Flip the finish PROPOSED on an existing row; saved with the sync.
+function setFinish(it, finish) {
+  it.finish_type = finish
+  // The displayed price follows the proposal immediately.
+  if (it.property) {
+    it.property = {
+      ...it.property,
+      price: finish === 'fini' ? it.property.price_fini : it.property.price_semi_fini,
+    }
+  }
+  touched.value = true
+}
+
 // Keys already on the shortlist — hidden inside the picker.
 const excludeKeys = computed(() =>
   items.value.map((i) => `${i.shortlistable_type}:${i.shortlistable_id}`),
 )
-const hasChanges = computed(() => additions.value.length > 0)
+const hasChanges = computed(() => additions.value.length > 0 || touched.value)
 
 onMounted(load)
 
@@ -61,14 +91,17 @@ async function load() {
     shortlistable_id: i.shortlistable_id,
     state: i.state,
     locked_reason: i.locked_reason,
+    finish_type: i.finish_type,
     property: i.property,
   }))
   additions.value = []
+  touched.value = false
 }
 
 function remove(item) {
   const i = items.value.indexOf(item)
   if (i !== -1) items.value.splice(i, 1)
+  touched.value = true
 }
 
 async function save() {
@@ -89,6 +122,7 @@ async function save() {
         items: all.map((i) => ({
           shortlistable_type: i.shortlistable_type,
           shortlistable_id: i.shortlistable_id,
+          finish_type: i.finish_type ?? null,
         })),
         office_visit_id: null,
       },
@@ -127,6 +161,22 @@ async function save() {
           <span class="min-w-0 truncate text-ink">{{ propertyLine(it) }}</span>
           <StatusTag :value="it.state" />
           <StatusTag v-if="it.locked_reason" :value="it.locked_reason" />
+          <!-- Both finishes quoted → the proposal can flip while unlocked. -->
+          <FinishToggle
+            v-if="
+              canEdit() &&
+              !it.locked_reason &&
+              !['won', 'lost'].includes(it.state) &&
+              it.shortlistable_type === 'unit' &&
+              it.property?.price_semi_fini != null &&
+              it.property?.price_fini != null
+            "
+            :model-value="it.finish_type ?? 'semi_fini'"
+            :semi-fini="it.property.price_semi_fini"
+            :fini="it.property.price_fini"
+            :with-prices="false"
+            @update:model-value="setFinish(it, $event)"
+          />
         </span>
         <Button
           v-if="canEdit() && !['won', 'lost'].includes(it.state) && !it.locked_reason"

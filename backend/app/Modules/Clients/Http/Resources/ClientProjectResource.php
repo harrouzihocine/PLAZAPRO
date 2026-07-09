@@ -101,7 +101,7 @@ class ClientProjectResource extends JsonResource
                 'type' => $this->unit->location?->type?->localizedLabel(),
                 'floor' => $this->unit->floor?->localizedLabel(),
                 'area_sqm' => $this->unit->area_sqm,
-                'price' => $this->unit->price,
+                'price' => $this->unit->displayPrice(),
                 'sale_status' => $this->unit->sale_status?->value,
             ] : null),
             'active_deal' => $this->whenLoaded('activeDeal', fn () => $this->activeDeal ? [

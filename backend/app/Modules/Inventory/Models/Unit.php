@@ -6,6 +6,7 @@ namespace App\Modules\Inventory\Models;
 
 use App\Core\Models\BaseModel;
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Inventory\Enums\FinishType;
 use App\Modules\Inventory\Enums\GtmPriority;
 use App\Modules\Inventory\Enums\HoldStatus;
 use App\Modules\Inventory\Enums\SaleStatus;
@@ -20,9 +21,14 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Collection as SupportCollection;
 
 /**
- * An apartment / lot inside a location. price and sale_status corrections go
+ * An apartment / lot inside a location. Price and sale_status corrections go
  * through HasVersions::supersedeWith (cancel-and-duplicate); ordinary spec edits
  * and interest-hold lifecycle transitions are plain updates.
+ *
+ * A unit quotes up to TWO prices — semi-fini (semi-finished) and fini (turnkey);
+ * at least one is always set (DB check). When both exist the client picks the
+ * finish (FinishType on shortlist/deal items) and that price IS the unit's price
+ * for the sale.
  */
 class Unit extends BaseModel
 {
@@ -30,19 +36,50 @@ class Unit extends BaseModel
 
     protected $fillable = [
         'location_id', 'reference', 'room_number_id', 'floor_id', 'area_sqm',
-        'price', 'sale_status', 'reserved_expires_at', 'reserved_project_id',
-        'block', 'stack_floor', 'position', 'gtm_priority',
+        'price_semi_fini', 'price_fini', 'sale_status', 'reserved_expires_at',
+        'reserved_project_id', 'block', 'stack_floor', 'position', 'gtm_priority',
     ];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'price' => 'decimal:2',
+            'price_semi_fini' => 'decimal:2',
+            'price_fini' => 'decimal:2',
             'area_sqm' => 'decimal:2',
             'sale_status' => SaleStatus::class,
             'reserved_expires_at' => 'datetime',
             'gtm_priority' => GtmPriority::class,
         ]);
+    }
+
+    /** The price the unit quotes at a given finish — null when not offered. */
+    public function priceFor(FinishType $finish): ?string
+    {
+        return match ($finish) {
+            FinishType::SemiFini => $this->price_semi_fini,
+            FinishType::Fini => $this->price_fini,
+        };
+    }
+
+    /** @return list<FinishType> the finishes this unit is offered at (always ≥ 1). */
+    public function availableFinishes(): array
+    {
+        return array_values(array_filter(
+            FinishType::cases(),
+            fn (FinishType $finish) => $this->priceFor($finish) !== null,
+        ));
+    }
+
+    /** The finish quoted when nobody chose: semi-fini when offered, else fini. */
+    public function defaultFinish(): FinishType
+    {
+        return $this->price_semi_fini !== null ? FinishType::SemiFini : FinishType::Fini;
+    }
+
+    /** The single displayable price where one number is needed (semi-fini first). */
+    public function displayPrice(): ?string
+    {
+        return $this->price_semi_fini ?? $this->price_fini;
     }
 
     /**

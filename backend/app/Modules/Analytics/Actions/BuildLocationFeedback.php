@@ -51,7 +51,7 @@ class BuildLocationFeedback
         $isUnitScope = $unit !== null;
 
         $units = Unit::query()->active()->where('location_id', $location->id)
-            ->get(['id', 'reference', 'price', 'sale_status']);
+            ->get(['id', 'reference', 'price_semi_fini', 'price_fini', 'sale_status']);
         if ($isUnitScope) {
             $units = $units->where('id', $unit->id)->values();
         }
@@ -250,7 +250,7 @@ class BuildLocationFeedback
             return [
                 'id' => $u->id,
                 'reference' => $u->reference,
-                'price' => $u->price,
+                'price' => $u->displayPrice(),
                 'sale_status' => $u->sale_status?->value,
                 'shortlisted' => $shortlisted,
                 'visits' => $visits,
@@ -290,7 +290,7 @@ class BuildLocationFeedback
             return [
                 'id' => $u->id,
                 'reference' => $u->reference,
-                'price' => $u->price,
+                'price' => $u->displayPrice(),
                 'visits' => $visitsByUnit->get($u->id, collect())->count(),
                 'rejected' => $rejected,
                 'seen' => $seen,

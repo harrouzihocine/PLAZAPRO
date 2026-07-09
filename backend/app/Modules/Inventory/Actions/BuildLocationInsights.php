@@ -10,6 +10,7 @@ use App\Modules\Inventory\Models\Box;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Payments\Models\Versement;
+use Illuminate\Support\Facades\DB;
 
 /**
  * A pure read view for the development (Location) detail page: the inventory
@@ -54,7 +55,13 @@ class BuildLocationInsights
                 ->whereIn('client_project_id', (clone $projects)->pluck('id'))
                 ->sum('amount');
 
-            $soldValue = (clone $units)->where('sale_status', 'sold')->sum('price');
+            // What the units actually sold for: the won deal item's agreed
+            // price. Units sold without a deal (legacy imports) fall back to
+            // the default list price — a fini sale would otherwise be
+            // understated by the semi-fini COALESCE.
+            $soldValue = (clone $units)->where('sale_status', 'sold')
+                ->leftJoin(DB::raw("(select unit_id, max(agreed_price) as agreed_price from deal_items where status = 'active' and state = 'won' group by unit_id) as won_items"), 'won_items.unit_id', '=', 'units.id')
+                ->sum(DB::raw('COALESCE(won_items.agreed_price, units.price_semi_fini, units.price_fini)'));
 
             $data['revenue'] = [
                 'collected' => $this->money($collected),

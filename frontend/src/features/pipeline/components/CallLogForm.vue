@@ -6,6 +6,7 @@ import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { shortlistApi } from '@/features/clients/api'
+import FinishToggle from '@/features/inventory/components/FinishToggle.vue'
 import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPicker.vue'
 import UnitBoxPicker from '@/features/inventory/components/UnitBoxPicker.vue'
 import DesireFields from '@/features/clients/components/DesireFields.vue'
@@ -76,8 +77,22 @@ const existingShortlistKeys = computed(() =>
   existingShortlist.value.map((i) => `${i.shortlistable_type}:${i.shortlistable_id}`),
 )
 
-const propertyLabel = (p) =>
-  p ? unitLine(p, { price: p.price ? formatMoney(p.price) : null }) : null
+// `p.price` is the PROPOSED finish's price — name the finish whenever the
+// unit quotes a fini offer, so the quoted number is never ambiguous.
+const priceText = (p, finish) => {
+  if (!p?.price) return null
+  const tag =
+    p.price_fini != null && p.price_semi_fini != null
+      ? finish === 'fini'
+        ? t('inventory.finishFiniShort')
+        : t('inventory.finishSemiShort')
+      : p.price_fini != null
+        ? t('inventory.finishFiniShort')
+        : null
+  return [tag, formatMoney(p.price)].filter(Boolean).join(' ')
+}
+const propertyLabel = (p, finish) =>
+  p ? unitLine(p, { price: priceText(p, finish) }) : null
 
 // The interested list = the shortlisted apartments/locals the client has not
 // passed on. Loaded once; the deal picks from it.
@@ -87,7 +102,7 @@ onMounted(async () => {
   existingShortlist.value = items.map((i) => ({
     shortlistable_type: i.shortlistable_type,
     shortlistable_id: i.shortlistable_id,
-    label: propertyLabel(i.property) ?? `${i.shortlistable_type} #${i.shortlistable_id}`,
+    label: propertyLabel(i.property, i.finish_type) ?? `${i.shortlistable_type} #${i.shortlistable_id}`,
     state: i.state,
   }))
   const restorable = new Map(dealChoices.value.map((c) => [c.unit_id, c]))
@@ -99,10 +114,14 @@ onMounted(async () => {
     )
     .map((i) => ({
       unit_id: i.shortlistable_id,
-      label: propertyLabel(i.property) ?? `unit #${i.shortlistable_id}`,
+      label: propertyLabel(i.property, i.finish_type) ?? `unit #${i.shortlistable_id}`,
       location_id: i.property?.location_id ?? null,
       include: restorable.get(i.shortlistable_id)?.include ?? false,
       box_ids: restorable.get(i.shortlistable_id)?.box_ids ?? [],
+      // The finish the shortlist proposed — switchable per included apartment.
+      finish_type: restorable.get(i.shortlistable_id)?.finish_type ?? i.finish_type ?? null,
+      price_semi_fini: i.property?.price_semi_fini ?? null,
+      price_fini: i.property?.price_fini ?? null,
     }))
 })
 
@@ -173,10 +192,14 @@ const branchDesireReady = computed(
 const includedDealUnits = computed(() => [
   ...dealChoices.value
     .filter((c) => c.include)
-    .map((c) => ({ unit_id: c.unit_id, box_ids: c.box_ids ?? [] })),
+    .map((c) => ({ unit_id: c.unit_id, box_ids: c.box_ids ?? [], finish_type: c.finish_type ?? null })),
   ...dealAdditions.value
     .filter((p) => p.shortlistable_type === 'unit')
-    .map((p) => ({ unit_id: p.shortlistable_id, box_ids: p.box_ids ?? [] })),
+    .map((p) => ({
+      unit_id: p.shortlistable_id,
+      box_ids: p.box_ids ?? [],
+      finish_type: p.finish_type ?? null,
+    })),
 ])
 
 // Every conclusion has its own completeness gate — nothing dangling. The
@@ -208,10 +231,13 @@ function submit() {
 
   // Interest qualification rides on the call regardless of how it concludes.
   if (branch.value === 'properties' && properties.value.length) {
-    payload.properties = properties.value.map(({ shortlistable_type, shortlistable_id }) => ({
-      shortlistable_type,
-      shortlistable_id,
-    }))
+    payload.properties = properties.value.map(
+      ({ shortlistable_type, shortlistable_id, finish_type }) => ({
+        shortlistable_type,
+        shortlistable_id,
+        finish_type: finish_type ?? null,
+      }),
+    )
   }
   // Branch-A desire is upserted top-level — except when the call concludes to the
   // desire list, where the same profile rides inside the closure (no double-send).
@@ -416,6 +442,15 @@ function submit() {
               </span>
             </label>
             <div v-if="c.include" class="mt-2 border-t border-line pt-2">
+              <!-- Both finishes quoted → pick which offer the client takes. -->
+              <div v-if="c.price_semi_fini != null && c.price_fini != null" class="mb-2">
+                <FinishToggle
+                  :model-value="c.finish_type ?? 'semi_fini'"
+                  :semi-fini="c.price_semi_fini"
+                  :fini="c.price_fini"
+                  @update:model-value="c.finish_type = $event"
+                />
+              </div>
               <p class="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-mute">
                 {{ $t('calls.boxesWithApartment') }}
               </p>

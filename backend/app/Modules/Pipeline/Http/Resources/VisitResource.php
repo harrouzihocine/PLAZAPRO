@@ -48,7 +48,9 @@ class VisitResource extends JsonResource
                 'property_type' => $this->unit->location?->type?->localizedLabel(),
                 'floor' => $this->unit->floor?->localizedLabel(),
                 'area_sqm' => $this->unit->area_sqm,
-                'price' => $this->unit->price,
+                'price' => $this->unit->displayPrice(),
+                'price_semi_fini' => $this->unit->price_semi_fini,
+                'price_fini' => $this->unit->price_fini,
                 // Site coordinates — lets the field agent open the in-site visit
                 // in Google Maps.
                 'location' => $this->unit->relationLoaded('location') && $this->unit->location ? [

@@ -66,7 +66,7 @@ class DealTest extends TestCase
         $client = Client::factory()->create();
         $project = ClientProject::factory()->create(['client_id' => $client->id]);
         $location = Location::factory()->create();
-        $unit = Unit::factory()->create(['location_id' => $location->id, 'price' => '500000.00']);
+        $unit = Unit::factory()->create(['location_id' => $location->id, 'price_semi_fini' => '500000.00']);
         Box::factory()->count($boxes)->create(['location_id' => $location->id, 'price' => '20000.00']);
 
         ShortlistItem::factory()->create([
@@ -258,7 +258,7 @@ class DealTest extends TestCase
         // But ANOTHER apartment opens its own deal alongside the first one —
         // one deal per committed apartment.
         $other = Unit::factory()->create([
-            'location_id' => $unit->location_id, 'price' => '400000.00',
+            'location_id' => $unit->location_id, 'price_semi_fini' => '400000.00',
         ]);
         $this->postJson("/api/v1/projects/{$project->id}/deals", [
             'visit_id' => $visit->id,
@@ -350,7 +350,7 @@ class DealTest extends TestCase
         // Two shortlisted apartments enter the deal; the client buys one and
         // passes on the other — the deal resolves itself as won.
         [$project, $visit, $unit] = $this->projectWithVisitAndUnit();
-        $second = Unit::factory()->create(['location_id' => $unit->location_id, 'price' => '400000.00']);
+        $second = Unit::factory()->create(['location_id' => $unit->location_id, 'price_semi_fini' => '400000.00']);
         ShortlistItem::factory()->create([
             'client_project_id' => $project->id,
             'shortlistable_id' => $second->id,

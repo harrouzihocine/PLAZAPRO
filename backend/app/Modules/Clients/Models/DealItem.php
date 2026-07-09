@@ -6,6 +6,7 @@ namespace App\Modules\Clients\Models;
 
 use App\Core\Models\BaseModel;
 use App\Modules\Clients\Enums\DealState;
+use App\Modules\Inventory\Enums\FinishType;
 use App\Modules\Inventory\Models\Box;
 use App\Modules\Inventory\Models\Unit;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -26,7 +27,7 @@ class DealItem extends BaseModel
 
     protected $fillable = [
         'deal_id', 'unit_id', 'box_id', 'parent_item_id',
-        'state', 'agreed_price', 'closed_at', 'box_linked', 'credits',
+        'state', 'agreed_price', 'finish_type', 'closed_at', 'box_linked', 'credits',
     ];
 
     protected function casts(): array
@@ -34,6 +35,8 @@ class DealItem extends BaseModel
         return array_merge(parent::casts(), [
             'state' => DealState::class,
             'agreed_price' => 'decimal:2',
+            // The finish the client committed to (apartment items only).
+            'finish_type' => FinishType::class,
             'closed_at' => 'datetime',
             'box_linked' => 'boolean',
             // { sale: [user ids], insite: [user ids], other: [user ids] }

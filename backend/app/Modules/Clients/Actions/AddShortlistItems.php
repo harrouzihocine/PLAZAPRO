@@ -7,6 +7,8 @@ namespace App\Modules\Clients\Actions;
 use App\Modules\Clients\Enums\ShortlistState;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Clients\Models\ShortlistItem;
+use App\Modules\Inventory\Enums\FinishType;
+use App\Modules\Inventory\Models\Unit;
 use Illuminate\Support\Collection;
 
 /**
@@ -18,7 +20,7 @@ use Illuminate\Support\Collection;
 class AddShortlistItems
 {
     /**
-     * @param  list<array{shortlistable_type: string, shortlistable_id: int|string, note?: string|null}>  $items
+     * @param  list<array{shortlistable_type: string, shortlistable_id: int|string, note?: string|null, finish_type?: string|null}>  $items
      */
     public function handle(ClientProject $project, array $items, ?int $callId = null): Collection
     {
@@ -45,9 +47,37 @@ class AddShortlistItems
                 'shortlistable_id' => $id,
                 'state' => ShortlistState::Shortlisted->value,
                 'note' => $item['note'] ?? null,
+                'finish_type' => $this->finishFor($type, $id, $item['finish_type'] ?? null),
             ]);
         }
 
         return $project->shortlistItems()->active()->withProperty()->get();
+    }
+
+    /**
+     * The finish proposed on a fresh row: boxes carry none; a unit takes the
+     * explicit choice (guarded against finishes it doesn't offer), else its
+     * default (semi-fini when offered).
+     */
+    private function finishFor(string $type, int $id, ?string $explicit): ?string
+    {
+        if ($type !== 'unit') {
+            return null;
+        }
+
+        $unit = Unit::query()->findOrFail($id);
+
+        if ($explicit !== null) {
+            $finish = FinishType::from($explicit);
+            abort_if(
+                $unit->priceFor($finish) === null,
+                422,
+                "Unit {$unit->reference} has no {$finish->value} price.",
+            );
+
+            return $finish->value;
+        }
+
+        return $unit->defaultFinish()->value;
     }
 }

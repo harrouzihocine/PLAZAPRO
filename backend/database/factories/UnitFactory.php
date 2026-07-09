@@ -23,13 +23,30 @@ class UnitFactory extends Factory
             'location_id' => Location::factory(),
             'reference' => 'U-'.fake()->unique()->numberBetween(1, 999999),
             'area_sqm' => fake()->numberBetween(30, 200),
-            'price' => fake()->numberBetween(50000, 900000),
+            'price_semi_fini' => fake()->numberBetween(50000, 900000),
             'sale_status' => SaleStatus::Available->value,
             'block' => fake()->randomElement(['A', 'B', 'C']),
             'stack_floor' => fake()->numberBetween(0, 10),
             'position' => fake()->numberBetween(1, 6),
             'gtm_priority' => fake()->randomElement(GtmPriority::cases())->value,
         ];
+    }
+
+    /** Offered at BOTH finishes — fini above the semi-fini price. */
+    public function dualPrice(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'price_fini' => ($attributes['price_semi_fini'] ?? 500000) + fake()->numberBetween(50000, 300000),
+        ]);
+    }
+
+    /** Offered turnkey ONLY — no semi-fini price. */
+    public function finiOnly(): static
+    {
+        return $this->state(fn () => [
+            'price_semi_fini' => null,
+            'price_fini' => fake()->numberBetween(100000, 1200000),
+        ]);
     }
 
     public function interested(): static

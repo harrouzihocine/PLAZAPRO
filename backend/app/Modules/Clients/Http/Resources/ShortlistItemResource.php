@@ -22,6 +22,9 @@ class ShortlistItemResource extends JsonResource
             'call_id' => $this->call_id,
             'state' => $this->state?->value,
             'note' => $this->note,
+            // The finish proposed to the client (units only; null on boxes and
+            // on rows shortlisted before units went dual-price).
+            'finish_type' => $this->finish_type?->value,
             'shortlistable_type' => $this->shortlistable_type,
             'shortlistable_id' => $this->shortlistable_id,
             // Non-null when an open deal (open/won) or a Reserved deposit
@@ -33,7 +36,14 @@ class ShortlistItemResource extends JsonResource
                 'type' => $this->shortlistable_type,
                 'id' => $this->shortlistable->id,
                 'reference' => $this->shortlistable->reference,
-                'price' => $this->shortlistable->price,
+                // Units: `price` is the proposed finish's price (default finish
+                // when unset) with both raw prices alongside; boxes keep their
+                // single price.
+                'price' => $this->shortlistable_type === 'unit'
+                    ? $this->shortlistable->priceFor($this->finish_type ?? $this->shortlistable->defaultFinish())
+                    : $this->shortlistable->price,
+                'price_semi_fini' => $this->shortlistable_type === 'unit' ? $this->shortlistable->price_semi_fini : null,
+                'price_fini' => $this->shortlistable_type === 'unit' ? $this->shortlistable->price_fini : null,
                 'sale_status' => $this->shortlistable->sale_status?->value,
                 'location_id' => $this->shortlistable->location_id,
                 'location' => $this->shortlistable->location?->name,

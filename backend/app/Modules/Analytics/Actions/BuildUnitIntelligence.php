@@ -25,7 +25,7 @@ class BuildUnitIntelligence
         $units = Unit::query()->active()
             ->when($locationId, fn ($q) => $q->where('location_id', $locationId))
             ->with('location:id,name')
-            ->get(['id', 'reference', 'location_id', 'sale_status', 'price']);
+            ->get(['id', 'reference', 'location_id', 'sale_status', 'price_semi_fini', 'price_fini']);
 
         $unitIds = $units->pluck('id');
 
@@ -59,7 +59,7 @@ class BuildUnitIntelligence
                     'reference' => $u->reference,
                     'location' => $u->location?->name,
                     'sale_status' => $u->sale_status?->value,
-                    'price' => $u->price,
+                    'price' => $u->displayPrice(),
                     'visits' => $interest,
                     'holds' => (int) $holds->get($u->id, 0),
                     'won' => $conversions,

@@ -86,7 +86,8 @@ class BuildReservationQueues
                 'room_number' => $unit->roomNumber?->localizedLabel(),
                 'floor' => $unit->floor?->localizedLabel(),
                 'area_sqm' => $unit->area_sqm,
-                'price' => $unit->price,
+                'price_semi_fini' => $unit->price_semi_fini,
+                'price_fini' => $unit->price_fini,
                 'queue' => $unit->reservationQueue()
                     ->values()
                     ->map(fn (Reservation $hold, int $i) => $this->entry($unit, $hold, $i + 1, $user))

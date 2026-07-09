@@ -10,6 +10,7 @@ use App\Modules\Clients\Actions\CloseDeal;
 use App\Modules\Clients\Actions\CloseDealUnit;
 use App\Modules\Clients\Actions\CreateDeal;
 use App\Modules\Clients\Actions\ReleaseWonDealUnit;
+use App\Modules\Clients\Actions\SetDealItemFinish;
 use App\Modules\Clients\Actions\SyncDealUnitBoxes;
 use App\Modules\Clients\Http\Requests\AddDealBoxesRequest;
 use App\Modules\Clients\Http\Requests\CloseDealItemRequest;
@@ -17,10 +18,12 @@ use App\Modules\Clients\Http\Requests\CloseDealRequest;
 use App\Modules\Clients\Http\Requests\ReleaseDealItemRequest;
 use App\Modules\Clients\Http\Requests\StoreDealRequest;
 use App\Modules\Clients\Http\Requests\SyncDealBoxesRequest;
+use App\Modules\Clients\Http\Requests\UpdateDealItemFinishRequest;
 use App\Modules\Clients\Http\Resources\DealResource;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Clients\Models\Deal;
 use App\Modules\Clients\Models\DealItem;
+use App\Modules\Inventory\Enums\FinishType;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -148,6 +151,20 @@ class DealController extends Controller
         );
 
         return new DealResource($updated->load(self::relations()));
+    }
+
+    /** Switch the finish (semi-fini / fini) the client takes ONE open apartment at. */
+    public function updateItemFinish(
+        UpdateDealItemFinishRequest $request,
+        Deal $deal,
+        DealItem $item,
+        SetDealItemFinish $action,
+    ): DealResource {
+        abort_unless((int) $item->deal_id === (int) $deal->id, 404);
+
+        $action->handle($item, FinishType::from($request->validated('finish_type')));
+
+        return new DealResource($deal->fresh()->load(self::relations()));
     }
 
     /** Re-set the boxes riding with ONE apartment on the open deal. */
