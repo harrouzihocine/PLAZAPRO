@@ -80,6 +80,21 @@ export function toastInfo(text) {
   return showToast(text, 'info')
 }
 
+// Status-coloured flash toast: the accent bar, icon and timer take the same
+// severity palette as <StatusTag> (utils/status.js), so the colour alone tells
+// which state a unit moved to. `icon` is a PrimeVue icon class (pi pi-*);
+// severities without a swal.css rule fall back to a neutral accent.
+export function toastStatus(text, { severity = 'secondary', icon = null } = {}) {
+  if (!text) return
+  return Toast.fire({
+    icon: 'info',
+    ...(icon ? { iconHtml: `<i class="${icon}"></i>` } : {}),
+    title: text,
+    position: isRTL() ? 'top-start' : 'top-end',
+    customClass: { popup: `plaza-swal-toast plaza-toast plaza-toast-${severity}` },
+  })
+}
+
 export function useConfirm() {
   return { confirm: confirmAction, alert: alertMessage }
 }

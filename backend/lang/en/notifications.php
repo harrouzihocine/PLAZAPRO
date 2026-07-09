@@ -131,6 +131,10 @@ return [
         'title' => 'Unit :unit updated',
         'body' => ':details',
     ],
+    'units_imported' => [
+        'title' => 'Inventory imported',
+        'body' => ':user imported units from a file — :created added, :updated updated.',
+    ],
     'box_updated' => [
         'title' => 'Box :box updated',
         'body' => ':details',
@@ -150,6 +154,12 @@ return [
     ],
     'chat_message' => [
         'title' => ':title',
+        'body' => ':preview',
+    ],
+    // First message a sender has ever written to this recipient — the only
+    // chat traffic that lands in the bell feed.
+    'chat_first_message' => [
+        'title' => 'New chat from :name',
         'body' => ':preview',
     ],
     'chat_group' => 'Group chat',

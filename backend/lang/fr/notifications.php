@@ -129,6 +129,10 @@ return [
         'title' => 'Unité :unit mise à jour',
         'body' => ':details',
     ],
+    'units_imported' => [
+        'title' => 'Inventaire importé',
+        'body' => ':user a importé des unités depuis un fichier — :created ajoutées, :updated mises à jour.',
+    ],
     'box_updated' => [
         'title' => 'Box :box mis à jour',
         'body' => ':details',
@@ -148,6 +152,12 @@ return [
     ],
     'chat_message' => [
         'title' => ':title',
+        'body' => ':preview',
+    ],
+    // First message a sender has ever written to this recipient — the only
+    // chat traffic that lands in the bell feed.
+    'chat_first_message' => [
+        'title' => 'Nouvelle discussion de :name',
         'body' => ':preview',
     ],
     'chat_group' => 'Discussion de groupe',

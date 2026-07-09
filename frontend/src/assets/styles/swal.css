@@ -50,3 +50,57 @@
   font-size: 0.9rem !important;
   font-weight: 500 !important;
 }
+
+/* Status-coloured flash toasts (unit available / interested / reserved / sold /
+   blocked, plus plain edits): accent bar, icon and timer all take the severity
+   colour that <StatusTag> uses for the same state, so the colour alone says
+   what happened. Logical inline-start keeps the bar on the reading edge in RTL.
+   Severity → token map mirrors PrimeVue Tag severities (tokens are theme-aware). */
+.plaza-toast {
+  /* Neutral accent: plain edits (severity "secondary") and unmapped
+     severities — grey says "changed, but no state move". Indirection via
+     --toast-neutral lets the dark override below retint the default without
+     out-specifying the per-severity --toast-accent rules. */
+  --toast-neutral: #6f6c63;
+  --toast-accent: var(--toast-neutral);
+  border-inline-start: 4px solid var(--toast-accent) !important;
+  /* Subtle wash of the accent over the surface; browsers without color-mix
+     simply keep the plain surface from .plaza-swal-toast. */
+  background: color-mix(in srgb, var(--toast-accent) 8%, var(--color-surface)) !important;
+}
+
+[data-theme='dark'] .plaza-toast {
+  --toast-neutral: #a5a196;
+}
+
+.plaza-toast-success {
+  --toast-accent: var(--color-success);
+}
+.plaza-toast-warn {
+  --toast-accent: var(--color-warning);
+}
+.plaza-toast-info {
+  --toast-accent: var(--app-info);
+}
+.plaza-toast-danger {
+  --toast-accent: var(--color-danger);
+}
+/* "contrast" severity (reserved) renders inverted like its badge. */
+.plaza-toast-contrast {
+  --toast-accent: var(--color-text);
+}
+
+.plaza-toast .swal2-icon {
+  border-color: var(--toast-accent) !important;
+  color: var(--toast-accent) !important;
+}
+
+/* PrimeVue icon injected via iconHtml — size it for the 2em toast circle. */
+.plaza-toast .swal2-icon .swal2-icon-content {
+  font-size: 1rem !important;
+}
+
+.plaza-toast .swal2-timer-progress-bar {
+  background: var(--toast-accent) !important;
+  opacity: 0.45;
+}

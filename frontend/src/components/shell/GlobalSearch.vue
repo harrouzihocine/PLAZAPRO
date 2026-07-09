@@ -93,6 +93,7 @@ function describe(kind, row) {
     return {
       title: fullName(row) || row.full_name || `Client #${row.id}`,
       meta: row.phone ?? row.email ?? '',
+      metaLtr: true,
       to: `/clients/${row.id}`,
     }
   }
@@ -203,7 +204,9 @@ defineExpose({ show })
           <i :class="item.group.icon" class="text-mute" aria-hidden="true" />
           <span class="min-w-0 flex-1">
             <span class="block truncate text-sm font-medium text-ink">{{ item.title }}</span>
-            <span v-if="item.meta" class="block truncate text-xs text-mute">{{ item.meta }}</span>
+            <span v-if="item.meta" class="block truncate text-xs text-mute"
+              ><span :class="{ 'ltr-data': item.metaLtr }">{{ item.meta }}</span></span
+            >
           </span>
           <i
             v-if="item.index === active"

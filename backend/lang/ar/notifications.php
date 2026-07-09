@@ -129,6 +129,10 @@ return [
         'title' => 'حُدّثت الوحدة :unit',
         'body' => ':details',
     ],
+    'units_imported' => [
+        'title' => 'تم استيراد المخزون',
+        'body' => 'قام :user باستيراد وحدات من ملف — :created أُضيفت، :updated حُدِّثت.',
+    ],
     'box_updated' => [
         'title' => 'حُدّث الصندوق :box',
         'body' => ':details',
@@ -148,6 +152,12 @@ return [
     ],
     'chat_message' => [
         'title' => ':title',
+        'body' => ':preview',
+    ],
+    // First message a sender has ever written to this recipient — the only
+    // chat traffic that lands in the bell feed.
+    'chat_first_message' => [
+        'title' => 'محادثة جديدة من :name',
         'body' => ':preview',
     ],
     'chat_group' => 'محادثة جماعية',

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { getEcho } from '@/composables/useEcho'
-import { toastInfo, toastSuccess } from '@/composables/useConfirm'
+import { toastStatus, toastSuccess } from '@/composables/useConfirm'
 import { useUnitsStore } from '@/features/inventory/unitsStore'
 import { t } from '@/i18n'
 import { statusMeta } from '@/utils/status'
@@ -47,7 +47,8 @@ export const useAnnouncementsStore = defineStore('announcements', {
     },
 
     // A status move (interested / reserved / available / sold) — repaint open
-    // views and surface a quiet toast so people notice the change live.
+    // views and surface a quiet toast so people notice the change live. The
+    // toast carries the status colour + icon so it's readable at a glance.
     applyStatus(payload) {
       this.patchUnit(payload.id, {
         sale_status: payload.sale_status,
@@ -55,7 +56,8 @@ export const useAnnouncementsStore = defineStore('announcements', {
         reserved_expires_at: payload.reserved_expires_at,
       })
       if (payload.reference) {
-        toastInfo(`${payload.reference} · ${statusMeta(payload.sale_status).label}`)
+        const meta = statusMeta(payload.sale_status)
+        toastStatus(`${payload.reference} · ${meta.label}`, meta)
       }
     },
 
@@ -68,13 +70,15 @@ export const useAnnouncementsStore = defineStore('announcements', {
     },
 
     // A unit or box was edited anywhere — flash a live toast so the whole team
-    // sees the change without a refresh, naming what moved when known.
+    // sees the change without a refresh, naming what moved when known. Neutral
+    // grey accent + pencil = plain edit, never mistakable for a status move.
     itemUpdated(payload) {
       const label = payload.type === 'box' ? t('inventory.box') : t('project.unit')
-      toastInfo(
+      toastStatus(
         payload.changed
           ? t('inventory.itemChanged', { label, ref: payload.reference, field: payload.changed })
           : t('inventory.itemUpdated', { label, ref: payload.reference }),
+        { severity: 'secondary', icon: 'pi pi-pencil' },
       )
     },
 
