@@ -14,6 +14,7 @@ declare(strict_types=1);
 use App\Modules\Analytics\Http\Controllers\AuditController;
 use App\Modules\Analytics\Http\Controllers\DashboardController;
 use App\Modules\Analytics\Http\Controllers\FeedbackController;
+use App\Modules\Analytics\Http\Controllers\KpiDashboardController;
 use App\Modules\Analytics\Http\Controllers\OversightController;
 use App\Modules\Analytics\Http\Controllers\RecordActivityController;
 use App\Modules\Analytics\Http\Controllers\ReportController;
@@ -34,6 +35,33 @@ Route::middleware('auth:sanctum')->group(function () {
         // objections, demand, sentiment and next-best-action, plus a per-unit drill.
         Route::get('/analytics/locations/{location}/feedback', [FeedbackController::class, 'location']);
         Route::get('/analytics/units/{unit}/feedback', [FeedbackController::class, 'unit']);
+    });
+
+    // The company-wide KPI command center — one filterable board of sales,
+    // inventory, hold-engine, pipeline, collections, agent, cancellation and
+    // profitability KPIs. Read-only aggregates over the domain tables; every
+    // route takes the shared global filter query params (period, from, to,
+    // location_id, unit_type, agent_id). Gated by its own permission.
+    Route::middleware('can:analytics.kpi')->prefix('analytics/kpi')->group(function () {
+        Route::get('/overview', [KpiDashboardController::class, 'overview']);
+        Route::get('/sales', [KpiDashboardController::class, 'sales']);
+        Route::get('/inventory', [KpiDashboardController::class, 'inventory']);
+        Route::get('/holds', [KpiDashboardController::class, 'holds']);
+        Route::get('/pipeline', [KpiDashboardController::class, 'pipeline']);
+        Route::get('/collections', [KpiDashboardController::class, 'collections']);
+        Route::get('/agents', [KpiDashboardController::class, 'agents']);
+        Route::get('/cancellations', [KpiDashboardController::class, 'cancellations']);
+        Route::get('/profitability', [KpiDashboardController::class, 'profitability']);
+        Route::get('/trends', [KpiDashboardController::class, 'trends']);
+
+        // Reference data for the filter bar's dimension selects.
+        Route::get('/filters', [KpiDashboardController::class, 'filters']);
+
+        // Editable configuration behind target-attainment + profitability.
+        Route::get('/targets', [KpiDashboardController::class, 'targets']);
+        Route::put('/targets', [KpiDashboardController::class, 'saveTarget']);
+        Route::get('/costs', [KpiDashboardController::class, 'costs']);
+        Route::put('/costs', [KpiDashboardController::class, 'saveCost']);
     });
 
     // One record's audit trail, gated by that record's own view permission

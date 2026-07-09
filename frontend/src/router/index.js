@@ -129,6 +129,15 @@ const routes = [
         meta: { permission: 'reports.view' },
       },
       {
+        // The company-wide KPI command center — sales, inventory, hold engine,
+        // pipeline, collections, agents, cancellations and profitability on one
+        // filterable board. Gated by its own permission.
+        path: 'analytics/kpi',
+        name: 'kpi-dashboard',
+        component: () => import('@/features/analytics/views/KpiDashboardView.vue'),
+        meta: { permission: 'analytics.kpi' },
+      },
+      {
         // Open to any authed user; the view self-scopes to the caller's own logs
         // unless they have logs.view_all (which unlocks the all-users selector).
         path: 'team-logs',

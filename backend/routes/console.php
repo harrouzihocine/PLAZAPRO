@@ -31,6 +31,10 @@ Schedule::command('reminders:upcoming-digest')->dailyAt('08:00')->withoutOverlap
 // Flip past-due, unpaid payment-schedule instalments to overdue (daily).
 Schedule::command('schedules:mark-overdue')->dailyAt('00:15')->withoutOverlapping();
 
+// Materialize the day's KPI values into kpi_snapshots (after schedules flip to
+// overdue) so the command center's trend curves have a fresh daily point.
+Schedule::command('kpi:snapshot')->dailyAt('00:30')->withoutOverlapping();
+
 // Nudge creators of clients left empty (no project/call/desire) for 48h — once.
 Schedule::command('clients:flag-empty')->dailyAt('07:00')->withoutOverlapping();
 

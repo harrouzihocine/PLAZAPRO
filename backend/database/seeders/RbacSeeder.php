@@ -98,6 +98,10 @@ class RbacSeeder extends Seeder
         //    (implies view).
         'chat.use', 'chat.view_project_chats', 'chat.participate_project_chats',
         'notifications.view', 'dashboard.view', 'reports.view',
+        // The company-wide KPI command center: sales, inventory, hold engine,
+        // pipeline, collections, agents, cancellations and profitability KPIs on
+        // one filterable board. Wider than the tabular reports.view analytics.
+        'analytics.kpi',
         // Team-oversight monitors (follow up anomalies / lazy work), one per area.
         'oversight.clients', 'oversight.pipeline', 'oversight.deals', 'oversight.drafts',
         // The desire-matches board: waiting clients whose wishlist now fits available
@@ -172,6 +176,7 @@ class RbacSeeder extends Seeder
         'notifications.view' => 'Receive and see notifications.',
         'dashboard.view' => 'See the personal dashboard.',
         'reports.view' => 'Open analytics reports.',
+        'analytics.kpi' => 'Open the company-wide KPI command center: sales, inventory, hold engine, pipeline, collections, agent, cancellation and profitability dashboards on one filterable board.',
         'oversight.clients' => 'Monitor client-handling anomalies across the team.',
         'oversight.pipeline' => 'Monitor pipeline and visit anomalies across the team.',
         'oversight.deals' => 'Monitor deal anomalies (e.g. stale holds) across the team.',
@@ -241,6 +246,9 @@ class RbacSeeder extends Seeder
         // project" grant — untick it per role to self-scope agents.
         'reservations.view' => 'units.view',
         'reservations.view_all' => 'projects.view_all',
+        // The KPI command center split from the tabular reports: every custom
+        // role that could open analytics reports keeps the new board too.
+        'analytics.kpi' => 'reports.view',
     ];
 
     /**
@@ -346,13 +354,15 @@ class RbacSeeder extends Seeder
             ...$this->baseline, ...$fullVisibility, 'clients.view',
             'reservations.view', 'reservations.view_all',
             'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
+            // The payment desk gets the KPI board for its Collections dashboard.
+            'analytics.kpi',
         ];
 
         // Every rapport type + all analytics reports + operational oversight
         // (incl. reading AND writing in any project chat without being a
         // contributor — untick participate to fall back to read-only view).
         $manager = [
-            ...$this->baseline, ...$fullVisibility, 'reports.view', 'logs.view_all',
+            ...$this->baseline, ...$fullVisibility, 'reports.view', 'analytics.kpi', 'logs.view_all',
             'oversight.clients', 'oversight.pipeline', 'oversight.deals', 'oversight.drafts',
             'oversight.archive', 'oversight.matches',
             'chat.view_project_chats', 'chat.participate_project_chats',

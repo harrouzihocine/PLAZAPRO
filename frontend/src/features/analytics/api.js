@@ -43,6 +43,44 @@ export const analyticsApi = {
     const { data } = await useApi().get(`/analytics/units/${id}/feedback`, { params })
     return data.data
   },
+
+  // ── KPI command center ────────────────────────────────────────────────────
+  // Every section takes the shared global filters as query params:
+  // { period, from, to, location_id, unit_type, agent_id }. One GET per tab so
+  // the board lazy-loads only what's on screen.
+  async kpiSection(name, params = {}) {
+    const { data } = await useApi().get(`/analytics/kpi/${name}`, { params })
+    return data.data
+  },
+
+  // Reference data for the filter bar's dimension selects.
+  async kpiFilters() {
+    const { data } = await useApi().get('/analytics/kpi/filters')
+    return data.data
+  },
+
+  // Trend series from the nightly snapshots. params: { metrics, days, location_id }.
+  async kpiTrends(params = {}) {
+    const { data } = await useApi().get('/analytics/kpi/trends', { params })
+    return data.data
+  },
+
+  async kpiTargets() {
+    const { data } = await useApi().get('/analytics/kpi/targets')
+    return data.data
+  },
+  async saveKpiTarget(body) {
+    const { data } = await useApi().put('/analytics/kpi/targets', body)
+    return data.data
+  },
+  async kpiCosts() {
+    const { data } = await useApi().get('/analytics/kpi/costs')
+    return data.data
+  },
+  async saveKpiCost(body) {
+    const { data } = await useApi().put('/analytics/kpi/costs', body)
+    return data.data
+  },
 }
 
 export const auditApi = {

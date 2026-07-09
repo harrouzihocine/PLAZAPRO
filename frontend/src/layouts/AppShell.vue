@@ -30,6 +30,7 @@ import NotificationPrefsModal from '@/features/settings/components/NotificationP
 import UpdateBanner from '@/components/shell/UpdateBanner.vue'
 import OfflineBanner from '@/features/offline/OfflineBanner.vue'
 import { useAnnouncementsStore } from '@/features/inventory/announcementsStore'
+import { useChatDockStore } from '@/features/collaboration/chatDockStore'
 import { usePresenceStore } from '@/features/collaboration/presenceStore'
 import { useNetworkStore } from '@/features/offline/networkStore'
 import { useOutboxStore } from '@/features/offline/outboxStore'
@@ -47,6 +48,11 @@ const nativePhone = useNativePhone()
 // A chat thread on a native phone takes over the viewport like a messaging
 // app: no page padding, no bottom bar — just the conversation.
 const chatTakeover = computed(() => nativePhone.value && route.name === 'chat.thread')
+
+// Unread-chat counter for the shell's bottom-bar Chat tab (the web shows the
+// same number on the dock launcher instead). ChatDock keeps it live: it stays
+// mounted on native phones purely to feed this store.
+const chatDock = useChatDockStore()
 
 // Oversight sidebar badge counts (only fetched for users who can see any monitor).
 const badges = ref({})
@@ -182,6 +188,7 @@ const SECTIONS = [
   {
     key: 'insights',
     items: [
+      { to: '/analytics/kpi', labelKey: 'nav.kpi', icon: 'pi pi-chart-bar', permission: 'analytics.kpi' },
       { to: '/analytics', labelKey: 'nav.reports', icon: 'pi pi-chart-line', permission: 'reports.view' },
       // Open to everyone: a user without logs.view_all sees only their own logs
       // (the label reads "My logs" for them, "Team logs" for the company-wide view).
@@ -635,10 +642,17 @@ async function logout() {
       >
         <!-- In the shell the active icon sits in a Material-style pill. -->
         <span
-          class="flex items-center justify-center native:h-8 native:w-14 native:rounded-full native:transition-colors"
+          class="relative flex items-center justify-center native:h-8 native:w-14 native:rounded-full native:transition-colors"
           :class="isActive(item.to) && 'native:bg-highlight'"
         >
           <i :class="item.icon" class="text-lg" aria-hidden="true" />
+          <!-- Unread chats ride the Chat tab (shell only — web has the dock). -->
+          <span
+            v-if="item.to === '/chat' && chatDock.totalUnread > 0"
+            class="num pointer-events-none absolute -end-1.5 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-white"
+          >
+            {{ chatDock.totalUnread > 99 ? '99+' : chatDock.totalUnread }}
+          </span>
         </span>
         {{ item.label }}
       </RouterLink>

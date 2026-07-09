@@ -6,10 +6,12 @@ use App\Http\Middleware\EnsureUserActive;
 use App\Http\Middleware\IdempotencyKey;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
+use App\Modules\Analytics\Console\SnapshotKpis;
 use App\Modules\Clients\Console\FlagEmptyClients;
 use App\Modules\Collaboration\Console\BackfillProjectChats;
 use App\Modules\Inventory\Console\ExpireHolds;
 use App\Modules\Inventory\Console\ExpireReserved;
+use App\Modules\Inventory\Console\OptimizeExistingMedia;
 use App\Modules\Payments\Console\MarkSchedulesOverdueCommand;
 use App\Modules\Pipeline\Console\DispatchReminders;
 use App\Modules\Pipeline\Console\MarkActionsOverdue;
@@ -39,6 +41,8 @@ return Application::configure(basePath: dirname(__DIR__))
         BackfillProjectChats::class,
         SendUpcomingDigest::class,
         FlagEmptyClients::class,
+        OptimizeExistingMedia::class,
+        SnapshotKpis::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         // Sanctum SPA (cookie) auth for the first-party frontend.
