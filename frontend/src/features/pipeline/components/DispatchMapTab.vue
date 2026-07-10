@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
@@ -10,6 +10,7 @@ import Select from 'primevue/select'
 import { pipelineApi } from '@/features/pipeline/api'
 import {
   AGENT_STATUS_COLORS,
+  AGENT_STATUS_DOTS,
   AGENT_STATUS_LABEL_KEYS,
   VISIT_STATUS_LABEL_KEYS,
 } from '@/features/pipeline/dispatchStatus'
@@ -56,6 +57,55 @@ let replayLayer = null
 let channel = null
 let sitesCache = []
 let pendingCache = []
+// Marker per agent id, so the roster's "show me" can fly to and open one.
+const agentMarkers = new Map()
+
+// Full-screen overlay (same pattern as LocationMap): body scroll locked,
+// Escape exits, Leaflet re-measures after the box change.
+const expanded = ref(false)
+
+async function toggleExpanded(value) {
+  expanded.value = typeof value === 'boolean' ? value : !expanded.value
+  document.body.style.overflow = expanded.value ? 'hidden' : ''
+  await nextTick()
+  refreshSize()
+}
+
+function refreshSize() {
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => map && map.invalidateSize({ animate: false })),
+  )
+}
+
+function onKeydown(e) {
+  if (e.key === 'Escape' && expanded.value) toggleExpanded(false)
+}
+
+// The roster beside the map: on-duty agents first, GPS-less ones listed too
+// (greyed) so "who is dark" is visible at a glance, never hunted for.
+const roster = computed(() =>
+  [...agents.value].sort(
+    (a, b) =>
+      (a.status === 'off_duty') - (b.status === 'off_duty')
+      || !a.position - !b.position
+      || a.name.localeCompare(b.name),
+  ),
+)
+
+const rosterDot = (s) => AGENT_STATUS_DOTS[s] ?? AGENT_STATUS_DOTS.off_duty
+
+function minutesAgo(at) {
+  const n = Math.max(0, Math.round((Date.now() - new Date(at).getTime()) / 60000))
+  return t('dispatch.minAgo', { n })
+}
+
+// Click a name → fly to the agent's last fix and open their popup.
+function focusAgent(agent) {
+  if (!agent.position || !map) return
+  if (mode.value !== 'live') setMode('live')
+  map.setView([agent.position.lat, agent.position.lng], Math.max(map.getZoom(), 15))
+  agentMarkers.get(agent.id)?.openPopup()
+}
 
 function agentDivIcon(agent) {
   const color = AGENT_STATUS_COLORS[agent.status] ?? AGENT_STATUS_COLORS.off_duty
@@ -77,14 +127,16 @@ function agentPopup(agent) {
 
 function renderAgents() {
   agentLayer.clearLayers()
+  agentMarkers.clear()
   for (const agent of agents.value) {
     if (!agent.position) continue
-    L.marker([agent.position.lat, agent.position.lng], {
+    const marker = L.marker([agent.position.lat, agent.position.lng], {
       icon: agentDivIcon(agent),
       zIndexOffset: 1000,
     })
       .bindPopup(agentPopup(agent))
       .addTo(agentLayer)
+    agentMarkers.set(agent.id, marker)
   }
 }
 
@@ -247,11 +299,14 @@ onMounted(() => {
     requestAnimationFrame(() => map && map.invalidateSize({ animate: false })),
   )
 
+  window.addEventListener('keydown', onKeydown)
   loadLive()
   subscribe()
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  document.body.style.overflow = ''
   channel?.stopListening('.agent.position')
   channel?.stopListening('.agent.duty')
   channel?.stopListening('.visit.lifecycle')
@@ -265,7 +320,7 @@ defineExpose({ reload: loadLive })
 </script>
 
 <template>
-  <div class="space-y-3">
+  <div :class="expanded ? 'fixed inset-0 z-[1100] flex flex-col gap-3 overflow-y-auto bg-bg p-4' : 'space-y-3'">
     <!-- Mode + replay controls -->
     <div class="flex flex-wrap items-center gap-2">
       <Button
@@ -320,7 +375,27 @@ defineExpose({ reload: loadLive })
       {{ $t('dispatch.unpinnedWarning', { names: unpinned.join(', ') }) }}
     </p>
 
-    <div class="relative h-[65vh] min-h-[380px]">
+    <!-- The roster: click a name to fly to their last fix (no more hunting
+         dots). GPS-less / off-duty agents trail the list, greyed. -->
+    <div v-if="roster.length" class="flex flex-wrap gap-1.5">
+      <button
+        v-for="a in roster"
+        :key="a.id"
+        type="button"
+        class="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs font-medium transition-colors"
+        :class="a.position ? 'text-ink hover:border-primary hover:text-primary-600 dark:hover:text-primary-400' : 'cursor-not-allowed text-mute opacity-60'"
+        :disabled="!a.position"
+        :title="a.position ? $t('dispatch.lastSeen', { time: formatDateTime(a.position.at) }) : $t('dispatch.noPosition')"
+        @click="focusAgent(a)"
+      >
+        <span class="inline-block h-2 w-2 rounded-full" :class="rosterDot(a.status)" />
+        {{ a.name }}
+        <span v-if="a.position" class="num text-[10px] opacity-70">{{ minutesAgo(a.position.at) }}</span>
+        <i v-else class="pi pi-eye-slash text-[10px]" aria-hidden="true" />
+      </button>
+    </div>
+
+    <div class="relative" :class="expanded ? 'min-h-0 flex-1' : 'h-[65vh] min-h-[380px]'">
       <div ref="mapEl" class="absolute inset-0 rounded-xl border border-line" />
       <div
         v-if="tilesUnavailable"
@@ -328,6 +403,16 @@ defineExpose({ reload: loadLive })
       >
         <p class="text-sm text-mute">{{ $t('dispatch.mapOffline') }}</p>
       </div>
+      <!-- Full-screen toggle (above Leaflet's controls). -->
+      <button
+        type="button"
+        class="absolute end-2 top-2 z-[1001] flex items-center justify-center rounded-lg border border-line bg-card p-2 text-ink shadow-card hover:opacity-90"
+        :aria-label="expanded ? $t('dispatch.closeMap') : $t('dispatch.expandMap')"
+        :title="expanded ? $t('dispatch.closeMap') : $t('dispatch.expandMap')"
+        @click="toggleExpanded()"
+      >
+        <i :class="expanded ? 'pi pi-times' : 'pi pi-window-maximize'" aria-hidden="true" />
+      </button>
     </div>
 
     <!-- Legend -->
