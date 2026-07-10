@@ -40,10 +40,14 @@ const ORIGINS = [
 const PROBE_TIMEOUT_MS = 4000
 const RETRY_EVERY_MS = 45_000
 
-// The banner in OfflineBanner.vue: are we running on a LAN fallback origin?
+// Which of the three doors this page came through — 'app' | 'office' | 'ip',
+// or null on an unknown origin (dev server). Drives the navbar ServerIndicator.
 // Module-level const is enough — changing origin is a full page navigation.
-export const onLanFallbackOrigin =
-  ORIGINS.includes(window.location.origin) && window.location.origin !== ORIGINS[0]
+export const serverOrigin =
+  ['app', 'office', 'ip'][ORIGINS.indexOf(window.location.origin)] ?? null
+
+// The host shown to the user next to the indicator icon.
+export const serverHost = window.location.host
 
 let lastAttemptAt = 0
 let retryTimer = null

@@ -22,6 +22,7 @@ import DraftsIndicator from '@/components/shell/DraftsIndicator.vue'
 import GlobalSearch from '@/components/shell/GlobalSearch.vue'
 import LanguageSwitcher from '@/components/shell/LanguageSwitcher.vue'
 import PullToRefresh from '@/components/shell/PullToRefresh.vue'
+import ServerIndicator from '@/components/shell/ServerIndicator.vue'
 import SyncIndicator from '@/components/shell/SyncIndicator.vue'
 import BrandLogo from '@/components/BrandLogo.vue'
 import UnitSoldCelebration from '@/features/inventory/components/UnitSoldCelebration.vue'
@@ -519,6 +520,7 @@ async function logout() {
             @click="toggle"
           />
           <LanguageSwitcher />
+          <ServerIndicator />
           <SyncIndicator />
           <DraftsIndicator />
           <NotificationBell v-if="auth.can('notifications.view')" />

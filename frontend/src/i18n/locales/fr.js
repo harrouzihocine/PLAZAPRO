@@ -753,7 +753,6 @@ export default {
   offline: {
     needsConnection: 'Vous êtes hors ligne — {what} nécessite une connexion.',
     bannerTitle: 'Vous êtes hors ligne — affichage des données enregistrées.',
-    lanOriginBanner: 'Connecté via le serveur du bureau (réseau local).',
     pendingCount: '{n} modification en attente de synchronisation. | {n} modifications en attente de synchronisation.',
     willSync: 'Les modifications se synchroniseront à la reconnexion.',
     savedOffline: 'Enregistré hors ligne — synchronisation à la reconnexion.',
