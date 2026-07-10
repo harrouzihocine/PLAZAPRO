@@ -72,13 +72,53 @@ async function onFix(position) {
   }
 }
 
+// APK shells ≥1.6.0 run a native foreground location service instead: it
+// keeps posting while the phone is pocketed and the WebView is suspended
+// (this watcher only lives while the page is foreground). Same server
+// contract, same throttles — the shell just survives the lock screen.
+let nativeActive = false
+let retryArmed = false
+
+function tryNativeTracking() {
+  const bridge = window.PlazaNative
+  if (typeof bridge?.startDutyTracking !== 'function') return false
+  try {
+    const result = bridge.startDutyTracking()
+    if (result === 'started') {
+      nativeActive = true
+      return true
+    }
+    if (result === 'requested' && !retryArmed) {
+      // OS prompt is up — retry once it answers; the web watcher covers the
+      // meantime (and stays if the user denies).
+      retryArmed = true
+      window.addEventListener(
+        'plaza:location-permission',
+        () => {
+          retryArmed = false
+          if (onDuty.value && tryNativeTracking()) stopWebWatch()
+        },
+        { once: true },
+      )
+    }
+  } catch {
+    /* old or broken bridge — the web watcher below covers it */
+  }
+  return false
+}
+
 function startWatch() {
+  if (tryNativeTracking()) return
+  startWebWatch()
+}
+
+function startWebWatch() {
   if (!supported || watchId !== null) return
   geoDenied.value = false
   watchId = navigator.geolocation.watchPosition(onFix, (err) => {
     if (err.code === err.PERMISSION_DENIED) {
       geoDenied.value = true
-      stopWatch()
+      stopWebWatch()
     }
   }, {
     enableHighAccuracy: true,
@@ -88,6 +128,18 @@ function startWatch() {
 }
 
 function stopWatch() {
+  if (nativeActive) {
+    try {
+      window.PlazaNative?.stopDutyTracking?.()
+    } catch {
+      /* nothing to stop */
+    }
+    nativeActive = false
+  }
+  stopWebWatch()
+}
+
+function stopWebWatch() {
   if (watchId !== null && supported) navigator.geolocation.clearWatch(watchId)
   watchId = null
   lastSentMs = 0

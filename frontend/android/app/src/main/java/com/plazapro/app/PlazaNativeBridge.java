@@ -97,6 +97,30 @@ public class PlazaNativeBridge {
         }
     }
 
+    /**
+     * Background duty tracking (My Day's duty switch, APK only). Returns:
+     *   "started"    the foreground location service is running;
+     *   "requested"  the OS permission prompt was raised — the page keeps its
+     *                foreground watcher and retries after the
+     *                'plaza:location-permission' event;
+     *   "unavailable" no activity to prompt from (should not happen in-app).
+     * The web layer falls back to navigator.geolocation when this method is
+     * absent (older shells) — the server contract is identical either way.
+     */
+    @JavascriptInterface
+    public String startDutyTracking() {
+        if (DutyLocationService.hasLocationPermission(context)) {
+            DutyLocationService.start(context);
+            return "started";
+        }
+        return MainActivity.requestLocationPermission() ? "requested" : "unavailable";
+    }
+
+    @JavascriptInterface
+    public void stopDutyTracking() {
+        DutyLocationService.stop(context);
+    }
+
     @JavascriptInterface
     public String getAppVersion() {
         try {

@@ -33,12 +33,23 @@ final class PlazaApi {
      */
     static boolean post(Context context, String path, JSONObject body, String idempotencyKey)
             throws Exception {
+        int status = postForStatus(context, path, body, idempotencyKey);
+        return status >= 200 && status < 300;
+    }
+
+    /**
+     * Same POST, but the raw HTTP status (-1 when no session cookies exist) —
+     * for callers whose behaviour hangs on a specific code, like the duty
+     * location service stopping on the 409 "off duty" refusal.
+     */
+    static int postForStatus(Context context, String path, JSONObject body, String idempotencyKey)
+            throws Exception {
         String origin = origin(context);
         String cookies = CookieManager.getInstance().getCookie(origin);
-        if (cookies == null || cookies.isEmpty()) return false;
+        if (cookies == null || cookies.isEmpty()) return -1;
 
         String xsrf = xsrfToken(cookies);
-        if (xsrf == null) return false;
+        if (xsrf == null) return -1;
 
         URL url = new URL(origin + "/api/v1" + path);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -61,8 +72,7 @@ final class PlazaApi {
                 conn.getOutputStream().write(body.toString().getBytes(StandardCharsets.UTF_8));
             }
 
-            int status = conn.getResponseCode();
-            return status >= 200 && status < 300;
+            return conn.getResponseCode();
         } finally {
             conn.disconnect();
         }

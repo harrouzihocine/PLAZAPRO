@@ -27,8 +27,42 @@ import com.google.firebase.messaging.FirebaseMessaging;
 public class MainActivity extends BridgeActivity {
     private static volatile boolean inForeground = false;
 
+    /**
+     * The live activity, for the JS bridge to raise runtime prompts from (a
+     * JavascriptInterface only holds an app context). Weak: never outlives it.
+     */
+    private static volatile java.lang.ref.WeakReference<MainActivity> current =
+            new java.lang.ref.WeakReference<>(null);
+
+    private static final int REQ_LOCATION = 1002;
+
     static boolean isInForeground() {
         return inForeground;
+    }
+
+    /**
+     * Raise the OS location prompt for the duty switch (PlazaNativeBridge).
+     * The result comes back to the page as a 'plaza:location-permission'
+     * event, which retries startDutyTracking().
+     */
+    static boolean requestLocationPermission() {
+        MainActivity activity = current.get();
+        if (activity == null) return false;
+        activity.runOnUiThread(() -> ActivityCompat.requestPermissions(
+                activity,
+                new String[] {Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION},
+                REQ_LOCATION));
+        return true;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @androidx.annotation.NonNull String[] permissions,
+            @androidx.annotation.NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQ_LOCATION) {
+            notifyWeb("plaza:location-permission");
+        }
     }
 
     @Override
@@ -98,6 +132,7 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         inForeground = true;
+        current = new java.lang.ref.WeakReference<>(this);
     }
 
     @Override

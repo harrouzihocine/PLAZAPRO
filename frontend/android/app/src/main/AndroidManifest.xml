@@ -37,6 +37,14 @@
             android:name=".ReplyReceiver"
             android:exported="false" />
 
+        <!-- On-duty location share (My Day's duty switch): a foreground service
+             with the mandated ongoing notification, posting throttled fixes to
+             /me/positions over the WebView session. Never self-starts. -->
+        <service
+            android:name=".DutyLocationService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
         <!-- Click-to-call trampoline: notification tap → default dialer with
              the number pre-filled + the "dialed" report to the backend. An
              invisible activity (Theme.NoDisplay) — Android 12+ forbids
@@ -60,6 +68,12 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- On-duty location share: runtime-prompted when the duty switch first
+         flips on; the foreground service type is mandatory from Android 14. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <!-- System-tray push (Android 13+ runtime prompt — MainActivity asks). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Webview media: photo capture from <input type="file"> (unit/client media
