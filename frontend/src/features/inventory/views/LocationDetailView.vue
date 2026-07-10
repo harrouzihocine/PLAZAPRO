@@ -118,14 +118,16 @@ const mode = ref(null) // 'create' | 'duplicate' | 'edit' | 'correct' | null
 const editingId = ref(null)
 const correction = reactive({ price_semi_fini: '', price_fini: '', sale_status: '', reason: '' })
 
-// Row multi-select cancel + CSV export/import of THIS project's units
-// (shared engine with the global browse).
+// Row multi-select cancel + Excel export/template/import of THIS project's
+// units (shared engine with the global browse).
 const {
   selected,
   exporting,
+  downloadingTemplate,
   importInput,
   cancelSelected,
-  exportCsv,
+  exportExcel,
+  downloadTemplate,
   pickImportFile,
   onImportFile,
 } = useUnitBulkTools(units, () => ({ location_id: props.id }))
@@ -350,17 +352,27 @@ async function remove(u) {
         <template #actions>
           <template v-if="!isNative">
             <Button
-              :label="$t('inventory.exportCsv')"
+              :label="$t('inventory.exportExcel')"
               icon="pi pi-download"
               severity="secondary"
               outlined
               size="small"
               :loading="exporting"
-              @click="exportCsv"
+              @click="exportExcel"
             />
             <Button
               v-if="canManage"
-              :label="$t('inventory.importCsv')"
+              :label="$t('inventory.importTemplate')"
+              icon="pi pi-file-excel"
+              severity="secondary"
+              outlined
+              size="small"
+              :loading="downloadingTemplate"
+              @click="downloadTemplate"
+            />
+            <Button
+              v-if="canManage"
+              :label="$t('inventory.importExcel')"
               icon="pi pi-upload"
               severity="secondary"
               outlined
@@ -371,7 +383,7 @@ async function remove(u) {
             <input
               ref="importInput"
               type="file"
-              accept=".csv,text/csv,.txt"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.csv,text/csv,.txt"
               class="hidden"
               @change="onImportFile"
             />

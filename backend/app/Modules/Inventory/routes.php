@@ -27,8 +27,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/locations/{location}/insights', [LocationController::class, 'insights']);
 
         Route::get('/units', [UnitController::class, 'index']);
-        // Before /units/{unit} so "export" never hits the model binding.
+        // Before /units/{unit} so "export"/"import-template" never hit the model binding.
         Route::get('/units/export', [UnitController::class, 'export']);
+        Route::get('/units/import-template', [UnitController::class, 'template']);
         Route::get('/units/{unit}', [UnitController::class, 'show']);
         Route::get('/units/{unit}/insights', [UnitController::class, 'insights']);
         Route::get('/units/{unit}/project-logs', [UnitController::class, 'projectLogs']);
@@ -62,7 +63,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/units/{unit}', [UnitController::class, 'update']);
         Route::post('/units/{unit}/correct', [UnitController::class, 'correct']);
         Route::delete('/units/{unit}', [UnitController::class, 'destroy']);
-        // Fast bulk tools: multi-select cancel + the CSV edit round-trip.
+        // Fast bulk tools: multi-select cancel + the Excel edit round-trip.
         Route::post('/units/bulk-cancel', [UnitController::class, 'bulkCancel']);
         Route::post('/units/import', [UnitController::class, 'import']);
 

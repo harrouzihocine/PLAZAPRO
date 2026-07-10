@@ -5,12 +5,14 @@ import { unitsApi } from '@/features/inventory/api'
 import { todayInput } from '@/utils/format'
 
 // The units-table bulk tools shared by the global browse (UnitsView) and a
-// project's Units tab (LocationDetailView): row multi-select → cancel, CSV
-// export of the current view, and the CSV re-import (fast bulk edit).
-// `exportParams` returns the filter params describing what the table shows.
+// project's Units tab (LocationDetailView): row multi-select → cancel, Excel
+// export of the current view, the empty import template, and the Excel
+// re-import (fast bulk edit). `exportParams` returns the filter params
+// describing what the table shows.
 export function useUnitBulkTools(units, exportParams = () => ({})) {
   const selected = ref([])
   const exporting = ref(false)
+  const downloadingTemplate = ref(false)
   const importInput = ref(null) // the hidden <input type=file>
 
   const selectedCount = computed(() => selected.value.length)
@@ -47,18 +49,30 @@ export function useUnitBulkTools(units, exportParams = () => ({})) {
     }
   }
 
-  async function exportCsv() {
+  function saveBlob(blob, filename) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function exportExcel() {
     exporting.value = true
     try {
-      const blob = await unitsApi.exportCsv(exportParams())
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `units-${todayInput()}.csv`
-      a.click()
-      URL.revokeObjectURL(url)
+      saveBlob(await unitsApi.exportExcel(exportParams()), `units-${todayInput()}.xlsx`)
     } finally {
       exporting.value = false
+    }
+  }
+
+  async function downloadTemplate() {
+    downloadingTemplate.value = true
+    try {
+      saveBlob(await unitsApi.downloadTemplate(), 'units-import-template.xlsx')
+    } finally {
+      downloadingTemplate.value = false
     }
   }
 
@@ -72,7 +86,7 @@ export function useUnitBulkTools(units, exportParams = () => ({})) {
     if (!file) return
 
     try {
-      const { created, updated, errors } = await units.importCsv(file)
+      const { created, updated, errors } = await units.importFile(file)
       const summary = t('inventory.importSummary', { created, updated })
       if (errors.length) {
         const lines = errors
@@ -96,9 +110,11 @@ export function useUnitBulkTools(units, exportParams = () => ({})) {
     selected,
     selectedCount,
     exporting,
+    downloadingTemplate,
     importInput,
     cancelSelected,
-    exportCsv,
+    exportExcel,
+    downloadTemplate,
     pickImportFile,
     onImportFile,
   }

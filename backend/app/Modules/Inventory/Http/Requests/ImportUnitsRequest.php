@@ -19,8 +19,9 @@ class ImportUnitsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // txt: Excel sometimes saves "CSV" with a .txt extension.
-            'file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
+            // xlsx is the format we export; legacy CSV still accepted
+            // (txt: Excel sometimes saves "CSV" with a .txt extension).
+            'file' => ['required', 'file', 'mimes:xlsx,csv,txt', 'max:10240'],
         ];
     }
 }

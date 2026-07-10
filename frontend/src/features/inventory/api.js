@@ -115,15 +115,21 @@ export const unitsApi = {
     return data.data
   },
 
-  // The current browse as a CSV blob (same filters as list) — the fast-edit
+  // The current browse as an .xlsx blob (same filters as list) — the fast-edit
   // round-trip: export, fix in Excel, re-import.
-  async exportCsv(params = {}) {
+  async exportExcel(params = {}) {
     const { data } = await useApi().get('/units/export', { params, responseType: 'blob' })
     return data
   },
 
+  // The empty import .xlsx: example rows + a per-column guide sheet.
+  async downloadTemplate() {
+    const { data } = await useApi().get('/units/import-template', { responseType: 'blob' })
+    return data
+  },
+
   // Returns { created, updated, errors: [{ line, message }] }.
-  async importCsv(file) {
+  async importFile(file) {
     const form = new FormData()
     form.append('file', file)
     const { data } = await useApi().post('/units/import', form)

@@ -7,6 +7,7 @@ namespace Tests\Feature\Inventory;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Inventory\Support\UnitReference;
+use App\Modules\Inventory\Support\UnitsWorkbook;
 use App\Modules\Settings\Models\DynamicList;
 use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\Permission;
@@ -15,11 +16,15 @@ use App\Modules\Settings\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Laravel\Sanctum\Sanctum;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
 
 /**
- * The units table's fast bulk tools: multi-select cancel, the CSV
- * export/import round-trip, and the auto-generated compact reference.
+ * The units table's fast bulk tools: multi-select cancel, the Excel
+ * export/template/import round-trip (legacy CSV still accepted), and the
+ * auto-generated compact reference.
  */
 class UnitBulkToolsTest extends TestCase
 {
@@ -45,6 +50,27 @@ class UnitBulkToolsTest extends TestCase
     private function csvUpload(string $contents): UploadedFile
     {
         return UploadedFile::fake()->createWithContent('units.csv', $contents);
+    }
+
+    /** @param list<list<mixed>> $rows header + data rows for the first sheet */
+    private function xlsxUpload(array $rows): UploadedFile
+    {
+        $spreadsheet = new Spreadsheet;
+        $spreadsheet->getActiveSheet()->fromArray($rows);
+
+        $path = tempnam(sys_get_temp_dir(), 'units-import').'.xlsx';
+        (new Xlsx($spreadsheet))->save($path);
+
+        return new UploadedFile($path, 'units.xlsx', null, null, true);
+    }
+
+    /** Re-open a streamed .xlsx response as a workbook. */
+    private function workbook($response): Spreadsheet
+    {
+        $path = tempnam(sys_get_temp_dir(), 'units-download').'.xlsx';
+        file_put_contents($path, $response->streamedContent());
+
+        return IOFactory::load($path);
     }
 
     // ── Bulk cancel ─────────────────────────────────────────────────────
@@ -84,25 +110,90 @@ class UnitBulkToolsTest extends TestCase
 
     // ── Export ──────────────────────────────────────────────────────────
 
-    public function test_export_streams_the_filtered_units_as_csv(): void
+    public function test_export_streams_the_filtered_units_as_xlsx(): void
     {
         $location = Location::factory()->create(['name' => 'Aqua']);
-        $unit = Unit::factory()->create(['location_id' => $location->id, 'reference' => 'AQU-F3-A2']);
-        $other = Unit::factory()->create(['reference' => 'ELSEWHERE-1']);
+        Unit::factory()->create(['location_id' => $location->id, 'reference' => 'AQU-F3-A2', 'block' => '05']);
+        Unit::factory()->create(['reference' => 'ELSEWHERE-1']);
 
         Sanctum::actingAs($this->userWithPermissions(['units.view']));
 
         $response = $this->get('/api/v1/units/export?location_id='.$location->id)->assertOk();
-        $csv = $response->streamedContent();
+        $this->assertStringContainsString('spreadsheetml', (string) $response->headers->get('content-type'));
 
-        $this->assertStringContainsString('text/csv', (string) $response->headers->get('content-type'));
-        $this->assertStringContainsString('id,location_id,project', $csv); // header row
-        $this->assertStringContainsString('AQU-F3-A2', $csv);
-        $this->assertStringContainsString('Aqua', $csv);
-        $this->assertStringNotContainsString('ELSEWHERE-1', $csv);
+        $rows = $this->workbook($response)->getSheet(0)->toArray();
+        $this->assertSame(UnitsWorkbook::EXPORT_COLUMNS, $rows[0]); // the import contract
+        $this->assertCount(2, $rows);
+
+        $row = array_combine($rows[0], $rows[1]);
+        $this->assertSame('AQU-F3-A2', $row['reference']);
+        $this->assertSame('Aqua', $row['project']);
+        $this->assertSame('05', $row['block']); // stays text, not the number 5
+    }
+
+    // ── Import template ─────────────────────────────────────────────────
+
+    public function test_import_template_ships_examples_and_a_guide_sheet(): void
+    {
+        Location::factory()->create(['name' => 'Aqua']);
+
+        Sanctum::actingAs($this->userWithPermissions(['units.view']));
+
+        $response = $this->get('/api/v1/units/import-template')->assertOk();
+        $workbook = $this->workbook($response);
+
+        $rows = $workbook->getSheet(0)->toArray();
+        $this->assertSame(UnitsWorkbook::TEMPLATE_COLUMNS, $rows[0]);
+        $this->assertGreaterThan(1, count($rows)); // example rows to replace
+
+        // The Guide sheet documents the columns and lists the live project names.
+        $guide = $workbook->getSheetByName(__('app.units_sheet_guide'));
+        $this->assertNotNull($guide);
+        $this->assertStringContainsString('Aqua', (string) $guide->getCell('D4')->getValue());
+    }
+
+    public function test_importing_the_untouched_template_creates_nothing(): void
+    {
+        Sanctum::actingAs($this->manager());
+
+        $template = $this->get('/api/v1/units/import-template')->assertOk();
+        $path = tempnam(sys_get_temp_dir(), 'units-template').'.xlsx';
+        file_put_contents($path, $template->streamedContent());
+
+        $response = $this->postJson('/api/v1/units/import', [
+            'file' => new UploadedFile($path, 'units-import-template.xlsx', null, null, true),
+        ])->assertOk();
+
+        // The example rows point at a project that does not exist — every one
+        // is reported back, none silently becomes a unit.
+        $this->assertSame(0, $response->json('data.created'));
+        $this->assertNotEmpty($response->json('data.errors'));
+        $this->assertSame(0, Unit::query()->count());
     }
 
     // ── Import ──────────────────────────────────────────────────────────
+
+    public function test_import_accepts_an_xlsx_workbook(): void
+    {
+        $location = Location::factory()->create(['name' => 'Aqua', 'code' => 'AQUA']);
+
+        Sanctum::actingAs($this->manager());
+
+        $file = $this->xlsxUpload([
+            ['project', 'reference', 'price_semi_fini', 'area_sqm', 'block'],
+            ['Aqua', 'XL-1', 5000000, 85.5, 'B'],
+            ['Aqua', 'XL-2', 6200000, null, null],
+        ]);
+        $response = $this->postJson('/api/v1/units/import', ['file' => $file])->assertOk();
+
+        $this->assertSame(2, $response->json('data.created'));
+        $this->assertSame([], $response->json('data.errors'));
+        $this->assertDatabaseHas('units', [
+            'location_id' => $location->id, 'reference' => 'XL-1',
+            'price_semi_fini' => '5000000.00', 'area_sqm' => '85.50', 'block' => 'B',
+        ]);
+        $this->assertDatabaseHas('units', ['reference' => 'XL-2', 'sale_status' => 'available']);
+    }
 
     public function test_import_updates_specs_in_place_and_versions_price_changes(): void
     {

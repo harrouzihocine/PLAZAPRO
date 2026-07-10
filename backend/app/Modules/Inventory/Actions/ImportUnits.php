@@ -13,10 +13,13 @@ use App\Modules\Inventory\Models\Unit;
 use App\Modules\Inventory\Support\UnitReference;
 use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 /**
- * CSV round-trip for fast bulk editing: rows with an `id` update that unit
+ * Spreadsheet round-trip for fast bulk editing (.xlsx from the export or the
+ * template; legacy CSV still accepted): rows with an `id` update that unit
  * (spec fields in place; a price change goes through supersedeWith so the
  * correction stays versioned like /correct), rows without an `id` create a new
  * unit in the given project (blank reference → auto-generated, UnitReference).
@@ -43,23 +46,13 @@ class ImportUnits
     /**
      * @return array{created: int, updated: int, errors: list<array{line: int, message: string}>}
      */
-    public function handle(User $user, string $csv): array
+    public function handle(User $user, UploadedFile $file): array
     {
-        [$header, $stream] = $this->open($csv);
-
         $created = 0;
         $updated = 0;
         $errors = [];
-        $line = 1;
 
-        while (($cells = fgetcsv($stream, 0, $header['delimiter'], '"', '\\')) !== false) {
-            $line++;
-            if ($cells === [null] || implode('', array_map(strval(...), $cells)) === '') {
-                continue; // blank line
-            }
-
-            $row = $this->mapRow($header['columns'], $cells);
-
+        foreach ($this->rows($file) as [$line, $row]) {
             try {
                 if (($row['id'] ?? '') !== '') {
                     $updated += $this->updateRow($user, $row) ? 1 : 0;
@@ -72,8 +65,6 @@ class ImportUnits
             }
         }
 
-        fclose($stream);
-
         if ($created + $updated > 0) {
             UnitsImported::dispatch($user, $created, $updated);
         }
@@ -82,11 +73,45 @@ class ImportUnits
     }
 
     /**
-     * @return array{0: array{delimiter: string, columns: list<string>}, 1: resource}
+     * .xlsx or CSV, detected by content (xlsx is a zip — "PK"), never by the
+     * filename Excel happened to pick.
+     *
+     * @return \Generator<array{0: int, 1: array<string, string>}> [spreadsheet line, column → cell]
      */
-    private function open(string $csv): array
+    private function rows(UploadedFile $file): \Generator
     {
-        // Strip the UTF-8 BOM our own export prepends (Excel needs it).
+        $contents = $file->getContent();
+
+        return str_starts_with($contents, 'PK')
+            ? $this->xlsxRows($file->getRealPath())
+            : $this->csvRows($contents);
+    }
+
+    /** @return \Generator<array{0: int, 1: array<string, string>}> */
+    private function xlsxRows(string $path): \Generator
+    {
+        $reader = IOFactory::createReader('Xlsx');
+        $reader->setReadDataOnly(true);
+        // First sheet only — the template's Guide sheet is documentation.
+        // Raw calculated values, no display formatting: a price shown as
+        // "12 500 000" must come back as 12500000.
+        $all = $reader->load($path)->getSheet(0)->toArray(null, true, false, false);
+
+        $columns = $this->headerColumns(array_map(fn ($c) => (string) $c, $all[0] ?? []));
+
+        foreach ($all as $index => $cells) {
+            if ($index === 0 || implode('', array_map(fn ($c) => trim((string) $c), $cells)) === '') {
+                continue; // header / blank line
+            }
+
+            yield [$index + 1, $this->mapRow($columns, $cells)];
+        }
+    }
+
+    /** @return \Generator<array{0: int, 1: array<string, string>}> */
+    private function csvRows(string $csv): \Generator
+    {
+        // Strip the UTF-8 BOM our own (pre-Excel) export prepended.
         if (str_starts_with($csv, "\xEF\xBB\xBF")) {
             $csv = substr($csv, 3);
         }
@@ -99,10 +124,28 @@ class ImportUnits
         // French Excel saves with semicolons — accept both.
         $delimiter = substr_count($firstLine, ';') > substr_count($firstLine, ',') ? ';' : ',';
 
-        $columns = array_map(
-            fn ($c) => strtolower(trim((string) $c)),
-            str_getcsv($firstLine, $delimiter, '"', '\\'),
-        );
+        $columns = $this->headerColumns(str_getcsv($firstLine, $delimiter, '"', '\\'));
+
+        $line = 1;
+        while (($cells = fgetcsv($stream, 0, $delimiter, '"', '\\')) !== false) {
+            $line++;
+            if ($cells === [null] || implode('', array_map(strval(...), $cells)) === '') {
+                continue; // blank line
+            }
+
+            yield [$line, $this->mapRow($columns, $cells)];
+        }
+
+        fclose($stream);
+    }
+
+    /**
+     * @param list<string> $raw
+     * @return list<string> lowercased header names
+     */
+    private function headerColumns(array $raw): array
+    {
+        $columns = array_map(fn ($c) => strtolower(trim((string) $c)), $raw);
 
         abort_if(
             ! in_array('id', $columns, true) && ! in_array('location_id', $columns, true) && ! in_array('project', $columns, true),
@@ -110,7 +153,7 @@ class ImportUnits
             __('app.units_import_bad_header'),
         );
 
-        return [['delimiter' => $delimiter, 'columns' => $columns], $stream];
+        return $columns;
     }
 
     /** @return array<string, string> column → trimmed cell (only columns present in the file) */

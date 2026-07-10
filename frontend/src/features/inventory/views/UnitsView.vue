@@ -116,13 +116,15 @@ function currentFilterParams() {
   return params
 }
 
-// Row multi-select cancel + CSV export/import (shared with the project tab).
+// Row multi-select cancel + Excel export/template/import (shared with the project tab).
 const {
   selected,
   exporting,
+  downloadingTemplate,
   importInput,
   cancelSelected,
-  exportCsv,
+  exportExcel,
+  downloadTemplate,
   pickImportFile,
   onImportFile,
 } = useUnitBulkTools(units, currentFilterParams)
@@ -359,17 +361,27 @@ async function removeUnit(u) {
     <PageHeader :title="$t('nav.units')" :subtitle="$t('inventory.unitsSubtitle')">
       <template v-if="!nativePhone" #actions>
         <Button
-          :label="$t('inventory.exportCsv')"
+          :label="$t('inventory.exportExcel')"
           icon="pi pi-download"
           severity="secondary"
           outlined
           size="small"
           :loading="exporting"
-          @click="exportCsv"
+          @click="exportExcel"
         />
         <Button
           v-if="canManage"
-          :label="$t('inventory.importCsv')"
+          :label="$t('inventory.importTemplate')"
+          icon="pi pi-file-excel"
+          severity="secondary"
+          outlined
+          size="small"
+          :loading="downloadingTemplate"
+          @click="downloadTemplate"
+        />
+        <Button
+          v-if="canManage"
+          :label="$t('inventory.importExcel')"
           icon="pi pi-upload"
           severity="secondary"
           outlined
@@ -380,7 +392,7 @@ async function removeUnit(u) {
         <input
           ref="importInput"
           type="file"
-          accept=".csv,text/csv,.txt"
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.csv,text/csv,.txt"
           class="hidden"
           @change="onImportFile"
         />

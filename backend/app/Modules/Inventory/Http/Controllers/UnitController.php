@@ -20,11 +20,14 @@ use App\Modules\Inventory\Http\Requests\UpdateUnitRequest;
 use App\Modules\Inventory\Http\Resources\UnitResource;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
+use App\Modules\Inventory\Support\UnitsWorkbook;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -94,52 +97,40 @@ class UnitController extends Controller
     }
 
     /**
-     * The current browse (same filters as index) as a CSV — the fast-edit
-     * round-trip: export, fix in Excel, re-import. Column names are the
-     * import's contract; base (untranslated) labels so a file exported in
-     * Arabic re-imports fine.
+     * The current browse (same filters as index) as an .xlsx — the fast-edit
+     * round-trip: export, fix in Excel, re-import (UnitsWorkbook holds the
+     * column contract).
      */
-    public function export(Request $request): StreamedResponse
+    public function export(Request $request, UnitsWorkbook $workbook): StreamedResponse
     {
-        $units = $this->filteredQuery($request)->get();
-
-        return response()->streamDownload(function () use ($units): void {
-            $out = fopen('php://output', 'w');
-            fwrite($out, "\xEF\xBB\xBF"); // BOM: Excel reads UTF-8 (Arabic names)
-            fputcsv($out, [
-                'id', 'location_id', 'project', 'wilaya', 'commune', 'reference', 'rooms', 'floor',
-                'area_sqm', 'price_semi_fini', 'price_fini', 'sale_status', 'gtm_priority', 'block', 'stack_floor', 'position',
-            ], ',', '"', '\\');
-
-            foreach ($units as $unit) {
-                fputcsv($out, [
-                    $unit->id,
-                    $unit->location_id,
-                    $unit->location?->name,
-                    $unit->location?->wilaya?->name,
-                    $unit->location?->commune?->name,
-                    $unit->reference,
-                    $unit->roomNumber?->label,
-                    $unit->floor?->label,
-                    $unit->area_sqm,
-                    $unit->price_semi_fini,
-                    $unit->price_fini,
-                    $unit->sale_status?->value,
-                    $unit->gtm_priority?->value,
-                    $unit->block,
-                    $unit->stack_floor,
-                    $unit->position,
-                ], ',', '"', '\\');
-            }
-
-            fclose($out);
-        }, 'units-'.now()->format('Y-m-d-Hi').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        return $this->xlsxDownload(
+            $workbook->export($this->filteredQuery($request)->get()),
+            'units-'.now()->format('Y-m-d-Hi').'.xlsx',
+        );
     }
 
-    /** Re-import an (edited) export: rows with id update, rows without create. */
+    /** The empty import .xlsx: example rows + a translated per-column guide sheet. */
+    public function template(UnitsWorkbook $workbook): StreamedResponse
+    {
+        return $this->xlsxDownload($workbook->template(), 'units-import-template.xlsx');
+    }
+
+    private function xlsxDownload(Spreadsheet $spreadsheet, string $filename): StreamedResponse
+    {
+        return response()->streamDownload(
+            function () use ($spreadsheet): void {
+                (new Xlsx($spreadsheet))->save('php://output');
+                $spreadsheet->disconnectWorksheets();
+            },
+            $filename,
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+        );
+    }
+
+    /** Re-import an (edited) export or a filled template: rows with id update, rows without create. */
     public function import(ImportUnitsRequest $request, ImportUnits $action): JsonResponse
     {
-        $result = $action->handle($request->user(), $request->file('file')->getContent());
+        $result = $action->handle($request->user(), $request->file('file'));
 
         return response()->json(['data' => $result]);
     }
