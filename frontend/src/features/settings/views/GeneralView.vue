@@ -18,6 +18,7 @@ const holdHours = ref('')
 const reservedHours = ref('')
 const maxAttempts = ref('')
 const lockoutMinutes = ref('')
+const officeWindowDays = ref('')
 const geofenceRadius = ref('')
 const acceptSla = ref('')
 const arrivalGrace = ref('')
@@ -32,6 +33,7 @@ async function load() {
     reservedHours.value = settings.reserved_hold_hours ?? '72'
     maxAttempts.value = settings.login_max_attempts ?? '3'
     lockoutMinutes.value = settings.login_lockout_minutes ?? '0'
+    officeWindowDays.value = settings.office_visit_max_days ?? '1'
     geofenceRadius.value = settings.dispatch_geofence_radius_m ?? '200'
     acceptSla.value = settings.dispatch_accept_sla_minutes ?? '15'
     arrivalGrace.value = settings.dispatch_arrival_grace_minutes ?? '15'
@@ -63,6 +65,11 @@ async function save() {
     toastError(t('settings.lockoutInvalid'))
     return
   }
+  const officeDays = Number(officeWindowDays.value)
+  if (!Number.isInteger(officeDays) || officeDays < 0) {
+    toastError(t('settings.officeWindowInvalid'))
+    return
+  }
   const radius = Number(geofenceRadius.value)
   const sla = Number(acceptSla.value)
   const grace = Number(arrivalGrace.value)
@@ -83,6 +90,7 @@ async function save() {
       reserved_hold_hours: reserved,
       login_max_attempts: attempts,
       login_lockout_minutes: lockout,
+      office_visit_max_days: officeDays,
       dispatch_geofence_radius_m: radius,
       dispatch_accept_sla_minutes: sla,
       dispatch_arrival_grace_minutes: grace,
@@ -123,6 +131,25 @@ async function save() {
           />
           <p class="mt-1.5 text-xs text-mute">
             {{ $t('settings.reservedHoursHint') }}
+          </p>
+        </div>
+        <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="saving" />
+      </form>
+    </SectionCard>
+
+    <SectionCard :title="$t('settings.visits')" icon="pi pi-calendar" class="mt-6">
+      <p v-if="loading" class="text-sm text-mute">{{ $t('common.loading') }}</p>
+      <form v-else class="max-w-md space-y-4" @submit.prevent="save">
+        <div>
+          <BaseInput
+            v-model="officeWindowDays"
+:label="$t('settings.officeWindowLabel')"
+            type="number"
+            min="0"
+            max="60"
+          />
+          <p class="mt-1.5 text-xs text-mute">
+            {{ $t('settings.officeWindowHint') }}
           </p>
         </div>
         <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="saving" />

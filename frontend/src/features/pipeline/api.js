@@ -91,6 +91,20 @@ export const pipelineApi = {
     return data
   },
 
+  // The Office Visits Program (oversight.pipeline): one week of office visits
+  // by day × hour + every plan waiting for an approval verdict.
+  async officeProgram(week = null) {
+    const { data } = await useApi().get('/office-program', { params: week ? { week } : {} })
+    return data.data // { week_start, window_days, visits, pending_approvals }
+  },
+
+  // A dispatcher's verdict on a beyond-window office-visit plan.
+  // Payload: { decision: 'approve'|'deny'|'reschedule', reason?, due_date?, due_time? }
+  async decideOfficeVisitApproval(nextActionId, payload) {
+    const { data } = await useApi().post(`/next-actions/${nextActionId}/approval`, payload)
+    return data.data
+  },
+
   // --- The dispatch GPS layer -----------------------------------------------
 
   // The dispatcher's live map: agent dots (status + freshest fix) and today's
@@ -170,8 +184,9 @@ export const tasksApi = {
     return data.data
   },
 
-  async complete(id) {
-    const { data } = await useApi().post(`/tasks/${id}/complete`)
+  // Completion report: { summary, outcome, difficulties?, time_spent_minutes? }
+  async complete(id, report) {
+    const { data } = await useApi().post(`/tasks/${id}/complete`, report)
     return data.data
   },
 

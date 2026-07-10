@@ -30,11 +30,15 @@ class DomainNotification extends Notification implements ShouldQueue
      */
     public const PUSH_CATEGORIES = [
         'chat' => ['chat_message'],
-        'visits' => ['visit_assigned', 'visit_agent_assigned', 'office_visit_scheduled', 'dispatch_request', 'visit_declined', 'visit_unaccepted', 'visit_late'],
+        'visits' => [
+            'visit_assigned', 'visit_agent_assigned', 'office_visit_scheduled', 'dispatch_request',
+            'office_visit_approval', 'office_visit_approved', 'office_visit_denied', 'office_visit_rescheduled',
+            'visit_declined', 'visit_unaccepted', 'visit_late',
+        ],
         'payments' => ['payment', 'reserved_lapsed', 'reservation_next', 'reservation_cancelled'],
         'reminders' => ['reminder', 'upcoming_digest'],
         'listings' => ['unit_published', 'unit_updated', 'unit_sold', 'unit_status', 'unit_match', 'box_published', 'box_updated', 'units_imported'],
-        'workflow' => ['project', 'desire_assigned', 'duplicate', 'work_transferred'],
+        'workflow' => ['project', 'desire_assigned', 'duplicate', 'work_transferred', 'task_assigned', 'task_completed'],
     ];
 
     public static function pushCategoryFor(string $kind): ?string

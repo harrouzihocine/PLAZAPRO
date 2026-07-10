@@ -19,6 +19,7 @@ use App\Modules\Pipeline\Http\Controllers\DispatchLiveController;
 use App\Modules\Pipeline\Http\Controllers\DutyController;
 use App\Modules\Pipeline\Http\Controllers\MyDayController;
 use App\Modules\Pipeline\Http\Controllers\NextActionController;
+use App\Modules\Pipeline\Http\Controllers\OfficeProgramController;
 use App\Modules\Pipeline\Http\Controllers\TaskController;
 use App\Modules\Pipeline\Http\Controllers\TimelineController;
 use App\Modules\Pipeline\Http\Controllers\VisitController;
@@ -65,6 +66,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dispatch/board', [DispatchController::class, 'board']);
         Route::post('/dispatch/assign', [DispatchController::class, 'assign']);
 
+        // The verdict on a beyond-window office-visit plan (approve / deny /
+        // reschedule) — the manager side of the office-visit window rule.
+        Route::post('/next-actions/{nextAction}/approval', [NextActionController::class, 'decideApproval']);
+
         // The live layer: agents map, ranked assignment suggestions, day replay.
         Route::get('/dispatch/map', [DispatchLiveController::class, 'map']);
         Route::get('/dispatch/suggest', [DispatchLiveController::class, 'suggest']);
@@ -82,6 +87,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/visits/{visit}/decline', [VisitLifecycleController::class, 'decline']);
     Route::post('/visits/{visit}/en-route', [VisitLifecycleController::class, 'enRoute']);
     Route::post('/visits/{visit}/arrived', [VisitLifecycleController::class, 'arrived']);
+
+    // The Office Visits Program: the manager's week of office visits by day ×
+    // hour, plus the plans waiting for an approval verdict. Same audience as
+    // the upcoming-office-visits oversight list.
+    Route::middleware('can:oversight.pipeline')->group(function () {
+        Route::get('/office-program', [OfficeProgramController::class, 'index']);
+    });
 
     // Scheduling / assigning a visit picks an agent (agent-only).
     Route::middleware('can:visits.assign')->group(function () {

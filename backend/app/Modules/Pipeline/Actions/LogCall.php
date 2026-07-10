@@ -80,7 +80,7 @@ class LogCall
             // only forces an assignee for in-site visits).
             if (! empty($data['next_action'])) {
                 $nextAction = $this->createNextAction->handle(
-                    $project ?? $client, $call, $data['next_action'], $client->assigned_agent_id ?? $actor->id,
+                    $project ?? $client, $call, $data['next_action'], $client->assigned_agent_id ?? $actor->id, $actor,
                 );
 
                 // A visit-type next step IS the scheduling — materialize the visit(s).

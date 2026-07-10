@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Pipeline;
 
+use App\Modules\Collaboration\Notifications\DomainNotification;
 use App\Modules\Pipeline\Models\Task;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -40,20 +42,143 @@ class TaskTest extends TestCase
             ->assertJsonPath('data.assigned_to.id', $user->id);
     }
 
-    public function test_a_task_can_be_completed(): void
+    public function test_completing_a_task_requires_the_report(): void
     {
-        $task = Task::factory()->create();
-        Sanctum::actingAs($this->userWithPermissions(['tasks.manage']));
+        $me = $this->userWithPermissions(['tasks.manage']);
+        $task = Task::factory()->create(['assigned_to' => $me->id]);
+        Sanctum::actingAs($me);
 
         $this->postJson("/api/v1/tasks/{$task->id}/complete")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['summary', 'outcome']);
+    }
+
+    public function test_a_task_is_completed_with_its_report(): void
+    {
+        $me = $this->userWithPermissions(['tasks.manage']);
+        $task = Task::factory()->create(['assigned_to' => $me->id]);
+        Sanctum::actingAs($me);
+
+        $this->postJson("/api/v1/tasks/{$task->id}/complete", [
+            'summary' => 'Filmed and edited the apartment tour.',
+            'outcome' => 'partial',
+            'difficulties' => 'Bad lighting on site.',
+            'time_spent_minutes' => 90,
+        ])
             ->assertOk()
-            ->assertJsonPath('data.state', 'done');
+            ->assertJsonPath('data.state', 'done')
+            ->assertJsonPath('data.completion_outcome', 'partial')
+            ->assertJsonPath('data.completion_summary', 'Filmed and edited the apartment tour.')
+            ->assertJsonPath('data.completed_by.id', $me->id);
+    }
+
+    public function test_completing_a_recurring_task_spawns_the_next_occurrence(): void
+    {
+        $me = $this->userWithPermissions(['tasks.manage']);
+        $task = Task::factory()->create([
+            'assigned_to' => $me->id,
+            'title' => 'Publish a listing story',
+            'category' => 'publication',
+            'repeat_every_hours' => 12,
+        ]);
+        Sanctum::actingAs($me);
+
+        $this->postJson("/api/v1/tasks/{$task->id}/complete", [
+            'summary' => 'Posted on TikTok and Instagram.',
+            'outcome' => 'full',
+        ])->assertOk();
+
+        $next = Task::where('id', '!=', $task->id)->where('title', 'Publish a listing story')->first();
+        $this->assertNotNull($next);
+        $this->assertSame('open', $next->state->value);
+        $this->assertSame(12, $next->repeat_every_hours);
+        $this->assertTrue($next->due_at->between(now()->addHours(11), now()->addHours(13)));
+    }
+
+    public function test_completing_someone_elses_task_needs_tasks_assign(): void
+    {
+        $task = Task::factory()->create();
+        $report = ['summary' => 'Done.', 'outcome' => 'full'];
+
+        Sanctum::actingAs($this->userWithPermissions(['tasks.manage']));
+        $this->postJson("/api/v1/tasks/{$task->id}/complete", $report)->assertForbidden();
+
+        Sanctum::actingAs($this->userWithPermissions(['tasks.manage', 'tasks.assign']));
+        $this->postJson("/api/v1/tasks/{$task->id}/complete", $report)->assertOk();
+    }
+
+    public function test_creating_a_task_for_someone_else_needs_tasks_assign(): void
+    {
+        $other = User::factory()->create();
+
+        Sanctum::actingAs($this->userWithPermissions(['tasks.manage']));
+        $this->postJson('/api/v1/tasks', ['title' => 'X', 'assigned_to' => $other->id])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['assigned_to']);
+
+        Sanctum::actingAs($this->userWithPermissions(['tasks.manage', 'tasks.assign']));
+        $this->postJson('/api/v1/tasks', ['title' => 'X', 'assigned_to' => $other->id])
+            ->assertCreated()
+            ->assertJsonPath('data.assigned_to.id', $other->id);
+    }
+
+    public function test_assigning_a_task_notifies_the_assignee_but_self_tasks_stay_silent(): void
+    {
+        Notification::fake();
+        $other = User::factory()->create();
+        Sanctum::actingAs($this->userWithPermissions(['tasks.manage', 'tasks.assign']));
+
+        $this->postJson('/api/v1/tasks', ['title' => 'For me'])->assertCreated();
+        Notification::assertNothingSent();
+
+        $this->postJson('/api/v1/tasks', ['title' => 'For you', 'assigned_to' => $other->id])->assertCreated();
+        Notification::assertSentTo(
+            $other,
+            DomainNotification::class,
+            fn (DomainNotification $n) => $n->kind === 'task_assigned',
+        );
+    }
+
+    public function test_completing_a_task_notifies_tasks_assign_holders_for_review(): void
+    {
+        $manager = $this->userWithPermissions(['tasks.manage', 'tasks.assign']);
+        $me = $this->userWithPermissions(['tasks.manage']);
+        $task = Task::factory()->create(['assigned_to' => $me->id]);
+        Notification::fake();
+        Sanctum::actingAs($me);
+
+        $this->postJson("/api/v1/tasks/{$task->id}/complete", [
+            'summary' => 'Done.',
+            'outcome' => 'full',
+        ])->assertOk();
+
+        Notification::assertSentTo(
+            $manager,
+            DomainNotification::class,
+            fn (DomainNotification $n) => $n->kind === 'task_completed',
+        );
+        // The completer is never their own reviewer.
+        Notification::assertNotSentTo($me, DomainNotification::class);
+    }
+
+    public function test_without_tasks_assign_the_board_is_personal_even_on_team_scope(): void
+    {
+        $me = $this->userWithPermissions(['tasks.manage']);
+        Task::factory()->create(['assigned_to' => $me->id, 'title' => 'Mine']);
+        Task::factory()->create(['title' => 'Someone else']);
+        Sanctum::actingAs($me);
+
+        $this->getJson('/api/v1/tasks?scope=team')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title', 'Mine');
     }
 
     public function test_cancelling_a_task_keeps_the_record(): void
     {
-        $task = Task::factory()->create();
-        Sanctum::actingAs($this->userWithPermissions(['tasks.manage']));
+        $me = $this->userWithPermissions(['tasks.manage']);
+        $task = Task::factory()->create(['assigned_to' => $me->id]);
+        Sanctum::actingAs($me);
 
         $this->deleteJson("/api/v1/tasks/{$task->id}", ['reason' => 'No longer needed'])
             ->assertOk();
@@ -86,7 +211,7 @@ class TaskTest extends TestCase
         Task::factory()->create(['state' => 'open', 'due_at' => now()->subDay(), 'title' => 'Late']);
         Task::factory()->create(['state' => 'open', 'due_at' => now()->addDay(), 'title' => 'Future']);
         Task::factory()->create(['state' => 'done', 'due_at' => now()->subDay(), 'title' => 'Late but done']);
-        Sanctum::actingAs($this->userWithPermissions(['tasks.manage']));
+        Sanctum::actingAs($this->userWithPermissions(['tasks.manage', 'tasks.assign']));
 
         $this->getJson('/api/v1/tasks?overdue=1')
             ->assertOk()
@@ -98,7 +223,7 @@ class TaskTest extends TestCase
     {
         Task::factory()->create(['priority' => 'high', 'title' => 'Urgent']);
         Task::factory()->create(['priority' => 'low', 'title' => 'Whenever']);
-        Sanctum::actingAs($this->userWithPermissions(['tasks.manage']));
+        Sanctum::actingAs($this->userWithPermissions(['tasks.manage', 'tasks.assign']));
 
         $this->getJson('/api/v1/tasks?priority=high')
             ->assertOk()

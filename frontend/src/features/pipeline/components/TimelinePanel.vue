@@ -371,6 +371,13 @@ async function submitEditNa() {
                 }}<template v-if="formatTimeIfSet(na.due_at)">, {{ formatTimeIfSet(na.due_at) }}</template>
               </span>
             </span>
+            <!-- Beyond-window office visit: a dispatcher must approve it. -->
+            <span
+              v-if="na.approval_status === 'pending'"
+              class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+            >
+              {{ $t('pipeline.awaitingApproval') }}
+            </span>
           </span>
           <span class="flex items-center gap-1.5">
             <span v-if="na.assigned_to?.name" class="text-xs text-mute">

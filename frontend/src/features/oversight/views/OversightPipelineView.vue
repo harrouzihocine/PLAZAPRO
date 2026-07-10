@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import OversightList from '@/features/oversight/components/OversightList.vue'
 import OversightFilters from '@/features/oversight/components/OversightFilters.vue'
@@ -85,14 +86,27 @@ const officeVisitCols = [
         :row-to="subjectLink"
         :empty-text="$t('oversight.overdueEmpty')"
       />
-      <OversightList
+      <div>
+        <!-- The organising view lives on its own page now — this list stays
+             as the filterable anomaly monitor. -->
+        <div class="mb-2 flex justify-end">
+          <RouterLink
+            :to="{ name: 'oversight.officeProgram' }"
+            class="flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:underline dark:text-primary-400"
+          >
+            <i class="pi pi-calendar text-xs" aria-hidden="true" />
+            {{ $t('oversight.openProgram') }}
+          </RouterLink>
+        </div>
+        <OversightList
 :title="$t('oversight.upcomingOffice')"
-        icon="pi pi-building"
-        :data="data.upcoming_office_visits"
-        :columns="officeVisitCols"
-        :row-to="subjectLink"
-        :empty-text="$t('oversight.officeEmpty')"
-      />
+          icon="pi pi-building"
+          :data="data.upcoming_office_visits"
+          :columns="officeVisitCols"
+          :row-to="subjectLink"
+          :empty-text="$t('oversight.officeEmpty')"
+        />
+      </div>
     </div>
   </div>
 </template>

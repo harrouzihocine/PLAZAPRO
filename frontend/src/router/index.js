@@ -182,6 +182,12 @@ const routes = [
         meta: { permission: 'oversight.pipeline' },
       },
       {
+        path: 'oversight/office-program',
+        name: 'oversight.officeProgram',
+        component: () => import('@/features/oversight/views/OfficeProgramView.vue'),
+        meta: { permission: 'oversight.pipeline' },
+      },
+      {
         path: 'oversight/deals',
         name: 'oversight.deals',
         component: () => import('@/features/oversight/views/OversightDealsView.vue'),

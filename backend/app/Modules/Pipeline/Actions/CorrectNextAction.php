@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Pipeline\Actions;
 
+use App\Modules\Pipeline\Enums\NextActionApproval;
 use App\Modules\Pipeline\Enums\NextActionState;
 use App\Modules\Pipeline\Enums\NextActionType;
+use App\Modules\Pipeline\Events\OfficeVisitApprovalRequested;
 use App\Modules\Pipeline\Models\NextAction;
+use App\Modules\Pipeline\Support\OfficeVisitWindow;
 use App\Modules\Settings\Models\User;
 use Illuminate\Support\Facades\DB;
 
@@ -27,17 +30,32 @@ class CorrectNextAction
     public function __construct(private SyncVisitFromNextAction $syncVisitFromNextAction) {}
 
     /**
+     * `$planner` (the user making the correction) re-runs the office-visit
+     * window rule for the corrected version: pushing a plan beyond the window
+     * is a fresh approval request, exactly like planning it there directly.
+     *
      * @param  array<string, mixed>  $data  type, due_date + optional due_time, assigned_to
      */
-    public function handle(NextAction $action, array $data, string $reason): NextAction
+    public function handle(NextAction $action, array $data, string $reason, ?User $planner = null): NextAction
     {
-        return DB::transaction(function () use ($action, $data, $reason) {
+        $dueAt = CreateNextAction::resolveDueAt($data);
+        $approvalStatus = OfficeVisitWindow::approvalStatusFor($planner, $data['type'] ?? null, $dueAt);
+
+        return DB::transaction(function () use ($action, $data, $reason, $dueAt, $approvalStatus, $planner) {
             $corrected = $action->supersedeWith([
                 'type' => $data['type'],
-                'due_at' => CreateNextAction::resolveDueAt($data),
+                'due_at' => $dueAt,
                 'assigned_to' => $this->resolveAssignee($action, $data),
                 'state' => NextActionState::Pending->value,
                 'completed_at' => null,
+                // supersedeWith replicates the original's attributes — the
+                // approval trail must not ride along: recompute it for the
+                // corrected plan and clear the old verdict fields.
+                'approval_status' => $approvalStatus,
+                'approval_requested_by' => $approvalStatus !== null ? $planner?->id : null,
+                'approval_decided_by' => null,
+                'approval_decided_at' => null,
+                'approval_reason' => null,
             ], $reason);
 
             // The old plan's visits that never happened are retired with the same
@@ -47,6 +65,10 @@ class CorrectNextAction
 
             // A visit-type next step IS the scheduling — materialize the visit(s).
             $this->syncVisitFromNextAction->handle($corrected);
+
+            if ($corrected->approval_status === NextActionApproval::Pending) {
+                OfficeVisitApprovalRequested::dispatch($corrected);
+            }
 
             return $corrected;
         });

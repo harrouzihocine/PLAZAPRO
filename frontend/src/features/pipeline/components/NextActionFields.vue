@@ -5,7 +5,8 @@ import TimeField from '@/components/base/TimeField.vue'
 import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPicker.vue'
 import AgentAgendaStrip from '@/features/pipeline/components/AgentAgendaStrip.vue'
 import { useAuthStore } from '@/features/settings/store'
-import { todayInput, unitLine } from '@/utils/format'
+import { appSettingsApi } from '@/features/settings/api'
+import { formatDate, todayInput, unitLine } from '@/utils/format'
 import { t } from '@/i18n'
 
 // The next-action fieldset, shared by the log-call and complete-visit forms.
@@ -46,6 +47,43 @@ const today = todayInput()
 
 const isInSite = computed(() => props.modelValue.type === 'in_site_visit')
 const canDispatch = computed(() => auth.can('visits.dispatch'))
+
+// Office-visit window: a date beyond today + N days is NOT blocked — the plan
+// goes to the dispatchers for approval — but the agent should know before
+// submitting. N is the office_visit_max_days app setting (read once per app
+// session: it moves rarely); dispatchers are the approvers, so their own picks
+// are exempt. Local-date string arithmetic on purpose (Africa/Algiers rule:
+// never toISOString on "now").
+let settingsOnce = null
+const officeWindowDays = ref(null)
+onMounted(async () => {
+  try {
+    settingsOnce ??= appSettingsApi.get()
+    const settings = await settingsOnce
+    const days = Number(settings.office_visit_max_days)
+    officeWindowDays.value = Number.isInteger(days) && days >= 0 ? days : 1
+  } catch {
+    officeWindowDays.value = null // no hint — the server still enforces
+  }
+})
+
+function addDays(isoDate, n) {
+  const d = new Date(isoDate + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+const lastFreeDay = computed(() =>
+  officeWindowDays.value === null ? null : addDays(today, officeWindowDays.value),
+)
+const beyondWindow = computed(
+  () =>
+    props.modelValue.type === 'office_visit' &&
+    !canDispatch.value &&
+    lastFreeDay.value !== null &&
+    !!props.modelValue.due_date &&
+    props.modelValue.due_date > lastFreeDay.value,
+)
 
 // The free/busy strip helps the OWNER of the plan pick a lighter day. Calls and
 // office visits default to the signed-in sales agent, so her own agenda is the
@@ -176,6 +214,18 @@ onMounted(() => {
         @update:model-value="(d) => update('due_date', d)"
       />
     </div>
+
+    <!-- Office-visit window: beyond today + N days the plan is created but a
+         dispatcher must approve it — say so before the agent submits. -->
+    <p
+      v-if="beyondWindow"
+      class="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-ink sm:col-span-3 dark:border-amber-500/40 dark:bg-amber-500/10"
+    >
+      <i class="pi pi-shield mt-0.5 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+      <span>{{
+        $t('pipeline.officeWindowHint', { days: officeWindowDays, date: formatDate(lastFreeDay) })
+      }}</span>
+    </p>
 
     <!-- In-site: which apartment is this next field visit for? Same one (a
          second look) or another apartment picked from the full property picker. -->

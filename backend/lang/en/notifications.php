@@ -90,6 +90,22 @@ return [
         'title' => 'Upcoming office visit',
         'body' => ':type visit with :client:extra — with :agent.',
     ],
+    'office_visit_approval' => [
+        'title' => 'An office visit needs your approval',
+        'body' => ':user wants an office visit with :client on :date — beyond the :days-day window. Approve, deny or reschedule it on the program page.',
+    ],
+    'office_visit_approved' => [
+        'title' => 'Office visit approved',
+        'body' => ':manager approved the office visit with :client on :date.',
+    ],
+    'office_visit_denied' => [
+        'title' => 'Office visit denied — plan a new one',
+        'body' => ':manager denied the office visit with :client on :date (:reason). Plan a closer date with the client.',
+    ],
+    'office_visit_rescheduled' => [
+        'title' => 'Office visit rescheduled',
+        'body' => ':manager moved the office visit with :client to :date.',
+    ],
     'unit_match_new' => [
         'title' => 'New unit matches a client',
         'body' => 'Unit :unit:details fits: :clients.',
@@ -110,6 +126,23 @@ return [
         'call' => 'call',
         'office_visit' => 'office visit',
         'in_site_visit' => 'in-site visit',
+    ],
+    'task_reminder' => [
+        'title' => 'A task is due',
+        'body' => 'Your task ":title" is due now.',
+    ],
+    'task_assigned' => [
+        'title' => 'New task for you',
+        'body' => ':name gave you a task: ":title".',
+    ],
+    'task_completed' => [
+        'title' => 'Task done — review it',
+        'body' => ':name finished ":title" (:outcome). Open the board to read the report.',
+    ],
+    'task_outcome' => [
+        'full' => 'fully done',
+        'partial' => 'partially done',
+        'issues' => 'done with difficulties',
     ],
     'payment' => [
         'title' => 'Payment recorded',

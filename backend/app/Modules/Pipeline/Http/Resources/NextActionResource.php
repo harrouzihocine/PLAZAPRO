@@ -32,6 +32,9 @@ class NextActionResource extends JsonResource
             'edit_reason' => $this->whenLoaded('supersedes', fn () => $this->supersedes?->cancellation_reason),
             'supersedes_id' => $this->supersedes_id,
             'cancellation_reason' => $this->when($this->isCancelled(), fn () => $this->cancellation_reason),
+            // The beyond-window office-visit approval trail (null = in-window).
+            'approval_status' => $this->approval_status?->value,
+            'approval_reason' => $this->approval_reason,
             'assigned_to' => $this->whenLoaded('assignedTo', fn () => $this->assignedTo ? [
                 'id' => $this->assignedTo->id,
                 'name' => $this->assignedTo->name,

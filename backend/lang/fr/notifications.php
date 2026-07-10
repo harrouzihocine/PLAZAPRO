@@ -88,6 +88,22 @@ return [
         'title' => 'Visite bureau à venir',
         'body' => 'Visite :type avec :client:extra — avec :agent.',
     ],
+    'office_visit_approval' => [
+        'title' => 'Une visite bureau attend votre accord',
+        'body' => ':user souhaite une visite bureau avec :client le :date — au-delà de la fenêtre de :days jour(s). Approuvez, refusez ou replanifiez-la depuis la page programme.',
+    ],
+    'office_visit_approved' => [
+        'title' => 'Visite bureau approuvée',
+        'body' => ':manager a approuvé la visite bureau avec :client le :date.',
+    ],
+    'office_visit_denied' => [
+        'title' => 'Visite bureau refusée — à replanifier',
+        'body' => ':manager a refusé la visite bureau avec :client du :date (:reason). Planifiez une date plus proche avec le client.',
+    ],
+    'office_visit_rescheduled' => [
+        'title' => 'Visite bureau replanifiée',
+        'body' => ':manager a déplacé la visite bureau avec :client au :date.',
+    ],
     'unit_match_new' => [
         'title' => 'Une nouvelle unité correspond à un client',
         'body' => 'L’unité :unit:details correspond à : :clients.',
@@ -108,6 +124,23 @@ return [
         'call' => 'appel',
         'office_visit' => 'visite bureau',
         'in_site_visit' => 'visite sur site',
+    ],
+    'task_reminder' => [
+        'title' => 'Une tâche est à échéance',
+        'body' => 'Votre tâche « :title » est due maintenant.',
+    ],
+    'task_assigned' => [
+        'title' => 'Nouvelle tâche pour vous',
+        'body' => ':name vous a confié une tâche : « :title ».',
+    ],
+    'task_completed' => [
+        'title' => 'Tâche terminée — à relire',
+        'body' => ':name a terminé « :title » (:outcome). Ouvrez le tableau pour lire le rapport.',
+    ],
+    'task_outcome' => [
+        'full' => 'entièrement faite',
+        'partial' => 'partiellement faite',
+        'issues' => 'faite avec difficultés',
     ],
     'payment' => [
         'title' => 'Paiement enregistré',

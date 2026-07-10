@@ -88,6 +88,22 @@ return [
         'title' => 'زيارة مكتب قادمة',
         'body' => 'زيارة :type مع :client:extra — مع :agent.',
     ],
+    'office_visit_approval' => [
+        'title' => 'زيارة مكتب تحتاج موافقتك',
+        'body' => ':user يريد زيارة مكتب مع :client بتاريخ :date — خارج نافذة :days يوم/أيام. وافق أو ارفض أو أعد جدولتها من صفحة البرنامج.',
+    ],
+    'office_visit_approved' => [
+        'title' => 'تمت الموافقة على زيارة المكتب',
+        'body' => 'وافق :manager على زيارة المكتب مع :client بتاريخ :date.',
+    ],
+    'office_visit_denied' => [
+        'title' => 'رُفضت زيارة المكتب — خطّط موعدًا جديدًا',
+        'body' => 'رفض :manager زيارة المكتب مع :client بتاريخ :date (:reason). خطّط موعدًا أقرب مع العميل.',
+    ],
+    'office_visit_rescheduled' => [
+        'title' => 'أُعيدت جدولة زيارة المكتب',
+        'body' => 'نقل :manager زيارة المكتب مع :client إلى :date.',
+    ],
     'unit_match_new' => [
         'title' => 'وحدة جديدة تطابق عميلًا',
         'body' => 'الوحدة :unit:details تناسب: :clients.',
@@ -108,6 +124,23 @@ return [
         'call' => 'مكالمة',
         'office_visit' => 'زيارة مكتب',
         'in_site_visit' => 'زيارة ميدانية',
+    ],
+    'task_reminder' => [
+        'title' => 'مهمة مستحقة',
+        'body' => 'مهمتك ":title" مستحقة الآن.',
+    ],
+    'task_assigned' => [
+        'title' => 'مهمة جديدة لك',
+        'body' => ':name أسند إليك مهمة: ":title".',
+    ],
+    'task_completed' => [
+        'title' => 'أُنجزت مهمة — راجعها',
+        'body' => ':name أنهى ":title" (:outcome). افتح اللوحة لقراءة التقرير.',
+    ],
+    'task_outcome' => [
+        'full' => 'أُنجزت كاملة',
+        'partial' => 'أُنجزت جزئيًا',
+        'issues' => 'أُنجزت مع صعوبات',
     ],
     'payment' => [
         'title' => 'سُجلت دفعة',

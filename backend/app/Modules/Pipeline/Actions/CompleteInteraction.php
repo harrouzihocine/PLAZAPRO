@@ -118,7 +118,7 @@ class CompleteInteraction
             // Default assignee = the client's sales agent, else whoever conducted
             // the visit (only in-site visits force an explicit field-agent assignee).
             $nextAction = empty($data['next_action']) ? null : $this->createNextAction->handle(
-                $subject, $visit, $data['next_action'], $client->assigned_agent_id ?? $visit->agent_id,
+                $subject, $visit, $data['next_action'], $client->assigned_agent_id ?? $visit->agent_id, $actor,
             );
 
             // No follow-up planned: completing the visit still FULFILS the open

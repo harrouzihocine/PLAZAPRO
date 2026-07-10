@@ -20,6 +20,7 @@ use App\Modules\Collaboration\Listeners\NotifyParticipantsOfMessage;
 use App\Modules\Collaboration\Listeners\NotifyQueueCancelledBySale;
 use App\Modules\Collaboration\Listeners\SendDispatchRequestNotification;
 use App\Modules\Collaboration\Listeners\SendDueReminderNotification;
+use App\Modules\Collaboration\Listeners\SendOfficeVisitApprovalRequestNotification;
 use App\Modules\Collaboration\Listeners\SendPaymentNotification;
 use App\Modules\Collaboration\Listeners\SendVisitAssignedNotification;
 use App\Modules\Collaboration\Listeners\SendVisitDeclinedNotification;
@@ -36,6 +37,7 @@ use App\Modules\Inventory\Events\UnitSold;
 use App\Modules\Inventory\Events\UnitStatusChanged;
 use App\Modules\Payments\Events\VersementRecorded;
 use App\Modules\Pipeline\Events\InSiteDispatchRequested;
+use App\Modules\Pipeline\Events\OfficeVisitApprovalRequested;
 use App\Modules\Pipeline\Events\ReminderDue;
 use App\Modules\Pipeline\Events\VisitAssigned;
 use App\Modules\Pipeline\Events\VisitDeclined;
@@ -59,6 +61,7 @@ class CollaborationServiceProvider extends ServiceProvider
         VisitAssigned::class => [SendVisitAssignedNotification::class, GrantFieldAgentChatAccess::class],
         InSiteDispatchRequested::class => [SendDispatchRequestNotification::class],
         VisitDeclined::class => [SendVisitDeclinedNotification::class],
+        OfficeVisitApprovalRequested::class => [SendOfficeVisitApprovalRequestNotification::class],
         MessageSent::class => [NotifyParticipantsOfMessage::class],
         VersementRecorded::class => [SendPaymentNotification::class],
         UnitPublished::class => [NotifyAgentsOfMatchingUnit::class, AnnounceNewUnit::class],

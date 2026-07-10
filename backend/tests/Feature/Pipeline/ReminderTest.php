@@ -8,6 +8,7 @@ use App\Modules\Pipeline\Actions\DispatchReminders;
 use App\Modules\Pipeline\Actions\GenerateDueReminders;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Reminder;
+use App\Modules\Pipeline\Models\Task;
 use App\Modules\Settings\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -75,6 +76,41 @@ class ReminderTest extends TestCase
         $action = NextAction::factory()->overdue()->create();
         $reminder = Reminder::factory()->due()->create(['next_action_id' => $action->id]);
         $action->update(['state' => 'done', 'completed_at' => now()]);
+
+        $sent = app(DispatchReminders::class)->handle();
+
+        $this->assertSame(0, $sent);
+        $this->assertSame('cancelled', $reminder->fresh()->state->value);
+    }
+
+    public function test_an_overdue_open_task_generates_a_reminder_once(): void
+    {
+        $agent = User::factory()->create();
+        $task = Task::factory()->create(['assigned_to' => $agent->id, 'due_at' => now()->subHour()]);
+
+        $this->assertSame(1, app(GenerateDueReminders::class)->handle());
+        // Running again does not create a duplicate reminder for the same task.
+        $this->assertSame(0, app(GenerateDueReminders::class)->handle());
+
+        $reminder = Reminder::first();
+        $this->assertSame($task->id, $reminder->task_id);
+        $this->assertSame('pending', $reminder->state->value);
+    }
+
+    public function test_a_done_or_future_task_does_not_generate_a_reminder(): void
+    {
+        Task::factory()->create(['due_at' => now()->addDay()]); // not due yet
+        Task::factory()->create(['due_at' => now()->subHour(), 'state' => 'done']);
+        Task::factory()->create(['due_at' => null]); // nothing to remind about
+
+        $this->assertSame(0, app(GenerateDueReminders::class)->handle());
+    }
+
+    public function test_dispatch_cancels_a_reminder_whose_task_was_completed(): void
+    {
+        $task = Task::factory()->create(['due_at' => now()->subHour()]);
+        $reminder = Reminder::factory()->due()->create(['next_action_id' => null, 'task_id' => $task->id]);
+        $task->update(['state' => 'done']);
 
         $sent = app(DispatchReminders::class)->handle();
 

@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Pipeline\Actions;
 
+use App\Modules\Pipeline\Enums\NextActionApproval;
 use App\Modules\Pipeline\Enums\NextActionState;
 use App\Modules\Pipeline\Enums\NextActionType;
+use App\Modules\Pipeline\Events\OfficeVisitApprovalRequested;
 use App\Modules\Pipeline\Models\NextAction;
+use App\Modules\Pipeline\Support\OfficeVisitWindow;
+use App\Modules\Settings\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -27,9 +31,14 @@ class CreateNextAction
     public function __construct(private ClosePendingNextActions $closePending) {}
 
     /**
+     * `$planner` (the signed-in user creating the plan) feeds the office-visit
+     * window rule: their beyond-window office plan is flagged for a manager's
+     * approval — unless they hold visits.dispatch themselves. Console/seeder
+     * callers leave it null and are never gated.
+     *
      * @param  array<string, mixed>  $data
      */
-    public function handle(Model $subject, ?Model $source, array $data, ?int $defaultAssigneeId = null): NextAction
+    public function handle(Model $subject, ?Model $source, array $data, ?int $defaultAssigneeId = null, ?User $planner = null): NextAction
     {
         // An in-site plan may stay UNASSIGNED — it lands in the dispatch pool,
         // where a visits.dispatch holder hands it to a field agent (weekly
@@ -50,23 +59,38 @@ class CreateNextAction
             ? array_values(array_unique(array_map('intval', $data['unit_ids'])))
             : null;
 
-        return DB::transaction(function () use ($subject, $source, $data, $assignedTo, $targetUnitIds) {
+        $dueAt = self::resolveDueAt($data);
+
+        // Beyond the office-visit window (and not a dispatcher's own plan) →
+        // the plan is still created, flagged pending, and the dispatchers are
+        // asked to approve / deny / reschedule it.
+        $approvalStatus = OfficeVisitWindow::approvalStatusFor($planner, $data['type'] ?? null, $dueAt);
+
+        return DB::transaction(function () use ($subject, $source, $data, $assignedTo, $targetUnitIds, $dueAt, $approvalStatus, $planner) {
             // Close any prior open plan so exactly one stays pending (fulfilled →
             // done; an undispatched pool plan → cancelled). Shared rule — see
             // ClosePendingNextActions.
             $this->closePending->handle($subject, 'Replaced by a new plan before dispatch');
 
-            return NextAction::create([
+            $action = NextAction::create([
                 'subject_type' => $subject->getMorphClass(),
                 'subject_id' => $subject->getKey(),
                 'source_type' => $source?->getMorphClass(),
                 'source_id' => $source?->getKey(),
                 'type' => $data['type'],
-                'due_at' => self::resolveDueAt($data),
+                'due_at' => $dueAt,
                 'assigned_to' => $assignedTo,
                 'target_unit_ids' => $targetUnitIds,
                 'state' => NextActionState::Pending->value,
+                'approval_status' => $approvalStatus,
+                'approval_requested_by' => $approvalStatus !== null ? $planner?->id : null,
             ]);
+
+            if ($action->approval_status === NextActionApproval::Pending) {
+                OfficeVisitApprovalRequested::dispatch($action);
+            }
+
+            return $action;
         });
     }
 

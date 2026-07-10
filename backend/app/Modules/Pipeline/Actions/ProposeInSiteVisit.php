@@ -63,7 +63,7 @@ class ProposeInSiteVisit
                 'due_date' => $dueDate,
                 'due_time' => $dueTime,
                 'assigned_to' => $agentId,
-            ], $actor->id);
+            ], $actor->id, $actor);
 
             return $this->syncVisit->handle($plan);
         });

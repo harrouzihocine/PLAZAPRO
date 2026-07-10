@@ -12,7 +12,7 @@ export const useTasksStore = defineStore('tasks', {
   state: () => ({
     items: [],
     agents: [],
-    filters: { scope: 'mine', state: '', priority: '', overdue: false },
+    filters: { scope: 'mine', state: '', category: '', priority: '', overdue: false },
     loading: false,
     saving: false,
     error: '',
@@ -26,6 +26,7 @@ export const useTasksStore = defineStore('tasks', {
       const defaultView =
         this.filters.scope === 'mine' &&
         !this.filters.state &&
+        !this.filters.category &&
         !this.filters.priority &&
         !this.filters.overdue
       try {
@@ -69,9 +70,15 @@ export const useTasksStore = defineStore('tasks', {
       }
     },
 
-    async complete(id) {
-      await tasksApi.complete(id)
-      await this.fetch()
+    // report = the completion form (summary/outcome/difficulties/time spent).
+    async complete(id, report) {
+      this.saving = true
+      try {
+        await tasksApi.complete(id, report)
+        await this.fetch()
+      } finally {
+        this.saving = false
+      }
     },
 
     async cancel(id, reason = 'Task cancelled') {

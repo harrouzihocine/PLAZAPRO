@@ -7,28 +7,38 @@ namespace App\Modules\Pipeline\Http\Controllers;
 use App\Modules\Pipeline\Actions\CancelTask;
 use App\Modules\Pipeline\Actions\CompleteTask;
 use App\Modules\Pipeline\Actions\CreateTask;
+use App\Modules\Pipeline\Http\Requests\CompleteTaskRequest;
 use App\Modules\Pipeline\Http\Requests\StoreTaskRequest;
 use App\Modules\Pipeline\Http\Resources\TaskResource;
 use App\Modules\Pipeline\Models\Task;
+use App\Modules\Settings\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
 
 /**
- * Tasks (to-dos). All endpoints require tasks.manage. Backs the Phase 5 tasks
- * board: filter by scope (mine vs the whole team), state, priority and overdue.
+ * Tasks (to-dos). All endpoints require tasks.manage; the team layer
+ * (tasks.assign) additionally sees everyone's tasks, creates tasks for other
+ * users and cancels any task — without it the board is strictly personal.
  */
 class TaskController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
+        $user = $request->user();
+
         $tasks = Task::query()
-            ->with(['assignedTo', 'subject'])
+            ->with(['assignedTo', 'createdBy', 'subject'])
             ->active()
-            // scope=mine limits to the current user's tasks; anything else = team.
-            ->when($request->query('scope') === 'mine', fn ($q) => $q->where('assigned_to', $request->user()->id))
+            // Without the team layer the board is personal, whatever the
+            // requested scope; with it, scope=mine still narrows on demand.
+            ->when(
+                ! $user->can('tasks.assign') || $request->query('scope') === 'mine',
+                fn ($q) => $q->where('assigned_to', $user->id),
+            )
             ->when($request->filled('assigned_to'), fn ($q) => $q->where('assigned_to', $request->integer('assigned_to')))
             ->when($request->filled('state'), fn ($q) => $q->where('state', $request->query('state')))
+            ->when($request->filled('category'), fn ($q) => $q->where('category', $request->query('category')))
             ->when($request->filled('priority'), fn ($q) => $q->where('priority', $request->query('priority')))
             // overdue = still open and past due.
             ->when($request->boolean('overdue'), fn ($q) => $q->where('state', 'open')->whereNotNull('due_at')->where('due_at', '<=', now()))
@@ -41,19 +51,39 @@ class TaskController extends Controller
     public function store(StoreTaskRequest $request, CreateTask $action): TaskResource
     {
         return new TaskResource(
-            $action->handle($request->validated(), $request->user())->load('assignedTo'),
+            $action->handle($request->validated(), $request->user())->load(['assignedTo', 'createdBy']),
         );
     }
 
-    public function complete(Task $task, CompleteTask $action): TaskResource
+    public function complete(CompleteTaskRequest $request, Task $task, CompleteTask $action): TaskResource
     {
-        return new TaskResource($action->handle($task)->load('assignedTo'));
+        $this->authorizeTouch($request->user(), $task);
+
+        return new TaskResource(
+            $action->handle($task, $request->validated(), $request->user())->load(['assignedTo', 'createdBy', 'completedBy']),
+        );
     }
 
     public function destroy(Request $request, Task $task, CancelTask $action): TaskResource
     {
+        $this->authorizeTouch($request->user(), $task);
+
         $reason = (string) $request->input('reason', 'Task cancelled');
 
         return new TaskResource($action->handle($task, $reason)->load('assignedTo'));
+    }
+
+    /**
+     * Completing/cancelling someone else's task is a team-layer move; the
+     * assignee (or the person who created the task) always may.
+     */
+    private function authorizeTouch(User $user, Task $task): void
+    {
+        abort_unless(
+            $task->assigned_to === $user->id
+                || $task->created_by === $user->id
+                || $user->can('tasks.assign'),
+            403,
+        );
     }
 }

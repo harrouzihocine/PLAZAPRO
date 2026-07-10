@@ -9,8 +9,10 @@ use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Pipeline\Actions\BuildAgentAgenda;
 use App\Modules\Pipeline\Actions\CorrectNextAction;
 use App\Modules\Pipeline\Actions\CreateNextAction;
+use App\Modules\Pipeline\Actions\DecideOfficeVisitApproval;
 use App\Modules\Pipeline\Actions\SyncVisitFromNextAction;
 use App\Modules\Pipeline\Http\Requests\CorrectNextActionRequest;
+use App\Modules\Pipeline\Http\Requests\DecideOfficeVisitApprovalRequest;
 use App\Modules\Pipeline\Http\Requests\StoreNextActionRequest;
 use App\Modules\Pipeline\Http\Resources\NextActionResource;
 use App\Modules\Pipeline\Models\NextAction;
@@ -62,7 +64,7 @@ class NextActionController extends Controller
         // closing of the prior pending plan — must roll back with it.
         $nextAction = DB::transaction(function () use ($create, $syncVisit, $subject, $data, $client, $request) {
             $nextAction = $create->handle(
-                $subject, null, $data, $client->assigned_agent_id ?? $request->user()->id,
+                $subject, null, $data, $client->assigned_agent_id ?? $request->user()->id, $request->user(),
             );
 
             // A visit-type plan IS the scheduling — materialize the visit(s).
@@ -106,7 +108,23 @@ class NextActionController extends Controller
         $reason = trim($label.($note ? " — {$note}" : ''));
 
         return new NextActionResource(
-            $action->handle($nextAction, $request->validated(), $reason)
+            $action->handle($nextAction, $request->validated(), $reason, $request->user())
+                ->load('assignedTo'),
+        );
+    }
+
+    /**
+     * A dispatcher's verdict on a beyond-window office-visit plan: approve
+     * (announce the quiet visit), deny with a reason (plan + visit cancelled,
+     * the agent replans) or reschedule (superseded by the manager's own date).
+     */
+    public function decideApproval(
+        DecideOfficeVisitApprovalRequest $request,
+        NextAction $nextAction,
+        DecideOfficeVisitApproval $action,
+    ): NextActionResource {
+        return new NextActionResource(
+            $action->handle($nextAction, $request->user(), $request->validated())
                 ->load('assignedTo'),
         );
     }

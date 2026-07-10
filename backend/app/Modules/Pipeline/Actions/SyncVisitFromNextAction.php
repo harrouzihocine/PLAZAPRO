@@ -8,6 +8,7 @@ use App\Modules\Clients\Actions\AddShortlistItems;
 use App\Modules\Clients\Enums\ShortlistState;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Clients\Models\ShortlistItem;
+use App\Modules\Pipeline\Enums\NextActionApproval;
 use App\Modules\Pipeline\Enums\NextActionType;
 use App\Modules\Pipeline\Events\InSiteDispatchRequested;
 use App\Modules\Pipeline\Events\VisitAssigned;
@@ -82,7 +83,12 @@ class SyncVisitFromNextAction
             'scheduled_at' => $action->due_at,
         ]);
 
-        VisitAssigned::dispatch($visit);
+        // A beyond-window plan stays quiet while it waits for a dispatcher's
+        // verdict — DecideOfficeVisitApproval announces it on approve. An
+        // in-window plan announces immediately, as always.
+        if ($action->approval_status !== NextActionApproval::Pending) {
+            VisitAssigned::dispatch($visit);
+        }
 
         return $visit;
     }

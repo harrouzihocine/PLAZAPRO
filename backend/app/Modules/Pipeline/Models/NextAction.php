@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Pipeline\Models;
 
 use App\Core\Models\BaseModel;
+use App\Modules\Pipeline\Enums\NextActionApproval;
 use App\Modules\Pipeline\Enums\NextActionState;
 use App\Modules\Pipeline\Enums\NextActionType;
 use App\Modules\Settings\Models\User;
@@ -26,6 +27,11 @@ class NextAction extends BaseModel
     protected $fillable = [
         'subject_type', 'subject_id', 'source_type', 'source_id',
         'type', 'due_at', 'assigned_to', 'target_unit_ids', 'state', 'completed_at',
+        // Manager approval of a beyond-window office-visit plan. Server-set
+        // only (OfficeVisitWindow / DecideOfficeVisitApproval) — no FormRequest
+        // ever forwards these from input.
+        'approval_status', 'approval_requested_by', 'approval_decided_by',
+        'approval_decided_at', 'approval_reason',
     ];
 
     protected function casts(): array
@@ -37,6 +43,8 @@ class NextAction extends BaseModel
             'completed_at' => 'datetime',
             // The specific apartment(s) an in-site plan targets (else the whole shortlist).
             'target_unit_ids' => 'array',
+            'approval_status' => NextActionApproval::class,
+            'approval_decided_at' => 'datetime',
         ]);
     }
 
@@ -53,6 +61,18 @@ class NextAction extends BaseModel
     public function assignedTo(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    /** Who planned the beyond-window office visit (null when no approval was involved). */
+    public function approvalRequestedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approval_requested_by');
+    }
+
+    /** The dispatcher who approved / denied / rescheduled it. */
+    public function approvalDecidedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approval_decided_by');
     }
 
     public function reminders(): HasMany

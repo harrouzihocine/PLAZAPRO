@@ -24,6 +24,9 @@ class AppSettingController extends Controller
         // the lock lasts (0 = until an admin unlocks it in Settings → Users).
         'login_max_attempts' => ['required', 'integer', 'min:1', 'max:10'],
         'login_lockout_minutes' => ['required', 'integer', 'min:0', 'max:10080'],
+        // Office-visit window: how far ahead an office visit may be planned
+        // without a manager's approval (0 = today only, 1 = today or tomorrow).
+        'office_visit_max_days' => ['required', 'integer', 'min:0', 'max:60'],
         // The dispatch GPS layer: site geofence radius (auto check-in/out),
         // how long an assignment may sit unaccepted / an arrival may run late
         // before the dispatchers are nudged, and breadcrumb retention.

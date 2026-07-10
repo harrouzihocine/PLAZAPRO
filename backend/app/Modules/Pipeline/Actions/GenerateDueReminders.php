@@ -8,15 +8,21 @@ use App\Modules\Pipeline\Enums\ReminderChannel;
 use App\Modules\Pipeline\Enums\ReminderState;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Reminder;
+use App\Modules\Pipeline\Models\Task;
 
 /**
- * Generate reminders for pending next actions that are due/overdue and don't yet
- * have a live reminder. The reminder targets the action's assigned agent (via
- * next_action.assigned_to). Runs on a schedule (actions:mark-overdue).
+ * Generate reminders for pending next actions AND open tasks that are
+ * due/overdue and don't yet have a live reminder. The reminder targets the
+ * assigned agent. Runs on a schedule (actions:mark-overdue).
  */
 class GenerateDueReminders
 {
     public function handle(): int
+    {
+        return $this->forNextActions() + $this->forTasks();
+    }
+
+    private function forNextActions(): int
     {
         $count = 0;
 
@@ -38,6 +44,38 @@ class GenerateDueReminders
                     Reminder::create([
                         'next_action_id' => $action->id,
                         'remind_at' => $action->due_at,
+                        'channel' => ReminderChannel::InApp->value,
+                        'state' => ReminderState::Pending->value,
+                    ]);
+                    $count++;
+                }
+            });
+
+        return $count;
+    }
+
+    /**
+     * Same sweep for the tasks board: an open task past its due date gets one
+     * live reminder for its assignee (tasks always have one — no pool case).
+     */
+    private function forTasks(): int
+    {
+        $count = 0;
+
+        Task::query()
+            ->active()
+            ->open()
+            ->whereNotNull('due_at')
+            ->where('due_at', '<=', now())
+            ->whereDoesntHave('reminders', fn ($q) => $q->whereIn('state', [
+                ReminderState::Pending->value,
+                ReminderState::Sent->value,
+            ]))
+            ->chunkById(200, function ($tasks) use (&$count) {
+                foreach ($tasks as $task) {
+                    Reminder::create([
+                        'task_id' => $task->id,
+                        'remind_at' => $task->due_at,
                         'channel' => ReminderChannel::InApp->value,
                         'state' => ReminderState::Pending->value,
                     ]);

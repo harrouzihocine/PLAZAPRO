@@ -87,7 +87,13 @@ class RbacSeeder extends Seeder
         // next_actions.plan: the standalone "Plan next action" button (a log's
         // own next action still rides on calls.log / visits.conduct).
         'calls.log', 'next_actions.plan',
-        'visits.assign', 'visits.dispatch', 'visits.conduct', 'visits.propose', 'tasks.manage',
+        // tasks.manage opens the tasks board (own tasks only: create for
+        // yourself, complete with a report). tasks.assign is the team layer on
+        // top: create tasks FOR other users and see/cancel the whole team's
+        // board. Deliberately NOT split-from-legacy — restricting who hands
+        // out work is the point, so grant it role-by-role.
+        'visits.assign', 'visits.dispatch', 'visits.conduct', 'visits.propose',
+        'tasks.manage', 'tasks.assign',
         // Payments
         'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
         // Collaboration & analytics
@@ -163,7 +169,8 @@ class RbacSeeder extends Seeder
         'visits.dispatch' => 'Use the weekly dispatch board and hand out field visits company-wide.',
         'visits.conduct' => 'Carry out visits and write their rapports.',
         'visits.propose' => 'Use the "Add unit to visit" button — send apartment(s) out as in-site visits (into the dispatch pool; dispatchers may pre-assign the agent).',
-        'tasks.manage' => 'Create and manage follow-up tasks.',
+        'tasks.manage' => 'Open the tasks board: create tasks for yourself and complete them with a report.',
+        'tasks.assign' => 'Create tasks for other users and see (and cancel) the whole team\'s tasks — without it, users work their own list only.',
         // Payments
         'versements.view' => 'See payment records (versements) and schedules.',
         'versements.record' => 'Record incoming payments.',
@@ -370,7 +377,8 @@ class RbacSeeder extends Seeder
             'projects.create', 'projects.manage', 'projects.contributors', 'projects.freeze',
             'projects.advance', 'deals.direct', 'deals.manage', 'shortlist.manage',
             'calls.log', 'next_actions.plan',
-            'visits.assign', 'visits.dispatch', 'visits.conduct', 'visits.propose', 'tasks.manage',
+            'visits.assign', 'visits.dispatch', 'visits.conduct', 'visits.propose',
+            'tasks.manage', 'tasks.assign',
             'units.view', 'units.interest', 'units.manage', 'media.manage',
             'reservations.view', 'reservations.view_all',
             'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',

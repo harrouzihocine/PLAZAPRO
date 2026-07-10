@@ -219,6 +219,12 @@ const SECTIONS = [
         badgeKey: 'pipeline',
       },
       {
+        to: '/oversight/office-program',
+        labelKey: 'nav.officeProgram',
+        icon: 'pi pi-calendar',
+        permission: 'oversight.pipeline',
+      },
+      {
         to: '/oversight/deals',
         labelKey: 'nav.lostPaid',
         icon: 'pi pi-wallet',
