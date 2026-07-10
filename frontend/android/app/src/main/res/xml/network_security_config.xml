@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Trust the office's private LAN CA for the bare-IP fallback origin ONLY.
+     https://192.168.1.200 is the last-resort server origin the shell falls
+     back to when the office internet is down (public DNS unreachable, so
+     office.plaza-pro.com stops resolving; the IP needs no DNS at all). Its
+     certificate is issued on the server by scripts/setup-lan-ip-cert.sh and
+     signed by the CA whose PUBLIC cert is committed at res/raw/plaza_lan_ca.pem
+     (the key stays in ~/plaza-prod/secrets/lan-ip-ca, guarded like the
+     signing keystore). Every other host keeps the standard system trust
+     store — this config widens nothing else. -->
+<network-security-config>
+    <domain-config>
+        <domain includeSubdomains="false">192.168.1.200</domain>
+        <trust-anchors>
+            <certificates src="@raw/plaza_lan_ca" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

@@ -72,15 +72,25 @@ elif [[ ! -f secrets/cloudflare-dns.ini ]]; then
 fi
 
 # --- 2. self-signed placeholder so nginx can always start ---------------
+# ip-*.pem is the no-SNI (bare-IP) pair from the $plaza_cert map in prod.conf;
+# the real one comes from scripts/setup-lan-ip-cert.sh. A placeholder keeps
+# bare-IP handshakes answering (with a warning) instead of failing outright.
 docker compose run --rm --no-deps --entrypoint sh certbot -c "
-    test -f $NGINX_CERT_DIR/fullchain.pem && exit 0
     mkdir -p $NGINX_CERT_DIR
-    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
-        -subj '/CN=plaza-bootstrap-self-signed' \
-        -keyout $NGINX_CERT_DIR/privkey.pem \
-        -out $NGINX_CERT_DIR/fullchain.pem 2>/dev/null
-    chmod 600 $NGINX_CERT_DIR/privkey.pem
-    echo 'Seeded self-signed placeholder cert.'
+    if ! test -f $NGINX_CERT_DIR/fullchain.pem; then
+        openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+            -subj '/CN=plaza-bootstrap-self-signed' \
+            -keyout $NGINX_CERT_DIR/privkey.pem \
+            -out $NGINX_CERT_DIR/fullchain.pem 2>/dev/null
+        chmod 600 $NGINX_CERT_DIR/privkey.pem
+        echo 'Seeded self-signed placeholder cert.'
+    fi
+    if ! test -f $NGINX_CERT_DIR/ip-fullchain.pem; then
+        cp -f $NGINX_CERT_DIR/fullchain.pem $NGINX_CERT_DIR/ip-fullchain.pem
+        cp -f $NGINX_CERT_DIR/privkey.pem $NGINX_CERT_DIR/ip-privkey.pem
+        chmod 600 $NGINX_CERT_DIR/ip-privkey.pem
+        echo 'Seeded placeholder for the bare-IP cert pair.'
+    fi
 "
 if [[ "$BOOTSTRAP_ONLY" == 1 ]]; then
     exit 0

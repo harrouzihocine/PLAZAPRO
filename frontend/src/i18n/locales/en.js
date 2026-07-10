@@ -753,6 +753,7 @@ export default {
     needsConnection: "You're offline — {what} needs a connection.",
     bannerTitle: "You're offline — showing saved data.",
     pendingCount: '{n} change waiting to sync. | {n} changes waiting to sync.',
+    lanOriginBanner: 'Connected through the office server (local network).',
     willSync: 'Changes will sync when you reconnect.',
     savedOffline: 'Saved offline — it will sync when you reconnect.',
     actionNeedsConnection: "You're offline — this action needs a connection.",

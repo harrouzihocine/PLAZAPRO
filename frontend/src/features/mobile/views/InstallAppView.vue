@@ -51,12 +51,15 @@ const upToDate = computed(
 )
 
 // The WebView has no DownloadListener, so an in-page APK link would be
-// swallowed. Navigating to the http:// flavor of the URL instead makes the
-// scheme differ from the shell's https app URL, so Capacitor's launchIntent
-// hands it to the system browser (ACTION_VIEW) — which follows the server's
-// 301 back to https (Cloudflare and LAN nginx both redirect) and downloads
-// the APK. Works on every shell already in the field, no bridge method needed.
+// swallowed — the download must happen in the system browser. Shells v1.5.0+
+// expose PlazaNative.openExternal for exactly that. Older shells fall back to
+// the http:// scheme-mismatch trick: Capacitor's launchIntent ejects a URL
+// whose scheme differs from the https app URL, and the server 301s the
+// browser back to https. That trick is only safe on app.plaza-pro.com — the
+// LAN fallback hosts are in server.allowNavigation, whose host match ignores
+// the scheme — but pre-1.5.0 shells only ever run on app.* anyway.
 function downloadUpdate() {
+  if (window.PlazaNative?.openExternal?.(`${window.location.origin}${apkUrl.value}`)) return
   window.location.href = `http://${window.location.host}${apkUrl.value}`
 }
 </script>

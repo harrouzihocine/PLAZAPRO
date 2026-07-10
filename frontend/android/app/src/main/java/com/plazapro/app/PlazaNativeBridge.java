@@ -1,8 +1,10 @@
 package com.plazapro.app;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
+import android.net.Uri;
 import android.webkit.JavascriptInterface;
 
 import androidx.core.content.pm.PackageInfoCompat;
@@ -21,6 +23,7 @@ import org.json.JSONObject;
  *   consumePendingLink()→ the deep link of the tapped notification, once
  *   isPushSupported()   → whether this build carries Firebase config
  *   getAppVersion()     → {"versionName":"1.2.0","versionCode":4} of this build
+ *   openExternal(url)   → hand an http(s) URL to the system browser (APK update)
  */
 public class PlazaNativeBridge {
     private static final String PREFS = "plaza_native";
@@ -71,6 +74,29 @@ public class PlazaNativeBridge {
      * (utils/appUpdate.js compares it against /downloads/version.json). Shells
      * without this method are treated as the last release that lacked it.
      */
+    /**
+     * Open a URL in the system browser (Chrome), outside the webview. The APK
+     * update download needs this: the webview has no DownloadListener, and the
+     * old http:// scheme-mismatch trick stopped ejecting on the LAN fallback
+     * origins once they joined server.allowNavigation (Capacitor's host match
+     * ignores the scheme). Returns false so old shells without the method make
+     * the web layer fall back to that legacy trick.
+     */
+    @JavascriptInterface
+    public boolean openExternal(String url) {
+        if (url == null || !(url.startsWith("https://") || url.startsWith("http://"))) {
+            return false;
+        }
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     @JavascriptInterface
     public String getAppVersion() {
         try {

@@ -95,12 +95,37 @@ set `LAN_DNS_IP=<server LAN IP>` + `LAN_TLS_DOMAIN=office.plaza-pro.com` in `.en
 `lan-dhcp` profile (server runs DHCP; disable the router's first). All three need *some* client or
 router reach — the recommended method above needs none, which is why it's preferred.
 
+**Phones (the Android app) during an internet outage — the bare-IP door.** With the internet
+down, phones can't resolve `office.plaza-pro.com` (their DNS goes router → ISP, and the locked
+router can't hand out the local dnsmasq), so the APK carries a third, DNS-free origin:
+`https://192.168.1.200`. Public CAs can't issue for a private IP, so it is served with a leaf
+signed by our **private LAN CA** — trusted ONLY by the Android app (Network Security Config
+pins it to that one IP; browsers keep their warning and the bare IP stays break-glass for them).
+
+```bash
+./scripts/setup-lan-ip-cert.sh              # in the PROD checkout; default IP 192.168.1.200
+```
+
+Creates the CA once in `secrets/lan-ip-ca/` (public half committed at
+`frontend/android/app/src/main/res/raw/plaza_lan_ca.pem` — regenerating the CA means rebuilding
+the APK; guard `ca.key` like the signing keystore), issues/renews the IP leaf, installs it as
+`ip-fullchain.pem`/`ip-privkey.pem` in the letsencrypt volume, reloads nginx, and installs a
+monthly renewal cron. nginx serves it from the `default_server` block (no-SNI clients =
+bare-IP URLs); named hosts keep the Let's Encrypt cert. The app fails over between the three
+origins by itself (`frontend/src/utils/serverFailover.js` + the shell's `PlazaWebViewClient`)
+and shows a slim "office server" banner while parked on a LAN origin.
+
+Optional but recommended: `SESSION_DOMAIN=.plaza-pro.com` in `backend/.env` (+
+`php artisan optimize`) so a failover between `app.` and `office.` keeps the login session
+(the bare-IP origin always needs a fresh login — cookies can't span host↔IP).
+
 Notes:
 - Port 80 stays published for the container healthcheck and the HTTP→HTTPS redirect; the tunnel
   path is exempt from the redirect (Cloudflare already terminated TLS), so nothing loops.
-- nginx loads the cert from stable copies at `letsencrypt` volume path `/etc/letsencrypt/nginx/`;
-  until the first successful issuance a self-signed placeholder sits there (deploy.sh seeds it)
-  so nginx always boots — browsers warn, tunnel traffic is unaffected.
+- nginx loads the certs from stable copies at `letsencrypt` volume path `/etc/letsencrypt/nginx/`;
+  until the first successful issuance a self-signed placeholder sits there (deploy.sh seeds it,
+  including the `ip-*.pem` pair) so nginx always boots — browsers warn, tunnel traffic is
+  unaffected.
 - Token rotation: edit `CLOUDFLARE_DNS_API_TOKEN` in `.env` — the renew script re-derives its
   credentials file from `.env` on every run.
 

@@ -162,6 +162,44 @@ reusing the WebView's session cookies + XSRF token, then appends the sent text
 as "You" (or raises a "Reply not sent — tap to open the chat" notice if the
 session is gone or the network drops).
 
+## Office-LAN failover (works with the internet down)
+
+One backend, three doors, walked in priority order (v1.5.0+):
+
+| origin | path | needs |
+| --- | --- | --- |
+| `https://app.plaza-pro.com` | Cloudflare tunnel | internet |
+| `https://office.plaza-pro.com` | LAN direct, Let's Encrypt cert | DNS (public record → LAN IP) |
+| `https://192.168.1.200` | LAN direct, private-CA cert | nothing — the no-internet door |
+
+Two cooperating halves, lists kept in sync:
+
+- **`PlazaWebViewClient.java`** (shell): a main-frame load error on one of the
+  origins loads the next — covers the cold boot with no service-worker cache,
+  where no JS can run. Both LAN hosts are in `capacitor.config.json`
+  `server.allowNavigation` so they stay inside the webview.
+- **`frontend/src/utils/serverFailover.js`** (web layer, ships with deploys):
+  when the network store flags offline, it probes the current origin's `/up`,
+  then the others (opaque no-cors fetches), and hard-navigates to the first
+  that answers. Same watcher walks a phone that left the building back to
+  `app.*` over mobile data. A slim banner (OfflineBanner.vue) shows while
+  parked on a LAN origin; cold starts always begin at `app.*`.
+
+The bare-IP door works because public CAs can't issue for a private IP: the
+server presents a leaf signed by our own **LAN CA** (issue/renew:
+`scripts/setup-lan-ip-cert.sh` in the prod checkout; nginx serves it to no-SNI
+clients from the `default_server` block). The CA's public cert is committed at
+`res/raw/plaza_lan_ca.pem` and pinned to `192.168.1.200` only via
+`res/xml/network_security_config.xml` — browsers still warn on the bare IP,
+and every other host keeps the system trust store. The CA key lives in
+`~/plaza-prod/secrets/lan-ip-ca/` (guard like the keystore; regenerating the
+CA = rebuild + redistribute the APK).
+
+Sessions are per-origin cookies, so a hop can land on the login screen.
+`SESSION_DOMAIN=.plaza-pro.com` on prod lets `app.` ↔ `office.` share the
+session; the bare-IP origin always logs in fresh. Push/tray-reply keeps
+targeting `app.*` (it needs internet anyway — FCM is down when the tunnel is).
+
 ## Future: bundled-assets mode (Play Store)
 
 If the app ever goes to a store, remote mode won't pass review. Switch:
@@ -179,3 +217,6 @@ remote mode avoids today.
 5. Media upload from camera and from gallery (unit/client media, chat voice note).
 6. Logout → login as another user.
 7. On office Wi-Fi AND on mobile data (split-horizon: both must work).
+8. LAN failover: on office Wi-Fi with the WAN cable pulled, the app lands on
+   an office origin (blue "office server" banner) and works; plugging the
+   internet back in and cold-starting the app returns it to app.plaza-pro.com.

@@ -40,6 +40,10 @@ public class MainActivity extends BridgeActivity {
         WebView webView = getBridge().getWebView();
         webView.addJavascriptInterface(new PlazaNativeBridge(this, pushSupported), "PlazaNative");
 
+        // Cold-boot LAN failover: replace Capacitor's client with our subclass
+        // (same behavior + main-frame-error fallback to the office origins).
+        webView.setWebViewClient(new PlazaWebViewClient(getBridge()));
+
         PlazaPush.createChannels(this);
         requestNotificationPermission();
         fetchPushToken(pushSupported);

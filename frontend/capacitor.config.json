@@ -6,7 +6,8 @@
   "backgroundColor": "#1e214b",
   "server": {
     "url": "https://app.plaza-pro.com",
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "allowNavigation": ["office.plaza-pro.com", "192.168.1.200"]
   },
   "plugins": {
     "SplashScreen": {

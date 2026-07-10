@@ -21,6 +21,7 @@ import '@/assets/styles/rtl.css'
 import { initNativeMode } from '@/utils/nativeApp'
 import { initAppBack } from '@/utils/appBack'
 import { installAppRecovery } from '@/utils/appRecovery'
+import { initServerFailover } from '@/utils/serverFailover'
 
 // APK-only design layer: stamp <html class="native"> before the first paint so
 // the shell's app-grade styling (native.css + `native:` classes) applies from
@@ -58,6 +59,11 @@ app.use(PrimeVue, {
 app.directive('tooltip', Tooltip)
 
 app.mount('#app')
+
+// APK only: when the current server origin stops answering, hop to the office
+// LAN origins (or back to app.* once the phone leaves the building) — see
+// utils/serverFailover.js. Needs pinia active, hence after mount.
+initServerFailover()
 
 // Installable app (PWA) + offline boot for the Android shell: the service
 // worker caches the app shell so the SPA opens with zero signal (remote-mode

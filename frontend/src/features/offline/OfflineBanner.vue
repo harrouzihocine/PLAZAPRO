@@ -1,9 +1,12 @@
 <script setup>
 import { useNetworkStore } from '@/features/offline/networkStore'
 import { useOutboxStore } from '@/features/offline/outboxStore'
+import { onLanFallbackOrigin } from '@/utils/serverFailover'
 
 // Slim page-wide notice under the header while the connection is down, with
-// the number of queued writes waiting in the outbox.
+// the number of queued writes waiting in the outbox. When the connection is
+// fine but the APK failed over to an office LAN origin (serverFailover.js),
+// the same slot shows a calm "office server" notice instead.
 //
 // OVERLAY, not in-flow: it position:fixes itself under the h-16 header (z-10,
 // below the header's z-20 so it slides out from underneath). An in-flow banner
@@ -23,6 +26,7 @@ const outbox = useOutboxStore()
   >
     <div
       v-if="!network.online"
+      key="offline"
       class="fixed inset-x-0 top-16 z-10 flex items-center justify-center gap-2 border-b border-amber-300/60 bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-900 dark:border-amber-500/40 dark:bg-amber-950 dark:text-amber-200"
       role="status"
     >
@@ -35,6 +39,15 @@ const outbox = useOutboxStore()
             : $t('offline.willSync')
         }}
       </span>
+    </div>
+    <div
+      v-else-if="onLanFallbackOrigin"
+      key="lan-origin"
+      class="fixed inset-x-0 top-16 z-10 flex items-center justify-center gap-2 border-b border-sky-300/60 bg-sky-100 px-3 py-1.5 text-xs font-medium text-sky-900 dark:border-sky-500/40 dark:bg-sky-950 dark:text-sky-200"
+      role="status"
+    >
+      <i class="pi pi-building text-[11px] opacity-70" aria-hidden="true" />
+      <span>{{ $t('offline.lanOriginBanner') }}</span>
     </div>
   </Transition>
 </template>
