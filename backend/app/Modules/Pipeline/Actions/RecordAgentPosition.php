@@ -33,6 +33,9 @@ class RecordAgentPosition
     /**
      * @param  array{latitude: float, longitude: float, accuracy_m?: int|null, recorded_at?: string|null}  $data
      */
+    /** Whether the last ingest still needs precision (an en-route leg is live). */
+    public bool $wantsPrecision = false;
+
     public function handle(User $agent, array $data): AgentPosition
     {
         abort_if(DutySession::openFor($agent->id) === null, 409, 'You are off duty — position not recorded.');
@@ -45,6 +48,7 @@ class RecordAgentPosition
             'recorded_at' => $data['recorded_at'] ?? now(),
         ]);
 
+        $this->wantsPrecision = false;
         $eta = $this->applyGeofences($agent, $position);
 
         AgentPositionUpdated::dispatch(
@@ -113,6 +117,9 @@ class RecordAgentPosition
             }
 
             if ($visit->en_route_at !== null && $visit->arrived_at === null) {
+                // A live leg: the device should keep real GPS on until arrival
+                // (geofence + ETA need it); idle agents coast on coarse fixes.
+                $this->wantsPrecision = true;
                 $minutes = Geo::etaMinutes($meters / 1000);
                 $eta = $eta === null ? $minutes : min($eta, $minutes);
             }

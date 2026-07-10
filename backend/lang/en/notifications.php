@@ -217,4 +217,11 @@ return [
         'title' => 'Agent running late',
         'body' => ':agent has not arrived for the visit with :client (:when).',
     ],
+
+    // Dispatcher pulled a fresh fix (silent on new shells; older shells show
+    // this quiet line — transparency, not spam).
+    'locate_request' => [
+        'title' => 'Position check',
+        'body' => 'Dispatch refreshed your live position.',
+    ],
 ];

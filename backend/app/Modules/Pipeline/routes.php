@@ -74,6 +74,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dispatch/map', [DispatchLiveController::class, 'map']);
         Route::get('/dispatch/suggest', [DispatchLiveController::class, 'suggest']);
         Route::get('/dispatch/replay', [DispatchLiveController::class, 'replay']);
+        Route::post('/dispatch/locate', [DispatchLiveController::class, 'locate']);
     });
 
     // The field agent's own day + duty switch + GPS fixes + visit lifecycle

@@ -215,4 +215,9 @@ return [
         'title' => 'Agent en retard',
         'body' => ":agent n'est pas encore arrivé pour la visite avec :client (:when).",
     ],
+
+    'locate_request' => [
+        'title' => 'Vérification de position',
+        'body' => 'Le dispatch a actualisé votre position en direct.',
+    ],
 ];

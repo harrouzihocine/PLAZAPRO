@@ -30,6 +30,14 @@ public class PlazaMessagingService extends FirebaseMessagingService {
         // Click-to-call is the one kind that must ring even in the foreground:
         // its tap opens the DIALER, which the page itself cannot do — without
         // the tray entry a foregrounded phone would swallow the PC's click.
+        // A dispatcher asked for a fresh fix: no tray line — the running duty
+        // service answers with a short precision burst (no-op when off duty;
+        // the ongoing "On duty" notification is the standing indicator).
+        if ("locate_request".equals(message.getData().get("kind"))) {
+            DutyLocationService.requestBurst();
+            return;
+        }
+
         boolean isCallRequest = "call_request".equals(message.getData().get("kind"));
         if (MainActivity.isInForeground() && !isCallRequest) return;
 

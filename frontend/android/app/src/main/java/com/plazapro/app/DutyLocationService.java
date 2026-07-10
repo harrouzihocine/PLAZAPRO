@@ -25,32 +25,43 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * The on-duty location share as a FOREGROUND service, so a field agent's fixes
- * keep flowing to /api/v1/me/positions while the phone is pocketed and the
- * WebView is suspended (the web layer's watchPosition is foreground-only).
+ * The on-duty location share as a FOREGROUND service — DEMAND-DRIVEN, because
+ * continuous GPS eats a field phone's battery:
  *
- * The contract mirrors the server's privacy rules exactly:
- *  - runs ONLY between PlazaNativeBridge.startDutyTracking() (the My Day duty
- *    switch) and stopDutyTracking() — never self-starts, no boot receiver;
- *  - the ongoing notification is the visible tracking indicator Android
- *    mandates — and the transparency the owner promised the team;
- *  - a 409 from the server means "off duty" (toggled elsewhere / session swept):
- *    the service stops itself rather than argue.
+ *   idle       network/passive provider only, one coarse fix ~5 min — cell/
+ *              wifi positioning, near-zero battery ("roughly where");
+ *   precision  the real GPS listener, ONLY while it's needed:
+ *                - the server says so (`precision:true` on a post response —
+ *                  an en-route leg is live, geofence + ETA need it), or
+ *                - a dispatcher actually looked (locate_request FCM →
+ *                  requestBurst(): 2 minutes of GPS + one immediate fix).
  *
- * Cadence mirrors useDutyTracking: the OS wakes us at ≥45 s / ≥25 m, and a fix
- * is posted when 60 s passed or the device moved ≥30 m. Auth rides the
- * WebView's persisted session via PlazaApi, same as the tray quick-reply.
+ * Same privacy contract as v1.6: runs only between the My Day duty switch's
+ * start/stop, the ongoing notification is the visible indicator, a 409
+ * ("off duty") stops the service, no boot receiver. Auth rides the WebView
+ * session via PlazaApi, like the tray quick-reply.
  */
 public class DutyLocationService extends Service implements LocationListener {
     private static final String CHANNEL_ID = "duty";
     private static final int NOTIFICATION_ID = 4001;
-    private static final long MIN_UPDATE_MS = 45_000;
-    private static final float MIN_UPDATE_M = 25f;
-    private static final long MIN_POST_MS = 60_000;
+
+    // Idle: coarse and slow. Precision: tight enough for a moving car.
+    private static final long IDLE_UPDATE_MS = 300_000;
+    private static final float IDLE_UPDATE_M = 200f;
+    private static final long GPS_UPDATE_MS = 20_000;
+    private static final float GPS_UPDATE_M = 25f;
+    private static final long IDLE_MIN_POST_MS = 240_000;
+    private static final long PRECISION_MIN_POST_MS = 20_000;
     private static final float MIN_POST_M = 30f;
+    private static final long BURST_MS = 120_000;
+
+    private static volatile DutyLocationService instance;
 
     private LocationManager locationManager;
     private ExecutorService poster;
+    private boolean gpsListening = false;
+    private volatile boolean serverWantsPrecision = false;
+    private volatile long burstUntilMs = 0;
     private long lastPostMs = 0;
     private Location lastPosted = null;
 
@@ -63,15 +74,29 @@ public class DutyLocationService extends Service implements LocationListener {
         context.stopService(new Intent(context, DutyLocationService.class));
     }
 
+    /**
+     * A dispatcher looked (locate_request push): two minutes of real GPS and
+     * one immediate fix. No-op when off duty — the service isn't running.
+     */
+    static void requestBurst() {
+        DutyLocationService running = instance;
+        if (running == null) return;
+        running.burstUntilMs = System.currentTimeMillis() + BURST_MS;
+        running.syncGpsListener();
+        running.requestOneGpsFix();
+    }
+
     static boolean hasLocationPermission(Context context) {
         return ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED;
     }
 
+    private boolean precisionActive() {
+        return serverWantsPrecision || System.currentTimeMillis() < burstUntilMs;
+    }
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // Foreground within the 5 s the OS allows, with the location type
-        // declared (required from Android 14).
         Notification notification = buildNotification();
         if (Build.VERSION.SDK_INT >= 29) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
@@ -88,30 +113,69 @@ public class DutyLocationService extends Service implements LocationListener {
             locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
             poster = Executors.newSingleThreadExecutor();
             try {
-                // Both providers: GPS for the road, network for indoors/urban
-                // canyons. Duplicates collapse in the post throttle below.
-                if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                    locationManager.requestLocationUpdates(
-                            LocationManager.GPS_PROVIDER, MIN_UPDATE_MS, MIN_UPDATE_M, this);
-                }
+                // The idle diet: coarse network fixes, plus free passive ones
+                // whenever another app happens to use GPS.
                 if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
                     locationManager.requestLocationUpdates(
-                            LocationManager.NETWORK_PROVIDER, MIN_UPDATE_MS, MIN_UPDATE_M, this);
+                            LocationManager.NETWORK_PROVIDER, IDLE_UPDATE_MS, IDLE_UPDATE_M, this);
                 }
+                locationManager.requestLocationUpdates(
+                        LocationManager.PASSIVE_PROVIDER, IDLE_UPDATE_MS, IDLE_UPDATE_M, this);
+                // One opening fix so the dispatcher sees the agent right away.
+                requestOneGpsFix();
             } catch (SecurityException e) {
                 stopSelf();
                 return START_NOT_STICKY;
             }
         }
 
-        // If the OS kills us mid-shift, come back — duty is still on server-side.
+        instance = this;
         return START_STICKY;
+    }
+
+    /** Register/unregister the battery-expensive GPS listener as need changes. */
+    private synchronized void syncGpsListener() {
+        if (locationManager == null || !hasLocationPermission(this)) return;
+        boolean wanted = precisionActive();
+        try {
+            if (wanted && !gpsListening
+                    && locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                locationManager.requestLocationUpdates(
+                        LocationManager.GPS_PROVIDER, GPS_UPDATE_MS, GPS_UPDATE_M, this);
+                gpsListening = true;
+            } else if (!wanted && gpsListening) {
+                // Drop ONLY the GPS stream; re-register the idle diet.
+                locationManager.removeUpdates(this);
+                gpsListening = false;
+                if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                    locationManager.requestLocationUpdates(
+                            LocationManager.NETWORK_PROVIDER, IDLE_UPDATE_MS, IDLE_UPDATE_M, this);
+                }
+                locationManager.requestLocationUpdates(
+                        LocationManager.PASSIVE_PROVIDER, IDLE_UPDATE_MS, IDLE_UPDATE_M, this);
+            }
+        } catch (SecurityException ignored) {
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private void requestOneGpsFix() {
+        if (locationManager == null || !hasLocationPermission(this)) return;
+        try {
+            if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                locationManager.requestSingleUpdate(LocationManager.GPS_PROVIDER, this, null);
+            } else if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                locationManager.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, this, null);
+            }
+        } catch (SecurityException ignored) {
+        }
     }
 
     @Override
     public void onLocationChanged(@NonNull Location location) {
         long now = System.currentTimeMillis();
-        boolean due = now - lastPostMs >= MIN_POST_MS;
+        long minGap = precisionActive() ? PRECISION_MIN_POST_MS : IDLE_MIN_POST_MS;
+        boolean due = now - lastPostMs >= minGap;
         boolean moved = lastPosted == null || location.distanceTo(lastPosted) >= MIN_POST_M;
         if (!due && !moved) return;
 
@@ -126,12 +190,19 @@ public class DutyLocationService extends Service implements LocationListener {
                 if (location.hasAccuracy()) {
                     body.put("accuracy_m", Math.min(65000, Math.round(location.getAccuracy())));
                 }
-                int status = PlazaApi.postForStatus(this, "/me/positions", body, null);
-                if (status == 409) {
-                    // Off duty server-side (toggled elsewhere / sweeper): obey and stop.
+                PlazaApi.Result result = PlazaApi.postForResult(this, "/me/positions", body, null);
+                if (result.status == 409) {
                     stopSelf();
+                    return;
                 }
-                // Network errors / 5xx: drop the fix, the next one retries.
+                if (result.status >= 200 && result.status < 300) {
+                    // The server's cue: a live en-route leg keeps GPS on.
+                    boolean wants = result.body.contains("\"precision\":true");
+                    if (wants != serverWantsPrecision) {
+                        serverWantsPrecision = wants;
+                        syncGpsListener();
+                    }
+                }
             } catch (Exception ignored) {
             }
         });
@@ -165,6 +236,7 @@ public class DutyLocationService extends Service implements LocationListener {
 
     @Override
     public void onDestroy() {
+        instance = null;
         if (locationManager != null) locationManager.removeUpdates(this);
         if (poster != null) poster.shutdown();
         super.onDestroy();

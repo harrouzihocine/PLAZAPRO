@@ -121,6 +121,12 @@ export const pipelineApi = {
     return data.data // { sites, candidates }
   },
 
+  // Ping one on-duty agent's device for a fresh fix (server-throttled 60s).
+  async dispatchLocate(agentId) {
+    const { data } = await useApi().post('/dispatch/locate', { agent_id: agentId })
+    return data.data // { pinged }
+  },
+
   // One agent's breadcrumb trail + in-site visits for a day. visits.dispatch.
   async dispatchReplay(agentId, date) {
     const { data } = await useApi().get('/dispatch/replay', { params: { agent_id: agentId, date } })

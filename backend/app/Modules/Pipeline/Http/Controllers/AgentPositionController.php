@@ -23,6 +23,9 @@ class AgentPositionController extends Controller
 
         return response()->json(['data' => [
             'recorded_at' => $position->recorded_at,
+            // The device's cue to run real GPS (en-route leg live) or coast
+            // on coarse fixes — the battery contract's server half.
+            'precision' => $action->wantsPrecision,
         ]], 201);
     }
 }

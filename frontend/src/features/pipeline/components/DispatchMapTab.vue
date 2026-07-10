@@ -99,12 +99,17 @@ function minutesAgo(at) {
   return t('dispatch.minAgo', { n })
 }
 
-// Click a name → fly to the agent's last fix and open their popup.
+// Click a name → fly to the agent's last fix, open their popup, and ping
+// their device for a fresh one (idle tracking is coarse on purpose — the
+// battery contract — so "a dispatcher looking" is what buys precision).
 function focusAgent(agent) {
   if (!agent.position || !map) return
   if (mode.value !== 'live') setMode('live')
   map.setView([agent.position.lat, agent.position.lng], Math.max(map.getZoom(), 15))
   agentMarkers.get(agent.id)?.openPopup()
+  if (agent.status !== 'off_duty') {
+    pipelineApi.dispatchLocate(agent.id).catch(() => {})
+  }
 }
 
 function agentDivIcon(agent) {

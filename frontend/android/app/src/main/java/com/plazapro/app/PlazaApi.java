@@ -44,12 +44,18 @@ final class PlazaApi {
      */
     static int postForStatus(Context context, String path, JSONObject body, String idempotencyKey)
             throws Exception {
+        return postForResult(context, path, body, idempotencyKey).status;
+    }
+
+    /** Status + response body — the duty service reads the server's `precision` cue. */
+    static Result postForResult(Context context, String path, JSONObject body, String idempotencyKey)
+            throws Exception {
         String origin = origin(context);
         String cookies = CookieManager.getInstance().getCookie(origin);
-        if (cookies == null || cookies.isEmpty()) return -1;
+        if (cookies == null || cookies.isEmpty()) return new Result(-1, "");
 
         String xsrf = xsrfToken(cookies);
-        if (xsrf == null) return -1;
+        if (xsrf == null) return new Result(-1, "");
 
         URL url = new URL(origin + "/api/v1" + path);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -72,9 +78,34 @@ final class PlazaApi {
                 conn.getOutputStream().write(body.toString().getBytes(StandardCharsets.UTF_8));
             }
 
-            return conn.getResponseCode();
+            int status = conn.getResponseCode();
+            String responseBody = "";
+            if (status >= 200 && status < 300) {
+                try (InputStream in = conn.getInputStream()) {
+                    byte[] buffer = new byte[4096];
+                    StringBuilder sb = new StringBuilder();
+                    int read;
+                    while ((read = in.read(buffer)) > 0) {
+                        sb.append(new String(buffer, 0, read, StandardCharsets.UTF_8));
+                    }
+                    responseBody = sb.toString();
+                } catch (Exception ignored) {
+                    // A body-less 2xx is still a success.
+                }
+            }
+            return new Result(status, responseBody);
         } finally {
             conn.disconnect();
+        }
+    }
+
+    static final class Result {
+        final int status;
+        final String body;
+
+        Result(int status, String body) {
+            this.status = status;
+            this.body = body;
         }
     }
 

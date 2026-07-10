@@ -6,6 +6,7 @@ namespace App\Modules\Pipeline\Http\Controllers;
 
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Inventory\Models\Unit;
+use App\Modules\Pipeline\Actions\LocateOnDutyAgents;
 use App\Modules\Pipeline\Actions\SuggestDispatchAgents;
 use App\Modules\Pipeline\Enums\NextActionType;
 use App\Modules\Pipeline\Models\AgentPosition;
@@ -31,8 +32,13 @@ use Illuminate\Support\Carbon;
  */
 class DispatchLiveController extends Controller
 {
-    public function map(): JsonResponse
+    public function map(LocateOnDutyAgents $locate): JsonResponse
     {
+        // Opening (or refreshing) the map is exactly "a dispatcher looking":
+        // ping the on-duty phones for fresh fixes — the answers stream in over
+        // the dispatch channel moments later. Throttled per agent inside.
+        $locate->handle();
+
         $agents = User::query()->active()->where('is_active', true)
             ->whereHas('role', fn ($q) => $q->where('is_agent', true))
             ->orderBy('name')
@@ -94,6 +100,14 @@ class DispatchLiveController extends Controller
                 ->filter(fn ($l) => $l !== null && ($l->latitude === null || $l->longitude === null))
                 ->unique('id')->pluck('name')->values(),
         ]]);
+    }
+
+    /** A targeted ping (roster click) — same throttle as the map-open burst. */
+    public function locate(Request $request, LocateOnDutyAgents $locate): JsonResponse
+    {
+        $data = $request->validate(['agent_id' => ['required', 'integer', 'exists:users,id']]);
+
+        return response()->json(['data' => ['pinged' => $locate->handle([(int) $data['agent_id']])]]);
     }
 
     public function suggest(Request $request, SuggestDispatchAgents $action): JsonResponse

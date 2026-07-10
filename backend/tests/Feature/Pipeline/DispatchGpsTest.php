@@ -387,6 +387,47 @@ class DispatchGpsTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_locate_pings_only_on_duty_agents_and_throttles(): void
+    {
+        \Illuminate\Support\Facades\Cache::flush();
+        $dispatcher = $this->userWith(['visits.dispatch']);
+        $agent = $this->userWith([], isAgent: true);
+
+        Sanctum::actingAs($dispatcher);
+
+        // Off duty: nothing to ping.
+        $this->postJson('/api/v1/dispatch/locate', ['agent_id' => $agent->id])
+            ->assertOk()->assertJsonPath('data.pinged', 0);
+
+        DutySession::create(['user_id' => $agent->id, 'started_at' => now()]);
+        $this->postJson('/api/v1/dispatch/locate', ['agent_id' => $agent->id])
+            ->assertOk()->assertJsonPath('data.pinged', 1);
+
+        // Throttled: five dispatchers staring cost one burst a minute, not five.
+        $this->postJson('/api/v1/dispatch/locate', ['agent_id' => $agent->id])
+            ->assertOk()->assertJsonPath('data.pinged', 0);
+    }
+
+    public function test_the_position_response_carries_the_precision_cue(): void
+    {
+        $agent = $this->userWith([], isAgent: true);
+        $visit = $this->assignedVisit($agent);
+
+        Sanctum::actingAs($agent);
+        $this->postJson('/api/v1/me/duty', ['on' => true]);
+
+        // Idle (nothing en route): coast on coarse fixes.
+        $this->postJson('/api/v1/me/positions', [
+            'latitude' => self::SITE_LAT + 0.05, 'longitude' => self::SITE_LNG,
+        ])->assertCreated()->assertJsonPath('data.precision', false);
+
+        // A live leg (en route, still ~5.5 km out): keep real GPS on.
+        $this->postJson("/api/v1/visits/{$visit->id}/en-route")->assertOk();
+        $this->postJson('/api/v1/me/positions', [
+            'latitude' => self::SITE_LAT + 0.05, 'longitude' => self::SITE_LNG,
+        ])->assertCreated()->assertJsonPath('data.precision', true);
+    }
+
     public function test_the_sweeper_closes_forgotten_duty_sessions(): void
     {
         $agent = $this->userWith([], isAgent: true);
