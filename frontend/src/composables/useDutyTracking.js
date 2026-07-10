@@ -6,8 +6,9 @@ import { useAuthStore } from '@/features/settings/store'
 // The agent-side half of live dispatch — DEMAND-DRIVEN, because continuous
 // GPS eats a field phone's battery:
 //
-//   idle on duty   one cheap, low-accuracy fix every 5 minutes ("roughly
-//                  where", keeps the roster's fix-age honest);
+//   idle on duty   NO location access at all — no watcher, no heartbeat, no
+//                  OS location indicator; the roster shows the age of the
+//                  last fix a look or a leg produced;
 //   precision      a real high-accuracy watch, ONLY while it's needed:
 //                    - a visit is en route (geofence arrival + live ETA),
 //                      flagged by My Day AND confirmed by the server on every
@@ -27,13 +28,12 @@ const supported = typeof navigator !== 'undefined' && 'geolocation' in navigator
 const geoDenied = ref(false)
 const lastFixAt = ref(null)
 
-const IDLE_POLL_MS = 300_000 // coarse heartbeat: one low-power fix / 5 min
 const PRECISION_MIN_POST_MS = 20_000
 const MOVE_METERS = 30
 const BURST_MS = 120_000 // dispatcher looked: precision for 2 minutes
 
-let idleTimer = null
 let precisionWatchId = null
+let burstTimer = null
 let enRoute = false // My Day's flag: a leg is being driven
 let serverPrecision = false // the server's flag from the last post
 let burstUntil = 0 // dispatcher-pull window
@@ -125,18 +125,7 @@ function syncPrecisionWatch() {
   }
 }
 
-// --- Idle heartbeat + dispatcher pull ----------------------------------------
-
-function startIdlePolling() {
-  if (idleTimer !== null || !supported) return
-  geoDenied.value = false
-  grabFix({ precise: false })
-  idleTimer = setInterval(() => {
-    // The precision watch is already streaming — no extra fix needed.
-    if (precisionWatchId === null) grabFix({ precise: false })
-    if (Date.now() >= burstUntil) syncPrecisionWatch() // burst expired
-  }, IDLE_POLL_MS)
-}
+// --- Dispatcher pull ----------------------------------------------------------
 
 function listenForLocate() {
   if (locateChannel) return
@@ -150,12 +139,15 @@ function listenForLocate() {
     burstUntil = Date.now() + BURST_MS
     grabFix({ precise: true })
     syncPrecisionWatch()
+    // Nothing re-evaluates on its own anymore — close the window explicitly.
+    if (burstTimer) clearTimeout(burstTimer)
+    burstTimer = setTimeout(syncPrecisionWatch, BURST_MS + 1000)
   })
 }
 
 function stopAll() {
-  if (idleTimer !== null) clearInterval(idleTimer)
-  idleTimer = null
+  if (burstTimer) clearTimeout(burstTimer)
+  burstTimer = null
   if (precisionWatchId !== null && supported) navigator.geolocation.clearWatch(precisionWatchId)
   precisionWatchId = null
   serverPrecision = false
@@ -190,11 +182,7 @@ function tryNativeTracking() {
         'plaza:location-permission',
         () => {
           retryArmed = false
-          if (onDuty.value && tryNativeTracking()) {
-            if (idleTimer !== null) clearInterval(idleTimer)
-            idleTimer = null
-            syncPrecisionWatch()
-          }
+          if (onDuty.value && tryNativeTracking()) syncPrecisionWatch()
         },
         { once: true },
       )
@@ -210,7 +198,9 @@ function apply(state) {
   dutySince.value = state?.since ?? null
   if (onDuty.value) {
     listenForLocate()
-    if (!tryNativeTracking()) startIdlePolling()
+    // Native shell or web alike: NOTHING starts here. Precision comes from
+    // an en-route leg or a dispatcher's locate ping — never from idling.
+    tryNativeTracking()
     syncPrecisionWatch()
   } else {
     stopAll()
@@ -235,6 +225,15 @@ async function setDuty(on) {
 /** My Day flips this when a visit goes en route / arrives — precision follows. */
 function setEnRoute(active) {
   enRoute = Boolean(active)
+  if (nativeActive) {
+    // The shell holds the listeners; tell it directly (v1.8+; older shells
+    // learn from the server's `precision` cue on their next post instead).
+    try {
+      window.PlazaNative?.setDutyPrecision?.(enRoute)
+    } catch {
+      /* old bridge */
+    }
+  }
   syncPrecisionWatch()
 }
 

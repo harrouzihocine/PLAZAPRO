@@ -121,6 +121,15 @@ public class PlazaNativeBridge {
         DutyLocationService.stop(context);
     }
 
+    /**
+     * My Day's en-route flag: precision GPS follows the work, not the shift.
+     * True while a leg is being driven, false again on arrival/completion.
+     */
+    @JavascriptInterface
+    public void setDutyPrecision(boolean wanted) {
+        DutyLocationService.setPrecision(wanted);
+    }
+
     @JavascriptInterface
     public String getAppVersion() {
         try {

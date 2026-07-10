@@ -28,11 +28,13 @@ import java.util.concurrent.Executors;
  * The on-duty location share as a FOREGROUND service — DEMAND-DRIVEN, because
  * continuous GPS eats a field phone's battery:
  *
- *   idle       network/passive provider only, one coarse fix ~5 min — cell/
- *              wifi positioning, near-zero battery ("roughly where");
- *   precision  the real GPS listener, ONLY while it's needed:
- *                - the server says so (`precision:true` on a post response —
- *                  an en-route leg is live, geofence + ETA need it), or
+ *   idle       NO location listener AT ALL — the OS location indicator is
+ *              dark, battery cost is zero; the service only stays alive to
+ *              answer bursts and en-route legs;
+ *   precision  listeners registered ONLY while needed, dropped after:
+ *                - the app said an en-route leg started (bridge
+ *                  setDutyPrecision), confirmed by the server's
+ *                  `precision` cue on each post response, or
  *                - a dispatcher actually looked (locate_request FCM →
  *                  requestBurst(): 2 minutes of GPS + one immediate fix).
  *
@@ -45,12 +47,9 @@ public class DutyLocationService extends Service implements LocationListener {
     private static final String CHANNEL_ID = "duty";
     private static final int NOTIFICATION_ID = 4001;
 
-    // Idle: coarse and slow. Precision: tight enough for a moving car.
-    private static final long IDLE_UPDATE_MS = 300_000;
-    private static final float IDLE_UPDATE_M = 200f;
+    // Precision cadence: tight enough for a moving car.
     private static final long GPS_UPDATE_MS = 20_000;
     private static final float GPS_UPDATE_M = 25f;
-    private static final long IDLE_MIN_POST_MS = 240_000;
     private static final long PRECISION_MIN_POST_MS = 20_000;
     private static final float MIN_POST_M = 30f;
     private static final long BURST_MS = 120_000;
@@ -59,7 +58,9 @@ public class DutyLocationService extends Service implements LocationListener {
 
     private LocationManager locationManager;
     private ExecutorService poster;
-    private boolean gpsListening = false;
+    private final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private boolean listening = false;
+    private volatile boolean appWantsPrecision = false; // My Day: a leg is en route
     private volatile boolean serverWantsPrecision = false;
     private volatile long burstUntilMs = 0;
     private long lastPostMs = 0;
@@ -82,8 +83,19 @@ public class DutyLocationService extends Service implements LocationListener {
         DutyLocationService running = instance;
         if (running == null) return;
         running.burstUntilMs = System.currentTimeMillis() + BURST_MS;
-        running.syncGpsListener();
-        running.requestOneGpsFix();
+        running.syncListeners();
+        running.requestOneFix();
+        // Nothing re-evaluates on its own once posts stop — drop the
+        // listeners the moment the burst window closes.
+        running.handler.postDelayed(running::syncListeners, BURST_MS + 1000);
+    }
+
+    /** My Day's en-route flag, via the JS bridge — precision follows the work. */
+    static void setPrecision(boolean wanted) {
+        DutyLocationService running = instance;
+        if (running == null) return;
+        running.appWantsPrecision = wanted;
+        running.syncListeners();
     }
 
     static boolean hasLocationPermission(Context context) {
@@ -92,7 +104,8 @@ public class DutyLocationService extends Service implements LocationListener {
     }
 
     private boolean precisionActive() {
-        return serverWantsPrecision || System.currentTimeMillis() < burstUntilMs;
+        return appWantsPrecision || serverWantsPrecision
+                || System.currentTimeMillis() < burstUntilMs;
     }
 
     @Override
@@ -112,54 +125,40 @@ public class DutyLocationService extends Service implements LocationListener {
         if (locationManager == null) {
             locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
             poster = Executors.newSingleThreadExecutor();
-            try {
-                // The idle diet: coarse network fixes, plus free passive ones
-                // whenever another app happens to use GPS.
-                if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-                    locationManager.requestLocationUpdates(
-                            LocationManager.NETWORK_PROVIDER, IDLE_UPDATE_MS, IDLE_UPDATE_M, this);
-                }
-                locationManager.requestLocationUpdates(
-                        LocationManager.PASSIVE_PROVIDER, IDLE_UPDATE_MS, IDLE_UPDATE_M, this);
-                // One opening fix so the dispatcher sees the agent right away.
-                requestOneGpsFix();
-            } catch (SecurityException e) {
-                stopSelf();
-                return START_NOT_STICKY;
-            }
+            // Deliberately NO listener and NO opening fix here: idle duty
+            // costs nothing and shows no location indicator. Precision starts
+            // when a leg goes en route or a dispatcher pings.
         }
 
         instance = this;
         return START_STICKY;
     }
 
-    /** Register/unregister the battery-expensive GPS listener as need changes. */
-    private synchronized void syncGpsListener() {
+    /** Listeners exist ONLY while precision is needed; idle holds none at all. */
+    private synchronized void syncListeners() {
         if (locationManager == null || !hasLocationPermission(this)) return;
         boolean wanted = precisionActive();
         try {
-            if (wanted && !gpsListening
-                    && locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                locationManager.requestLocationUpdates(
-                        LocationManager.GPS_PROVIDER, GPS_UPDATE_MS, GPS_UPDATE_M, this);
-                gpsListening = true;
-            } else if (!wanted && gpsListening) {
-                // Drop ONLY the GPS stream; re-register the idle diet.
-                locationManager.removeUpdates(this);
-                gpsListening = false;
+            if (wanted && !listening) {
+                if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                    locationManager.requestLocationUpdates(
+                            LocationManager.GPS_PROVIDER, GPS_UPDATE_MS, GPS_UPDATE_M, this);
+                }
                 if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
                     locationManager.requestLocationUpdates(
-                            LocationManager.NETWORK_PROVIDER, IDLE_UPDATE_MS, IDLE_UPDATE_M, this);
+                            LocationManager.NETWORK_PROVIDER, GPS_UPDATE_MS, GPS_UPDATE_M, this);
                 }
-                locationManager.requestLocationUpdates(
-                        LocationManager.PASSIVE_PROVIDER, IDLE_UPDATE_MS, IDLE_UPDATE_M, this);
+                listening = true;
+            } else if (!wanted && listening) {
+                locationManager.removeUpdates(this);
+                listening = false;
             }
         } catch (SecurityException ignored) {
         }
     }
 
     @SuppressWarnings("deprecation")
-    private void requestOneGpsFix() {
+    private void requestOneFix() {
         if (locationManager == null || !hasLocationPermission(this)) return;
         try {
             if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
@@ -174,8 +173,7 @@ public class DutyLocationService extends Service implements LocationListener {
     @Override
     public void onLocationChanged(@NonNull Location location) {
         long now = System.currentTimeMillis();
-        long minGap = precisionActive() ? PRECISION_MIN_POST_MS : IDLE_MIN_POST_MS;
-        boolean due = now - lastPostMs >= minGap;
+        boolean due = now - lastPostMs >= PRECISION_MIN_POST_MS;
         boolean moved = lastPosted == null || location.distanceTo(lastPosted) >= MIN_POST_M;
         if (!due && !moved) return;
 
@@ -200,7 +198,7 @@ public class DutyLocationService extends Service implements LocationListener {
                     boolean wants = result.body.contains("\"precision\":true");
                     if (wants != serverWantsPrecision) {
                         serverWantsPrecision = wants;
-                        syncGpsListener();
+                        syncListeners();
                     }
                 }
             } catch (Exception ignored) {
