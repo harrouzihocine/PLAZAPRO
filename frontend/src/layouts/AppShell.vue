@@ -223,7 +223,8 @@ const SECTIONS = [
         to: '/oversight/office-program',
         labelKey: 'nav.officeProgram',
         icon: 'pi pi-calendar',
-        permission: 'oversight.pipeline',
+        // View permission (agents, masked grid) or the managing dispatchers.
+        permissionAny: ['oversight.office_program', 'visits.dispatch'],
       },
       {
         to: '/oversight/deals',
@@ -279,7 +280,12 @@ const sections = computed(() =>
     ...s,
     label: t(`nav.section.${s.key}`),
     items: s.items
-      .filter((i) => (!i.permission || auth.can(i.permission)) && (!i.agentOnly || auth.isAgent))
+      .filter(
+        (i) =>
+          (!i.permission || auth.can(i.permission)) &&
+          (!i.permissionAny || i.permissionAny.some((p) => auth.can(p))) &&
+          (!i.agentOnly || auth.isAgent),
+      )
       // Team logs is self-scoped for users without logs.view_all — call it what it
       // is for them so the label never over-promises a company-wide view.
       .map((i) => ({

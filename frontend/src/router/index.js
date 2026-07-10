@@ -185,7 +185,9 @@ const routes = [
         path: 'oversight/office-program',
         name: 'oversight.officeProgram',
         component: () => import('@/features/oversight/views/OfficeProgramView.vue'),
-        meta: { permission: 'oversight.pipeline' },
+        // View permission (agents pick a free slot, masked view) OR the
+        // managing side — dispatchers land here from approval notifications.
+        meta: { permissionAny: ['oversight.office_program', 'visits.dispatch'] },
       },
       {
         path: 'oversight/deals',
@@ -272,6 +274,9 @@ router.beforeEach(async (to) => {
   }
   if (to.meta.permission && !auth.can(to.meta.permission)) {
     return { name: 'dashboard' } // lacks the required permission
+  }
+  if (to.meta.permissionAny && !to.meta.permissionAny.some((p) => auth.can(p))) {
+    return { name: 'dashboard' } // holds none of the accepted permissions
   }
   return true
 })

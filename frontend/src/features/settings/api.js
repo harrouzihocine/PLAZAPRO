@@ -54,14 +54,28 @@ export const authApi = {
 
 // Scalar app-wide settings (e.g. the interest hold duration in hours).
 // Read is open to any authed user; writes require settings.manage.
+let appSettingsOnce = null
+
 export const appSettingsApi = {
   async get() {
     const { data } = await useApi().get('/app-settings')
     return data.data
   },
 
+  // One fetch per app session — the values move rarely and several forms read
+  // them on mount. A failed fetch is not kept, so the next mount retries; a
+  // save drops the memo so fresh values win without a reload.
+  cached() {
+    appSettingsOnce ??= this.get().catch((e) => {
+      appSettingsOnce = null
+      throw e
+    })
+    return appSettingsOnce
+  },
+
   async save(payload) {
     const { data } = await useApi().put('/app-settings', payload)
+    appSettingsOnce = null
     return data.data
   },
 }

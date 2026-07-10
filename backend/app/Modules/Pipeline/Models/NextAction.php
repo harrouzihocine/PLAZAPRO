@@ -48,6 +48,25 @@ class NextAction extends BaseModel
         ]);
     }
 
+    /**
+     * A superseding plan is a NEW request: supersedeWith() replicates every
+     * attribute, so without this reset a replacement row would silently carry
+     * the old row's approval verdict (an 'approved' it never earned, or a
+     * 'pending' that keeps its announcement muted). Reset the whole trail by
+     * default; a caller that computes a fresh verdict (CorrectNextAction)
+     * passes its own approval_* values, which win over the reset.
+     */
+    public function supersedeWith(array $attributes, string $reason): static
+    {
+        return parent::supersedeWith($attributes + [
+            'approval_status' => null,
+            'approval_requested_by' => null,
+            'approval_decided_by' => null,
+            'approval_decided_at' => null,
+            'approval_reason' => null,
+        ], $reason);
+    }
+
     public function subject(): MorphTo
     {
         return $this->morphTo();

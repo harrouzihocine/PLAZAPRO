@@ -7,6 +7,7 @@ namespace Tests\Feature\Pipeline;
 use App\Modules\Clients\Models\Client;
 use App\Modules\Collaboration\Notifications\DomainNotification;
 use App\Modules\Pipeline\Enums\NextActionApproval;
+use App\Modules\Pipeline\Enums\NextActionState;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Settings\Models\AppSetting;
@@ -15,6 +16,7 @@ use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -61,7 +63,7 @@ class OfficeVisitApprovalTest extends TestCase
     }
 
     /** Plan an office visit on a bare client, due in $days days. */
-    private function planOfficeVisit(Client $client, int $days, ?string $time = null): \Illuminate\Testing\TestResponse
+    private function planOfficeVisit(Client $client, int $days, ?string $time = null): TestResponse
     {
         return $this->postJson("/api/v1/clients/{$client->id}/next-actions", [
             'type' => 'office_visit',
@@ -288,10 +290,16 @@ class OfficeVisitApprovalTest extends TestCase
         $this->planOfficeVisit($today, 0, '09:00')->assertCreated();
         $this->planOfficeVisit($far, 5)->assertCreated();
 
-        // No grant → no program.
+        // No grant → no program; the planner has neither page permission.
         $this->getJson('/api/v1/office-program')->assertForbidden();
 
+        // oversight.pipeline alone no longer opens the page (it seeds the
+        // split oversight.office_program onto its roles instead).
         Sanctum::actingAs($this->userWithPermissions(['oversight.pipeline']));
+        $this->getJson('/api/v1/office-program')->assertForbidden();
+
+        // Dispatchers are the managing audience: full names + the queue.
+        Sanctum::actingAs($this->userWithPermissions(['visits.dispatch']));
         $data = $this->getJson('/api/v1/office-program')
             ->assertOk()
             ->json('data');
@@ -301,8 +309,165 @@ class OfficeVisitApprovalTest extends TestCase
         $this->assertCount(1, $data['pending_approvals']);
         $this->assertSame($far->full_name, $data['pending_approvals'][0]['client']);
 
-        $states = collect($data['visits'])->where('client_id', $today->id)->pluck('state');
-        $this->assertTrue($states->contains('scheduled'));
+        $chips = collect($data['visits'])->where('client_id', $today->id);
+        $this->assertTrue($chips->pluck('state')->contains('scheduled'));
+        $this->assertFalse($chips->firstOrFail()['masked']);
+        $this->assertSame($today->full_name, $chips->firstOrFail()['client']);
+    }
+
+    public function test_the_view_permission_gets_a_masked_grid_and_no_pending_pool(): void
+    {
+        $viewer = $this->userWithPermissions([
+            'clients.view', 'calls.log', 'next_actions.plan', 'oversight.office_program',
+        ]);
+        $colleague = $this->planner();
+        $mine = Client::factory()->create(['assigned_agent_id' => $viewer->id]);
+        $theirs = Client::factory()->create(['assigned_agent_id' => $colleague->id]);
+        $far = Client::factory()->create(['assigned_agent_id' => $colleague->id]);
+
+        Sanctum::actingAs($viewer);
+        $this->planOfficeVisit($mine, 0, '09:00')->assertCreated();
+        Sanctum::actingAs($colleague);
+        $this->planOfficeVisit($theirs, 0, '10:00')->assertCreated();
+        $this->planOfficeVisit($far, 5)->assertCreated(); // pending request
+
+        Sanctum::actingAs($viewer);
+        $data = $this->getJson('/api/v1/office-program')->assertOk()->json('data');
+
+        // The approval queue is management data — dispatchers only.
+        $this->assertSame([], $data['pending_approvals']);
+
+        // Own visit in the clear; every colleague slot is booked-anonymous:
+        // no client name, no ids to link out with.
+        $visits = collect($data['visits']);
+        $own = $visits->first(fn ($v) => ! $v['masked']);
+        $this->assertNotNull($own);
+        $this->assertSame($mine->full_name, $own['client']);
+        $this->assertSame($mine->id, $own['client_id']);
+
+        $others = $visits->filter(fn ($v) => $v['masked']);
+        $this->assertNotEmpty($others);
+        foreach ($others as $chip) {
+            $this->assertNull($chip['client']);
+            $this->assertNull($chip['client_id']);
+            $this->assertNull($chip['project_id']);
+            $this->assertNotNull($chip['agent']); // the slot still names the colleague
+        }
+        // Exactly one chip is the viewer's own.
+        $this->assertCount($visits->count() - 1, $others);
+    }
+
+    public function test_closing_a_pending_request_retracts_its_quiet_visit(): void
+    {
+        $planner = $this->planner();
+        $dispatcher = $this->dispatcher();
+        $client = Client::factory()->create(['assigned_agent_id' => $planner->id]);
+
+        Sanctum::actingAs($planner);
+        $this->planOfficeVisit($client, 5)->assertCreated();
+        $request = NextAction::query()->active()->pending()->sole();
+        $quiet = Visit::query()->active()->sole();
+
+        // A later CALL plan replaces the request (ClosePendingNextActions):
+        // the never-announced visit must not linger as an undecidable amber
+        // ghost on the program grid.
+        $this->postJson("/api/v1/clients/{$client->id}/next-actions", [
+            'type' => 'call',
+            'due_date' => now()->addDay()->toDateString(),
+        ])->assertCreated();
+
+        $request->refresh();
+        $quiet->refresh();
+        $this->assertSame(NextActionState::Done, $request->state);
+        $this->assertTrue($quiet->isCancelled());
+
+        Sanctum::actingAs($dispatcher);
+        $data = $this->getJson('/api/v1/office-program')->assertOk()->json('data');
+        $this->assertSame([], $data['pending_approvals']);
+        $this->assertSame(
+            [],
+            collect($data['visits'])->where('state', 'awaiting_approval')->all(),
+        );
+    }
+
+    public function test_replanning_in_window_replaces_the_quiet_visit_and_announces(): void
+    {
+        $planner = $this->planner();
+        $overseer = $this->userWithPermissions(['oversight.pipeline']);
+        $client = Client::factory()->create(['assigned_agent_id' => $planner->id]);
+
+        Sanctum::actingAs($planner);
+        $this->planOfficeVisit($client, 5)->assertCreated();
+        $quiet = Visit::query()->active()->sole();
+
+        // The agent thinks better of it and replans inside the window: the
+        // request evaporates, and the NEW visit must be announced — it is a
+        // confirmed appointment, not a muted request any more.
+        Notification::fake();
+        $this->planOfficeVisit($client, 1, '09:00')->assertCreated();
+
+        $this->assertTrue($quiet->refresh()->isCancelled());
+        $fresh = Visit::query()->active()->whereNull('completed_at')->sole();
+        $this->assertNotSame($quiet->id, $fresh->id);
+        $this->assertNull(NextAction::query()->active()->pending()->sole()->approval_status);
+
+        Notification::assertSentTo(
+            $overseer,
+            DomainNotification::class,
+            fn (DomainNotification $n) => $n->kind === 'office_visit_scheduled',
+        );
+    }
+
+    public function test_the_decision_and_program_inputs_are_validated(): void
+    {
+        $planner = $this->planner();
+        $dispatcher = $this->dispatcher();
+        $client = Client::factory()->create(['assigned_agent_id' => $planner->id]);
+
+        Sanctum::actingAs($planner);
+        $this->planOfficeVisit($client, 5)->assertCreated();
+        $na = NextAction::query()->active()->pending()->sole();
+
+        Sanctum::actingAs($dispatcher);
+
+        // A malformed week must 422, never 500 (Carbon::parse on raw input).
+        $this->getJson('/api/v1/office-program?week=garbage')->assertUnprocessable();
+        $this->getJson('/api/v1/office-program?week[]=x')->assertUnprocessable();
+
+        // The deny reason lands in a VARCHAR(255) with a prefix — cap enforced.
+        $this->postJson("/api/v1/next-actions/{$na->id}/approval", [
+            'decision' => 'deny',
+            'reason' => str_repeat('x', 201),
+        ])->assertUnprocessable();
+
+        // A reschedule can never point into the past.
+        $this->postJson("/api/v1/next-actions/{$na->id}/approval", [
+            'decision' => 'reschedule',
+            'due_date' => now()->subDay()->toDateString(),
+        ])->assertUnprocessable();
+    }
+
+    public function test_superseding_resets_the_approval_trail_by_default(): void
+    {
+        $planner = $this->planner();
+        $dispatcher = $this->dispatcher();
+        $client = Client::factory()->create(['assigned_agent_id' => $planner->id]);
+
+        Sanctum::actingAs($planner);
+        $this->planOfficeVisit($client, 5)->assertCreated();
+        $na = NextAction::query()->active()->pending()->sole();
+
+        Sanctum::actingAs($dispatcher);
+        $this->postJson("/api/v1/next-actions/{$na->id}/approval", ['decision' => 'approve'])->assertOk();
+
+        // A future supersede path that never heard of approvals must not clone
+        // the earned verdict onto the replacement — the model resets the trail
+        // by default (callers that DO compute one pass it explicitly).
+        $replacement = $na->refresh()->supersedeWith([], 'unrelated correction');
+        $this->assertNull($replacement->approval_status);
+        $this->assertNull($replacement->approval_requested_by);
+        $this->assertNull($replacement->approval_decided_by);
+        $this->assertNull($replacement->approval_decided_at);
     }
 
     public function test_the_window_setting_is_editable(): void

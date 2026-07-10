@@ -115,6 +115,10 @@ class RbacSeeder extends Seeder
         'oversight.matches',
         // The archive desk: review + reactivate archived (lost/closed) projects.
         'oversight.archive',
+        // The Office Visits Program page (week grid of office visits), view
+        // only — grantable to agents who plan office visits so they can pick a
+        // free slot. Deciding approval requests stays with visits.dispatch.
+        'oversight.office_program',
         // The dashboard is personal for everyone (own book only). logs.view_all
         // unlocks the company-wide Team Logs page — every user's rapports (calls /
         // office & in-site visits) and planned work across ALL visibility scopes.
@@ -190,6 +194,7 @@ class RbacSeeder extends Seeder
         'oversight.drafts' => 'Monitor abandoned drafts across the team.',
         'oversight.matches' => 'Open the company-wide Desire Matches board: waiting clients whose wishlist now fits available inventory.',
         'oversight.archive' => 'Review and reactivate archived (lost/closed) projects across the team.',
+        'oversight.office_program' => 'Open the Office Visits Program page — the week grid of scheduled office visits. View only: own clients by name, colleagues\' slots masked as booked. Deciding approval requests needs "Visits Dispatch".',
         'logs.view_all' => 'Open the company-wide Team Logs (everyone\'s calls & visits).',
     ];
 
@@ -256,6 +261,10 @@ class RbacSeeder extends Seeder
         // The KPI command center split from the tabular reports: every custom
         // role that could open analytics reports keeps the new board too.
         'analytics.kpi' => 'reports.view',
+        // The office-program week grid grew out of the upcoming-office-visits
+        // section of the pipeline monitor; roles that saw it there keep the
+        // dedicated page. Grant per-role to agents who plan office visits.
+        'oversight.office_program' => 'oversight.pipeline',
     ];
 
     /**
@@ -353,6 +362,9 @@ class RbacSeeder extends Seeder
             ...$this->baseline, ...$fullVisibility,
             'clients.view', 'clients.create', 'projects.create', 'reservations.view',
             'calls.log', 'next_actions.plan', 'visits.conduct', 'visits.propose',
+            // Plans office visits ⇒ sees the program grid to pick a free slot
+            // (masked view — no colleague client names without visits.dispatch).
+            'oversight.office_program',
         ];
 
         // The payment desk: record versements, manage schedules, generate
@@ -371,7 +383,7 @@ class RbacSeeder extends Seeder
         $manager = [
             ...$this->baseline, ...$fullVisibility, 'reports.view', 'analytics.kpi', 'logs.view_all',
             'oversight.clients', 'oversight.pipeline', 'oversight.deals', 'oversight.drafts',
-            'oversight.archive', 'oversight.matches',
+            'oversight.archive', 'oversight.matches', 'oversight.office_program',
             'chat.view_project_chats', 'chat.participate_project_chats',
             'clients.view', 'clients.create', 'clients.manage', 'clients.duplicates.resolve',
             'projects.create', 'projects.manage', 'projects.contributors', 'projects.freeze',

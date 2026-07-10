@@ -10,6 +10,7 @@ use App\Modules\Pipeline\Enums\NextActionType;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Pipeline\Support\OfficeVisitWindow;
+use App\Modules\Settings\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -18,26 +19,35 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 
 /**
- * The Office Visits Program: one manager-facing week of office visits laid out
- * by day × hour (the read side of the dedicated page), plus every plan waiting
- * for an approval verdict. Gated by oversight.pipeline — the same audience the
- * upcoming-office-visits oversight list already serves; the decision buttons
- * on the page are additionally gated by visits.dispatch (its own endpoint).
+ * The Office Visits Program: one week of office visits laid out by day × hour
+ * (the read side of the dedicated page). Two audiences:
+ *
+ *  - oversight.office_program — view only, so agents who plan office visits
+ *    can pick a free slot. Their own visits show the client; colleagues'
+ *    slots are masked to agent + "booked" (no client identity, no links).
+ *  - visits.dispatch — the managing side: full names everywhere plus the
+ *    pending-approval queue (the decision endpoint carries its own gate).
  */
 class OfficeProgramController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $start = ($request->filled('week')
-            ? Carbon::parse((string) $request->query('week'))
-            : now())->startOfWeek();
+        /** @var User $user */
+        $user = $request->user();
+        abort_unless($user->canAny(['oversight.office_program', 'visits.dispatch']), 403);
+        $canDispatch = $user->can('visits.dispatch');
+
+        // Validated, not blindly parsed: ?week=garbage (or week[]=…) must 422,
+        // never bubble a Carbon InvalidFormatException into a 500.
+        $week = $request->validate(['week' => ['nullable', 'date']])['week'] ?? null;
+        $start = ($week !== null ? Carbon::parse($week) : now())->startOfWeek();
         $end = $start->copy()->endOfWeek();
 
         return response()->json(['data' => [
             'week_start' => $start->toDateString(),
             'window_days' => OfficeVisitWindow::maxDays(),
-            'visits' => $this->weekVisits($start, $end),
-            'pending_approvals' => $this->pendingApprovals(),
+            'visits' => $this->weekVisits($start, $end, $canDispatch ? null : $user),
+            'pending_approvals' => $canDispatch ? $this->pendingApprovals() : [],
         ]]);
     }
 
@@ -47,9 +57,14 @@ class OfficeProgramController extends Controller
      * rule as the oversight upcoming list. A not-yet-approved plan's visit
      * shows as awaiting_approval so the manager sees it inside the program.
      *
+     * A non-null $viewer is a view-only reader: any visit that is not their
+     * own (they are not its agent) ships without the client's identity or
+     * links — the grid tells them the slot is booked, never by whom. The
+     * masking happens here so the names never leave the server.
+     *
      * @return list<array<string, mixed>>
      */
-    private function weekVisits(Carbon $start, Carbon $end): array
+    private function weekVisits(Carbon $start, Carbon $end, ?User $viewer): array
     {
         return Visit::query()->active()
             ->where('type', 'office')
@@ -68,28 +83,35 @@ class OfficeProgramController extends Controller
             ])
             ->orderBy('scheduled_at')
             ->get()
-            ->map(fn (Visit $v) => [
-                'id' => $v->id,
-                'client' => (($v->clientProject?->client) ?? $v->client)?->full_name,
-                'client_id' => $v->client_id,
-                'project_id' => $v->client_project_id,
-                'agent' => $v->agent?->name,
-                'scheduled_at' => $v->scheduled_at,
-                'day' => $v->scheduled_at?->toDateString(),
-                'time' => $this->wallClock($v->scheduled_at),
-                'state' => $v->completed_at !== null
-                    ? 'done'
-                    : ($v->nextAction?->approval_status === NextActionApproval::Pending
-                        ? 'awaiting_approval'
-                        : 'scheduled'),
-            ])
+            ->map(function (Visit $v) use ($viewer) {
+                $masked = $viewer !== null && $v->agent_id !== $viewer->id;
+
+                return [
+                    'id' => $v->id,
+                    'client' => $masked ? null : (($v->clientProject?->client) ?? $v->client)?->full_name,
+                    'client_id' => $masked ? null : $v->client_id,
+                    'project_id' => $masked ? null : $v->client_project_id,
+                    'masked' => $masked,
+                    'agent' => $v->agent?->name,
+                    'scheduled_at' => $v->scheduled_at,
+                    'day' => $v->scheduled_at?->toDateString(),
+                    'time' => $this->wallClock($v->scheduled_at),
+                    'state' => $v->completed_at !== null
+                        ? 'done'
+                        : ($v->nextAction?->approval_status === NextActionApproval::Pending
+                            ? 'awaiting_approval'
+                            : 'scheduled'),
+                ];
+            })
             ->values()
             ->all();
     }
 
     /**
      * Every office-visit plan waiting for a dispatcher's verdict — all weeks,
-     * oldest wanted date first, so nothing waits past its own deadline.
+     * oldest wanted date first, so nothing waits past its own deadline. Capped
+     * as a payload backstop: one plan can pend per project, so hitting the cap
+     * means the queue has been ignored for weeks, not that data is missing.
      *
      * @return list<array<string, mixed>>
      */
@@ -98,6 +120,7 @@ class OfficeProgramController extends Controller
         return NextAction::query()->active()->pending()
             ->where('type', NextActionType::OfficeVisit->value)
             ->where('approval_status', NextActionApproval::Pending->value)
+            ->limit(200)
             ->with([
                 'assignedTo:id,name',
                 'approvalRequestedBy:id,name',

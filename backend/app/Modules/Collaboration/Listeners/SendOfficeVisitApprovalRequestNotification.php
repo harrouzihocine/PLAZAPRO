@@ -21,6 +21,11 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  */
 class SendOfficeVisitApprovalRequestNotification implements ShouldQueue
 {
+    // The event fires inside CreateNextAction/CorrectNextAction transactions;
+    // without this a fast worker could grab the job before the next_actions
+    // row is committed and fail restoring the model (no dispatcher notified).
+    public bool $afterCommit = true;
+
     public function handle(OfficeVisitApprovalRequested $event): void
     {
         // Morph-aware load: the subject is a project (its client nests) or a

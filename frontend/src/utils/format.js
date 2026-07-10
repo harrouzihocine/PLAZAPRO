@@ -34,6 +34,16 @@ export function todayInput(date = new Date()) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
+// Day arithmetic on a local "YYYY-MM-DD" string. The round-trip pins the string
+// to UTC midnight so no wall clock (and no Africa/Algiers offset) is ever
+// consulted — safe pure-string math, unlike toISOString() on "now". Used by the
+// scheduling views for week paging and window bounds.
+export function addDays(isoDate, n) {
+  const d = new Date(isoDate + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
 // Server instant → local "YYYY-MM-DD" / "HH:mm" for prefilling date/time inputs
 // (edit forms round-trip through these; slicing the raw ISO string would show
 // the UTC parts, one hour off for Algeria). timeInput returns '' for a local

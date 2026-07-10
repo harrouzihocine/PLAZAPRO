@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Pipeline\Actions;
 
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Pipeline\Enums\NextActionApproval;
 use App\Modules\Pipeline\Enums\NextActionState;
 use App\Modules\Pipeline\Enums\NextActionType;
 use App\Modules\Pipeline\Models\NextAction;
@@ -52,6 +53,20 @@ class ClosePendingNextActions
                 $prior->cancel($replacedReason);
 
                 continue;
+            }
+
+            // A beyond-window office plan still awaiting its verdict is a
+            // REQUEST, not an appointment. Closing it (replacement plan, or a
+            // log with no follow-up) retracts the request, so its quiet
+            // never-announced visit must not survive: it would sit on the
+            // program grid as an undecidable amber ghost (the plan leaves the
+            // pending pool the moment it is Done) and hog the one-open-office-
+            // visit slot. A replacement office plan then materializes a fresh
+            // visit and announces it through its own window verdict.
+            if ($prior->type === NextActionType::OfficeVisit
+                && $prior->approval_status === NextActionApproval::Pending) {
+                $prior->visits()->active()->whereNull('completed_at')->get()
+                    ->each->cancel('Approval request closed before a verdict');
             }
 
             $prior->update([

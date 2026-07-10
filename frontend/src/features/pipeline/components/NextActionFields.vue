@@ -6,7 +6,7 @@ import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPick
 import AgentAgendaStrip from '@/features/pipeline/components/AgentAgendaStrip.vue'
 import { useAuthStore } from '@/features/settings/store'
 import { appSettingsApi } from '@/features/settings/api'
-import { formatDate, todayInput, unitLine } from '@/utils/format'
+import { addDays, formatDate, todayInput, unitLine } from '@/utils/format'
 import { t } from '@/i18n'
 
 // The next-action fieldset, shared by the log-call and complete-visit forms.
@@ -50,28 +50,20 @@ const canDispatch = computed(() => auth.can('visits.dispatch'))
 
 // Office-visit window: a date beyond today + N days is NOT blocked — the plan
 // goes to the dispatchers for approval — but the agent should know before
-// submitting. N is the office_visit_max_days app setting (read once per app
-// session: it moves rarely); dispatchers are the approvers, so their own picks
+// submitting. N is the office_visit_max_days app setting (cached in the api
+// module: it moves rarely); dispatchers are the approvers, so their own picks
 // are exempt. Local-date string arithmetic on purpose (Africa/Algiers rule:
 // never toISOString on "now").
-let settingsOnce = null
 const officeWindowDays = ref(null)
 onMounted(async () => {
   try {
-    settingsOnce ??= appSettingsApi.get()
-    const settings = await settingsOnce
+    const settings = await appSettingsApi.cached()
     const days = Number(settings.office_visit_max_days)
     officeWindowDays.value = Number.isInteger(days) && days >= 0 ? days : 1
   } catch {
     officeWindowDays.value = null // no hint — the server still enforces
   }
 })
-
-function addDays(isoDate, n) {
-  const d = new Date(isoDate + 'T00:00:00Z')
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
-}
 
 const lastFreeDay = computed(() =>
   officeWindowDays.value === null ? null : addDays(today, officeWindowDays.value),

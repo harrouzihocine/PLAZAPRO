@@ -6,9 +6,17 @@ import OversightList from '@/features/oversight/components/OversightList.vue'
 import OversightFilters from '@/features/oversight/components/OversightFilters.vue'
 import { oversightApi } from '@/features/oversight/api'
 import { defaultOversightRange } from '@/features/oversight/dateRange'
+import { useAuthStore } from '@/features/settings/store'
 import { toastError } from '@/composables/useConfirm'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { t } from '@/i18n'
+
+// The program page has its own audience (view perm or dispatchers) — an
+// oversight.pipeline holder isn't automatically part of it, so the link must
+// not dead-end into the router guard's silent dashboard bounce.
+const auth = useAuthStore()
+const canOpenProgram =
+  auth.can('oversight.office_program') || auth.can('visits.dispatch')
 
 const data = ref({ stuck: {}, overdue: {}, upcoming_office_visits: {} })
 const loading = ref(true)
@@ -89,7 +97,7 @@ const officeVisitCols = [
       <div>
         <!-- The organising view lives on its own page now — this list stays
              as the filterable anomaly monitor. -->
-        <div class="mb-2 flex justify-end">
+        <div v-if="canOpenProgram" class="mb-2 flex justify-end">
           <RouterLink
             :to="{ name: 'oversight.officeProgram' }"
             class="flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:underline dark:text-primary-400"

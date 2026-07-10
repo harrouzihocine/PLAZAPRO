@@ -11,16 +11,18 @@ import { pipelineApi } from '@/features/pipeline/api'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction, toastError, toastSuccess } from '@/composables/useConfirm'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
-import { formatDate, intlLocale, todayInput } from '@/utils/format'
+import { addDays, formatDate, intlLocale, todayInput } from '@/utils/format'
 import { t } from '@/i18n'
 
-// The Office Visits Program: the manager's week of office visits as a
-// day × hour grid (empty slots are as informative as full ones), fed by
-// GET /office-program. On top sits the approval strip — every beyond-window
-// office-visit plan waiting for a verdict; visits.dispatch holders decide
-// (approve / deny with a reason / reschedule with their own date) right here.
-// The grid works in Algerian wall-clock dates, same rules as the dispatch
-// board: pure Y-m-d string arithmetic, never toISOString on "now".
+// The Office Visits Program: a week of office visits as a day × hour grid
+// (empty slots are as informative as full ones), fed by GET /office-program.
+// Two audiences: oversight.office_program holders read the grid to pick a free
+// slot — the server masks colleagues' visits down to agent + "booked", so a
+// masked chip has no client and no link; visits.dispatch holders see full
+// names plus the approval strip on top — every beyond-window office-visit plan
+// waiting for a verdict (approve / deny with a reason / reschedule with their
+// own date). The grid works in Algerian wall-clock dates, same rules as the
+// dispatch board: pure Y-m-d string arithmetic, never toISOString on "now".
 
 const auth = useAuthStore()
 const canDecide = computed(() => auth.can('visits.dispatch'))
@@ -32,11 +34,6 @@ const visits = ref([])
 const pending = ref([])
 const deciding = ref(false)
 
-function addDays(isoDate, n) {
-  const d = new Date(isoDate + 'T00:00:00Z')
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
-}
 const today = todayInput()
 
 async function load(week = weekStart.value) {
@@ -87,11 +84,18 @@ const hours = computed(() => {
 })
 const hasTimeless = computed(() => visits.value.some((v) => !v.time))
 
-function cellVisits(day, hour) {
-  return visits.value.filter(
-    (v) => v.day === day && (hour === null ? !v.time : v.time && Number(v.time.slice(0, 2)) === hour),
-  )
-}
+// One O(visits) bucketing per load instead of a filter pass per cell — the
+// template asks for 7 days × ~11 rows on every render.
+const cellMap = computed(() => {
+  const map = new Map()
+  for (const v of visits.value) {
+    const key = `${v.day}|${v.time ? Number(v.time.slice(0, 2)) : 'none'}`
+    if (!map.has(key)) map.set(key, [])
+    map.get(key).push(v)
+  }
+  return map
+})
+const cellVisits = (day, hour) => cellMap.value.get(`${day}|${hour ?? 'none'}`) ?? []
 
 const hh = (h) => String(h).padStart(2, '0') + ':00'
 
@@ -176,9 +180,10 @@ const inputClass =
   <div>
     <PageHeader :title="$t('program.title')" :subtitle="$t('program.subtitle')" />
 
-    <!-- Plans waiting for a verdict — all weeks, oldest wanted date first. -->
+    <!-- Plans waiting for a verdict — all weeks, oldest wanted date first.
+         Management data: dispatchers only (the server ships [] to others). -->
     <SectionCard
-      v-if="pending.length || !loading"
+      v-if="canDecide && (pending.length || !loading)"
       :title="$t('program.pendingTitle')"
       icon="pi pi-shield"
       class="mb-4"
@@ -337,7 +342,9 @@ const inputClass =
                   />
                   {{ v.time }}
                 </span>
-                <span class="block truncate text-xs text-ink">{{ v.client ?? '—' }}</span>
+                <span class="block truncate text-xs" :class="v.masked ? 'italic text-mute' : 'text-ink'">
+                  {{ v.masked ? $t('program.booked') : (v.client ?? '—') }}
+                </span>
                 <span v-if="v.agent" class="block truncate text-[11px] text-mute">{{ v.agent }}</span>
               </component>
             </td>
@@ -358,7 +365,12 @@ const inputClass =
                 class="mb-1 block rounded-lg border px-2 py-1.5 last:mb-0"
                 :class="chipClass[v.state]"
               >
-                <span class="block truncate text-xs font-medium text-ink">{{ v.client ?? '—' }}</span>
+                <span
+                  class="block truncate text-xs font-medium"
+                  :class="v.masked ? 'italic text-mute' : 'text-ink'"
+                >
+                  {{ v.masked ? $t('program.booked') : (v.client ?? '—') }}
+                </span>
                 <span v-if="v.agent" class="block truncate text-[11px] text-mute">{{ v.agent }}</span>
               </component>
             </td>

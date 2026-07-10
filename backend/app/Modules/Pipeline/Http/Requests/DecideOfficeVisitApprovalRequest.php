@@ -27,8 +27,10 @@ class DecideOfficeVisitApprovalRequest extends FormRequest
     {
         return [
             'decision' => ['required', Rule::in(['approve', 'deny', 'reschedule'])],
-            'reason' => ['nullable', 'required_if:decision,deny', 'string', 'max:500'],
-            'due_date' => ['nullable', 'required_if:decision,reschedule', 'date'],
+            // 200: the reason lands in cancellation_reason VARCHAR(255) with a
+            // "Office visit denied: " prefix — leave prefix headroom.
+            'reason' => ['nullable', 'required_if:decision,deny', 'string', 'max:200'],
+            'due_date' => ['nullable', 'required_if:decision,reschedule', 'date', 'after_or_equal:today'],
             'due_time' => ['nullable', 'date_format:H:i'],
         ];
     }

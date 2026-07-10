@@ -89,12 +89,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/visits/{visit}/en-route', [VisitLifecycleController::class, 'enRoute']);
     Route::post('/visits/{visit}/arrived', [VisitLifecycleController::class, 'arrived']);
 
-    // The Office Visits Program: the manager's week of office visits by day ×
-    // hour, plus the plans waiting for an approval verdict. Same audience as
-    // the upcoming-office-visits oversight list.
-    Route::middleware('can:oversight.pipeline')->group(function () {
-        Route::get('/office-program', [OfficeProgramController::class, 'index']);
-    });
+    // The Office Visits Program: a week of office visits by day × hour.
+    // Two audiences, authorized in the controller (middleware `can:` cannot
+    // express OR): oversight.office_program holders get a view-only grid with
+    // colleagues' clients masked; visits.dispatch holders see everything plus
+    // the pending-approval queue.
+    Route::get('/office-program', [OfficeProgramController::class, 'index']);
 
     // Scheduling / assigning a visit picks an agent (agent-only).
     Route::middleware('can:visits.assign')->group(function () {
@@ -120,6 +120,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Tasks (to-dos). The dedicated tasks page is built in Phase 5.
     Route::middleware('can:tasks.manage')->group(function () {
         Route::get('/tasks', [TaskController::class, 'index']);
+        // Single task with its completion report — backs the detail modal the
+        // task notifications deep-link to (/tasks?task={id}).
+        Route::get('/tasks/{task}', [TaskController::class, 'show']);
         Route::post('/tasks', [TaskController::class, 'store']);
         Route::post('/tasks/{task}/complete', [TaskController::class, 'complete']);
         Route::delete('/tasks/{task}', [TaskController::class, 'destroy']);
