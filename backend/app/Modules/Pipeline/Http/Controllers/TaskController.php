@@ -12,6 +12,7 @@ use App\Modules\Pipeline\Http\Requests\StoreTaskRequest;
 use App\Modules\Pipeline\Http\Resources\TaskResource;
 use App\Modules\Pipeline\Models\Task;
 use App\Modules\Settings\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
@@ -48,11 +49,13 @@ class TaskController extends Controller
         return TaskResource::collection($tasks);
     }
 
-    public function store(StoreTaskRequest $request, CreateTask $action): TaskResource
+    // One task per assignee (assigned_to_ids fans out); always a collection.
+    public function store(StoreTaskRequest $request, CreateTask $action): JsonResponse
     {
-        return new TaskResource(
-            $action->handle($request->validated(), $request->user())->load(['assignedTo', 'createdBy']),
-        );
+        $tasks = $action->handle($request->validated(), $request->user());
+        $tasks->each->load(['assignedTo', 'createdBy']);
+
+        return TaskResource::collection($tasks)->response()->setStatusCode(201);
     }
 
     public function complete(CompleteTaskRequest $request, Task $task, CompleteTask $action): TaskResource

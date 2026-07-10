@@ -6,6 +6,7 @@ import Checkbox from 'primevue/checkbox'
 import Tag from 'primevue/tag'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import BaseMultiSelect from '@/components/base/BaseMultiSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
 import TimeField from '@/components/base/TimeField.vue'
@@ -17,7 +18,7 @@ import FilterPanel from '@/components/ui/FilterPanel.vue'
 import { useTasksStore } from '@/features/pipeline/tasksStore'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction, toastSuccess, toastError } from '@/composables/useConfirm'
-import { countActiveFilters, intlLocale, todayInput } from '@/utils/format'
+import { countActiveFilters, dateInputValue, intlLocale, todayInput } from '@/utils/format'
 import { t } from '@/i18n'
 
 const store = useTasksStore()
@@ -52,18 +53,15 @@ const templates = [
   { key: 'reading', icon: 'pi pi-book', category: 'training', repeat: 168 },
 ]
 
-const repeatOptions = computed(() => [
-  { value: 12, label: t('tasks.repeatEveryHours', { n: 12 }) },
-  { value: 24, label: t('tasks.repeatEveryHours', { n: 24 }) },
-  { value: 48, label: t('tasks.repeatEveryHours', { n: 48 }) },
-  { value: 168, label: t('tasks.repeatWeekly') },
-])
+const repeatOptions = computed(() =>
+  [12, 24, 48, 168].map((h) => ({ value: h, label: repeatLabel(h) })),
+)
 
 const emptyForm = () => ({
   title: '',
   description: '',
   category: 'follow_up',
-  assigned_to: '',
+  assigned_to_ids: [], // empty = just me; several users = one task each
   priority: 'normal',
   due_date: '',
   due_time: '',
@@ -89,7 +87,7 @@ function isOverdue(task) {
   return task.state === 'open' && task.due_at && new Date(task.due_at) <= new Date()
 }
 function isToday(task) {
-  return task.due_at && new Date(task.due_at).toDateString() === new Date().toDateString()
+  return task.due_at && dateInputValue(task.due_at) === todayInput()
 }
 
 const openGroups = computed(() => {
@@ -119,7 +117,7 @@ async function quickAdd() {
     description: form.description.trim() || null,
     category: form.category,
     priority: form.priority,
-    assigned_to: (canAssign.value && form.assigned_to) || null,
+    assigned_to_ids: canAssign.value && form.assigned_to_ids.length ? form.assigned_to_ids : null,
     due_at: dueAt,
     repeat_every_hours: form.repeat_every_hours || null,
   }
@@ -154,7 +152,7 @@ async function submitComplete() {
       outcome: report.outcome,
       summary: report.summary.trim(),
       difficulties: report.difficulties.trim() || null,
-      time_spent_minutes: report.time_spent_minutes || null,
+      time_spent_minutes: Number(report.time_spent_minutes) || null,
     })
     completing.value = null
     toastSuccess(t('tasks.completed'))
@@ -241,9 +239,9 @@ function formatDue(value) {
             { value: 'high', label: $t('status.high') },
           ]"
         />
-        <BaseSelect
+        <BaseMultiSelect
           v-if="canAssign"
-          v-model="form.assigned_to"
+          v-model="form.assigned_to_ids"
           :label="$t('pipeline.assignedTo')"
           :placeholder="$t('tasks.me')"
           :options="store.agents.map((a) => ({ value: a.id, label: a.name }))"

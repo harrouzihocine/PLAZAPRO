@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { toastError } from '@/composables/useConfirm'
 import { tasksApi } from '@/features/pipeline/api'
 import { agentsApi } from '@/features/clients/api'
+import { useAuthStore } from '@/features/settings/store'
 import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
 import { t } from '@/i18n'
 
@@ -34,7 +35,13 @@ export const useTasksStore = defineStore('tasks', {
         for (const [k, v] of Object.entries(this.filters)) {
           if (v !== '' && v !== null && v !== false) params[k] = v
         }
-        const [tasks, agents] = await Promise.all([tasksApi.list(params), agentsApi.list()])
+        // The agents list only feeds the assignee picker (tasks.assign holders)
+        // and never changes mid-session — fetch it once, and never for others.
+        const needAgents = useAuthStore().can('tasks.assign') && !this.agents.length
+        const [tasks, agents] = await Promise.all([
+          tasksApi.list(params),
+          needAgents ? agentsApi.list() : Promise.resolve(this.agents),
+        ])
         this.items = tasks
         this.agents = agents
         this.offlineAt = null

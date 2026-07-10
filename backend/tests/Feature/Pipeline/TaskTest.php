@@ -37,9 +37,10 @@ class TaskTest extends TestCase
 
         $this->postJson('/api/v1/tasks', ['title' => 'Call the notary'])
             ->assertCreated()
-            ->assertJsonPath('data.title', 'Call the notary')
-            ->assertJsonPath('data.state', 'open')
-            ->assertJsonPath('data.assigned_to.id', $user->id);
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title', 'Call the notary')
+            ->assertJsonPath('data.0.state', 'open')
+            ->assertJsonPath('data.0.assigned_to.id', $user->id);
     }
 
     public function test_completing_a_task_requires_the_report(): void
@@ -119,7 +120,38 @@ class TaskTest extends TestCase
         Sanctum::actingAs($this->userWithPermissions(['tasks.manage', 'tasks.assign']));
         $this->postJson('/api/v1/tasks', ['title' => 'X', 'assigned_to' => $other->id])
             ->assertCreated()
-            ->assertJsonPath('data.assigned_to.id', $other->id);
+            ->assertJsonPath('data.0.assigned_to.id', $other->id);
+    }
+
+    public function test_a_task_can_be_fanned_out_to_several_users_each_notified(): void
+    {
+        Notification::fake();
+        $a = User::factory()->create();
+        $b = User::factory()->create();
+        $me = $this->userWithPermissions(['tasks.manage', 'tasks.assign']);
+        Sanctum::actingAs($me);
+
+        $this->postJson('/api/v1/tasks', [
+            'title' => 'Film a TikTok tour',
+            'assigned_to_ids' => [$a->id, $b->id, $b->id], // duplicate collapses
+        ])
+            ->assertCreated()
+            ->assertJsonCount(2, 'data');
+
+        $this->assertSame(2, Task::where('title', 'Film a TikTok tour')->count());
+        $this->assertDatabaseHas('tasks', ['assigned_to' => $a->id, 'created_by' => $me->id]);
+        $this->assertDatabaseHas('tasks', ['assigned_to' => $b->id, 'created_by' => $me->id]);
+        Notification::assertSentTo([$a, $b], DomainNotification::class);
+    }
+
+    public function test_the_fan_out_list_also_needs_tasks_assign(): void
+    {
+        $other = User::factory()->create();
+        Sanctum::actingAs($this->userWithPermissions(['tasks.manage']));
+
+        $this->postJson('/api/v1/tasks', ['title' => 'X', 'assigned_to_ids' => [$other->id]])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['assigned_to']);
     }
 
     public function test_assigning_a_task_notifies_the_assignee_but_self_tasks_stay_silent(): void

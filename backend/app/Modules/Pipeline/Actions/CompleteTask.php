@@ -9,6 +9,7 @@ use App\Modules\Pipeline\Enums\TaskState;
 use App\Modules\Pipeline\Models\Task;
 use App\Modules\Settings\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 
 /**
  * Mark a task done with its completion report (what was done, outcome,
@@ -20,7 +21,8 @@ class CompleteTask
 {
     public function handle(Task $task, array $report, User $actor): Task
     {
-        $task = DB::transaction(function () use ($task, $report, $actor) {
+        $next = null;
+        $task = DB::transaction(function () use ($task, $report, $actor, &$next) {
             $task->update([
                 'state' => TaskState::Done->value,
                 'completed_at' => now(),
@@ -32,7 +34,7 @@ class CompleteTask
             ]);
 
             if ($task->repeat_every_hours) {
-                Task::create([
+                $next = Task::create([
                     'title' => $task->title,
                     'description' => $task->description,
                     'category' => $task->category?->value,
@@ -49,6 +51,20 @@ class CompleteTask
 
             return $task->fresh();
         });
+
+        // A manager closing someone else's recurring task: tell the assignee a
+        // fresh occurrence was opened (self-completions need no ping — the due
+        // reminder covers them).
+        if ($next && (int) $next->assigned_to !== $actor->id) {
+            $next->assignedTo?->notify(new DomainNotification(
+                kind: 'task_assigned',
+                key: 'task_assigned',
+                params: ['name' => $actor->name, 'title' => $next->title],
+                link: '/tasks',
+                subjectType: Task::class,
+                subjectId: $next->id,
+            ));
+        }
 
         $this->notifyReviewers($task, $actor);
 
@@ -69,19 +85,17 @@ class CompleteTask
                 ->orWhereHas('role', fn ($r) => $r->where('slug', 'super-admin')))
             ->get();
 
-        foreach ($reviewers as $reviewer) {
-            $reviewer->notify(new DomainNotification(
-                kind: 'task_completed',
-                key: 'task_completed',
-                params: [
-                    'name' => $actor->name,
-                    'title' => $task->title,
-                    'outcome' => '@notifications.task_outcome.'.$task->completion_outcome->value,
-                ],
-                link: '/tasks',
-                subjectType: Task::class,
-                subjectId: $task->id,
-            ));
-        }
+        Notification::send($reviewers, new DomainNotification(
+            kind: 'task_completed',
+            key: 'task_completed',
+            params: [
+                'name' => $actor->name,
+                'title' => $task->title,
+                'outcome' => '@notifications.task_outcome.'.$task->completion_outcome->value,
+            ],
+            link: '/tasks',
+            subjectType: Task::class,
+            subjectId: $task->id,
+        ));
     }
 }
