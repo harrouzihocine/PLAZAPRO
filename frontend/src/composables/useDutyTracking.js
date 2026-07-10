@@ -176,6 +176,13 @@ function tryNativeTracking() {
       nativeActive = true
       return true
     }
+    if (result === 'location-off' && onDuty.value) {
+      // On duty server-side but the phone's location is off (turned off
+      // while away): pull the plug through the server — it ends duty and
+      // notifies the agent AND the dispatchers.
+      pipelineApi.locationLost().then(apply).catch(() => {})
+      return false
+    }
     if (result === 'requested' && !retryArmed) {
       retryArmed = true
       window.addEventListener(
@@ -218,6 +225,19 @@ async function refresh() {
 
 /** The My Day toggle. Returns the applied state. */
 async function setDuty(on) {
+  // Duty with the device's location switched off would be a lie on the
+  // dispatch board — refuse up front, open the settings, let the user retry.
+  if (on && typeof window.PlazaNative?.isLocationEnabled === 'function') {
+    try {
+      if (!window.PlazaNative.isLocationEnabled()) {
+        window.PlazaNative.openLocationSettings?.()
+        throw new Error('location-off')
+      }
+    } catch (e) {
+      if (e.message === 'location-off') throw e
+      /* old bridge quirks: fall through, the shell watchdog covers it */
+    }
+  }
   apply(await pipelineApi.setDuty(on))
   return onDuty.value
 }

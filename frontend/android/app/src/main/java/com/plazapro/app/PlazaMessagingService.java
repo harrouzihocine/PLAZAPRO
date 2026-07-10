@@ -34,7 +34,7 @@ public class PlazaMessagingService extends FirebaseMessagingService {
         // service answers with a short precision burst (no-op when off duty;
         // the ongoing "On duty" notification is the standing indicator).
         if ("locate_request".equals(message.getData().get("kind"))) {
-            DutyLocationService.requestBurst();
+            DutyLocationService.requestBurst(this);
             return;
         }
 

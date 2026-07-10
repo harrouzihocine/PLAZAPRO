@@ -14,10 +14,12 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.Looper;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.location.LocationManagerCompat;
 
 import org.json.JSONObject;
 
@@ -55,6 +57,10 @@ public class DutyLocationService extends Service implements LocationListener {
     private static final long BURST_MS = 120_000;
 
     private static volatile DutyLocationService instance;
+    /** A locate ping that arrived while the service was dead (OS killed it). */
+    private static volatile boolean pendingBurst = false;
+
+    private static final long LOCATION_CHECK_MS = 180_000;
 
     private LocationManager locationManager;
     private ExecutorService poster;
@@ -79,23 +85,45 @@ public class DutyLocationService extends Service implements LocationListener {
      * A dispatcher looked (locate_request push): two minutes of real GPS and
      * one immediate fix. No-op when off duty — the service isn't running.
      */
-    static void requestBurst() {
+    static void requestBurst(Context context) {
         DutyLocationService running = instance;
-        if (running == null) return;
-        running.burstUntilMs = System.currentTimeMillis() + BURST_MS;
-        running.syncListeners();
-        running.requestOneFix();
-        // Nothing re-evaluates on its own once posts stop — drop the
-        // listeners the moment the burst window closes.
-        running.handler.postDelayed(running::syncListeners, BURST_MS + 1000);
+        if (running == null) {
+            // The OS killed the service but the server says this agent is on
+            // duty (locate pings only go to on-duty agents) — heal: restart
+            // and burst as soon as it is up.
+            if (hasLocationPermission(context)) {
+                pendingBurst = true;
+                start(context);
+            }
+            return;
+        }
+        // FCM delivers on a background thread with no Looper — every
+        // LocationManager call must run on the main one, or the registration
+        // dies silently and the dispatcher never gets the fix (the v1.8 bug).
+        running.handler.post(() -> {
+            running.burstUntilMs = System.currentTimeMillis() + BURST_MS;
+            running.syncListeners();
+            running.requestOneFix();
+            // Nothing re-evaluates on its own once posts stop — drop the
+            // listeners the moment the burst window closes.
+            running.handler.postDelayed(running::syncListeners, BURST_MS + 1000);
+        });
     }
 
     /** My Day's en-route flag, via the JS bridge — precision follows the work. */
     static void setPrecision(boolean wanted) {
         DutyLocationService running = instance;
         if (running == null) return;
-        running.appWantsPrecision = wanted;
-        running.syncListeners();
+        running.handler.post(() -> {
+            running.appWantsPrecision = wanted;
+            running.syncListeners();
+        });
+    }
+
+    /** Device-level location toggle (not the app permission). */
+    static boolean isLocationEnabled(Context context) {
+        LocationManager lm = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+        return lm != null && LocationManagerCompat.isLocationEnabled(lm);
     }
 
     static boolean hasLocationPermission(Context context) {
@@ -131,8 +159,37 @@ public class DutyLocationService extends Service implements LocationListener {
         }
 
         instance = this;
+
+        // On duty with device location OFF is a lie on the dispatch board —
+        // watch the toggle (a settings read, zero battery) and pull the plug
+        // through the server (it notifies the agent AND the dispatchers).
+        handler.removeCallbacks(locationCheck);
+        handler.post(locationCheck);
+
+        if (pendingBurst) {
+            pendingBurst = false;
+            handler.post(() -> requestBurst(this));
+        }
+
         return START_STICKY;
     }
+
+    private final Runnable locationCheck = new Runnable() {
+        @Override
+        public void run() {
+            if (!isLocationEnabled(DutyLocationService.this)) {
+                poster.execute(() -> {
+                    try {
+                        PlazaApi.post(DutyLocationService.this, "/me/duty/location-lost", null, null);
+                    } catch (Exception ignored) {
+                    }
+                });
+                stopSelf();
+                return;
+            }
+            handler.postDelayed(this, LOCATION_CHECK_MS);
+        }
+    };
 
     /** Listeners exist ONLY while precision is needed; idle holds none at all. */
     private synchronized void syncListeners() {
@@ -142,11 +199,13 @@ public class DutyLocationService extends Service implements LocationListener {
             if (wanted && !listening) {
                 if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                     locationManager.requestLocationUpdates(
-                            LocationManager.GPS_PROVIDER, GPS_UPDATE_MS, GPS_UPDATE_M, this);
+                            LocationManager.GPS_PROVIDER, GPS_UPDATE_MS, GPS_UPDATE_M, this,
+                            Looper.getMainLooper());
                 }
                 if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
                     locationManager.requestLocationUpdates(
-                            LocationManager.NETWORK_PROVIDER, GPS_UPDATE_MS, GPS_UPDATE_M, this);
+                            LocationManager.NETWORK_PROVIDER, GPS_UPDATE_MS, GPS_UPDATE_M, this,
+                            Looper.getMainLooper());
                 }
                 listening = true;
             } else if (!wanted && listening) {
@@ -161,10 +220,15 @@ public class DutyLocationService extends Service implements LocationListener {
     private void requestOneFix() {
         if (locationManager == null || !hasLocationPermission(this)) return;
         try {
+            // Network first (fast, indoors-friendly) AND GPS (accurate outside)
+            // — the throttle in onLocationChanged collapses duplicates.
+            if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                locationManager.requestSingleUpdate(
+                        LocationManager.NETWORK_PROVIDER, this, Looper.getMainLooper());
+            }
             if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                locationManager.requestSingleUpdate(LocationManager.GPS_PROVIDER, this, null);
-            } else if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-                locationManager.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, this, null);
+                locationManager.requestSingleUpdate(
+                        LocationManager.GPS_PROVIDER, this, Looper.getMainLooper());
             }
         } catch (SecurityException ignored) {
         }
@@ -235,6 +299,7 @@ public class DutyLocationService extends Service implements LocationListener {
     @Override
     public void onDestroy() {
         instance = null;
+        handler.removeCallbacks(locationCheck);
         if (locationManager != null) locationManager.removeUpdates(this);
         if (poster != null) poster.shutdown();
         super.onDestroy();

@@ -15,7 +15,7 @@ import {
   VISIT_STATUS_LABEL_KEYS,
 } from '@/features/pipeline/dispatchStatus'
 import { getEcho } from '@/composables/useEcho'
-import { toastError } from '@/composables/useConfirm'
+import { toastError, toastInfo, toastSuccess } from '@/composables/useConfirm'
 import { formatDateTime, initials, todayInput } from '@/utils/format'
 import { t } from '@/i18n'
 
@@ -102,14 +102,23 @@ function minutesAgo(at) {
 // Click a name → fly to the agent's last fix, open their popup, and ping
 // their device for a fresh one (idle tracking is coarse on purpose — the
 // battery contract — so "a dispatcher looking" is what buys precision).
-function focusAgent(agent) {
+async function focusAgent(agent) {
+  // Off duty → the chip becomes a "go on duty" nudge (bell + tray push).
+  if (agent.status === 'off_duty') {
+    try {
+      const { sent } = await pipelineApi.dispatchNudge(agent.id)
+      ;(sent ? toastSuccess : toastInfo)(t(sent ? 'dispatch.nudgeSent' : 'dispatch.nudgeThrottled', { name: agent.name }))
+    } catch (e) {
+      toastError(e.response?.data?.message ?? t('common.actionFailed'))
+    }
+    return
+  }
+  // On duty: ping for a fresh fix; fly to the last known one if we have it.
+  pipelineApi.dispatchLocate(agent.id).catch(() => {})
   if (!agent.position || !map) return
   if (mode.value !== 'live') setMode('live')
   map.setView([agent.position.lat, agent.position.lng], Math.max(map.getZoom(), 15))
   agentMarkers.get(agent.id)?.openPopup()
-  if (agent.status !== 'off_duty') {
-    pipelineApi.dispatchLocate(agent.id).catch(() => {})
-  }
 }
 
 function agentDivIcon(agent) {
@@ -388,14 +397,14 @@ defineExpose({ reload: loadLive })
         :key="a.id"
         type="button"
         class="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-xs font-medium transition-colors"
-        :class="a.position ? 'text-ink hover:border-primary hover:text-primary-600 dark:hover:text-primary-400' : 'cursor-not-allowed text-mute opacity-60'"
-        :disabled="!a.position"
-        :title="a.position ? $t('dispatch.lastSeen', { time: formatDateTime(a.position.at) }) : $t('dispatch.noPosition')"
+        :class="a.status === 'off_duty' ? 'text-mute hover:border-amber-400 hover:text-amber-600 dark:hover:text-amber-400' : 'text-ink hover:border-primary hover:text-primary-600 dark:hover:text-primary-400'"
+        :title="a.status === 'off_duty' ? $t('dispatch.nudgeTitle') : a.position ? $t('dispatch.lastSeen', { time: formatDateTime(a.position.at) }) : $t('dispatch.noPosition')"
         @click="focusAgent(a)"
       >
         <span class="inline-block h-2 w-2 rounded-full" :class="rosterDot(a.status)" />
         {{ a.name }}
         <span v-if="a.position" class="num text-[10px] opacity-70">{{ minutesAgo(a.position.at) }}</span>
+        <i v-else-if="a.status === 'off_duty'" class="pi pi-bell text-[10px]" aria-hidden="true" />
         <i v-else class="pi pi-eye-slash text-[10px]" aria-hidden="true" />
       </button>
     </div>

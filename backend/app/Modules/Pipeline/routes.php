@@ -75,6 +75,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dispatch/suggest', [DispatchLiveController::class, 'suggest']);
         Route::get('/dispatch/replay', [DispatchLiveController::class, 'replay']);
         Route::post('/dispatch/locate', [DispatchLiveController::class, 'locate']);
+        Route::post('/dispatch/nudge', [DispatchLiveController::class, 'nudge']);
     });
 
     // The field agent's own day + duty switch + GPS fixes + visit lifecycle
@@ -83,6 +84,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me/day', [MyDayController::class, 'show']);
     Route::get('/me/duty', [DutyController::class, 'show']);
     Route::post('/me/duty', [DutyController::class, 'update']);
+    Route::post('/me/duty/location-lost', [DutyController::class, 'locationLost']);
     Route::post('/me/positions', [AgentPositionController::class, 'store'])->middleware('throttle:120,1');
     Route::post('/visits/{visit}/accept', [VisitLifecycleController::class, 'accept']);
     Route::post('/visits/{visit}/decline', [VisitLifecycleController::class, 'decline']);

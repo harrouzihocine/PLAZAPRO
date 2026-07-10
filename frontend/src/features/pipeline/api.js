@@ -150,6 +150,18 @@ export const pipelineApi = {
     return data.data
   },
 
+  // "Go on duty, please" — bell + tray push to one agent (60s throttle).
+  async dispatchNudge(agentId) {
+    const { data } = await useApi().post('/dispatch/nudge', { agent_id: agentId })
+    return data.data // { sent }
+  },
+
+  // Device location went off while on duty: end duty + notify both sides.
+  async locationLost() {
+    const { data } = await useApi().post('/me/duty/location-lost')
+    return data.data // { on, since }
+  },
+
   // One GPS fix while on duty. 409 = off duty (the watcher must stop).
   async postPosition(fix) {
     const { data } = await useApi().post('/me/positions', fix)

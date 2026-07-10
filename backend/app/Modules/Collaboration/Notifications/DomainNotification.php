@@ -34,6 +34,7 @@ class DomainNotification extends Notification implements ShouldQueue
             'visit_assigned', 'visit_agent_assigned', 'office_visit_scheduled', 'dispatch_request',
             'office_visit_approval', 'office_visit_approved', 'office_visit_denied', 'office_visit_rescheduled',
             'visit_declined', 'visit_unaccepted', 'visit_late',
+            'duty_reminder', 'duty_nudge', 'duty_gps_lost',
         ],
         'payments' => ['payment', 'reserved_lapsed', 'reservation_next', 'reservation_cancelled'],
         'reminders' => ['reminder', 'upcoming_digest'],

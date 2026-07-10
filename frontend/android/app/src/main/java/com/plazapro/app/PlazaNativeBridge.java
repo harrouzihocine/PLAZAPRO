@@ -109,11 +109,31 @@ public class PlazaNativeBridge {
      */
     @JavascriptInterface
     public String startDutyTracking() {
+        if (!DutyLocationService.isLocationEnabled(context)) {
+            return "location-off"; // the page toasts + opens the settings
+        }
         if (DutyLocationService.hasLocationPermission(context)) {
             DutyLocationService.start(context);
             return "started";
         }
         return MainActivity.requestLocationPermission() ? "requested" : "unavailable";
+    }
+
+    /** Device-level location toggle — the duty switch refuses to lie. */
+    @JavascriptInterface
+    public boolean isLocationEnabled() {
+        return DutyLocationService.isLocationEnabled(context);
+    }
+
+    /** Jump straight to Android's location settings page. */
+    @JavascriptInterface
+    public void openLocationSettings() {
+        try {
+            Intent intent = new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (Exception ignored) {
+        }
     }
 
     @JavascriptInterface

@@ -67,7 +67,11 @@ async function toggleDuty(on) {
   try {
     await duty.setDuty(on)
   } catch (e) {
-    toastError(e.response?.data?.message ?? t('myday.dutyFailed'))
+    toastError(
+      e.message === 'location-off'
+        ? t('myday.locationOff')
+        : (e.response?.data?.message ?? t('myday.dutyFailed')),
+    )
   } finally {
     dutyBusy.value = false
   }

@@ -102,6 +102,31 @@ class DispatchLiveController extends Controller
         ]]);
     }
 
+    /**
+     * "Go on duty, please": the dispatcher's nudge to one agent whose dot is
+     * grey — bell + tray push with the deep link to the My Day switch.
+     * Throttled like locate, so a nervous dispatcher can't spam a phone.
+     */
+    public function nudge(Request $request): JsonResponse
+    {
+        $data = $request->validate(['agent_id' => ['required', 'integer', 'exists:users,id']]);
+
+        if (! \Illuminate\Support\Facades\Cache::add("duty-nudge:{$data['agent_id']}", 1, 60)) {
+            return response()->json(['data' => ['sent' => false]]);
+        }
+
+        User::query()->findOrFail($data['agent_id'])->notify(
+            new \App\Modules\Collaboration\Notifications\DomainNotification(
+                kind: 'duty_nudge',
+                key: 'duty_nudge',
+                params: ['dispatcher' => $request->user()->name],
+                link: '/my-day',
+            ),
+        );
+
+        return response()->json(['data' => ['sent' => true]]);
+    }
+
     /** A targeted ping (roster click) — same throttle as the map-open burst. */
     public function locate(Request $request, LocateOnDutyAgents $locate): JsonResponse
     {

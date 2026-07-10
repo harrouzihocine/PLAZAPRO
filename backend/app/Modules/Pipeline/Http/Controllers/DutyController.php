@@ -43,6 +43,46 @@ class DutyController extends Controller
         return $this->state($userId);
     }
 
+    /**
+     * The shell's kill switch: device location was turned OFF while on duty.
+     * Duty ends (a dark "on duty" is a lie on the dispatch board) and both
+     * sides hear why — the agent gets the "turn it back on" nudge, the
+     * dispatchers learn the agent went dark and why.
+     */
+    public function locationLost(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $open = DutySession::openFor((int) $user->id);
+
+        if ($open !== null) {
+            $open->update(['ended_at' => now()]);
+            AgentDutyChanged::dispatch((int) $user->id, 'off_duty');
+
+            $user->notify(new \App\Modules\Collaboration\Notifications\DomainNotification(
+                kind: 'duty_gps_lost',
+                key: 'duty_gps_lost_agent',
+                link: '/my-day',
+            ));
+
+            $dispatchers = \App\Modules\Settings\Models\User::query()
+                ->where('is_active', true)
+                ->whereHas('role.permissions', fn ($q) => $q->where('slug', 'visits.dispatch'))
+                ->where('id', '!=', $user->id)
+                ->get();
+            $notice = new \App\Modules\Collaboration\Notifications\DomainNotification(
+                kind: 'duty_gps_lost',
+                key: 'duty_gps_lost_dispatcher',
+                params: ['agent' => $user->name],
+                link: '/dispatch',
+            );
+            foreach ($dispatchers as $dispatcher) {
+                $dispatcher->notify($notice);
+            }
+        }
+
+        return $this->state((int) $user->id);
+    }
+
     private function state(int $userId): JsonResponse
     {
         $open = DutySession::openFor($userId);

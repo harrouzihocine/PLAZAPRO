@@ -48,6 +48,9 @@ Schedule::call(fn () => DB::table('idempotency_keys')->where('created_at', '<', 
 // site arrivals (one-shot per visit), auto-close forgotten duty sessions.
 Schedule::command('dispatch:sweep')->everyFiveMinutes()->withoutOverlapping();
 
+// 07:20 duty nudge for field agents (the command itself skips Fridays).
+Schedule::command('duty:remind')->dailyAt('07:20')->withoutOverlapping();
+
 // GPS breadcrumbs are operational telemetry, not an archive: drop rows older
 // than the retention window (configurable in Settings → General).
 Schedule::call(function () {

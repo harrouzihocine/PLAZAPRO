@@ -220,4 +220,21 @@ return [
         'title' => 'Vérification de position',
         'body' => 'Le dispatch a actualisé votre position en direct.',
     ],
+
+    'duty_reminder' => [
+        'title' => 'Bonjour — passez en service',
+        'body' => 'Ouvrez Ma journée et activez le service pour que le dispatch puisse vous joindre.',
+    ],
+    'duty_nudge' => [
+        'title' => 'Le dispatch vous demande en service',
+        'body' => ':dispatcher vous demande d\'activer le service (et la localisation) dans Ma journée.',
+    ],
+    'duty_gps_lost_agent' => [
+        'title' => 'Service désactivé — localisation coupée',
+        'body' => 'La localisation du téléphone a été coupée, le service a donc pris fin. Réactivez la localisation puis le service dans Ma journée.',
+    ],
+    'duty_gps_lost_dispatcher' => [
+        'title' => 'Agent hors de portée',
+        'body' => 'La localisation du téléphone de :agent a été coupée — son service a été terminé automatiquement.',
+    ],
 ];

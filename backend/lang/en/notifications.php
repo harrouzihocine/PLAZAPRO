@@ -224,4 +224,23 @@ return [
         'title' => 'Position check',
         'body' => 'Dispatch refreshed your live position.',
     ],
+
+    // The duty discipline set: the 07:20 opener, the dispatcher's nudge, and
+    // the "location off ended your duty" kill-switch notices.
+    'duty_reminder' => [
+        'title' => 'Good morning — go on duty',
+        'body' => 'Open My Day and flip the duty switch so dispatch can reach you.',
+    ],
+    'duty_nudge' => [
+        'title' => 'Dispatch needs you on duty',
+        'body' => ':dispatcher asks you to switch duty (and location) on in My Day.',
+    ],
+    'duty_gps_lost_agent' => [
+        'title' => 'Duty turned off — location is off',
+        'body' => 'Your phone\'s location was switched off, so duty ended. Turn location back on, then flip duty on again in My Day.',
+    ],
+    'duty_gps_lost_dispatcher' => [
+        'title' => 'Agent went dark',
+        'body' => ':agent\'s phone location was switched off — their duty was ended automatically.',
+    ],
 ];

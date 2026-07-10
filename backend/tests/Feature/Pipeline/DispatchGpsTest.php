@@ -428,6 +428,51 @@ class DispatchGpsTest extends TestCase
         ])->assertCreated()->assertJsonPath('data.precision', true);
     }
 
+    public function test_nudge_and_location_lost_close_the_duty_loop(): void
+    {
+        Notification::fake();
+        \Illuminate\Support\Facades\Cache::flush();
+
+        $dispatcher = $this->userWith(['visits.dispatch']);
+        $agent = $this->userWith([], isAgent: true);
+
+        // The dispatcher's "go on duty" nudge, throttled.
+        Sanctum::actingAs($dispatcher);
+        $this->postJson('/api/v1/dispatch/nudge', ['agent_id' => $agent->id])
+            ->assertOk()->assertJsonPath('data.sent', true);
+        $this->postJson('/api/v1/dispatch/nudge', ['agent_id' => $agent->id])
+            ->assertOk()->assertJsonPath('data.sent', false);
+        Notification::assertSentTo($agent, DomainNotification::class, fn ($n) => $n->kind === 'duty_nudge');
+
+        // Location switched off while on duty: duty ends, both sides notified.
+        DutySession::create(['user_id' => $agent->id, 'started_at' => now()]);
+        Sanctum::actingAs($agent);
+        $this->postJson('/api/v1/me/duty/location-lost')
+            ->assertOk()->assertJsonPath('data.on', false);
+        $this->assertNotNull(DutySession::first()->ended_at);
+        Notification::assertSentTo($agent, DomainNotification::class, fn ($n) => $n->kind === 'duty_gps_lost');
+        Notification::assertSentTo($dispatcher, DomainNotification::class, fn ($n) => $n->kind === 'duty_gps_lost');
+    }
+
+    public function test_the_duty_reminder_skips_friday_and_already_on_duty_agents(): void
+    {
+        Notification::fake();
+        $onDuty = $this->userWith([], isAgent: true);
+        $offDuty = $this->userWith([], isAgent: true);
+        DutySession::create(['user_id' => $onDuty->id, 'started_at' => now()]);
+
+        Carbon::setTestNow(now()->next(Carbon::MONDAY)->setTime(7, 20));
+        $this->artisan('duty:remind')->assertSuccessful();
+        Notification::assertSentTo($offDuty, DomainNotification::class, fn ($n) => $n->kind === 'duty_reminder');
+        Notification::assertNotSentTo($onDuty, DomainNotification::class);
+
+        Notification::fake();
+        Carbon::setTestNow(now()->next(Carbon::FRIDAY)->setTime(7, 20));
+        $this->artisan('duty:remind')->assertSuccessful();
+        Notification::assertNothingSent();
+        Carbon::setTestNow();
+    }
+
     public function test_the_sweeper_closes_forgotten_duty_sessions(): void
     {
         $agent = $this->userWith([], isAgent: true);
