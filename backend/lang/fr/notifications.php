@@ -167,4 +167,19 @@ return [
     'message_photo' => '📷 Photo',
     'message_voice' => '🎤 Note vocale',
     'message_file' => '📎 Fichier',
+
+    // La couche GPS du dispatch : refus d'affectation, affectation non
+    // acceptée au-delà du délai, arrivée en retard sur site.
+    'visit_declined' => [
+        'title' => 'Visite refusée',
+        'body' => ":agent a refusé la visite avec :client:extra — « :reason ».",
+    ],
+    'visit_unaccepted' => [
+        'title' => "Affectation pas encore acceptée",
+        'body' => ":agent n'a pas encore accepté la visite avec :client (:when).",
+    ],
+    'visit_late' => [
+        'title' => 'Agent en retard',
+        'body' => ":agent n'est pas encore arrivé pour la visite avec :client (:when).",
+    ],
 ];

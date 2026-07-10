@@ -30,7 +30,7 @@ class DomainNotification extends Notification implements ShouldQueue
      */
     public const PUSH_CATEGORIES = [
         'chat' => ['chat_message'],
-        'visits' => ['visit_assigned', 'visit_agent_assigned', 'office_visit_scheduled', 'dispatch_request'],
+        'visits' => ['visit_assigned', 'visit_agent_assigned', 'office_visit_scheduled', 'dispatch_request', 'visit_declined', 'visit_unaccepted', 'visit_late'],
         'payments' => ['payment', 'reserved_lapsed', 'reservation_next', 'reservation_cancelled'],
         'reminders' => ['reminder', 'upcoming_digest'],
         'listings' => ['unit_published', 'unit_updated', 'unit_sold', 'unit_status', 'unit_match', 'box_published', 'box_updated', 'units_imported'],

@@ -93,6 +93,13 @@ const routes = [
         meta: { permission: 'visits.dispatch' },
       },
       {
+        // The field agent's own day: duty switch, today's dispatched visits,
+        // the accept/en-route/arrived stepper. Personal data — no permission.
+        path: 'my-day',
+        name: 'my-day',
+        component: () => import('@/features/pipeline/views/MyDayView.vue'),
+      },
+      {
         path: 'chat',
         name: 'chat',
         component: () => import('@/features/collaboration/views/ChatView.vue'),

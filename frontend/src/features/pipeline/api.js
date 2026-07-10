@@ -90,6 +90,72 @@ export const pipelineApi = {
     const { data } = await useApi().post('/dispatch/assign', { changes })
     return data
   },
+
+  // --- The dispatch GPS layer -----------------------------------------------
+
+  // The dispatcher's live map: agent dots (status + freshest fix) and today's
+  // target sites; pending pool sites ride along hollow. visits.dispatch.
+  async dispatchMap() {
+    const { data } = await useApi().get('/dispatch/map')
+    return data.data
+  },
+
+  // Ranked agents for one pending in-site plan (distance/load/familiarity —
+  // suggest-only, the dispatcher assigns). visits.dispatch.
+  async dispatchSuggest(actionId) {
+    const { data } = await useApi().get('/dispatch/suggest', { params: { action_id: actionId } })
+    return data.data // { sites, candidates }
+  },
+
+  // One agent's breadcrumb trail + in-site visits for a day. visits.dispatch.
+  async dispatchReplay(agentId, date) {
+    const { data } = await useApi().get('/dispatch/replay', { params: { agent_id: agentId, date } })
+    return data.data // { positions, visits }
+  },
+
+  // The field agent's own day: duty state + today's visits with lifecycle
+  // stamps, site pins and a nearest-first route_order proposal.
+  async myDay() {
+    const { data } = await useApi().get('/me/day')
+    return data.data
+  },
+
+  async dutyState() {
+    const { data } = await useApi().get('/me/duty')
+    return data.data // { on, since }
+  },
+
+  async setDuty(on) {
+    const { data } = await useApi().post('/me/duty', { on })
+    return data.data
+  },
+
+  // One GPS fix while on duty. 409 = off duty (the watcher must stop).
+  async postPosition(fix) {
+    const { data } = await useApi().post('/me/positions', fix)
+    return data.data
+  },
+
+  // The lifecycle stamps are idempotent — safe to retry blindly.
+  async acceptVisit(visitId) {
+    const { data } = await useApi().post(`/visits/${visitId}/accept`)
+    return data.data
+  },
+
+  async declineVisit(visitId, reason) {
+    const { data } = await useApi().post(`/visits/${visitId}/decline`, { reason })
+    return data.data
+  },
+
+  async enRouteVisit(visitId) {
+    const { data } = await useApi().post(`/visits/${visitId}/en-route`)
+    return data.data
+  },
+
+  async arrivedVisit(visitId) {
+    const { data } = await useApi().post(`/visits/${visitId}/arrived`)
+    return data.data
+  },
 }
 
 // Tasks (to-dos) backing the Phase 5 tasks board. All gated tasks.manage.

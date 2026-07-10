@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import draggable from 'vuedraggable'
 import Button from 'primevue/button'
@@ -8,6 +8,13 @@ import Tag from 'primevue/tag'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import { pipelineApi } from '@/features/pipeline/api'
+import SuggestAgentsDialog from '@/features/pipeline/components/SuggestAgentsDialog.vue'
+import {
+  AGENT_STATUS_DOTS,
+  AGENT_STATUS_LABEL_KEYS,
+  VISIT_STATUS_LABEL_KEYS,
+} from '@/features/pipeline/dispatchStatus'
+import { getEcho } from '@/composables/useEcho'
 import { toastError, toastSuccess } from '@/composables/useConfirm'
 import { copyToClipboard } from '@/composables/useClipboard'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
@@ -39,6 +46,82 @@ const cells = ref({}) // `${agentId}|${day}` -> draggable list (week view)
 // several times before saving must express only where it ended up — posting
 // every intermediate hop would assign/notify agents the card merely passed by.
 const moves = ref(new Map())
+
+// Board | live map tab — the map (and its Leaflet chunk) only loads on demand.
+const DispatchMapTab = defineAsyncComponent(
+  () => import('@/features/pipeline/components/DispatchMapTab.vue'),
+)
+const tab = ref('board')
+
+// The assignment assist: ranked agents for one pending plan. Picking records
+// a normal board move — the dispatcher still presses Save.
+const suggestVisible = ref(false)
+const suggestItem = ref(null)
+
+function openSuggest(item) {
+  suggestItem.value = item
+  suggestVisible.value = true
+}
+
+function onSuggestPick(agentId) {
+  const item = suggestItem.value
+  suggestVisible.value = false
+  if (!item) return
+  const today = localToday()
+  const day = (item.due_at ?? '').slice(0, 10) >= today ? item.due_at.slice(0, 10) : today
+  const move = { kind: 'action', id: item.id, agent_id: agentId, due_date: day }
+  if (item.time) move.due_time = item.time
+  recordMove(item, move)
+  // Mirror a drag: the card leaves the pool and lands on the agent's day.
+  pending.value = pending.value.filter((el) => el !== item)
+  item.type = 'in_site'
+  item.agent_id = agentId
+  item.day = day
+  item.at = `${day}T${item.time ?? '09:00'}:00`
+  const key = cellKey(agentId, day)
+  if (!cells.value[key]) cells.value[key] = []
+  cells.value[key].push(item)
+  cells.value[key].sort(byTime)
+  if (viewDay.value === day) showDay(day) // re-bucket the zoomed hours
+  toastSuccess(t('dispatch.suggestRecorded'))
+}
+
+const agentStatusDot = (s) => AGENT_STATUS_DOTS[s] ?? AGENT_STATUS_DOTS.off_duty
+const agentStatusLabel = (s) => t(AGENT_STATUS_LABEL_KEYS[s] ?? AGENT_STATUS_LABEL_KEYS.off_duty)
+const visitStatusLabel = (s) => t(VISIT_STATUS_LABEL_KEYS[s] ?? VISIT_STATUS_LABEL_KEYS.assigned)
+// The in-between lifecycle steps get a dot on the grid card (assigned = none,
+// done = the existing strike-through).
+const VISIT_DOT = { accepted: 'bg-violet-500', en_route: 'bg-amber-500', arrived: 'bg-sky-500' }
+// A pool plan pointing at a site with no map pin — GPS features degrade there.
+const hasUnpinnedSite = (el) => (el.sites ?? []).some((site) => !site.maps_url)
+
+// Live layer over Reverb: agent dots recolor, cards advance — no polling.
+let liveChannel = null
+function onAgentLive(e) {
+  const agent = agents.value.find((a) => a.id === e.userId)
+  if (agent) agent.status = e.status
+}
+function onVisitLive(e) {
+  // Grid + overdue share object references with the zoomed hour buckets, so
+  // patching these two covers every rendering.
+  for (const list of Object.values(cells.value)) {
+    const item = list.find((i) => i.kind === 'visit' && i.id === e.visit_id)
+    if (item) item.status = e.status
+  }
+  const stale = overdue.value.find((i) => i.kind === 'visit' && i.id === e.visit_id)
+  if (stale) stale.status = e.status
+}
+onMounted(() => {
+  const echo = getEcho()
+  if (!echo) return
+  liveChannel = echo.private('dispatch')
+  liveChannel.listen('.agent.duty', onAgentLive)
+  liveChannel.listen('.agent.position', onAgentLive)
+  liveChannel.listen('.visit.lifecycle', onVisitLive)
+})
+onBeforeUnmount(() => {
+  if (liveChannel) getEcho()?.leave('dispatch')
+})
 
 // The board works in Algerian calendar dates: the backend (app timezone
 // Africa/Algiers) produces week_start, every item's `day` + `time`, and the
@@ -385,13 +468,30 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
       :subtitle="$t('dispatch.subtitle')"
     >
       <template #actions>
+        <!-- Board | live map -->
+        <Button
+          :label="$t('dispatch.boardTab')"
+          icon="pi pi-table"
+          size="small"
+          :severity="tab === 'board' ? 'primary' : 'secondary'"
+          :outlined="tab !== 'board'"
+          @click="tab = 'board'"
+        />
+        <Button
+          :label="$t('dispatch.mapTab')"
+          icon="pi pi-map"
+          size="small"
+          :severity="tab === 'map' ? 'primary' : 'secondary'"
+          :outlined="tab !== 'map'"
+          @click="tab = 'map'"
+        />
         <!-- Week navigation, or day navigation when zoomed into hours. -->
-        <template v-if="!viewDay">
+        <template v-if="tab === 'board' && !viewDay">
           <Button icon="pi pi-chevron-left" severity="secondary" text :aria-label="$t('pipeline.previousWeek')" @click="shiftWeek(-7)" />
           <span class="num self-center text-sm font-medium text-ink">{{ $t('dispatch.weekOf', { date: weekStart }) }}</span>
           <Button icon="pi pi-chevron-right" severity="secondary" text :aria-label="$t('pipeline.nextWeek')" @click="shiftWeek(7)" />
         </template>
-        <template v-else>
+        <template v-else-if="tab === 'board'">
           <Button
             icon="pi pi-chevron-left"
             severity="secondary"
@@ -421,6 +521,10 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
       </template>
     </PageHeader>
 
+    <!-- Live map tab: agents + today's sites + replay (Leaflet, lazy). -->
+    <DispatchMapTab v-if="tab === 'map'" />
+
+    <template v-else>
     <!-- Pending pool -->
     <SectionCard
       :title="$t('dispatch.pendingTitle', { n: pending.length })"
@@ -452,6 +556,15 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
                 </span>
                 <button
                   type="button"
+                  class="text-primary-600 transition-colors hover:text-primary-700 dark:text-primary-400"
+                  :aria-label="$t('dispatch.suggest')"
+                  :title="$t('dispatch.suggest')"
+                  @click.stop="openSuggest(element)"
+                >
+                  <i class="pi pi-bolt" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
                   class="text-mute transition-colors hover:text-ink"
 :aria-label="$t('dispatch.taskDetails')"
                   @click.stop="showDetails($event, element)"
@@ -463,6 +576,13 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
               <span v-if="element.sites?.length" class="truncate text-xs text-ink">
                 <i class="pi pi-building text-[10px]" aria-hidden="true" />
                 {{ element.sites.map((s) => s.name).join(', ') }}
+                <!-- A site with no map pin: distance/geofence/ETA degrade there. -->
+                <i
+                  v-if="hasUnpinnedSite(element)"
+                  class="pi pi-exclamation-triangle text-[10px] text-amber-500"
+                  :title="$t('dispatch.noPin')"
+                  aria-hidden="true"
+                />
               </span>
               <span
                 class="num text-xs"
@@ -564,9 +684,19 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
           <tbody>
             <tr v-for="agent in agents" :key="agent.id" class="align-top">
               <th class="sticky start-0 z-10 border-b border-line bg-card px-3 py-2 text-start font-medium text-ink">
-                {{ agent.name }}
+                <span class="inline-flex items-center gap-1.5">
+                  <!-- The live duty dot: green available, amber en route,
+                       sky on site, grey off duty (recolors over Reverb). -->
+                  <span
+                    class="inline-block h-2 w-2 shrink-0 rounded-full"
+                    :class="agentStatusDot(agent.status)"
+                    :title="agentStatusLabel(agent.status)"
+                  />
+                  {{ agent.name }}
+                </span>
                 <span class="num mt-0.5 block text-xs font-normal text-mute">
                   {{ agentCount(agent.id) }} · {{ viewDay ? $t('dispatch.thisDay') : $t('dispatch.thisWeek') }}
+                  <template v-if="agent.today_left"> · {{ $t('dispatch.todayLeft', { n: agent.today_left }) }}</template>
                 </span>
               </th>
               <td
@@ -605,6 +735,12 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
                         @click="showDetails($event, element)"
                       >
                         <i :class="TYPE_ICONS[element.type]" aria-hidden="true" />
+                        <span
+                          v-if="element.type === 'in_site' && VISIT_DOT[element.status]"
+                          class="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+                          :class="VISIT_DOT[element.status]"
+                          :title="visitStatusLabel(element.status)"
+                        />
                         <span class="min-w-0 flex-1 truncate font-medium">{{ element.client ?? '—' }}</span>
                         <span v-if="element.unit" class="num shrink-0">{{ element.unit }}</span>
                       </button>
@@ -649,6 +785,7 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
     <p class="mt-2 text-xs text-mute">
       {{ $t('dispatch.boardHint') }}
     </p>
+    </template>
 
     <!-- Time chip editor: exact HH:mm without dragging. -->
     <Popover ref="timeEditRef" class="w-60 max-w-[92vw]">
@@ -773,6 +910,13 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
         </div>
       </div>
     </Popover>
+
+    <!-- The assignment assist (ranked agents for one pending plan). -->
+    <SuggestAgentsDialog
+      v-model:visible="suggestVisible"
+      :action-id="suggestItem?.id ?? null"
+      @pick="onSuggestPick"
+    />
   </div>
 </template>
 

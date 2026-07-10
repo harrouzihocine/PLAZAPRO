@@ -32,6 +32,7 @@ import OfflineBanner from '@/features/offline/OfflineBanner.vue'
 import { useAnnouncementsStore } from '@/features/inventory/announcementsStore'
 import { useChatDockStore } from '@/features/collaboration/chatDockStore'
 import { usePresenceStore } from '@/features/collaboration/presenceStore'
+import { useDutyTracking } from '@/composables/useDutyTracking'
 import { useNetworkStore } from '@/features/offline/networkStore'
 import { useOutboxStore } from '@/features/offline/outboxStore'
 import { oversightApi } from '@/features/oversight/api'
@@ -109,6 +110,9 @@ onMounted(async () => {
   // Everyone joins the `online` presence channel so the app's green "Active
   // now" dots reflect web users too; the web UI itself never shows them.
   usePresenceStore().join()
+  // Field agents: align the location watcher with the server's duty state so
+  // an on-duty agent keeps sharing while browsing any page (My Day toggles it).
+  if (auth.isAgent) useDutyTracking().refresh()
 
   if (!OVERSIGHT_PERMS.some((p) => auth.can(p))) return
   try {
@@ -161,6 +165,7 @@ const SECTIONS = [
     items: [
       { to: '/clients', labelKey: 'nav.clients', icon: 'pi pi-users', permission: 'clients.view' },
       { to: '/tasks', labelKey: 'nav.tasks', icon: 'pi pi-check-square', permission: 'tasks.manage' },
+      { to: '/my-day', labelKey: 'nav.myDay', icon: 'pi pi-compass', agentOnly: true },
       { to: '/dispatch', labelKey: 'nav.dispatch', icon: 'pi pi-send', permission: 'visits.dispatch' },
       { to: '/chat', labelKey: 'nav.chat', icon: 'pi pi-comments', permission: 'chat.use' },
     ],
@@ -267,7 +272,7 @@ const sections = computed(() =>
     ...s,
     label: t(`nav.section.${s.key}`),
     items: s.items
-      .filter((i) => !i.permission || auth.can(i.permission))
+      .filter((i) => (!i.permission || auth.can(i.permission)) && (!i.agentOnly || auth.isAgent))
       // Team logs is self-scoped for users without logs.view_all — call it what it
       // is for them so the label never over-promises a company-wide view.
       .map((i) => ({

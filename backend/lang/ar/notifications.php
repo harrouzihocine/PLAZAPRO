@@ -167,4 +167,18 @@ return [
     'message_photo' => '📷 صورة',
     'message_voice' => '🎤 رسالة صوتية',
     'message_file' => '📎 ملف',
+
+    // طبقة GPS للإرسال: رفض مهمة، مهمة لم تُقبل ضمن المهلة، تأخر الوصول للموقع.
+    'visit_declined' => [
+        'title' => 'تم رفض الزيارة',
+        'body' => 'رفض :agent الزيارة مع :client:extra — «:reason».',
+    ],
+    'visit_unaccepted' => [
+        'title' => 'مهمة لم تُقبل بعد',
+        'body' => 'لم يقبل :agent بعد الزيارة مع :client (:when).',
+    ],
+    'visit_late' => [
+        'title' => 'الوكيل متأخر',
+        'body' => 'لم يصل :agent بعد إلى موقع الزيارة مع :client (:when).',
+    ],
 ];

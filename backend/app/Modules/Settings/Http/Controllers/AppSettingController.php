@@ -24,6 +24,13 @@ class AppSettingController extends Controller
         // the lock lasts (0 = until an admin unlocks it in Settings → Users).
         'login_max_attempts' => ['required', 'integer', 'min:1', 'max:10'],
         'login_lockout_minutes' => ['required', 'integer', 'min:0', 'max:10080'],
+        // The dispatch GPS layer: site geofence radius (auto check-in/out),
+        // how long an assignment may sit unaccepted / an arrival may run late
+        // before the dispatchers are nudged, and breadcrumb retention.
+        'dispatch_geofence_radius_m' => ['required', 'integer', 'min:50', 'max:2000'],
+        'dispatch_accept_sla_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
+        'dispatch_arrival_grace_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
+        'agent_position_retention_days' => ['required', 'integer', 'min:7', 'max:365'],
     ];
 
     public function index(): JsonResponse

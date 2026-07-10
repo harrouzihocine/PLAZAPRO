@@ -43,3 +43,14 @@ Schedule::command('clients:flag-empty')->dailyAt('07:00')->withoutOverlapping();
 Schedule::call(fn () => DB::table('idempotency_keys')->where('created_at', '<', now()->subDays(7))->delete())
     ->name('idempotency:prune')
     ->dailyAt('04:00');
+
+// Dispatch watchdog: nudge dispatchers about unaccepted assignments and late
+// site arrivals (one-shot per visit), auto-close forgotten duty sessions.
+Schedule::command('dispatch:sweep')->everyFiveMinutes()->withoutOverlapping();
+
+// GPS breadcrumbs are operational telemetry, not an archive: drop rows older
+// than the retention window (configurable in Settings → General).
+Schedule::call(function () {
+    $days = \App\Modules\Settings\Models\AppSetting::integer('agent_position_retention_days', 30);
+    DB::table('agent_positions')->where('recorded_at', '<', now()->subDays($days))->delete();
+})->name('positions:prune')->dailyAt('04:10');

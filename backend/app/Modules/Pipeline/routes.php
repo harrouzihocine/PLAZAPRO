@@ -11,13 +11,18 @@ declare(strict_types=1);
 | here. See docs/phase-3-clients-pipeline.md.
 */
 
+use App\Modules\Pipeline\Http\Controllers\AgentPositionController;
 use App\Modules\Pipeline\Http\Controllers\CallController;
 use App\Modules\Pipeline\Http\Controllers\CallRequestController;
 use App\Modules\Pipeline\Http\Controllers\DispatchController;
+use App\Modules\Pipeline\Http\Controllers\DispatchLiveController;
+use App\Modules\Pipeline\Http\Controllers\DutyController;
+use App\Modules\Pipeline\Http\Controllers\MyDayController;
 use App\Modules\Pipeline\Http\Controllers\NextActionController;
 use App\Modules\Pipeline\Http\Controllers\TaskController;
 use App\Modules\Pipeline\Http\Controllers\TimelineController;
 use App\Modules\Pipeline\Http\Controllers\VisitController;
+use App\Modules\Pipeline\Http\Controllers\VisitLifecycleController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -59,7 +64,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('can:visits.dispatch')->group(function () {
         Route::get('/dispatch/board', [DispatchController::class, 'board']);
         Route::post('/dispatch/assign', [DispatchController::class, 'assign']);
+
+        // The live layer: agents map, ranked assignment suggestions, day replay.
+        Route::get('/dispatch/map', [DispatchLiveController::class, 'map']);
+        Route::get('/dispatch/suggest', [DispatchLiveController::class, 'suggest']);
+        Route::get('/dispatch/replay', [DispatchLiveController::class, 'replay']);
     });
+
+    // The field agent's own day + duty switch + GPS fixes + visit lifecycle
+    // steps. Personal, ownership-checked endpoints — no extra permission.
+    // Position ingest is rate-limited as a backstop (the client throttles).
+    Route::get('/me/day', [MyDayController::class, 'show']);
+    Route::get('/me/duty', [DutyController::class, 'show']);
+    Route::post('/me/duty', [DutyController::class, 'update']);
+    Route::post('/me/positions', [AgentPositionController::class, 'store'])->middleware('throttle:120,1');
+    Route::post('/visits/{visit}/accept', [VisitLifecycleController::class, 'accept']);
+    Route::post('/visits/{visit}/decline', [VisitLifecycleController::class, 'decline']);
+    Route::post('/visits/{visit}/en-route', [VisitLifecycleController::class, 'enRoute']);
+    Route::post('/visits/{visit}/arrived', [VisitLifecycleController::class, 'arrived']);
 
     // Scheduling / assigning a visit picks an agent (agent-only).
     Route::middleware('can:visits.assign')->group(function () {

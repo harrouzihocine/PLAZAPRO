@@ -36,6 +36,14 @@ Broadcast::channel('conversation.{conversationId}', function (User $user, int $c
     return $conversation !== null && $conversation->isReadableBy($user);
 });
 
+// The dispatchers' live layer: agent dots (position/status) and visit
+// lifecycle changes. Strictly visits.dispatch holders — agent positions are
+// oversight data, never peer-visible (same spirit as the identity-masked
+// reservations board).
+Broadcast::channel('dispatch', function (User $user) {
+    return $user->can('visits.dispatch');
+});
+
 // Who is online right now (presence). Any authenticated user may join; the
 // member payload is intentionally minimal (id + name). Powers the green
 // "Active now" dots in the Android app's chat — web users still JOIN (so

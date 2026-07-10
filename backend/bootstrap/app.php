@@ -16,6 +16,7 @@ use App\Modules\Payments\Console\MarkSchedulesOverdueCommand;
 use App\Modules\Pipeline\Console\DispatchReminders;
 use App\Modules\Pipeline\Console\MarkActionsOverdue;
 use App\Modules\Pipeline\Console\SendUpcomingDigest;
+use App\Modules\Pipeline\Console\SweepDispatchAlerts;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -43,6 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
         FlagEmptyClients::class,
         OptimizeExistingMedia::class,
         SnapshotKpis::class,
+        SweepDispatchAlerts::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         // Sanctum SPA (cookie) auth for the first-party frontend.

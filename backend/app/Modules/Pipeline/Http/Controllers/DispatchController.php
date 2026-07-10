@@ -11,6 +11,7 @@ use App\Modules\Pipeline\Enums\NextActionType;
 use App\Modules\Pipeline\Http\Requests\DispatchAssignRequest;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
+use App\Modules\Pipeline\Support\AgentStatus;
 use App\Modules\Settings\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -76,6 +77,18 @@ class DispatchController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'role_id']);
 
+        // Live layer: duty status + freshest fix per agent (the row-header dot),
+        // and how much in-site work each still has open today.
+        $live = AgentStatus::forUsers($agents->pluck('id')->all());
+        $todayLeft = Visit::query()->active()
+            ->whereIn('agent_id', $agents->pluck('id'))
+            ->where('type', 'in_site')
+            ->whereNull('completed_at')
+            ->whereBetween('scheduled_at', [now()->startOfDay(), now()->endOfDay()])
+            ->selectRaw('agent_id, COUNT(*) as n')
+            ->groupBy('agent_id')
+            ->pluck('n', 'agent_id');
+
         $todayStart = now()->startOfDay();
 
         // The week's workload: every visit scheduled in range, plus assigned
@@ -135,7 +148,12 @@ class DispatchController extends Controller
             'week_start' => $start->toDateString(),
             'pending' => $pending->values(),
             'overdue' => $overdue->values(),
-            'agents' => $agents->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])->values(),
+            'agents' => $agents->map(fn (User $u) => [
+                'id' => $u->id,
+                'name' => $u->name,
+                'today_left' => (int) ($todayLeft[$u->id] ?? 0),
+                ...$live->payloadFor((int) $u->id),
+            ])->values(),
             'items' => $visits->concat($callPlans)->values(),
         ]]);
     }
@@ -157,6 +175,8 @@ class DispatchController extends Controller
             'day' => $v->scheduled_at->toDateString(),
             'time' => $this->wallClock($v->scheduled_at),
             'is_completed' => $v->completed_at !== null,
+            // Where the visit stands on the live lifecycle — the card's colour.
+            'status' => $v->dispatchStatus(),
             'draggable' => $v->type->value === 'in_site' && $v->completed_at === null,
             'can_unassign' => $v->type->value === 'in_site' && $v->completed_at === null && $v->next_action_id !== null,
             'client' => $v->client?->full_name,

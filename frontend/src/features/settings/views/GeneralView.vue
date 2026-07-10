@@ -18,6 +18,10 @@ const holdHours = ref('')
 const reservedHours = ref('')
 const maxAttempts = ref('')
 const lockoutMinutes = ref('')
+const geofenceRadius = ref('')
+const acceptSla = ref('')
+const arrivalGrace = ref('')
+const gpsRetention = ref('')
 const loading = ref(true)
 const saving = ref(false)
 
@@ -28,6 +32,10 @@ async function load() {
     reservedHours.value = settings.reserved_hold_hours ?? '72'
     maxAttempts.value = settings.login_max_attempts ?? '3'
     lockoutMinutes.value = settings.login_lockout_minutes ?? '0'
+    geofenceRadius.value = settings.dispatch_geofence_radius_m ?? '200'
+    acceptSla.value = settings.dispatch_accept_sla_minutes ?? '15'
+    arrivalGrace.value = settings.dispatch_arrival_grace_minutes ?? '15'
+    gpsRetention.value = settings.agent_position_retention_days ?? '30'
   } catch {
     toastError(t('settings.loadFailed'))
   } finally {
@@ -55,6 +63,19 @@ async function save() {
     toastError(t('settings.lockoutInvalid'))
     return
   }
+  const radius = Number(geofenceRadius.value)
+  const sla = Number(acceptSla.value)
+  const grace = Number(arrivalGrace.value)
+  const retention = Number(gpsRetention.value)
+  if (
+    !Number.isInteger(radius) || radius < 50 || radius > 2000
+    || !Number.isInteger(sla) || sla < 1
+    || !Number.isInteger(grace) || grace < 1
+    || !Number.isInteger(retention) || retention < 7
+  ) {
+    toastError(t('settings.dispatchGpsInvalid'))
+    return
+  }
   saving.value = true
   try {
     await appSettingsApi.save({
@@ -62,6 +83,10 @@ async function save() {
       reserved_hold_hours: reserved,
       login_max_attempts: attempts,
       login_lockout_minutes: lockout,
+      dispatch_geofence_radius_m: radius,
+      dispatch_accept_sla_minutes: sla,
+      dispatch_arrival_grace_minutes: grace,
+      agent_position_retention_days: retention,
     })
     toastSuccess(t('settings.saved'))
   } catch (e) {
@@ -128,6 +153,61 @@ async function save() {
           />
           <p class="mt-1.5 text-xs text-mute">
             {{ $t('settings.lockoutHint') }}
+          </p>
+        </div>
+        <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="saving" />
+      </form>
+    </SectionCard>
+
+    <!-- The dispatch GPS layer: geofence auto check-in, the watchdog's two
+         clocks, and how long breadcrumb trails are kept. -->
+    <SectionCard :title="$t('settings.dispatchGps')" icon="pi pi-map-marker" class="mt-6">
+      <p v-if="loading" class="text-sm text-mute">{{ $t('common.loading') }}</p>
+      <form v-else class="max-w-md space-y-4" @submit.prevent="save">
+        <div>
+          <BaseInput
+            v-model="geofenceRadius"
+:label="$t('settings.geofenceLabel')"
+            type="number"
+            min="50"
+            max="2000"
+          />
+          <p class="mt-1.5 text-xs text-mute">
+            {{ $t('settings.geofenceHint') }}
+          </p>
+        </div>
+        <div>
+          <BaseInput
+            v-model="acceptSla"
+:label="$t('settings.acceptSlaLabel')"
+            type="number"
+            min="1"
+          />
+          <p class="mt-1.5 text-xs text-mute">
+            {{ $t('settings.acceptSlaHint') }}
+          </p>
+        </div>
+        <div>
+          <BaseInput
+            v-model="arrivalGrace"
+:label="$t('settings.graceLabel')"
+            type="number"
+            min="1"
+          />
+          <p class="mt-1.5 text-xs text-mute">
+            {{ $t('settings.graceHint') }}
+          </p>
+        </div>
+        <div>
+          <BaseInput
+            v-model="gpsRetention"
+:label="$t('settings.retentionLabel')"
+            type="number"
+            min="7"
+            max="365"
+          />
+          <p class="mt-1.5 text-xs text-mute">
+            {{ $t('settings.retentionHint') }}
           </p>
         </div>
         <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="saving" />

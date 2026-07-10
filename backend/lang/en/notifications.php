@@ -169,4 +169,19 @@ return [
     'message_photo' => '📷 Photo',
     'message_voice' => '🎤 Voice note',
     'message_file' => '📎 File',
+
+    // The dispatch GPS layer: an agent bounced an assignment back to the pool,
+    // an assignment sat unaccepted past the SLA, an arrival is running late.
+    'visit_declined' => [
+        'title' => 'Visit declined',
+        'body' => ':agent declined the visit with :client:extra — ":reason".',
+    ],
+    'visit_unaccepted' => [
+        'title' => 'Assignment not accepted yet',
+        'body' => ':agent has not accepted the visit with :client (:when).',
+    ],
+    'visit_late' => [
+        'title' => 'Agent running late',
+        'body' => ':agent has not arrived for the visit with :client (:when).',
+    ],
 ];

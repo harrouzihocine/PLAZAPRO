@@ -22,6 +22,7 @@ use App\Modules\Collaboration\Listeners\SendDispatchRequestNotification;
 use App\Modules\Collaboration\Listeners\SendDueReminderNotification;
 use App\Modules\Collaboration\Listeners\SendPaymentNotification;
 use App\Modules\Collaboration\Listeners\SendVisitAssignedNotification;
+use App\Modules\Collaboration\Listeners\SendVisitDeclinedNotification;
 use App\Modules\Inventory\Events\BackupHoldsCancelled;
 use App\Modules\Inventory\Events\BoxEdited;
 use App\Modules\Inventory\Events\BoxPublished;
@@ -37,6 +38,7 @@ use App\Modules\Payments\Events\VersementRecorded;
 use App\Modules\Pipeline\Events\InSiteDispatchRequested;
 use App\Modules\Pipeline\Events\ReminderDue;
 use App\Modules\Pipeline\Events\VisitAssigned;
+use App\Modules\Pipeline\Events\VisitDeclined;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -56,6 +58,7 @@ class CollaborationServiceProvider extends ServiceProvider
         ReminderDue::class => [SendDueReminderNotification::class],
         VisitAssigned::class => [SendVisitAssignedNotification::class, GrantFieldAgentChatAccess::class],
         InSiteDispatchRequested::class => [SendDispatchRequestNotification::class],
+        VisitDeclined::class => [SendVisitDeclinedNotification::class],
         MessageSent::class => [NotifyParticipantsOfMessage::class],
         VersementRecorded::class => [SendPaymentNotification::class],
         UnitPublished::class => [NotifyAgentsOfMatchingUnit::class, AnnounceNewUnit::class],
