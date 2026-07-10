@@ -13,7 +13,7 @@ export const useTasksStore = defineStore('tasks', {
   state: () => ({
     items: [],
     agents: [],
-    filters: { scope: 'mine', state: '', category: '', priority: '', overdue: false },
+    filters: { scope: 'mine', assigned_to: '', state: '', category: '', priority: '', overdue: false },
     loading: false,
     saving: false,
     error: '',
@@ -26,6 +26,7 @@ export const useTasksStore = defineStore('tasks', {
       // Offline snapshot covers the default view ("mine", no extra filters).
       const defaultView =
         this.filters.scope === 'mine' &&
+        !this.filters.assigned_to &&
         !this.filters.state &&
         !this.filters.category &&
         !this.filters.priority &&

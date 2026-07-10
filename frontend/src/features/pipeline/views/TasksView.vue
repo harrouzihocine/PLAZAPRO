@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
@@ -16,6 +17,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import OfflineStamp from '@/components/ui/OfflineStamp.vue'
 import FilterPanel from '@/components/ui/FilterPanel.vue'
 import { useTasksStore } from '@/features/pipeline/tasksStore'
+import { tasksApi } from '@/features/pipeline/api'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction, toastSuccess, toastError } from '@/composables/useConfirm'
 import { countActiveFilters, dateInputValue, intlLocale, todayInput } from '@/utils/format'
@@ -75,7 +77,10 @@ function applyTemplate(tpl) {
   form.repeat_every_hours = tpl.repeat
 }
 
-onMounted(() => store.fetch())
+onMounted(() => {
+  store.fetch()
+  openFromQuery() // arrived via a task notification's deep link
+})
 useRefreshable(() => store.fetch()) // pull-to-refresh (APK)
 
 // ── Board grouping: open tasks split into overdue / today / upcoming / no
@@ -128,6 +133,51 @@ async function quickAdd() {
     /* error surfaced via store.error */
   }
 }
+
+// ── Detail modal: click a row (or a task notification's ?task= deep link)
+// to see the full record — description, meta and the completion report.
+const route = useRoute()
+const router = useRouter()
+const detail = ref(null)
+
+async function openDetail(task) {
+  detail.value = task // instant paint from the row…
+  try {
+    detail.value = await tasksApi.get(task.id) // …then the full record (completed-by etc.)
+  } catch {
+    /* keep the row data — the modal is already useful */
+  }
+}
+
+async function openFromQuery() {
+  const id = Number(route.query.task)
+  if (!id) return
+  try {
+    detail.value = await tasksApi.get(id)
+  } catch {
+    toastError(t('tasks.loadFailed'))
+    closeDetail()
+  }
+}
+
+function closeDetail() {
+  detail.value = null
+  if (route.query.task) router.replace({ query: { ...route.query, task: undefined } })
+}
+
+function completeFromDetail() {
+  const task = detail.value
+  closeDetail()
+  openComplete(task)
+}
+
+async function cancelFromDetail() {
+  const task = detail.value
+  closeDetail()
+  await cancelTask(task)
+}
+
+watch(() => route.query.task, openFromQuery)
 
 // ── Completion report: done is never just a tick — the dialog asks what was
 // actually done, how it went, difficulties and time spent.
@@ -294,6 +344,15 @@ function formatDue(value) {
           @change="store.fetch()"
         />
         <BaseSelect
+          v-if="canAssign"
+          v-model="store.filters.assigned_to"
+          :placeholder="$t('tasks.anyUser')"
+          :aria-label="$t('pipeline.assignedTo')"
+          class="w-full sm:w-44"
+          :options="store.agents.map((a) => ({ value: a.id, label: a.name }))"
+          @change="store.fetch()"
+        />
+        <BaseSelect
           v-model="store.filters.state"
           :placeholder="$t('tasks.allStates')"
           :aria-label="$t('common.status')"
@@ -352,7 +411,8 @@ function formatDue(value) {
               <li
                 v-for="task in openGroups[group.key]"
                 :key="task.id"
-                class="flex items-center gap-3 px-4 py-3 sm:px-5"
+                class="flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-50 dark:hover:bg-surface-900 sm:px-5"
+                @click="openDetail(task)"
               >
                 <span
                   class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
@@ -403,7 +463,7 @@ function formatDue(value) {
                   size="small"
                   outlined
                   severity="success"
-                  @click="openComplete(task)"
+                  @click.stop="openComplete(task)"
                 />
                 <Button
                   icon="pi pi-ban"
@@ -412,7 +472,7 @@ function formatDue(value) {
                   size="small"
                   severity="danger"
                   :aria-label="$t('tasks.cancelConfirm')"
-                  @click="cancelTask(task)"
+                  @click.stop="cancelTask(task)"
                 />
               </li>
             </ul>
@@ -426,7 +486,12 @@ function formatDue(value) {
             {{ $t('status.done') }} ({{ doneTasks.length }})
           </h2>
           <ul class="divide-y divide-line">
-            <li v-for="task in doneTasks" :key="task.id" class="px-4 py-2.5 sm:px-5">
+            <li
+              v-for="task in doneTasks"
+              :key="task.id"
+              class="cursor-pointer px-4 py-2.5 transition-colors hover:bg-surface-50 dark:hover:bg-surface-900 sm:px-5"
+              @click="openDetail(task)"
+            >
               <p class="flex flex-wrap items-center gap-2">
                 <i class="pi pi-check-circle text-success" aria-hidden="true" />
                 <span class="truncate text-sm text-mute line-through">{{ task.title }}</span>
@@ -455,6 +520,122 @@ function formatDue(value) {
         </section>
       </div>
     </SectionCard>
+
+    <!-- Task details (row click / notification deep link) -->
+    <BaseModal v-if="detail" :title="detail.title" @close="closeDetail">
+      <div class="space-y-4">
+        <div class="flex flex-wrap items-center gap-2">
+          <span
+            class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium"
+            :class="categoryMeta[detail.category]?.chip ?? 'bg-surface-100 text-mute dark:bg-surface-800'"
+          >
+            <i :class="categoryMeta[detail.category]?.icon" aria-hidden="true" />
+            {{ $t(`tasks.categories.${detail.category}`) }}
+          </span>
+          <Tag
+            v-if="detail.state === 'open' && isOverdue(detail)"
+            :value="$t('tasks.groups.overdue')"
+            severity="danger"
+            icon="pi pi-exclamation-circle"
+          />
+          <Tag
+            v-else
+            :value="$t(`status.${detail.state}`)"
+            :severity="detail.state === 'done' ? 'success' : 'info'"
+          />
+          <Tag
+            v-if="detail.priority !== 'normal'"
+            :value="$t(`status.${detail.priority}`)"
+            :severity="prioritySeverity[detail.priority]"
+          />
+          <Tag
+            v-if="detail.repeat_every_hours"
+            :value="repeatLabel(detail.repeat_every_hours)"
+            severity="secondary"
+            icon="pi pi-replay"
+          />
+        </div>
+
+        <p v-if="detail.description" class="whitespace-pre-wrap text-sm text-ink">
+          {{ detail.description }}
+        </p>
+
+        <dl class="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+          <div>
+            <dt class="text-xs font-semibold uppercase tracking-wide text-mute">
+              {{ $t('pipeline.assignedTo') }}
+            </dt>
+            <dd class="mt-0.5 text-ink">{{ detail.assigned_to?.name ?? $t('clients.unassigned') }}</dd>
+          </div>
+          <div v-if="detail.created_by">
+            <dt class="text-xs font-semibold uppercase tracking-wide text-mute">
+              {{ $t('tasks.createdBy') }}
+            </dt>
+            <dd class="mt-0.5 text-ink">{{ detail.created_by.name }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-semibold uppercase tracking-wide text-mute">
+              {{ $t('pipeline.dueDate') }}
+            </dt>
+            <dd class="mt-0.5" :class="isOverdue(detail) ? 'font-medium text-danger' : 'text-ink'">
+              {{ formatDue(detail.due_at) }}
+            </dd>
+          </div>
+          <div v-if="detail.subject_label">
+            <dt class="text-xs font-semibold uppercase tracking-wide text-mute">
+              {{ $t('tasks.about') }}
+            </dt>
+            <dd class="mt-0.5 text-ink">{{ detail.subject_label }}</dd>
+          </div>
+        </dl>
+
+        <div
+          v-if="detail.state === 'done'"
+          class="space-y-2 rounded-xl border border-line bg-surface-50 p-4 dark:bg-surface-900"
+        >
+          <p class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-semibold uppercase tracking-wide text-mute">
+              {{ $t('tasks.completionReport') }}
+            </span>
+            <Tag
+              v-if="detail.completion_outcome"
+              :value="$t(`tasks.outcomes.${detail.completion_outcome}`)"
+              :severity="outcomeSeverity[detail.completion_outcome]"
+            />
+          </p>
+          <p v-if="detail.completion_summary" class="whitespace-pre-wrap text-sm text-ink">
+            {{ detail.completion_summary }}
+          </p>
+          <p v-if="detail.completion_difficulties" class="whitespace-pre-wrap text-sm text-mute">
+            <i class="pi pi-exclamation-triangle" aria-hidden="true" />
+            {{ detail.completion_difficulties }}
+          </p>
+          <p class="text-xs text-mute">
+            {{ formatDue(detail.completed_at) }}
+            <span v-if="detail.completed_by"> · {{ detail.completed_by.name }}</span>
+            <span v-if="detail.time_spent_minutes">
+              · {{ $t('tasks.minutesSpent', { n: detail.time_spent_minutes }) }}
+            </span>
+          </p>
+        </div>
+
+        <div v-if="detail.state === 'open'" class="flex justify-end gap-2 pt-1">
+          <Button
+            :label="$t('tasks.cancelConfirm')"
+            icon="pi pi-ban"
+            severity="danger"
+            text
+            @click="cancelFromDetail"
+          />
+          <Button
+            :label="$t('status.done')"
+            icon="pi pi-check"
+            severity="success"
+            @click="completeFromDetail"
+          />
+        </div>
+      </div>
+    </BaseModal>
 
     <!-- Completion report -->
     <BaseModal

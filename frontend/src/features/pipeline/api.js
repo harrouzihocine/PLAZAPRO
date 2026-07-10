@@ -185,6 +185,12 @@ export const tasksApi = {
     return data.data
   },
 
+  // Single task incl. completion report — backs the detail modal (?task= links).
+  async get(id) {
+    const { data } = await useApi().get(`/tasks/${id}`)
+    return data.data
+  },
+
   async create(payload) {
     const { data } = await useApi().post('/tasks', payload)
     return data.data

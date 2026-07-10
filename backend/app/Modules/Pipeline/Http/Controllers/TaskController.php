@@ -28,16 +28,17 @@ class TaskController extends Controller
     {
         $user = $request->user();
 
+        // Without the team layer the board is personal, whatever the requested
+        // scope or user filter; with it, an explicit assigned_to (the per-user
+        // filter) wins over the mine/team scope.
+        $assignedTo = $user->can('tasks.assign')
+            ? ($request->integer('assigned_to') ?: ($request->query('scope') === 'mine' ? $user->id : null))
+            : $user->id;
+
         $tasks = Task::query()
             ->with(['assignedTo', 'createdBy', 'subject'])
             ->active()
-            // Without the team layer the board is personal, whatever the
-            // requested scope; with it, scope=mine still narrows on demand.
-            ->when(
-                ! $user->can('tasks.assign') || $request->query('scope') === 'mine',
-                fn ($q) => $q->where('assigned_to', $user->id),
-            )
-            ->when($request->filled('assigned_to'), fn ($q) => $q->where('assigned_to', $request->integer('assigned_to')))
+            ->when($assignedTo, fn ($q) => $q->where('assigned_to', $assignedTo))
             ->when($request->filled('state'), fn ($q) => $q->where('state', $request->query('state')))
             ->when($request->filled('category'), fn ($q) => $q->where('category', $request->query('category')))
             ->when($request->filled('priority'), fn ($q) => $q->where('priority', $request->query('priority')))
@@ -47,6 +48,17 @@ class TaskController extends Controller
             ->get();
 
         return TaskResource::collection($tasks);
+    }
+
+    // The detail modal (notification deep-links land here): the full record
+    // including the completion report. Same audience rule as touching it.
+    public function show(Request $request, Task $task): TaskResource
+    {
+        $this->authorizeTouch($request->user(), $task);
+
+        return new TaskResource(
+            $task->load(['assignedTo', 'createdBy', 'completedBy', 'subject']),
+        );
     }
 
     // One task per assignee (assigned_to_ids fans out); always a collection.

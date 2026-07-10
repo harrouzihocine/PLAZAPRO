@@ -55,7 +55,7 @@ class CreateTask
                     kind: 'task_assigned',
                     key: 'task_assigned',
                     params: ['name' => $actor->name, 'title' => $task->title],
-                    link: '/tasks',
+                    link: '/tasks?task='.$task->id,
                     subjectType: Task::class,
                     subjectId: $task->id,
                 ));

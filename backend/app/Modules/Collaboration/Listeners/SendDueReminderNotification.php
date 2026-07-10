@@ -62,7 +62,7 @@ class SendDueReminderNotification implements ShouldQueue
             kind: 'reminder',
             key: 'task_reminder',
             params: ['title' => $task->title],
-            link: '/tasks',
+            link: '/tasks?task='.$task->id,
             subjectType: Task::class,
             subjectId: $task->id,
         ));

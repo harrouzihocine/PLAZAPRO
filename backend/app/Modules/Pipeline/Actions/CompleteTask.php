@@ -60,7 +60,7 @@ class CompleteTask
                 kind: 'task_assigned',
                 key: 'task_assigned',
                 params: ['name' => $actor->name, 'title' => $next->title],
-                link: '/tasks',
+                link: '/tasks?task='.$next->id,
                 subjectType: Task::class,
                 subjectId: $next->id,
             ));
@@ -93,7 +93,7 @@ class CompleteTask
                 'title' => $task->title,
                 'outcome' => '@notifications.task_outcome.'.$task->completion_outcome->value,
             ],
-            link: '/tasks',
+            link: '/tasks?task='.$task->id,
             subjectType: Task::class,
             subjectId: $task->id,
         ));

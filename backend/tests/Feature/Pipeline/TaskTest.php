@@ -193,6 +193,57 @@ class TaskTest extends TestCase
         Notification::assertNotSentTo($me, DomainNotification::class);
     }
 
+    public function test_a_task_can_be_opened_with_its_completion_report(): void
+    {
+        $me = $this->userWithPermissions(['tasks.manage']);
+        $task = Task::factory()->create(['assigned_to' => $me->id]);
+        Sanctum::actingAs($me);
+
+        $this->postJson("/api/v1/tasks/{$task->id}/complete", [
+            'summary' => 'Posted the reel.',
+            'outcome' => 'full',
+        ])->assertOk();
+
+        $this->getJson("/api/v1/tasks/{$task->id}")
+            ->assertOk()
+            ->assertJsonPath('data.completion_summary', 'Posted the reel.')
+            ->assertJsonPath('data.completed_by.id', $me->id);
+    }
+
+    public function test_opening_someone_elses_task_needs_tasks_assign(): void
+    {
+        $task = Task::factory()->create();
+
+        Sanctum::actingAs($this->userWithPermissions(['tasks.manage']));
+        $this->getJson("/api/v1/tasks/{$task->id}")->assertForbidden();
+
+        Sanctum::actingAs($this->userWithPermissions(['tasks.manage', 'tasks.assign']));
+        $this->getJson("/api/v1/tasks/{$task->id}")->assertOk();
+    }
+
+    public function test_the_user_filter_narrows_the_team_board_for_assign_holders_only(): void
+    {
+        $agent = User::factory()->create();
+        Task::factory()->create(['assigned_to' => $agent->id, 'title' => 'Theirs']);
+
+        $manager = $this->userWithPermissions(['tasks.manage', 'tasks.assign']);
+        Task::factory()->create(['assigned_to' => $manager->id, 'title' => 'Managers own']);
+        Sanctum::actingAs($manager);
+
+        // The per-user filter wins over the scope select.
+        $this->getJson("/api/v1/tasks?scope=mine&assigned_to={$agent->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title', 'Theirs');
+
+        // Without the team layer the filter cannot widen the personal board.
+        $me = $this->userWithPermissions(['tasks.manage']);
+        Sanctum::actingAs($me);
+        $this->getJson("/api/v1/tasks?assigned_to={$agent->id}")
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
     public function test_without_tasks_assign_the_board_is_personal_even_on_team_scope(): void
     {
         $me = $this->userWithPermissions(['tasks.manage']);
