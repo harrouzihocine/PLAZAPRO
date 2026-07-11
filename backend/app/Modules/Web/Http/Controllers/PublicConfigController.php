@@ -46,17 +46,18 @@ class PublicConfigController extends Controller
                 'ar' => $value('website_about_ar'),
             ],
             'stats' => $this->stats(),
-            'hero' => $this->heroVideo($value('website_hero_media_id')),
+            'hero' => $this->hero($value('website_hero_media_id')),
             'form_token' => FormToken::issue(),
         ]]);
     }
 
     /**
-     * The landing hero video, when the owner picked one AND it is publicly
-     * streamable (video, public collection, published project). A stale or
-     * private pick silently degrades to the photo hero — never a dead URL.
+     * The landing hero backdrop the owner picked — a photo or a video, as long
+     * as it is publicly streamable (public collection, published project). A
+     * stale or private pick silently degrades to the default cover hero —
+     * never a dead URL.
      */
-    private function heroVideo(?string $mediaId): ?array
+    private function hero(?string $mediaId): ?array
     {
         if ($mediaId === null) {
             return null;
@@ -64,19 +65,31 @@ class PublicConfigController extends Controller
 
         $media = Media::find((int) $mediaId);
 
-        if ($media === null || $media->type !== MediaType::Video || ! PublicMediaGate::allows($media)) {
+        if ($media === null || ! PublicMediaGate::allows($media)) {
             return null;
         }
 
         $v = $media->updated_at ? '?v='.$media->updated_at->getTimestamp() : '';
 
         // Relative on purpose — see PublicMediaResource.
-        return [
-            'video_url' => route('public.media.file', $media->id, false).$v,
-            'poster_url' => $media->thumb_path !== null
-                ? route('public.media.thumb', $media->id, false).$v
-                : null,
-        ];
+        if ($media->type === MediaType::Video) {
+            return [
+                'type' => 'video',
+                'video_url' => route('public.media.file', $media->id, false).$v,
+                'poster_url' => $media->thumb_path !== null
+                    ? route('public.media.thumb', $media->id, false).$v
+                    : null,
+            ];
+        }
+
+        if ($media->type === MediaType::Photo) {
+            return [
+                'type' => 'photo',
+                'image_url' => route('public.media.file', $media->id, false).$v,
+            ];
+        }
+
+        return null; // plans (PDFs) pass the gate but make no hero
     }
 
     /** Headline numbers for the landing hero — published inventory only. */

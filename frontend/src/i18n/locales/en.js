@@ -1293,8 +1293,12 @@ export default {
   },
   // ── Settings area ────────────────────────────────────────────────────
   settings: {
-    websiteHeroLabel: "Hero video (media ID)",
-    websiteHeroHint: "The ID of a video uploaded on a PUBLISHED project (shown in its gallery). The landing page plays it as the hero background; leave empty for the photo hero.",
+    websiteHeroPickProject: "Choose a published project…",
+    websiteHeroClear: "Remove",
+    websiteHeroNoProjects: "Publish a project first — the hero is picked from published projects' galleries.",
+    websiteHeroNoMedia: "This project has no photos or videos yet.",
+    websiteHeroLabel: "Landing hero — photo or video",
+    websiteHeroHint: "The chosen photo or video becomes the landing page's full-screen background. Only media of published projects can be picked; leave empty to use the best project cover automatically.",
     websiteProfile: "Public website",
     websiteProfileHint: "Contact channels and the presentation text shown to visitors on the public site.",
     websiteWhatsappLabel: "WhatsApp number",

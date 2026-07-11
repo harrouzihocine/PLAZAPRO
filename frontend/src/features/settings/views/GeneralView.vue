@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import Button from 'primevue/button'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
+import HeroMediaPicker from '@/features/settings/components/HeroMediaPicker.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import { toastError, toastSuccess } from '@/composables/useConfirm'
@@ -261,10 +262,7 @@ async function saveWebsite() {
           <p class="mt-1.5 text-xs text-mute">{{ $t('settings.websiteAboutHint') }}</p>
         </div>
 
-        <div>
-          <BaseInput v-model="websiteHeroMediaId" :label="$t('settings.websiteHeroLabel')" type="number" min="1" />
-          <p class="mt-1.5 text-xs text-mute">{{ $t('settings.websiteHeroHint') }}</p>
-        </div>
+        <HeroMediaPicker v-model="websiteHeroMediaId" />
 
         <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="savingWebsite" />
       </form>

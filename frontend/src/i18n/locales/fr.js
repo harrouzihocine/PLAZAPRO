@@ -1292,8 +1292,12 @@ export default {
   },
   // ── Espace Paramètres ────────────────────────────────────────────────
   settings: {
-    websiteHeroLabel: "Vidéo d'accueil (ID média)",
-    websiteHeroHint: "L'ID d'une vidéo téléversée sur un projet PUBLIÉ (visible dans sa galerie). La page d'accueil la joue en arrière-plan ; laisser vide pour la photo.",
+    websiteHeroPickProject: "Choisir un projet publié…",
+    websiteHeroClear: "Retirer",
+    websiteHeroNoProjects: "Publiez d'abord un projet — l'arrière-plan se choisit dans les galeries des projets publiés.",
+    websiteHeroNoMedia: "Ce projet n'a pas encore de photos ni de vidéos.",
+    websiteHeroLabel: "Arrière-plan d'accueil — photo ou vidéo",
+    websiteHeroHint: "La photo ou la vidéo choisie devient l'arrière-plan plein écran de la page d'accueil. Seuls les médias des projets publiés sont proposés ; laisser vide pour utiliser automatiquement la meilleure couverture.",
     websiteProfile: "Site web public",
     websiteProfileHint: "Les canaux de contact et le texte de présentation affichés aux visiteurs du site public.",
     websiteWhatsappLabel: "Numéro WhatsApp",
