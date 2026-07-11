@@ -75,7 +75,9 @@ final class PlazaApi {
 
             if (body != null) {
                 conn.setDoOutput(true);
-                conn.getOutputStream().write(body.toString().getBytes(StandardCharsets.UTF_8));
+                try (java.io.OutputStream out = conn.getOutputStream()) {
+                    out.write(body.toString().getBytes(StandardCharsets.UTF_8));
+                }
             }
 
             int status = conn.getResponseCode();
@@ -131,9 +133,13 @@ final class PlazaApi {
 
         String origin = FALLBACK_ORIGIN;
         try (InputStream in = context.getAssets().open("capacitor.config.json")) {
-            byte[] raw = new byte[in.available()];
-            int read = in.read(raw);
-            JSONObject config = new JSONObject(new String(raw, 0, Math.max(read, 0), StandardCharsets.UTF_8));
+            java.io.ByteArrayOutputStream raw = new java.io.ByteArrayOutputStream();
+            byte[] chunk = new byte[4096];
+            int read;
+            while ((read = in.read(chunk)) != -1) {
+                raw.write(chunk, 0, read);
+            }
+            JSONObject config = new JSONObject(raw.toString("UTF-8"));
             String url = config.getJSONObject("server").getString("url");
             if (url.startsWith("http")) {
                 origin = url.replaceAll("/+$", "");

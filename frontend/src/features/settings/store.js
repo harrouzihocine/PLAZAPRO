@@ -59,6 +59,16 @@ export const useAuthStore = defineStore('auth', {
           clearUserSnapshots(leavingUserId),
         )
       }
+      // Realtime and GPS are per-user too: kill the authenticated websocket
+      // (and its private-channel subscriptions) and every duty tracker — the
+      // APK's foreground location service included — so nothing keeps acting
+      // for a user who is gone (logout AND 401 expiry land here). Dynamic
+      // imports keep these out of the boot chunk and dodge the import cycle
+      // (useDutyTracking imports this store back).
+      import('@/composables/useDutyTracking').then(({ teardownDutyTracking }) =>
+        teardownDutyTracking(),
+      )
+      import('@/composables/useEcho').then(({ disconnectEcho }) => disconnectEcho())
     },
 
     async login(login, password) {

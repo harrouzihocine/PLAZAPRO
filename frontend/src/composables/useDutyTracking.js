@@ -46,6 +46,7 @@ let lastLat = null
 let lastLng = null
 let posting = false
 let locateChannel = null
+let locateUserId = null
 let nativeActive = false
 let retryArmed = false
 
@@ -76,6 +77,7 @@ async function postFix(coords) {
     lastLat = coords.latitude
     lastLng = coords.longitude
     lastFixAt.value = new Date()
+    geoDenied.value = false // a fix went through — any earlier denial is over
     // The server knows whether an en-route leg is live — obey its verdict.
     serverPrecision = Boolean(data?.precision)
     syncPrecisionWatch()
@@ -162,22 +164,37 @@ function syncPrecisionWatch() {
 
 // --- Dispatcher pull ----------------------------------------------------------
 
+function onLocatePing() {
+  // The shell answers the FCM twin natively — don't double-post.
+  if (!onDuty.value || nativeActive) return
+  burstUntil = Date.now() + BURST_MS
+  grabFix({ precise: true })
+  syncPrecisionWatch()
+  // Nothing re-evaluates on its own anymore — close the window explicitly.
+  if (burstTimer) clearTimeout(burstTimer)
+  burstTimer = setTimeout(syncPrecisionWatch, BURST_MS + 1000)
+}
+
 function listenForLocate() {
-  if (locateChannel) return
-  const echo = getEcho()
   const userId = useAuthStore().user?.id
-  if (!echo || !userId) return
+  if (!userId) return
+  // Field phones are shared: a different user logged in since the last
+  // subscription must not keep answering pings aimed at the previous one.
+  if (locateChannel && locateUserId === userId) return
+  detachLocate()
+  const echo = getEcho()
+  if (!echo) return
   locateChannel = echo.private(`users.${userId}`)
-  locateChannel.listen('.duty.locate', () => {
-    // The shell answers the FCM twin natively — don't double-post.
-    if (!onDuty.value || nativeActive) return
-    burstUntil = Date.now() + BURST_MS
-    grabFix({ precise: true })
-    syncPrecisionWatch()
-    // Nothing re-evaluates on its own anymore — close the window explicitly.
-    if (burstTimer) clearTimeout(burstTimer)
-    burstTimer = setTimeout(syncPrecisionWatch, BURST_MS + 1000)
-  })
+  locateUserId = userId
+  locateChannel.listen('.duty.locate', onLocatePing)
+}
+
+function detachLocate() {
+  // Only the listener: `users.{id}` carries the bell/chat streams too, so the
+  // channel itself is never left from here.
+  locateChannel?.stopListening('.duty.locate', onLocatePing)
+  locateChannel = null
+  locateUserId = null
 }
 
 function stopAll() {
@@ -200,6 +217,21 @@ function stopAll() {
     }
     nativeActive = false
   }
+}
+
+/**
+ * Full reset on logout (authStore.clear): stop every tracker — including the
+ * native foreground service — drop the locate listener and forget whose duty
+ * state this module mirrors, so the next login starts from a clean slate.
+ */
+export function teardownDutyTracking() {
+  stopAll()
+  detachLocate()
+  onDuty.value = false
+  dutySince.value = null
+  lastFixAt.value = null
+  geoDenied.value = false
+  enRoute = false
 }
 
 // --- Native shell hand-off ----------------------------------------------------

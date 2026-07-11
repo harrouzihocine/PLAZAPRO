@@ -100,10 +100,16 @@ public class DutyLocationService extends Service implements LocationListener {
         if (running == null) {
             // The OS killed the service but the server says this agent is on
             // duty (locate pings only go to on-duty agents) — heal: restart
-            // and burst as soon as it is up.
+            // and burst as soon as it is up. Android 12+ may refuse a
+            // foreground start from the background (normal-priority FCM,
+            // Android 14 location limits) — a refusal must not crash the
+            // FCM handler; the next app open restarts the service anyway.
             if (hasLocationPermission(context)) {
                 pendingBurst = true;
-                start(context);
+                try {
+                    start(context);
+                } catch (Exception ignored) {
+                }
             }
             return;
         }
@@ -286,7 +292,11 @@ public class DutyLocationService extends Service implements LocationListener {
                     body.put("accuracy_m", Math.min(65000, Math.round(location.getAccuracy())));
                 }
                 PlazaApi.Result result = PlazaApi.postForResult(this, "/me/positions", body, null);
-                if (result.status == 409) {
+                // 409 = the server ended duty; 401 = the session died (logout,
+                // expiry) and no later post can succeed — either way this
+                // service has no business running. Duty-on at the next login
+                // starts it again (useDutyTracking's apply()).
+                if (result.status == 409 || result.status == 401) {
                     stopSelf();
                     return;
                 }
@@ -347,10 +357,12 @@ public class DutyLocationService extends Service implements LocationListener {
     @Override
     public void onDestroy() {
         instance = null;
-        handler.removeCallbacks(locationCheck);
-        handler.removeCallbacks(snapshotTick);
+        // Everything pending, including the burst-window closers posted as
+        // method references (removeCallbacks can't match those by instance).
+        handler.removeCallbacksAndMessages(null);
         snapshotScheduled = false;
         if (locationManager != null) locationManager.removeUpdates(this);
+        listening = false;
         if (poster != null) poster.shutdown();
         super.onDestroy();
     }
