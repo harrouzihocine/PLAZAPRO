@@ -172,9 +172,9 @@ function unitLabel(u) {
   // agent quotes the right number without opening the unit.
   const prices = [
     u.price_semi_fini != null
-      ? `${t('inventory.finishSemiShort')} ${formatMoney(u.price_semi_fini)}`
+      ? `${t('inventory.finishSemiFini')} ${formatMoney(u.price_semi_fini)}`
       : null,
-    u.price_fini != null ? `${t('inventory.finishFiniShort')} ${formatMoney(u.price_fini)}` : null,
+    u.price_fini != null ? `${t('inventory.finishFini')} ${formatMoney(u.price_fini)}` : null,
   ].filter(Boolean)
 
   return [
