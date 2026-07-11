@@ -17,6 +17,10 @@ Real-estate CRM: Laravel (`backend/`) + Vue 3 (`frontend/`), MySQL, Docker.
   Safe mode only: read-only access (`SELECT`, `SHOW`, `EXPLAIN`, `mysqldump`) is fine.
 - Schema changes reach prod **only** via `php artisan migrate --force` inside a
   deploy the user explicitly asked for (`scripts/deploy.sh` — it snapshots the DB first).
+- New permissions ship as idempotent one-shot seeders registered in
+  `Database\Seeders\ProductionSeeder` (deploy.sh runs it after migrate on every
+  deploy) — never as manual post-deploy steps. Follow its docblock rules
+  (updateOrCreate, backfills gated on `wasRecentlyCreated`, no factories).
 - Anything experimental — tests, seeders, verification scripts, data fixes you
   want to try — runs against the **dev** stack (`docker compose exec -T app …`
   from `/home/plazapro/www`, DB `plaza` on `plaza-mysql-1`) or the `plaza_test`

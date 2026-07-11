@@ -59,6 +59,10 @@ PLAZA_BACKUP_DIR="${PLAZA_BACKUP_DIR:-$HOME/backups/$project}" "$ROOT/scripts/ba
 echo "==> Maintenance window: migrate + rebuild caches"
 docker compose run --rm app php artisan down || true
 docker compose run --rm app php artisan migrate --force
+# Reconcile idempotent reference state (new permissions etc.) so a permission
+# split ships with the code that gates on it — see Database\Seeders\ProductionSeeder
+# for the strict rules on what may live there.
+docker compose run --rm app php artisan db:seed --class=ProductionSeeder --force
 # config / routes / views / events all cached for prod speed.
 docker compose run --rm app php artisan optimize
 

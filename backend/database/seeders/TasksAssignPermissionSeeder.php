@@ -31,8 +31,12 @@ class TasksAssignPermissionSeeder extends Seeder
             ],
         );
 
-        Role::whereIn('slug', ['super-admin', 'admin', 'manager'])
-            ->each(fn (Role $role) => $role->permissions()->syncWithoutDetaching($permission->id));
+        // First creation only — re-runs (ProductionSeeder rides every deploy)
+        // must respect an owner who unticked the grant in the role editor.
+        if ($permission->wasRecentlyCreated) {
+            Role::whereIn('slug', ['super-admin', 'admin', 'manager'])
+                ->each(fn (Role $role) => $role->permissions()->syncWithoutDetaching($permission->id));
+        }
 
         $granted = Role::whereHas('permissions', fn ($q) => $q->where('slug', 'tasks.assign'))
             ->pluck('slug')->join(', ');
