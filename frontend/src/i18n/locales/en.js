@@ -301,6 +301,8 @@ export default {
   },
   // ── Inventory vocabulary (fields shared across features) ─────────────
   inventory: {
+    websiteProgress: "Construction progress",
+    websiteProgressHint: "Shown as a progress bar on the public site. Clear it to hide the bar.",
     websitePanel: "Public website",
     websitePublish: "Show this project on the public website",
     websiteShowPrices: "Show prices publicly",
@@ -1291,6 +1293,8 @@ export default {
   },
   // ── Settings area ────────────────────────────────────────────────────
   settings: {
+    websiteHeroLabel: "Hero video (media ID)",
+    websiteHeroHint: "The ID of a video uploaded on a PUBLISHED project (shown in its gallery). The landing page plays it as the hero background; leave empty for the photo hero.",
     websiteProfile: "Public website",
     websiteProfileHint: "Contact channels and the presentation text shown to visitors on the public site.",
     websiteWhatsappLabel: "WhatsApp number",
@@ -2128,6 +2132,21 @@ export default {
 
   // ── Public showcase site (/plaza) ─────────────────────────────────
   showcase: {
+    compare: {
+      count: "{n} selected",
+      open: "Compare",
+      clear: "Clear selection",
+      title: "Compare apartments",
+      limit: "Comparison shows the first 3 selected apartments.",
+      block: "Block",
+      area: "Area",
+      heart: "Add to comparison",
+    },
+    grid: {
+      kicker: "Pick your apartment",
+      title: "The building at a glance",
+      floor: "Floor",
+    },
     nav: {
       home: "Home",
       projects: "Our Projects",

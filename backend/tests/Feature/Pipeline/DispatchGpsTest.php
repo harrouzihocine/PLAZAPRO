@@ -19,6 +19,7 @@ use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -161,6 +162,12 @@ class DispatchGpsTest extends TestCase
 
     public function test_the_agent_walks_the_lifecycle_and_strangers_cannot(): void
     {
+        // 10:00 sharp: the 20:00 visit is a far-future slot, so accept must
+        // NOT auto-promote to en_route (that hands-free shortcut is for
+        // imminent visits only — asserted in the next test). Without freezing,
+        // any test run after 19:00 crossed the one-hour imminence line.
+        $this->travelTo(now()->startOfDay()->addHours(10));
+
         $agent = $this->userWith([], isAgent: true);
         $other = $this->userWith([], isAgent: true);
         $visit = $this->assignedVisit($agent);
@@ -180,6 +187,24 @@ class DispatchGpsTest extends TestCase
         $first = $visit->fresh()->accepted_at;
         $this->postJson("/api/v1/visits/{$visit->id}/accept")->assertOk();
         $this->assertTrue($first->equalTo($visit->fresh()->accepted_at));
+    }
+
+    public function test_accepting_an_imminent_visit_goes_straight_en_route(): void
+    {
+        // 19:30: the 20:00 slot is due within the hour — accepting means
+        // "I'm going now", so the en_route stamp rides along (hands-free round).
+        $this->travelTo(now()->startOfDay()->addHours(19)->addMinutes(30));
+
+        $agent = $this->userWith([], isAgent: true);
+        $visit = $this->assignedVisit($agent);
+
+        Sanctum::actingAs($agent);
+        $this->postJson("/api/v1/visits/{$visit->id}/accept")->assertOk()
+            ->assertJsonPath('data.status', 'en_route');
+
+        $visit->refresh();
+        $this->assertNotNull($visit->accepted_at);
+        $this->assertNotNull($visit->en_route_at);
     }
 
     public function test_declining_returns_the_plan_to_the_pool_with_the_reason(): void
@@ -389,7 +414,7 @@ class DispatchGpsTest extends TestCase
 
     public function test_locate_pings_only_on_duty_agents_and_throttles(): void
     {
-        \Illuminate\Support\Facades\Cache::flush();
+        Cache::flush();
         $dispatcher = $this->userWith(['visits.dispatch']);
         $agent = $this->userWith([], isAgent: true);
 
@@ -431,7 +456,7 @@ class DispatchGpsTest extends TestCase
     public function test_nudge_and_location_lost_close_the_duty_loop(): void
     {
         Notification::fake();
-        \Illuminate\Support\Facades\Cache::flush();
+        Cache::flush();
 
         $dispatcher = $this->userWith(['visits.dispatch']);
         $agent = $this->userWith([], isAgent: true);

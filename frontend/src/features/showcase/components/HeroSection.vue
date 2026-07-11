@@ -15,6 +15,8 @@ const props = defineProps({
 const showcase = useShowcaseStore()
 
 const backdrop = computed(() => props.projects.find((p) => p.cover)?.cover ?? null)
+// The owner-picked hero video (config re-validates it is publicly streamable).
+const heroVideo = computed(() => showcase.config?.hero ?? null)
 const stats = computed(() => showcase.stats)
 
 const statItems = computed(() => {
@@ -29,8 +31,19 @@ const statItems = computed(() => {
 
 <template>
   <section class="relative flex min-h-[92vh] items-center justify-center overflow-hidden bg-surface-950">
+    <!-- Cinematic backdrop: owner's hero video > best cover photo > gradient -->
+    <video
+      v-if="heroVideo"
+      :src="heroVideo.video_url"
+      :poster="heroVideo.poster_url ?? backdrop?.file_url ?? undefined"
+      autoplay
+      muted
+      loop
+      playsinline
+      class="absolute inset-0 h-full w-full object-cover"
+    />
     <img
-      v-if="backdrop"
+      v-else-if="backdrop"
       :src="backdrop.file_url"
       :style="{ objectPosition: `${backdrop.focus_x}% ${backdrop.focus_y}%` }"
       alt=""

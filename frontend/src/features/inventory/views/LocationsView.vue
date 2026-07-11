@@ -5,6 +5,7 @@ import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
 import InputText from 'primevue/inputtext'
 import Skeleton from 'primevue/skeleton'
+import Slider from 'primevue/slider'
 import ToggleSwitch from 'primevue/toggleswitch'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseMultiSelect from '@/components/base/BaseMultiSelect.vue'
@@ -67,6 +68,7 @@ const blank = {
   show_availability: true,
   marketing_tagline: { en: '', fr: '', ar: '' },
   marketing_description: { en: '', fr: '', ar: '' },
+  construction_progress: null,
 }
 const form = reactive(structuredClone(blank))
 // Which language tab of the marketing copy is being edited.
@@ -133,6 +135,7 @@ function openEdit(loc) {
     show_availability: loc.show_availability !== false,
     marketing_tagline: { en: '', fr: '', ar: '', ...(loc.marketing_tagline ?? {}) },
     marketing_description: { en: '', fr: '', ar: '', ...(loc.marketing_description ?? {}) },
+    construction_progress: loc.construction_progress ?? null,
   })
   loadFormCommunes(loc.wilaya_id)
   editingId.value = loc.id
@@ -172,6 +175,7 @@ async function submit() {
     show_availability: form.show_availability,
     marketing_tagline: cleanTranslations(form.marketing_tagline),
     marketing_description: cleanTranslations(form.marketing_description),
+    construction_progress: form.construction_progress ?? null,
   }
   try {
     if (editingId.value) {
@@ -489,6 +493,33 @@ function toggleArchived() {
                 :label="$t('inventory.websiteDescription')"
                 :rows="4"
               />
+
+              <!-- Construction advancement, shown as a progress bar on the site -->
+              <div>
+                <div class="mb-2 flex items-center justify-between">
+                  <span class="text-sm font-medium text-ink">{{ $t('inventory.websiteProgress') }}</span>
+                  <span class="num text-sm font-semibold" :class="form.construction_progress === null ? 'text-mute' : 'text-primary-500'">
+                    {{ form.construction_progress === null ? $t('common.none') : `${form.construction_progress}%` }}
+                  </span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <Slider
+                    :model-value="form.construction_progress ?? 0"
+                    class="w-full"
+                    :step="5"
+                    @update:model-value="form.construction_progress = $event"
+                  />
+                  <button
+                    v-if="form.construction_progress !== null"
+                    type="button"
+                    class="text-xs text-mute hover:text-danger"
+                    :aria-label="$t('common.cancel')"
+                    @click="form.construction_progress = null"
+                  ><i class="pi pi-times" aria-hidden="true" /></button>
+                </div>
+                <p class="mt-1.5 text-xs text-mute">{{ $t('inventory.websiteProgressHint') }}</p>
+              </div>
+
               <p class="text-xs text-mute">{{ $t('inventory.websiteHint') }}</p>
             </template>
           </div>

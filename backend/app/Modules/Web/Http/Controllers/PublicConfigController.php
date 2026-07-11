@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Modules\Web\Http\Controllers;
 
 use App\Core\Enums\RecordStatus;
+use App\Modules\Inventory\Enums\MediaType;
 use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Models\Location;
+use App\Modules\Inventory\Models\Media;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Settings\Models\AppSetting;
 use App\Modules\Web\Support\FormToken;
+use App\Modules\Web\Support\PublicMediaGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 
@@ -43,8 +46,37 @@ class PublicConfigController extends Controller
                 'ar' => $value('website_about_ar'),
             ],
             'stats' => $this->stats(),
+            'hero' => $this->heroVideo($value('website_hero_media_id')),
             'form_token' => FormToken::issue(),
         ]]);
+    }
+
+    /**
+     * The landing hero video, when the owner picked one AND it is publicly
+     * streamable (video, public collection, published project). A stale or
+     * private pick silently degrades to the photo hero — never a dead URL.
+     */
+    private function heroVideo(?string $mediaId): ?array
+    {
+        if ($mediaId === null) {
+            return null;
+        }
+
+        $media = Media::find((int) $mediaId);
+
+        if ($media === null || $media->type !== MediaType::Video || ! PublicMediaGate::allows($media)) {
+            return null;
+        }
+
+        $v = $media->updated_at ? '?v='.$media->updated_at->getTimestamp() : '';
+
+        // Relative on purpose — see PublicMediaResource.
+        return [
+            'video_url' => route('public.media.file', $media->id, false).$v,
+            'poster_url' => $media->thumb_path !== null
+                ? route('public.media.thumb', $media->id, false).$v
+                : null,
+        ];
     }
 
     /** Headline numbers for the landing hero — published inventory only. */

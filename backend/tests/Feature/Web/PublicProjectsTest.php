@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Web;
 
 use App\Modules\Inventory\Models\Location;
+use App\Modules\Inventory\Models\Media;
 use App\Modules\Inventory\Models\Unit;
+use App\Modules\Settings\Models\AppSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -128,5 +130,31 @@ class PublicProjectsTest extends TestCase
         $this->assertNotEmpty($response->json('data.form_token'));
         $this->assertArrayHasKey('company', $response->json('data'));
         $this->assertArrayHasKey('stats', $response->json('data'));
+    }
+
+    public function test_hero_video_is_emitted_only_when_publicly_streamable(): void
+    {
+        $published = Location::factory()->create(['is_published' => true]);
+        $hidden = Location::factory()->create(['is_published' => false]);
+
+        $video = Media::factory()->create([
+            'mediable_type' => 'location', 'mediable_id' => $published->id,
+            'collection' => 'videos', 'type' => 'video', 'mime_type' => 'video/mp4',
+        ]);
+
+        AppSetting::set('website_hero_media_id', (string) $video->id);
+        $this->assertNotNull($this->getJson('/api/v1/public/config')->json('data.hero.video_url'));
+
+        // A photo pick or a video on an unpublished project degrades to null.
+        $photo = Media::factory()->create(['mediable_type' => 'location', 'mediable_id' => $published->id]);
+        AppSetting::set('website_hero_media_id', (string) $photo->id);
+        $this->assertNull($this->getJson('/api/v1/public/config')->json('data.hero'));
+
+        $privateVideo = Media::factory()->create([
+            'mediable_type' => 'location', 'mediable_id' => $hidden->id,
+            'collection' => 'videos', 'type' => 'video', 'mime_type' => 'video/mp4',
+        ]);
+        AppSetting::set('website_hero_media_id', (string) $privateVideo->id);
+        $this->assertNull($this->getJson('/api/v1/public/config')->json('data.hero'));
     }
 }

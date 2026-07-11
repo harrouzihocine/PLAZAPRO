@@ -46,6 +46,10 @@ class AppSettingController extends Controller
         'website_about_en' => ['sometimes', 'nullable', 'string', 'max:5000'],
         'website_about_fr' => ['sometimes', 'nullable', 'string', 'max:5000'],
         'website_about_ar' => ['sometimes', 'nullable', 'string', 'max:5000'],
+        // Landing hero video: a media id (video, public collection) living on a
+        // PUBLISHED project — PublicConfigController re-checks all of that
+        // before emitting URLs, so a stale id degrades to the photo hero.
+        'website_hero_media_id' => ['sometimes', 'nullable', 'integer', 'exists:media,id'],
         // The dispatch GPS layer: site geofence radius (auto check-in/out),
         // how long an assignment may sit unaccepted / an arrival may run late
         // before the dispatchers are nudged, and breadcrumb retention.

@@ -300,6 +300,8 @@ export default {
   },
   // ── Vocabulaire inventaire (champs partagés) ─────────────────────────
   inventory: {
+    websiteProgress: "Avancement des travaux",
+    websiteProgressHint: "Affiché comme barre de progression sur le site public. Effacez pour masquer la barre.",
     websitePanel: "Site web public",
     websitePublish: "Afficher ce projet sur le site public",
     websiteShowPrices: "Afficher les prix publiquement",
@@ -1290,6 +1292,8 @@ export default {
   },
   // ── Espace Paramètres ────────────────────────────────────────────────
   settings: {
+    websiteHeroLabel: "Vidéo d'accueil (ID média)",
+    websiteHeroHint: "L'ID d'une vidéo téléversée sur un projet PUBLIÉ (visible dans sa galerie). La page d'accueil la joue en arrière-plan ; laisser vide pour la photo.",
     websiteProfile: "Site web public",
     websiteProfileHint: "Les canaux de contact et le texte de présentation affichés aux visiteurs du site public.",
     websiteWhatsappLabel: "Numéro WhatsApp",
@@ -2127,6 +2131,21 @@ export default {
 
   // ── Public showcase site (/plaza) ─────────────────────────────────
   showcase: {
+    compare: {
+      count: "{n} sélectionnés",
+      open: "Comparer",
+      clear: "Vider la sélection",
+      title: "Comparer les appartements",
+      limit: "La comparaison affiche les 3 premiers appartements sélectionnés.",
+      block: "Bloc",
+      area: "Surface",
+      heart: "Ajouter à la comparaison",
+    },
+    grid: {
+      kicker: "Choisissez votre appartement",
+      title: "L'immeuble en un coup d'œil",
+      floor: "Étage",
+    },
     nav: {
       home: "Accueil",
       projects: "Nos projets",

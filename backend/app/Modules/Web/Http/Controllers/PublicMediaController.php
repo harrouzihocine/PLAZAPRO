@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Web\Http\Controllers;
 
 use App\Modules\Inventory\Enums\MediaType;
-use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Media;
-use App\Modules\Inventory\Models\Unit;
 use App\Modules\Inventory\Support\StreamsMediaFiles;
+use App\Modules\Web\Support\PublicMediaGate;
 use Illuminate\Routing\Controller;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -55,20 +54,6 @@ class PublicMediaController extends Controller
 
     private function authorizePublic(Media $media): void
     {
-        abort_unless($media->isActive(), 404);
-        abort_unless(in_array($media->collection, PublicProjectController::PUBLIC_COLLECTIONS, true), 404);
-
-        $mediable = $media->mediable;
-
-        $location = match (true) {
-            $mediable instanceof Location => $mediable,
-            $mediable instanceof Unit => $mediable->location,
-            default => null,
-        };
-
-        abort_unless(
-            $location !== null && $location->isActive() && $location->is_published,
-            404,
-        );
+        abort_unless(PublicMediaGate::allows($media), 404);
     }
 }

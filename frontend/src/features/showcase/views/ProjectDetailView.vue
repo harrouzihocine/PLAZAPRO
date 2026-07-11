@@ -8,8 +8,10 @@ import { useShowcaseStore } from '../store'
 import { pickLocalized } from '../localized'
 import { useSeoMeta } from '../composables/useSeoMeta'
 import PublicGallery from '../components/PublicGallery.vue'
+import AvailabilityGrid from '../components/AvailabilityGrid.vue'
 import UnitExplorer from '../components/UnitExplorer.vue'
 import PaymentSimulator from '../components/PaymentSimulator.vue'
+import CompareDrawer from '../components/CompareDrawer.vue'
 import LeadFormModal from '../components/LeadFormModal.vue'
 
 const props = defineProps({
@@ -195,11 +197,20 @@ useSeoMeta(() => ({
         <!-- Gallery -->
         <PublicGallery v-if="project.media?.length" :media="project.media" />
 
+        <!-- The building at a glance (units carrying stacking coordinates) -->
+        <AvailabilityGrid
+          v-if="project.show_availability && units.length"
+          :units="units"
+          :show-prices="project.show_prices"
+          @interested="(unit) => openLead('interest', unit)"
+        />
+
         <!-- Units -->
         <UnitExplorer
           v-if="project.show_availability && units.length"
           :units="units"
           :show-prices="project.show_prices"
+          :project-id="project.id"
           @interested="(unit) => openLead('interest', unit)"
         />
 
@@ -230,6 +241,15 @@ useSeoMeta(() => ({
           </div>
         </section>
       </div>
+
+      <!-- Visitor shortlist tray + side-by-side comparison -->
+      <CompareDrawer
+        v-if="project.show_availability && units.length"
+        :project-id="project.id"
+        :units="units"
+        :show-prices="project.show_prices"
+        @interested="(unit) => openLead('interest', unit)"
+      />
 
       <LeadFormModal
         v-model:open="leadModal.open"

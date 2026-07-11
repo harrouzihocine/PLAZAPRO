@@ -31,6 +31,7 @@ class PublicProjectSummaryResource extends JsonResource
             'type_id' => $this->type_id,
             'type' => $this->whenLoaded('type', fn () => $this->type?->localizedLabel()),
             'expected_delivery_date' => $this->expected_delivery_date?->toDateString(),
+            'construction_progress' => $this->construction_progress,
             'cover' => $this->coverThumb(),
             'show_prices' => (bool) $this->show_prices,
             'show_availability' => (bool) $this->show_availability,

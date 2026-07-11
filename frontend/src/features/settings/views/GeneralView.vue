@@ -32,6 +32,7 @@ const websiteFacebook = ref('')
 const websiteInstagram = ref('')
 const websiteAbout = ref({ en: '', fr: '', ar: '' })
 const websiteAboutLang = ref('fr')
+const websiteHeroMediaId = ref('')
 const savingWebsite = ref(false)
 const geofenceRadius = ref('')
 const acceptSla = ref('')
@@ -65,6 +66,7 @@ async function load() {
       fr: settings.website_about_fr ?? '',
       ar: settings.website_about_ar ?? '',
     }
+    websiteHeroMediaId.value = settings.website_hero_media_id ?? ''
     geofenceRadius.value = settings.dispatch_geofence_radius_m ?? '200'
     acceptSla.value = settings.dispatch_accept_sla_minutes ?? '15'
     arrivalGrace.value = settings.dispatch_arrival_grace_minutes ?? '15'
@@ -190,6 +192,7 @@ async function saveWebsite() {
       website_about_en: websiteAbout.value.en.trim() || null,
       website_about_fr: websiteAbout.value.fr.trim() || null,
       website_about_ar: websiteAbout.value.ar.trim() || null,
+      website_hero_media_id: websiteHeroMediaId.value || null,
     })
     toastSuccess(t('settings.saved'))
   } catch (e) {
@@ -256,6 +259,11 @@ async function saveWebsite() {
           </div>
           <BaseTextarea v-model="websiteAbout[websiteAboutLang]" :rows="5" :maxlength="5000" />
           <p class="mt-1.5 text-xs text-mute">{{ $t('settings.websiteAboutHint') }}</p>
+        </div>
+
+        <div>
+          <BaseInput v-model="websiteHeroMediaId" :label="$t('settings.websiteHeroLabel')" type="number" min="1" />
+          <p class="mt-1.5 text-xs text-mute">{{ $t('settings.websiteHeroHint') }}</p>
         </div>
 
         <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="savingWebsite" />

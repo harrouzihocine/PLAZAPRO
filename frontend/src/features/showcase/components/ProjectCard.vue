@@ -71,6 +71,17 @@ const coverStyle = computed(() => {
           {{ $t('showcase.projects.delivery') }} {{ formatDate(project.expected_delivery_date) }}
         </span>
       </div>
+
+      <!-- Construction advancement (only when the owner publishes it) -->
+      <div v-if="project.construction_progress !== null && project.construction_progress !== undefined" class="mt-3">
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-mute">{{ $t('showcase.project.progress') }}</span>
+          <span class="num font-semibold text-primary-600 dark:text-primary-400">{{ project.construction_progress }}%</span>
+        </div>
+        <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-200 dark:bg-surface-800">
+          <div class="h-full rounded-full bg-primary-500" :style="{ width: `${project.construction_progress}%` }" />
+        </div>
+      </div>
     </div>
   </RouterLink>
 </template>

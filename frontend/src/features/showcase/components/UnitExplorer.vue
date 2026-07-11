@@ -5,6 +5,7 @@ import Select from 'primevue/select'
 import ToggleButton from 'primevue/togglebutton'
 import { useI18n } from 'vue-i18n'
 import { formatMoney } from '@/features/payments/money'
+import { useFavorites } from '../composables/useFavorites'
 
 // The interactive availability explorer — the signature feature of top
 // promoter sites. Filters run client-side over the public units payload
@@ -14,11 +15,13 @@ import { formatMoney } from '@/features/payments/money'
 const props = defineProps({
   units: { type: Array, required: true },
   showPrices: { type: Boolean, default: false },
+  projectId: { type: [String, Number], required: true },
 })
 
 const emit = defineEmits(['interested'])
 
 const { t } = useI18n()
+const favorites = useFavorites(props.projectId)
 
 const rooms = ref(null)
 const floor = ref(null)
@@ -149,15 +152,29 @@ function priceLine(unit) {
           {{ $t('showcase.projects.priceOnRequest') }}
         </p>
 
-        <Button
-          v-if="unit.available"
-          :label="$t('showcase.units.interested')"
-          icon="pi pi-heart"
-          size="small"
-          rounded
-          class="mt-4 self-start"
-          @click="emit('interested', unit)"
-        />
+        <div class="mt-4 flex items-center gap-2">
+          <Button
+            v-if="unit.available"
+            :label="$t('showcase.units.interested')"
+            icon="pi pi-send"
+            size="small"
+            rounded
+            @click="emit('interested', unit)"
+          />
+          <!-- Heart: add to the visitor's compare shortlist (localStorage) -->
+          <button
+            type="button"
+            class="flex h-9 w-9 items-center justify-center rounded-full border transition-colors"
+            :class="favorites.has(unit.id)
+              ? 'border-danger/40 bg-danger/10 text-danger'
+              : 'border-line text-mute hover:border-danger/40 hover:text-danger'"
+            :aria-label="$t('showcase.compare.heart')"
+            :aria-pressed="favorites.has(unit.id)"
+            @click="favorites.toggle(unit.id)"
+          >
+            <i :class="favorites.has(unit.id) ? 'pi pi-heart-fill' : 'pi pi-heart'" aria-hidden="true" />
+          </button>
+        </div>
       </article>
     </div>
 
