@@ -87,8 +87,20 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     } catch {
       /* offline launch — leave any existing worker in place */
     }
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      // Registration failing (old browser, private mode) must never break the app.
-    })
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((reg) => {
+        // The APK's WebView lives for days without a real navigation — the
+        // only moment the browser re-checks sw.js on its own. Re-check on
+        // every foreground instead, so a deploy's whole-build precache lands
+        // the first time the phone has signal, not days later: offline boot
+        // is only as good as the last completed precache.
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') reg.update().catch(() => {})
+        })
+      })
+      .catch(() => {
+        // Registration failing (old browser, private mode) must never break the app.
+      })
   })
 }
