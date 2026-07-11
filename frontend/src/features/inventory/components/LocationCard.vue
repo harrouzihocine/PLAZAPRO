@@ -41,6 +41,14 @@ defineEmits(['edit', 'archive', 'remove'])
         :priority="loc.gtm_priority"
         class="absolute end-2 top-2"
       />
+      <!-- Live on the public showcase -->
+      <span
+        v-if="loc.is_published"
+        class="absolute start-2 top-2 flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm"
+      >
+        <i class="pi pi-globe text-[10px]" aria-hidden="true" />
+        {{ $t('inventory.websitePublished') }}
+      </span>
     </div>
 
     <div class="flex flex-1 flex-col p-4">

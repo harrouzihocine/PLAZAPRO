@@ -56,6 +56,13 @@ class LocationResource extends JsonResource
             // Focal point (%), applied as CSS object-position on the card/hero.
             'cover_focus_x' => (int) $this->cover_focus_x,
             'cover_focus_y' => (int) $this->cover_focus_y,
+            // Public-website controls (showcase visibility + marketing copy).
+            'is_published' => (bool) $this->is_published,
+            'show_prices' => (bool) $this->show_prices,
+            'show_availability' => (bool) $this->show_availability,
+            'marketing_tagline' => $this->marketing_tagline,
+            'marketing_description' => $this->marketing_description,
+            'construction_progress' => $this->construction_progress,
             'status' => $this->status?->value,
             'units_count' => $this->whenCounted('units'),
             'created_at' => $this->created_at,

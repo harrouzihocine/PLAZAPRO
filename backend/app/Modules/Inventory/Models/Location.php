@@ -27,6 +27,8 @@ class Location extends BaseModel
         'name', 'code', 'wilaya_id', 'commune_id', 'type_id', 'contract_type_id', 'address',
         'description', 'expected_delivery_date', 'gtm_priority', 'latitude', 'longitude',
         'cover_media_id', 'cover_focus_x', 'cover_focus_y',
+        'is_published', 'show_prices', 'show_availability',
+        'marketing_tagline', 'marketing_description', 'construction_progress',
     ];
 
     protected function casts(): array
@@ -36,7 +38,21 @@ class Location extends BaseModel
             'gtm_priority' => GtmPriority::class,
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
+            'is_published' => 'boolean',
+            'show_prices' => 'boolean',
+            'show_availability' => 'boolean',
+            'marketing_tagline' => 'array',
+            'marketing_description' => 'array',
         ]);
+    }
+
+    /**
+     * Projects visible on the public showcase — the ONLY scope public
+     * endpoints may query through (active + explicitly published).
+     */
+    public function scopePublished($query)
+    {
+        return $query->active()->where('is_published', true);
     }
 
     /**

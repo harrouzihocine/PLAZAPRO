@@ -204,6 +204,7 @@ const SECTIONS = [
     key: 'sales',
     items: [
       { to: '/clients', labelKey: 'nav.clients', icon: 'pi pi-users', permission: 'clients.view' },
+      { to: '/web-leads', labelKey: 'nav.webLeads', icon: 'pi pi-globe', permission: 'web.leads' },
       { to: '/tasks', labelKey: 'nav.tasks', icon: 'pi pi-check-square', permission: 'tasks.manage' },
       { to: '/my-day', labelKey: 'nav.myDay', icon: 'pi pi-compass', agentOnly: true },
       { to: '/dispatch', labelKey: 'nav.dispatch', icon: 'pi pi-send', permission: 'visits.dispatch' },

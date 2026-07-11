@@ -5,6 +5,7 @@ import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
 import InputText from 'primevue/inputtext'
 import Skeleton from 'primevue/skeleton'
+import ToggleSwitch from 'primevue/toggleswitch'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseMultiSelect from '@/components/base/BaseMultiSelect.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
@@ -60,8 +61,16 @@ const blank = {
   cover_media_id: null,
   cover_focus_x: 50,
   cover_focus_y: 50,
+  // Public-website controls (the /plaza showcase).
+  is_published: false,
+  show_prices: true,
+  show_availability: true,
+  marketing_tagline: { en: '', fr: '', ar: '' },
+  marketing_description: { en: '', fr: '', ar: '' },
 }
-const form = reactive({ ...blank })
+const form = reactive(structuredClone(blank))
+// Which language tab of the marketing copy is being edited.
+const marketingLang = ref('fr')
 const editingId = ref(null)
 const showForm = ref(false)
 const showMap = ref(false)
@@ -95,7 +104,7 @@ watch(
 useAutoFilter(() => store.filters, () => store.fetch())
 
 function openCreate() {
-  Object.assign(form, blank)
+  Object.assign(form, structuredClone(blank))
   editingId.value = null
   showMap.value = false
   showForm.value = true
@@ -119,11 +128,25 @@ function openEdit(loc) {
     cover_media_id: loc.cover_media_id ?? null,
     cover_focus_x: loc.cover_focus_x ?? 50,
     cover_focus_y: loc.cover_focus_y ?? 50,
+    is_published: !!loc.is_published,
+    show_prices: loc.show_prices !== false,
+    show_availability: loc.show_availability !== false,
+    marketing_tagline: { en: '', fr: '', ar: '', ...(loc.marketing_tagline ?? {}) },
+    marketing_description: { en: '', fr: '', ar: '', ...(loc.marketing_description ?? {}) },
   })
   loadFormCommunes(loc.wilaya_id)
   editingId.value = loc.id
   showMap.value = loc.latitude != null && loc.longitude != null
   showForm.value = true
+}
+
+// Empty-string translations are dropped; an all-empty object becomes null.
+function cleanTranslations(obj) {
+  const filled = Object.fromEntries(
+    Object.entries(obj ?? {}).filter(([, v]) => (v ?? '').trim() !== '')
+      .map(([k, v]) => [k, v.trim()]),
+  )
+  return Object.keys(filled).length ? filled : null
 }
 
 async function submit() {
@@ -144,6 +167,11 @@ async function submit() {
     cover_media_id: form.cover_media_id ?? null,
     cover_focus_x: form.cover_focus_x ?? 50,
     cover_focus_y: form.cover_focus_y ?? 50,
+    is_published: form.is_published,
+    show_prices: form.show_prices,
+    show_availability: form.show_availability,
+    marketing_tagline: cleanTranslations(form.marketing_tagline),
+    marketing_description: cleanTranslations(form.marketing_description),
   }
   try {
     if (editingId.value) {
@@ -416,6 +444,56 @@ function toggleArchived() {
           />
         </div>
         <BaseTextarea v-model="form.description" :label="$t('common.description')" :rows="3" />
+
+        <!-- Public website (/plaza) controls -->
+        <fieldset class="rounded-xl border border-line p-4">
+          <legend class="px-1 text-sm font-semibold text-ink">
+            <i class="pi pi-globe me-1 text-primary-500" aria-hidden="true" />{{ $t('inventory.websitePanel') }}
+          </legend>
+
+          <div class="space-y-3">
+            <label class="flex items-center justify-between gap-3 text-sm text-ink">
+              {{ $t('inventory.websitePublish') }}
+              <ToggleSwitch v-model="form.is_published" />
+            </label>
+            <template v-if="form.is_published">
+              <label class="flex items-center justify-between gap-3 text-sm text-ink">
+                {{ $t('inventory.websiteShowPrices') }}
+                <ToggleSwitch v-model="form.show_prices" />
+              </label>
+              <label class="flex items-center justify-between gap-3 text-sm text-ink">
+                {{ $t('inventory.websiteShowAvailability') }}
+                <ToggleSwitch v-model="form.show_availability" />
+              </label>
+
+              <!-- Trilingual marketing copy, one language tab at a time -->
+              <div class="flex gap-1 pt-1">
+                <button
+                  v-for="lang in ['fr', 'ar', 'en']"
+                  :key="lang"
+                  type="button"
+                  class="rounded-full px-3 py-1 text-xs font-semibold uppercase transition-colors"
+                  :class="marketingLang === lang
+                    ? 'bg-primary-500 text-primary-contrast'
+                    : 'bg-surface-100 text-mute hover:text-ink dark:bg-surface-800'"
+                  @click="marketingLang = lang"
+                >{{ lang }}</button>
+              </div>
+              <BaseInput
+                v-model="form.marketing_tagline[marketingLang]"
+                :label="$t('inventory.websiteTagline')"
+                :maxlength="180"
+              />
+              <BaseTextarea
+                v-model="form.marketing_description[marketingLang]"
+                :label="$t('inventory.websiteDescription')"
+                :rows="4"
+              />
+              <p class="text-xs text-mute">{{ $t('inventory.websiteHint') }}</p>
+            </template>
+          </div>
+        </fieldset>
+
         <div class="flex gap-2 pt-1">
           <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="store.saving" />
           <Button

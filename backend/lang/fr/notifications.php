@@ -209,10 +209,10 @@ return [
     // acceptée au-delà du délai, arrivée en retard sur site.
     'visit_declined' => [
         'title' => 'Visite refusée',
-        'body' => ":agent a refusé la visite avec :client:extra — « :reason ».",
+        'body' => ':agent a refusé la visite avec :client:extra — « :reason ».',
     ],
     'visit_unaccepted' => [
-        'title' => "Affectation pas encore acceptée",
+        'title' => 'Affectation pas encore acceptée',
         'body' => ":agent n'a pas encore accepté la visite avec :client (:when).",
     ],
     'visit_late' => [
@@ -231,7 +231,6 @@ return [
         'title' => 'Agent à l\'arrêt',
         'body' => ':agent est à l\'arrêt depuis :minutes minutes alors qu\'il est disponible.',
     ],
-
 
     'locate_request' => [
         'title' => 'Vérification de position',
@@ -254,4 +253,10 @@ return [
         'title' => 'Agent hors de portée',
         'body' => 'La localisation du téléphone de :agent a été coupée — son service a été terminé automatiquement.',
     ],
+
+    'web_lead' => [
+        'title' => 'Nouveau prospect du site web',
+        'body' => ':name s\'intéresse à :about sur le site — ouvrez la boîte des prospects.',
+    ],
+    'web_lead_about_general' => 'vos projets',
 ];

@@ -234,7 +234,6 @@ return [
         'body' => ':agent has been stopped for :minutes minutes while available.',
     ],
 
-
     // Dispatcher pulled a fresh fix (silent on new shells; older shells show
     // this quiet line — transparency, not spam).
     'locate_request' => [
@@ -260,4 +259,12 @@ return [
         'title' => 'Agent went dark',
         'body' => ':agent\'s phone location was switched off — their duty was ended automatically.',
     ],
+
+    // The public showcase (/plaza): a visitor submitted the lead form.
+    // `about` is the unit reference, the project name, or the general fallback.
+    'web_lead' => [
+        'title' => 'New website lead',
+        'body' => ':name asked about :about on the website — open the leads inbox.',
+    ],
+    'web_lead_about_general' => 'your projects',
 ];

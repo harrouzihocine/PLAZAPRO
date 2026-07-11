@@ -126,6 +126,9 @@ class RbacSeeder extends Seeder
         // unlocks the company-wide Team Logs page — every user's rapports (calls /
         // office & in-site visits) and planned work across ALL visibility scopes.
         'logs.view_all',
+        // Website (the public showcase, /plaza): the web-leads inbox — visitor
+        // form submissions, notified on arrival, converted into real clients.
+        'web.leads',
     ];
 
     /**
@@ -200,6 +203,7 @@ class RbacSeeder extends Seeder
         'oversight.archive' => 'Review and reactivate archived (lost/closed) projects across the team.',
         'oversight.office_program' => 'Open the Office Visits Program page — the week grid of scheduled office visits. View only: own clients by name, colleagues\' slots masked as booked. Deciding approval requests needs "Visits Dispatch".',
         'logs.view_all' => 'Open the company-wide Team Logs (everyone\'s calls & visits).',
+        'web.leads' => 'Open the website leads inbox: visitor requests from the public site, with notifications on arrival and one-click conversion into clients.',
     ];
 
     /**
@@ -228,6 +232,7 @@ class RbacSeeder extends Seeder
         'deals.direct' => 'Client Project Details',
         'deals.manage' => 'Client Project Details',
         'shortlist.manage' => 'Client Project Details',
+        'web.leads' => 'Website',
     ];
 
     /**
@@ -273,6 +278,9 @@ class RbacSeeder extends Seeder
         // section of the pipeline monitor; roles that saw it there keep the
         // dedicated page. Grant per-role to agents who plan office visits.
         'oversight.office_program' => 'oversight.pipeline',
+        // The website-leads inbox starts with the back-office desk that already
+        // owns client intake (reassign/archive) — the owner widens it per role.
+        'web.leads' => 'clients.manage',
     ];
 
     /**
@@ -402,6 +410,7 @@ class RbacSeeder extends Seeder
             'units.view', 'units.interest', 'units.manage', 'media.manage',
             'reservations.view', 'reservations.view_all',
             'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
+            'web.leads',
         ];
 
         $definitions = [

@@ -35,6 +35,17 @@ class AppSettingController extends Controller
         'office_address' => ['sometimes', 'nullable', 'string', 'max:255'],
         'office_maps_url' => ['sometimes', 'nullable', 'url', 'max:500'],
         'office_phone' => ['sometimes', 'nullable', 'string', 'max:40'],
+        // The public showcase site (/plaza): contact channels + the "about us"
+        // presentation text ({en,fr,ar} written as three separate keys). The
+        // WhatsApp number is the site's click-to-chat target — may differ from
+        // office_phone. Served to anonymous visitors via GET /public/config.
+        'website_whatsapp' => ['sometimes', 'nullable', 'string', 'max:40'],
+        'website_email' => ['sometimes', 'nullable', 'email', 'max:120'],
+        'website_facebook_url' => ['sometimes', 'nullable', 'url', 'max:500'],
+        'website_instagram_url' => ['sometimes', 'nullable', 'url', 'max:500'],
+        'website_about_en' => ['sometimes', 'nullable', 'string', 'max:5000'],
+        'website_about_fr' => ['sometimes', 'nullable', 'string', 'max:5000'],
+        'website_about_ar' => ['sometimes', 'nullable', 'string', 'max:5000'],
         // The dispatch GPS layer: site geofence radius (auto check-in/out),
         // how long an assignment may sit unaccepted / an arrival may run late
         // before the dispatchers are nudged, and breadcrumb retention.

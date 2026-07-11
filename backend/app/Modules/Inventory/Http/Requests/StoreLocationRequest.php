@@ -41,6 +41,19 @@ class StoreLocationRequest extends FormRequest
             'gtm_priority' => ['sometimes', new Enum(GtmPriority::class)],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            // Public-website controls (showcase visibility + marketing copy).
+            'is_published' => ['sometimes', 'boolean'],
+            'show_prices' => ['sometimes', 'boolean'],
+            'show_availability' => ['sometimes', 'boolean'],
+            'marketing_tagline' => ['sometimes', 'nullable', 'array'],
+            'marketing_tagline.en' => ['nullable', 'string', 'max:180'],
+            'marketing_tagline.fr' => ['nullable', 'string', 'max:180'],
+            'marketing_tagline.ar' => ['nullable', 'string', 'max:180'],
+            'marketing_description' => ['sometimes', 'nullable', 'array'],
+            'marketing_description.en' => ['nullable', 'string', 'max:5000'],
+            'marketing_description.fr' => ['nullable', 'string', 'max:5000'],
+            'marketing_description.ar' => ['nullable', 'string', 'max:5000'],
+            'construction_progress' => ['sometimes', 'nullable', 'integer', 'between:0,100'],
         ];
     }
 

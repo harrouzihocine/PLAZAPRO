@@ -44,5 +44,19 @@ class RbacServiceProvider extends ServiceProvider
 
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(120)
             ->by($request->user()?->id ?: $request->ip()));
+
+        // The public showcase (/api/v1/public/*): anonymous by design, so keyed
+        // by IP only. 60/min covers a normal browse (~3 GETs per page) while
+        // keeping scrapers off the inventory.
+        RateLimiter::for('public', fn (Request $request) => Limit::perMinute(60)
+            ->by('pub|'.$request->ip()));
+
+        // Lead submissions are the abuse magnet: a human sends one or two,
+        // never dozens. Hourly + daily ceilings per IP (an office NAT sharing
+        // one IP still fits — leads come from the public internet, not staff).
+        RateLimiter::for('public-leads', fn (Request $request) => [
+            Limit::perHour(5)->by('publead-h|'.$request->ip()),
+            Limit::perDay(15)->by('publead-d|'.$request->ip()),
+        ]);
     }
 }

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/features/settings/store'
 import { isStaleChunkError, reloadForFreshBuild } from '@/utils/appRecovery'
+import { showcaseRoutes } from '@/features/showcase/routes'
 
 const routes = [
   {
@@ -57,6 +58,13 @@ const routes = [
         name: 'clients',
         component: () => import('@/features/clients/views/ClientsView.vue'),
         meta: { permission: 'clients.view' },
+      },
+      {
+        // The public site's leads inbox (triage + convert into clients).
+        path: 'web-leads',
+        name: 'web-leads',
+        component: () => import('@/features/webleads/views/WebLeadsView.vue'),
+        meta: { permission: 'web.leads' },
       },
       {
         path: 'desires/matches',
@@ -252,16 +260,33 @@ const routes = [
       },
     ],
   },
+  // The public showcase (/plaza) — its own layout, fully outside AppShell.
+  ...showcaseRoutes,
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
+  // Marketing pages scroll like a website (top on navigate, anchors honored);
+  // the CRM keeps its old behavior (no managed scrolling) untouched.
+  scrollBehavior(to, from, savedPosition) {
+    if (!to.matched.some((r) => r.meta.public)) return undefined
+    if (savedPosition) return savedPosition
+    if (to.hash) return { el: to.hash, behavior: 'smooth', top: 80 }
+    return { top: 0 }
+  },
 })
 
 // Route guard: resolve the session once, then gate protected routes.
 router.beforeEach(async (to) => {
+  // Public showcase pages never touch the session — no /auth/me fetch, no
+  // boot-time 401 for anonymous visitors. (/login is also meta.public but
+  // stays below: it needs the session to bounce signed-in users to the app.)
+  if (to.matched.some((r) => r.meta.public) && to.name !== 'login') {
+    return true
+  }
+
   const auth = useAuthStore()
   if (!auth.ready) {
     await auth.fetchMe()

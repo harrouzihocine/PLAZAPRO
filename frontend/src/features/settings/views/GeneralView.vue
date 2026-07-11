@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import Button from 'primevue/button'
 import BaseInput from '@/components/base/BaseInput.vue'
+import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import { toastError, toastSuccess } from '@/composables/useConfirm'
@@ -24,6 +25,14 @@ const companyName = ref('')
 const officeAddress = ref('')
 const officeMapsUrl = ref('')
 const officePhone = ref('')
+// The public showcase site (/plaza): contact channels + trilingual "about us".
+const websiteWhatsapp = ref('')
+const websiteEmail = ref('')
+const websiteFacebook = ref('')
+const websiteInstagram = ref('')
+const websiteAbout = ref({ en: '', fr: '', ar: '' })
+const websiteAboutLang = ref('fr')
+const savingWebsite = ref(false)
 const geofenceRadius = ref('')
 const acceptSla = ref('')
 const arrivalGrace = ref('')
@@ -47,6 +56,15 @@ async function load() {
     officeAddress.value = settings.office_address ?? ''
     officeMapsUrl.value = settings.office_maps_url ?? ''
     officePhone.value = settings.office_phone ?? ''
+    websiteWhatsapp.value = settings.website_whatsapp ?? ''
+    websiteEmail.value = settings.website_email ?? ''
+    websiteFacebook.value = settings.website_facebook_url ?? ''
+    websiteInstagram.value = settings.website_instagram_url ?? ''
+    websiteAbout.value = {
+      en: settings.website_about_en ?? '',
+      fr: settings.website_about_fr ?? '',
+      ar: settings.website_about_ar ?? '',
+    }
     geofenceRadius.value = settings.dispatch_geofence_radius_m ?? '200'
     acceptSla.value = settings.dispatch_accept_sla_minutes ?? '15'
     arrivalGrace.value = settings.dispatch_arrival_grace_minutes ?? '15'
@@ -153,6 +171,33 @@ async function saveCompany() {
     savingCompany.value = false
   }
 }
+
+// The public-website block saves on its own too (same partial-PUT pattern).
+async function saveWebsite() {
+  for (const url of [websiteFacebook.value.trim(), websiteInstagram.value.trim()]) {
+    if (url && !/^https?:\/\//i.test(url)) {
+      toastError(t('settings.mapsUrlInvalid'))
+      return
+    }
+  }
+  savingWebsite.value = true
+  try {
+    await appSettingsApi.save({
+      website_whatsapp: websiteWhatsapp.value.trim() || null,
+      website_email: websiteEmail.value.trim() || null,
+      website_facebook_url: websiteFacebook.value.trim() || null,
+      website_instagram_url: websiteInstagram.value.trim() || null,
+      website_about_en: websiteAbout.value.en.trim() || null,
+      website_about_fr: websiteAbout.value.fr.trim() || null,
+      website_about_ar: websiteAbout.value.ar.trim() || null,
+    })
+    toastSuccess(t('settings.saved'))
+  } catch (e) {
+    toastError(e.response?.data?.message ?? t('settings.saveFailed'))
+  } finally {
+    savingWebsite.value = false
+  }
+}
 </script>
 
 <template>
@@ -179,6 +224,41 @@ async function saveCompany() {
         </div>
         <BaseInput v-model="officePhone" :label="$t('settings.officePhoneLabel')" maxlength="40" />
         <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="savingCompany" />
+      </form>
+    </SectionCard>
+
+    <!-- The public showcase site (/plaza): what anonymous visitors see. -->
+    <SectionCard :title="$t('settings.websiteProfile')" icon="pi pi-globe" class="mt-6">
+      <p v-if="loading" class="text-sm text-mute">{{ $t('common.loading') }}</p>
+      <form v-else class="max-w-md space-y-4" @submit.prevent="saveWebsite">
+        <p class="text-xs text-mute">{{ $t('settings.websiteProfileHint') }}</p>
+        <div>
+          <BaseInput v-model="websiteWhatsapp" :label="$t('settings.websiteWhatsappLabel')" maxlength="40" />
+          <p class="mt-1.5 text-xs text-mute">{{ $t('settings.websiteWhatsappHint') }}</p>
+        </div>
+        <BaseInput v-model="websiteEmail" :label="$t('settings.websiteEmailLabel')" type="email" maxlength="120" />
+        <BaseInput v-model="websiteFacebook" :label="$t('settings.websiteFacebookLabel')" type="url" maxlength="500" placeholder="https://facebook.com/…" />
+        <BaseInput v-model="websiteInstagram" :label="$t('settings.websiteInstagramLabel')" type="url" maxlength="500" placeholder="https://instagram.com/…" />
+
+        <div>
+          <div class="mb-2 flex items-center gap-1">
+            <span class="me-2 text-sm font-medium text-ink">{{ $t('settings.websiteAboutLabel') }}</span>
+            <button
+              v-for="lang in ['fr', 'ar', 'en']"
+              :key="lang"
+              type="button"
+              class="rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase transition-colors"
+              :class="websiteAboutLang === lang
+                ? 'bg-primary-500 text-primary-contrast'
+                : 'bg-surface-100 text-mute hover:text-ink dark:bg-surface-800'"
+              @click="websiteAboutLang = lang"
+            >{{ lang }}</button>
+          </div>
+          <BaseTextarea v-model="websiteAbout[websiteAboutLang]" :rows="5" :maxlength="5000" />
+          <p class="mt-1.5 text-xs text-mute">{{ $t('settings.websiteAboutHint') }}</p>
+        </div>
+
+        <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="savingWebsite" />
       </form>
     </SectionCard>
 

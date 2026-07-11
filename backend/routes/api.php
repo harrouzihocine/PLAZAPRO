@@ -22,6 +22,7 @@ Route::prefix('v1')->group(function () {
     ]));
 
     require app_path('Modules/Settings/routes.php');
+    require app_path('Modules/Web/routes.php');
     require app_path('Modules/Inventory/routes.php');
     require app_path('Modules/Clients/routes.php');
     require app_path('Modules/Pipeline/routes.php');

@@ -19,6 +19,9 @@ class CreateLocation
         $location = Location::create(Arr::only($data, [
             'name', 'code', 'wilaya_id', 'commune_id', 'type_id', 'contract_type_id', 'address',
             'description', 'expected_delivery_date', 'gtm_priority', 'latitude', 'longitude',
+            // Public-website controls (the /plaza showcase).
+            'is_published', 'show_prices', 'show_availability',
+            'marketing_tagline', 'marketing_description', 'construction_progress',
         ]));
 
         // The financing / payment options the project offers buyers.

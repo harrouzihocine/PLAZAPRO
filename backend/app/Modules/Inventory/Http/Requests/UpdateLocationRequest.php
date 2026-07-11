@@ -47,6 +47,19 @@ class UpdateLocationRequest extends FormRequest
             'cover_media_id' => ['sometimes', 'nullable', 'integer', 'exists:media,id'],
             'cover_focus_x' => ['sometimes', 'integer', 'between:0,100'],
             'cover_focus_y' => ['sometimes', 'integer', 'between:0,100'],
+            // Public-website controls (showcase visibility + marketing copy).
+            'is_published' => ['sometimes', 'boolean'],
+            'show_prices' => ['sometimes', 'boolean'],
+            'show_availability' => ['sometimes', 'boolean'],
+            'marketing_tagline' => ['sometimes', 'nullable', 'array'],
+            'marketing_tagline.en' => ['nullable', 'string', 'max:180'],
+            'marketing_tagline.fr' => ['nullable', 'string', 'max:180'],
+            'marketing_tagline.ar' => ['nullable', 'string', 'max:180'],
+            'marketing_description' => ['sometimes', 'nullable', 'array'],
+            'marketing_description.en' => ['nullable', 'string', 'max:5000'],
+            'marketing_description.fr' => ['nullable', 'string', 'max:5000'],
+            'marketing_description.ar' => ['nullable', 'string', 'max:5000'],
+            'construction_progress' => ['sometimes', 'nullable', 'integer', 'between:0,100'],
         ];
     }
 
