@@ -860,6 +860,7 @@ export default {
     tabOfficeVisits: 'Visites bureau',
     tabInSiteVisits: 'Visites sur site',
     tabNextActions: 'Prochaines actions',
+    tabToComplete: 'À compléter',
     addedToAgentVisits: "Ajouté aux visites de l'agent de terrain.",
     addedToPool: 'Ajouté à la file de dispatch — le dispatcheur a été notifié.',
     timeline: 'Chronologie',

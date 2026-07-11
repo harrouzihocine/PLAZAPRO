@@ -860,6 +860,7 @@ export default {
     tabOfficeVisits: 'زيارات المكتب',
     tabInSiteVisits: 'الزيارات الميدانية',
     tabNextActions: 'الإجراءات التالية',
+    tabToComplete: 'بانتظار الإكمال',
     addedToAgentVisits: 'أُضيفت إلى زيارات الوكيل الميداني.',
     addedToPool: 'أُضيفت إلى طابور التوزيع — وأُشعر الموزع.',
     timeline: 'الخط الزمني',

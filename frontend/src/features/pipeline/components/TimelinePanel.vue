@@ -128,7 +128,18 @@ const tab = ref('all')
 const calls = computed(() => callEntries(store.timeline.calls))
 const visits = computed(() => visitEntries(store.timeline.visits))
 const actions = computed(() => actionEntries(store.timeline.next_action_history ?? []))
+// The work queue: visits still waiting for their completion report. Unlike the
+// story tabs it orders oldest first (the longest-waiting report on top), and
+// its tab exists only while there is work — selected by default on open.
+const todoEntries = computed(() =>
+  visits.value
+    .filter((e) => e.data.status === 'active' && !e.data.is_completed)
+    .sort((a, b) => new Date(a.at) - new Date(b.at)),
+)
 const TABS = computed(() => [
+  ...(todoEntries.value.length
+    ? [{ value: 'todo', label: t('pipeline.tabToComplete'), icon: 'pi pi-exclamation-circle', entries: todoEntries.value, badgeSeverity: 'danger' }]
+    : []),
   { value: 'all', label: t('common.all'), icon: 'pi pi-history', entries: [...calls.value, ...visits.value].sort(byNewest) },
   { value: 'calls', label: t('pipeline.tabCalls'), icon: 'pi pi-phone', entries: [...calls.value].sort(byNewest) },
   { value: 'office', label: t('pipeline.tabOfficeVisits'), icon: 'pi pi-building', entries: visits.value.filter((e) => e.data.type === 'office').sort(byNewest) },
@@ -136,6 +147,12 @@ const TABS = computed(() => [
   { value: 'actions', label: t('pipeline.tabNextActions'), icon: 'pi pi-flag', entries: [...actions.value].sort(byNewest) },
 ])
 const entries = computed(() => TABS.value.find((t) => t.value === tab.value)?.entries ?? [])
+
+// Completing the last open visit removes the tab under the user — land on "All"
+// (where the just-filled log now sits) instead of a dead selection.
+watch(todoEntries, (list) => {
+  if (!list.length && tab.value === 'todo') tab.value = 'all'
+})
 
 // Draft identities for the two modal forms; ?resume=<key> (from the drafts
 // indicator) reopens the right modal with its draft restored.
@@ -182,6 +199,10 @@ watch(
 
 onMounted(async () => {
   await store.loadTimeline(props.clientId, props.projectId)
+
+  // Open straight on the work queue when reports are owed — the reason most
+  // agents come back to this page — rather than making them hunt the story.
+  if (todoEntries.value.length) tab.value = 'todo'
 
   handleLogcall()
 
@@ -443,7 +464,7 @@ async function submitEditNa() {
           <span class="flex items-center gap-1.5 text-sm">
             <i :class="tabDef.icon" aria-hidden="true" />
             {{ tabDef.label }}
-            <Badge v-if="tabDef.entries.length" :value="tabDef.entries.length" severity="secondary" size="small" />
+            <Badge v-if="tabDef.entries.length" :value="tabDef.entries.length" :severity="tabDef.badgeSeverity ?? 'secondary'" size="small" />
           </span>
         </Tab>
       </TabList>

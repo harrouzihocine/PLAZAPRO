@@ -861,6 +861,7 @@ export default {
     tabOfficeVisits: 'Office visits',
     tabInSiteVisits: 'In-site visits',
     tabNextActions: 'Next actions',
+    tabToComplete: 'To complete',
     addedToAgentVisits: "Added to the field agent's visits.",
     addedToPool: 'Added to the dispatch pool — the dispatcher was notified.',
     timeline: 'Timeline',
