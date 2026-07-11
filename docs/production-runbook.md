@@ -95,6 +95,24 @@ set `LAN_DNS_IP=<server LAN IP>` + `LAN_TLS_DOMAIN=office.plaza-pro.com` in `.en
 `lan-dhcp` profile (server runs DHCP; disable the router's first). All three need *some* client or
 router reach — the recommended method above needs none, which is why it's preferred.
 
+**The recommended method alone is NOT offline-proof.** The grey-cloud record lives in *public*
+DNS, so any device whose DNS still chains router → ISP loses `office.plaza-pro.com` the moment
+the internet drops (the name stops resolving; only the bare IP keeps working). Full offline
+operation needs both halves:
+
+1. **dnsmasq running and deploy-managed** — put `COMPOSE_PROFILES=tunnel,lan-dns` in the root
+   `.env`. Without it, the profile-gated services only survive because deploys happen not to
+   touch them; one `docker compose down` and office DNS is silently gone until someone
+   remembers the `--profile` flags.
+2. **Every office PC pointed at the server** — run
+   `https://office.plaza-pro.com/downloads/set-office-dns.bat` once per Windows PC
+   (self-elevating; sets DNS to `192.168.1.200` primary + `8.8.8.8` fallback;
+   `reset-office-dns.bat` undoes it). Phones need nothing — the APK walks to the bare-IP
+   origin by itself.
+
+Caveat: a browser configured with a *custom* "Secure DNS" (DoH) provider bypasses Windows DNS
+entirely and still fails offline — leave Chrome/Edge/Firefox Secure DNS on its default setting.
+
 **Phones (the Android app) during an internet outage — the bare-IP door.** With the internet
 down, phones can't resolve `office.plaza-pro.com` (their DNS goes router → ISP, and the locked
 router can't hand out the local dnsmasq), so the APK carries a third, DNS-free origin:

@@ -106,6 +106,10 @@ services:
       - --no-resolv                 # never read the container's resolv.conf
       - --no-hosts
       - --cache-size=1000
+      # --address answers default to TTL 0, so clients re-query on every
+      # lookup; 300s lets office PCs keep resolving through the brief dnsmasq
+      # recreate during a deploy.
+      - --local-ttl=300
       # Disables the implicit local-service filter, which drops LAN queries
       # because they arrive via docker NAT from a "non-local" subnet. Exposure
       # is already limited by publishing on the LAN IP only.
@@ -150,6 +154,7 @@ services:
       - --no-resolv
       - --no-hosts
       - --cache-size=1000
+      - --local-ttl=300
       - --bind-interfaces           # with listen-address: leaves systemd-resolved's
       - --listen-address=${LAN_DNS_IP:-}   # 127.0.0.53 stub untouched
       - --address=/${LAN_TLS_DOMAIN:-app.plaza-pro.com}/${LAN_DNS_IP:-}

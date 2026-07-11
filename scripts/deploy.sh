@@ -81,4 +81,5 @@ sleep 3
 curl -fsSk "https://127.0.0.1:${APP_TLS_PORT}/up" > /dev/null && echo "  /up OK"
 curl -fsSk "https://127.0.0.1:${APP_TLS_PORT}/api/v1/ping" > /dev/null && echo "  /api/v1/ping OK"
 
-echo "Deploy complete. If the tunnel should run here: docker compose --profile tunnel up -d"
+echo "Deploy complete. Tunnel + office DNS ride along when COMPOSE_PROFILES=tunnel,lan-dns"
+echo "is set in .env (otherwise: docker compose --profile tunnel --profile lan-dns up -d)."
