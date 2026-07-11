@@ -5,10 +5,11 @@ import { buildOfficeInviteText, officeProfile } from '@/features/pipeline/office
 import { t } from '@/i18n'
 
 // The shared body of the office-visit invitation: composes the message from the
-// office profile + the (optional) visit date, then offers the three hand-off
-// channels — WhatsApp, SMS, copy. Rendered inside the icon-button popover
-// (OfficeVisitInviteButton) and the dashboard quick-action modal alike. Emits
-// `done` when the agent picks a channel so the host can close.
+// office profile + the (optional) visit date and sends it over WhatsApp — the
+// one channel used for this invitation. A separate "copy address" button lets
+// the agent grab the office address (+ Maps link) to paste anywhere. Rendered
+// inside the icon-button popover (OfficeVisitInviteButton) and the dashboard
+// quick-action modal alike. Emits `done` when the agent acts so the host closes.
 const props = defineProps({
   clientName: { type: String, default: '' },
   phone: { type: String, default: '' },
@@ -28,13 +29,14 @@ const hasPhone = computed(() => digits.value.length > 0)
 const message = computed(() =>
   buildOfficeInviteText({ name: props.clientName, dateTime: props.scheduledAt, profile: profile.value }),
 )
-const encoded = computed(() => encodeURIComponent(message.value))
-const whatsappUrl = computed(() => `https://wa.me/${digits.value}?text=${encoded.value}`)
-// Android reads ?body= on the sms: scheme; keeps the raw number as typed.
-const smsUrl = computed(() => `sms:${props.phone}?body=${encoded.value}`)
+const whatsappUrl = computed(() => `https://wa.me/${digits.value}?text=${encodeURIComponent(message.value)}`)
 
-async function copy() {
-  await copyToClipboard(message.value, t('officeInvite.copied'))
+// The office location to paste elsewhere: address then the Maps link if set.
+const addressText = computed(() => [profile.value.address, profile.value.maps].filter(Boolean).join('\n'))
+const hasAddress = computed(() => addressText.value.length > 0)
+
+async function copyAddress() {
+  await copyToClipboard(addressText.value, t('officeInvite.addressCopied'))
   emit('done')
 }
 
@@ -47,23 +49,17 @@ const rowClass =
     <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-mute">
       {{ $t('officeInvite.action') }}
     </p>
-    <template v-if="hasPhone">
-      <a :href="whatsappUrl" target="_blank" rel="noopener" :class="rowClass" @click="$emit('done')">
-        <i class="pi pi-whatsapp text-green-600 dark:text-green-400" aria-hidden="true" />
-        {{ $t('officeInvite.whatsapp') }}
-      </a>
-      <a :href="smsUrl" :class="rowClass" @click="$emit('done')">
-        <i class="pi pi-comment text-primary-600 dark:text-primary-400" aria-hidden="true" />
-        {{ $t('officeInvite.sms') }}
-      </a>
-    </template>
+    <a v-if="hasPhone" :href="whatsappUrl" target="_blank" rel="noopener" :class="rowClass" @click="$emit('done')">
+      <i class="pi pi-whatsapp text-green-600 dark:text-green-400" aria-hidden="true" />
+      {{ $t('officeInvite.whatsapp') }}
+    </a>
     <p v-else class="flex items-center gap-2 px-2 py-1.5 text-xs text-mute">
       <i class="pi pi-exclamation-triangle" aria-hidden="true" />
       {{ $t('officeInvite.noPhone') }}
     </p>
-    <button type="button" :class="rowClass" @click="copy">
-      <i class="pi pi-copy text-mute" aria-hidden="true" />
-      {{ $t('officeInvite.copy') }}
+    <button v-if="hasAddress" type="button" :class="rowClass" @click="copyAddress">
+      <i class="pi pi-map-marker text-mute" aria-hidden="true" />
+      {{ $t('officeInvite.copyAddress') }}
     </button>
   </div>
 </template>

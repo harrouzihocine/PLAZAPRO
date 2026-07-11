@@ -156,6 +156,28 @@ class ClientTest extends TestCase
             ->assertJsonPath('data.0.first_name', 'Nadia');
     }
 
+    public function test_name_search_matches_the_full_name_in_any_word_order(): void
+    {
+        Client::factory()->create(['first_name' => 'Ahmed', 'last_name' => 'Benali']);
+        Client::factory()->create(['first_name' => 'Sofiane', 'last_name' => 'Meziane']);
+        Sanctum::actingAs($this->manager());
+
+        // Full name typed straight — the old first/last substring missed this.
+        $this->getJson('/api/v1/clients?search='.urlencode('Ahmed Benali'))
+            ->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.last_name', 'Benali');
+
+        // Reversed word order still finds the same client.
+        $this->getJson('/api/v1/clients?search='.urlencode('benali ahmed'))
+            ->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.last_name', 'Benali');
+
+        // A partial word narrows correctly (not the other client).
+        $this->getJson('/api/v1/clients?search=ahm')
+            ->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.first_name', 'Ahmed');
+    }
+
     public function test_phone_search_is_format_agnostic(): void
     {
         // Stored in compact international form (as the phone input now saves it).

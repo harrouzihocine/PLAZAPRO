@@ -43,9 +43,27 @@ class ClientController extends Controller
                 // leading trunk "0" so any fragment matches regardless of how the
                 // number (or the search term) is written — "+213555…", "0555…", "555…".
                 $digits = ltrim(preg_replace('/\D/', '', $term), '0');
-                $q->where(function ($sub) use ($term, $digits) {
-                    $sub->where('first_name', 'like', "%{$term}%")
-                        ->orWhere('last_name', 'like', "%{$term}%");
+                // Name match is similarity-tolerant: every typed word must appear
+                // somewhere in the WHOLE name, in any order — so "ahmed benali",
+                // "benali ahmed" and a partial "ben" all hit (the old first/last
+                // substring missed full-name searches). A phonetic (SOUNDS LIKE)
+                // pass catches near-spellings — but ONLY for pure-Latin terms:
+                // SOUNDEX is empty for Arabic script, which would otherwise make
+                // one Arabic query match every Arabic name.
+                $words = preg_split('/\s+/', $term, -1, PREG_SPLIT_NO_EMPTY);
+                $full = "TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')))";
+                $phonetic = preg_match('/[A-Za-z]/', $term) && ! preg_match('/[^\x00-\x7F]/', $term);
+                $q->where(function ($sub) use ($term, $digits, $words, $full, $phonetic) {
+                    if ($words !== []) {
+                        $sub->where(function ($name) use ($words, $full) {
+                            foreach ($words as $w) {
+                                $name->whereRaw("{$full} LIKE ?", ['%'.$w.'%']);
+                            }
+                        });
+                        if ($phonetic) {
+                            $sub->orWhereRaw("{$full} SOUNDS LIKE ?", [$term]);
+                        }
+                    }
                     if ($digits !== '') {
                         $sub->orWhereRaw("REGEXP_REPLACE(phone, '[^0-9]', '') LIKE ?", ["%{$digits}%"]);
                     } else {
