@@ -164,7 +164,7 @@ async function replayOutbox() {
 
   // Sanctum needs the XSRF cookie echoed as a header; no cookieStore (older
   // WebViews) means no header to build — leave the queue for the next open.
-  const xsrf = await readXsrfToken()
+  let xsrf = await readXsrfToken()
   if (!xsrf) return
 
   const session = await idbGet('kv', 'session:current')
@@ -176,29 +176,31 @@ async function replayOutbox() {
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 
   let applied = 0
+  let csrfRefreshed = false
   for (const item of queue) {
-    let res
-    try {
-      res = await fetch('/api/v1' + item.url, {
-        method: (item.method || 'post').toUpperCase(),
-        headers: {
-          Accept: 'application/json',
-          'X-XSRF-TOKEN': xsrf,
-          'X-Idempotency-Key': item.uuid,
-          ...(item.files?.length ? {} : { 'Content-Type': 'application/json' }),
-        },
-        body: buildBody(item),
-        credentials: 'same-origin',
-      })
-    } catch {
-      break // connection dropped again — keep FIFO order, retry next window
+    let res = await send(item, xsrf)
+    if (res === null) break // connection dropped again — retry next window
+
+    // Stale CSRF (a session that expired then re-issued, or a long-idle
+    // cookie): refresh ONCE per run and retry — the page-side axios has the
+    // same 419 dance. Without this, an app-closed replay after an offline
+    // stretch 419'd every item straight into `failed` (the "nothing synced"
+    // incident of 2026-07-11).
+    if (res.status === 419 && !csrfRefreshed) {
+      csrfRefreshed = true
+      await fetch('/sanctum/csrf-cookie', { credentials: 'same-origin' }).catch(() => {})
+      xsrf = (await readXsrfToken()) || xsrf
+      res = await send(item, xsrf)
+      if (res === null) break
     }
     if (res.ok) {
       await idbDelete('outbox', item.uuid)
       applied++
       continue
     }
-    if (res.status === 401) break // session expired — the login watcher resumes
+    // Auth is NEVER terminal: the session died — stop, keep everything
+    // pending, and the re-login flow replays it with the queue intact.
+    if (res.status === 401 || res.status === 419) break
     // The server judged it — terminal, surfaced in the Sync Center on next open.
     item.attempts = (item.attempts || 0) + 1
     item.status = 'failed'
@@ -213,6 +215,25 @@ async function replayOutbox() {
   }
 
   if (applied) notifySynced(applied, session.locale)
+}
+
+/** One outbox POST with the given XSRF echo; null = network error (stop). */
+async function send(item, xsrf) {
+  try {
+    return await fetch('/api/v1' + item.url, {
+      method: (item.method || 'post').toUpperCase(),
+      headers: {
+        Accept: 'application/json',
+        'X-XSRF-TOKEN': xsrf,
+        'X-Idempotency-Key': item.uuid,
+        ...(item.files?.length ? {} : { 'Content-Type': 'application/json' }),
+      },
+      body: buildBody(item),
+      credentials: 'same-origin',
+    })
+  } catch {
+    return null
+  }
 }
 
 // Mirror of apiOrQueue.buildPayload (keep in lockstep): JSON body, or

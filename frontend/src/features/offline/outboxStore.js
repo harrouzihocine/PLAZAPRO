@@ -58,6 +58,15 @@ export const useOutboxStore = defineStore('outbox', {
           .filter((i) => i.userId === userId)
           .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
           .map((i) => ({ ...i, status: i.status === 'syncing' ? 'pending' : i.status }))
+          // An auth hiccup is never a server verdict: items a replay stamped
+          // `failed` on a 401/419 (e.g. the SW replaying against an expired
+          // session) go back to pending — this login IS the recovery, and the
+          // idempotency key makes the retry safe.
+          .map((i) =>
+            i.status === 'failed' && (i.lastError?.status === 401 || i.lastError?.status === 419)
+              ? { ...i, status: 'pending', lastError: null }
+              : i,
+          )
         // Leftovers from a killed app: arm the SW replay in case the app is
         // closed again before the connection returns.
         if (this.items.some((i) => i.status === 'pending')) registerOutboxSync()

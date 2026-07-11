@@ -111,11 +111,23 @@ function onSwMessage(event) {
   if (event.data?.type === 'plaza-outbox-sync') outbox.sync()
 }
 // A fresh login (including re-login after a mid-sync 401) resumes the queue.
+// load() must FINISH first: resuming against the still-empty list synced
+// nothing and left the queue waiting for the next reconnect.
 watch(
   () => auth.user?.id,
-  (id) => {
-    outbox.load(id)
+  async (id) => {
+    await outbox.load(id)
     if (id) outbox.resumeAfterLogin()
+  },
+)
+
+// A session that dies mid-app (401 → authStore.clear) must LAND on the login
+// screen — the route guard only checks on navigation, so without this the
+// user sat on a half-dead page wondering what happened.
+watch(
+  () => auth.isAuthenticated,
+  (authed) => {
+    if (!authed && auth.ready) router.replace({ name: 'login' })
   },
 )
 
