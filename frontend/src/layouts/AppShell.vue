@@ -500,10 +500,11 @@ async function logout() {
           <BrandLogo variant="mark" icon-class="h-8 w-auto" />
         </RouterLink>
 
-        <!-- Search trigger -->
+        <!-- Search trigger — the topbar's left side; everything else lives in
+             the right cluster below. -->
         <button
           type="button"
-          class="ms-auto flex h-10 w-10 items-center justify-center rounded-lg text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800 sm:ms-2 sm:w-72 sm:justify-start sm:gap-2 sm:border sm:border-line sm:bg-surface-50 sm:px-3 dark:sm:bg-surface-900"
+          class="flex h-10 w-10 items-center justify-center rounded-lg text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800 sm:w-72 sm:justify-start sm:gap-2 sm:border sm:border-line sm:bg-surface-50 sm:px-3 dark:sm:bg-surface-900"
 :aria-label="$t('shell.searchAria')"
           @click="search.show()"
         >
@@ -516,7 +517,13 @@ async function logout() {
           </kbd>
         </button>
 
-        <div class="flex items-center gap-1 sm:ms-2">
+        <!-- Right cluster, pinned to the end: transient status first (sync /
+             drafts only render while something is pending), then the always-on
+             controls, with the account menu at the extreme edge. -->
+        <div class="ms-auto flex items-center gap-1">
+          <SyncIndicator />
+          <DraftsIndicator />
+          <ServerIndicator />
           <Button
             :icon="isNight ? 'pi pi-sun' : 'pi pi-moon'"
             text
@@ -526,10 +533,9 @@ async function logout() {
             @click="toggle"
           />
           <LanguageSwitcher />
-          <ServerIndicator />
-          <SyncIndicator />
-          <DraftsIndicator />
           <NotificationBell v-if="auth.can('notifications.view')" />
+
+          <span class="mx-1 hidden h-6 w-px bg-line sm:block" aria-hidden="true" />
 
           <!-- User menu -->
           <button
