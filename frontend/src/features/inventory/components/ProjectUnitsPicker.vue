@@ -51,6 +51,11 @@ const units = ref([])
 const boxes = ref([])
 const loading = ref(false)
 const showFilters = ref(false)
+// Cap on the inventory-wide sweep (cross-project mode) so a broad filter never
+// renders thousands of chips; `crossProjectTotal` holds how many actually match
+// so the hint can say "showing first N of M".
+const CROSS_PROJECT_LIMIT = 100
+const crossProjectTotal = ref(0)
 
 // Inventory-style refinements, applied server-side like UnitsView.
 const filters = reactive({
@@ -70,6 +75,14 @@ const hasUnitFilters = computed(
       (k) => filters[k] !== '' && filters[k] != null,
     ),
 )
+
+// Cross-project mode: no project picked but unit filters are set → sweep the
+// WHOLE inventory for matching units instead of forcing a project pick first.
+// Each candidate card names its own project, so the agent shortlists straight
+// from a "F3/F4 on floor 3" filter without hunting project by project. (Boxes
+// are location-scoped and rooms/floor don't apply to them, so this mode lists
+// units only.)
+const crossProject = computed(() => !locationId.value && hasUnitFilters.value)
 
 // The refinements narrow the PROJECT list itself (unit_* params): only projects
 // with at least one purchasable unit matching them stay in the dropdown.
@@ -109,18 +122,36 @@ watch(projectTypeId, () => {
 })
 
 async function loadCandidates() {
-  if (!locationId.value) return
+  // Nothing to show until a project is picked OR filters are set (cross-project).
+  if (!locationId.value && !crossProject.value) {
+    units.value = []
+    boxes.value = []
+    crossProjectTotal.value = 0
+    return
+  }
   loading.value = true
   try {
     // Interested / reserved units can still be shortlisted and held as backups
     // ("2nd place") — only a sold unit is off the table. Boxes stay single-tenant
     // (available only).
-    const params = {
-      location_id: locationId.value,
-      sale_status: ['available', 'interested', 'reserved'],
-    }
+    const params = { sale_status: ['available', 'interested', 'reserved'] }
+    if (locationId.value) params.location_id = locationId.value
     for (const [k, v] of Object.entries(filters)) {
       if (Array.isArray(v) ? v.length : v !== '' && v != null) params[k] = v
+    }
+    if (crossProject.value) {
+      // Inventory-wide sweep — paginate so a broad filter can't dump thousands
+      // of chips; the hint below tells the agent to refine past the cap. No
+      // boxes here (location-scoped, and rooms/floor don't apply to them).
+      const { items, total } = await unitsApi.listPaged({
+        ...params,
+        page: 1,
+        per_page: CROSS_PROJECT_LIMIT,
+      })
+      units.value = items
+      boxes.value = []
+      crossProjectTotal.value = total
+      return
     }
     const [u, b] = await Promise.all([
       unitsApi.list(params),
@@ -131,6 +162,7 @@ async function loadCandidates() {
     ])
     units.value = u
     boxes.value = b
+    crossProjectTotal.value = 0
   } finally {
     loading.value = false
   }
@@ -400,8 +432,18 @@ function setFinish(index, finish) {
       </p>
     </div>
 
+    <!-- Cross-project sweep note: results span every project (each card names
+         its own), and how many matched past the display cap. -->
+    <p v-if="crossProject && !loading" class="flex flex-wrap items-center gap-1 text-xs text-mute">
+      <i class="pi pi-globe text-[10px]" aria-hidden="true" />
+      {{ $t('inventory.searchingAllProjects') }}
+      <span v-if="crossProjectTotal > units.length" class="font-medium text-ink">
+        {{ $t('inventory.showingFirstN', { shown: units.length, total: crossProjectTotal }) }}
+      </span>
+    </p>
+
     <p v-if="loading" class="text-xs text-mute">{{ $t('inventory.loadingProperties') }}</p>
-    <div v-else-if="locationId" class="flex flex-wrap gap-1.5">
+    <div v-else-if="locationId || crossProject" class="flex flex-wrap gap-1.5">
       <button
         v-for="c in candidates"
         :key="c.type + c.id"
@@ -440,7 +482,7 @@ function setFinish(index, finish) {
         </span>
       </button>
       <p v-if="!candidates.length" class="text-xs text-mute">
-        {{ $t('inventory.noPropertiesMatch') }}
+        {{ crossProject ? $t('inventory.noPropertiesMatchFilters') : $t('inventory.noPropertiesMatch') }}
       </p>
     </div>
   </div>
