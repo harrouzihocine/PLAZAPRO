@@ -1,12 +1,14 @@
 <!doctype html>
 <html lang="en">
   <!--
-    Stub webDir for the Capacitor Android shell (REMOTE mode).
+    Stub webDir for the Capacitor Android shell (REMOTE mode) — and, since
+    server.errorPath points here, the branded error screen the WebView shows
+    when a load fails with NOTHING cached yet (fresh install opened offline;
+    once the service worker has installed once, offline boots never land here).
 
-    The native app loads https://app.plaza-pro.com directly (capacitor.config.json
-    server.url), so this page is never shown in normal use — Capacitor just needs a
-    webDir to sync. It doubles as a branded placeholder if the remote URL ever
-    fails to load on first launch.
+    Self-healing: retries the app origin as soon as Android reports
+    connectivity back, on a slow poll while waiting, and on tap. Local file,
+    no CSP in the way — the inline script is fine.
 
     Future "bundled assets" mode (store submission): point webDir at "dist",
     remove server.url, and switch the API/Echo base URLs to absolute — see
@@ -29,12 +31,45 @@
         justify-content: center;
         text-align: center;
       }
+      p {
+        color: #9aa0c3;
+        line-height: 1.6;
+        margin: 0.4rem 0;
+      }
+      button {
+        margin-top: 1.25rem;
+        padding: 0.65rem 2rem;
+        border: 1px solid #c9a227;
+        border-radius: 9999px;
+        background: transparent;
+        color: #c9a227;
+        font-size: 1rem;
+        font-family: inherit;
+      }
+      button:active {
+        background: rgba(201, 162, 39, 0.15);
+      }
     </style>
   </head>
   <body>
     <div>
       <h1 style="font-weight: 600; letter-spacing: 0.05em">PLAZA PRO</h1>
-      <p style="color: #9aa0c3">Connecting to app.plaza-pro.com&hellip;<br />Check your internet connection and reopen the app.</p>
+      <p>No connection — reconnecting automatically&hellip;</p>
+      <p>Pas de connexion — reconnexion automatique&hellip;</p>
+      <p dir="rtl">لا يوجد اتصال — ستتم إعادة المحاولة تلقائيًا&hellip;</p>
+      <button type="button" onclick="retry()">Retry / Réessayer / إعادة المحاولة</button>
     </div>
+    <script>
+      var HOME = 'https://app.plaza-pro.com/'
+      function retry() {
+        window.location.replace(HOME)
+      }
+      // The instant Android reports the link back, go home; poll as a backstop
+      // (navigator.onLine can lag behind real connectivity in the WebView).
+      window.addEventListener('online', retry)
+      setInterval(function () {
+        if (navigator.onLine) retry()
+      }, 8000)
+    </script>
   </body>
 </html>

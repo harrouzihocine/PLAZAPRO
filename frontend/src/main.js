@@ -88,7 +88,7 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
       /* offline launch — leave any existing worker in place */
     }
     navigator.serviceWorker
-      .register('/sw.js')
+      .register('/sw.js', { updateViaCache: 'none' })
       .then((reg) => {
         // The APK's WebView lives for days without a real navigation — the
         // only moment the browser re-checks sw.js on its own. Re-check on

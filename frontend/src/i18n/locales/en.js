@@ -758,6 +758,7 @@ export default {
     needsConnection: "You're offline — {what} needs a connection.",
     bannerTitle: "You're offline — showing saved data.",
     showingSaved: 'Offline — showing data saved {time}',
+    indicator: "You're offline — saved data is shown, changes sync on reconnect.",
     pendingCount: '{n} change waiting to sync. | {n} changes waiting to sync.',
     willSync: 'Changes will sync when you reconnect.',
     savedOffline: 'Saved offline — it will sync when you reconnect.',

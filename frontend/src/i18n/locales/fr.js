@@ -757,6 +757,7 @@ export default {
     needsConnection: 'Vous êtes hors ligne — {what} nécessite une connexion.',
     bannerTitle: 'Vous êtes hors ligne — affichage des données enregistrées.',
     showingSaved: 'Hors ligne — données enregistrées le {time}',
+    indicator: 'Vous êtes hors ligne — données enregistrées affichées, synchronisation à la reconnexion.',
     pendingCount: '{n} modification en attente de synchronisation. | {n} modifications en attente de synchronisation.',
     willSync: 'Les modifications se synchroniseront à la reconnexion.',
     savedOffline: 'Enregistré hors ligne — synchronisation à la reconnexion.',

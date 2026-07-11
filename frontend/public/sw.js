@@ -82,21 +82,14 @@ self.addEventListener('fetch', (event) => {
   // API-shaped paths are never touched beyond that one image slice.
   if (BYPASS.test(url.pathname)) return
 
-  // App navigations: fresh from the network, cached shell when offline.
+  // App navigations: fresh from the network, the INSTALL-TIME shell offline.
+  // Deliberately no runtime caching here: overwriting '/' with a newer
+  // deploy's index while this cache still holds the OLD build's chunks left
+  // phones with an offline shell whose scripts didn't exist — the "reopen
+  // offline = dead page" bug. '/' enters the cache only in install(), in the
+  // same atomic transaction as every asset it references.
   if (req.mode === 'navigate') {
-    event.respondWith(
-      fetch(req)
-        .then((res) => {
-          // Only a healthy answer may become the offline shell: caching a 502
-          // (mid-deploy) or a redirect here would serve THAT as the app later.
-          if (res.ok) {
-            const copy = res.clone()
-            caches.open(CACHE).then((c) => c.put('/', copy))
-          }
-          return res
-        })
-        .catch(() => caches.match('/')),
-    )
+    event.respondWith(fetch(req).catch(() => caches.match('/')))
     return
   }
 
