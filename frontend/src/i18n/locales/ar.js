@@ -2083,6 +2083,9 @@ export default {
   },
   officeInvite: {
     action: 'دعوة إلى المكتب',
+    quickAction: 'دعوة عميل إلى المكتب',
+    pickClient: 'أي عميل؟',
+    changeClient: 'تغيير',
     ariaSend: 'إرسال دعوة لزيارة المكتب إلى {name}',
     noPhone: 'لا يوجد رقم هاتف مسجّل',
     whatsapp: 'واتساب',

@@ -2083,6 +2083,9 @@ export default {
   },
   officeInvite: {
     action: 'Inviter au bureau',
+    quickAction: 'Inviter un client au bureau',
+    pickClient: 'Quel client ?',
+    changeClient: 'Changer',
     ariaSend: 'Envoyer une invitation de visite au bureau à {name}',
     noPhone: 'Aucun numéro de téléphone enregistré',
     whatsapp: 'WhatsApp',

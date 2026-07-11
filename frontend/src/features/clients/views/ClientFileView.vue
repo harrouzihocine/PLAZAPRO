@@ -14,6 +14,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import ActivityTimeline from '@/components/ui/ActivityTimeline.vue'
 import ClientFormDrawer from '@/features/clients/components/ClientFormDrawer.vue'
 import SendToPhoneButton from '@/features/clients/components/SendToPhoneButton.vue'
+import OfficeVisitInviteButton from '@/features/pipeline/components/OfficeVisitInviteButton.vue'
 import CallLogForm from '@/features/pipeline/components/CallLogForm.vue'
 import { useClientsStore } from '@/features/clients/clientsStore'
 import { pipelineApi } from '@/features/pipeline/api'
@@ -168,6 +169,11 @@ async function submitNewProject(callPayload) {
             >
               <i class="pi pi-whatsapp" aria-hidden="true" />
             </a>
+            <OfficeVisitInviteButton
+              :client-name="store.current.full_name"
+              :phone="store.current.phone"
+              size="sm"
+            />
             <template v-if="store.current.email">· {{ store.current.email }}</template>
           </span>
         </template>
@@ -216,6 +222,11 @@ async function submitNewProject(callPayload) {
                   >
                     <i class="pi pi-whatsapp text-sm" aria-hidden="true" />
                   </a>
+                  <OfficeVisitInviteButton
+                    :client-name="store.current.full_name"
+                    :phone="store.current.phone"
+                    size="sm"
+                  />
                 </p>
               </div>
             </div>

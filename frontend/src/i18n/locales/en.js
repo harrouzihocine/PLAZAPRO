@@ -2084,6 +2084,9 @@ export default {
   },
   officeInvite: {
     action: 'Invite to office',
+    quickAction: 'Invite a client to the office',
+    pickClient: 'Which client?',
+    changeClient: 'Change',
     ariaSend: 'Send an office-visit invitation to {name}',
     noPhone: 'No phone number on file',
     whatsapp: 'WhatsApp',

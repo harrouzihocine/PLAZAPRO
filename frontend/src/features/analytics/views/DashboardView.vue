@@ -9,6 +9,7 @@ import StatCard from '@/components/ui/StatCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import WorkItemGroups from '@/features/analytics/components/WorkItemGroups.vue'
 import UpcomingTasksCard from '@/features/pipeline/components/UpcomingTasksCard.vue'
+import OfficeInviteQuickAction from '@/features/pipeline/components/OfficeInviteQuickAction.vue'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
 import OfflineStamp from '@/components/ui/OfflineStamp.vue'
@@ -102,6 +103,9 @@ useRefreshable(load) // pull-to-refresh (APK)
   <div>
     <PageHeader :title="firstName ? `${greeting}, ${firstName}` : greeting">
       <template #subtitle>{{ $t('dashboard.subtitle') }}</template>
+      <template #actions>
+        <OfficeInviteQuickAction />
+      </template>
     </PageHeader>
     <OfflineStamp :at="offlineAt" />
 
