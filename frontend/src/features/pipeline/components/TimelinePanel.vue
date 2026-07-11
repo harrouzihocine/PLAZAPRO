@@ -16,7 +16,7 @@ import CompleteVisitForm from '@/features/pipeline/components/CompleteVisitForm.
 import LogTimeline from '@/features/pipeline/components/LogTimeline.vue'
 import NextActionFields from '@/features/pipeline/components/NextActionFields.vue'
 import { pipelineApi } from '@/features/pipeline/api'
-import { actionEntries, byNewest, callEntries, visitEntries } from '@/features/pipeline/timeline'
+import { byNewest, callEntries, visitEntries } from '@/features/pipeline/timeline'
 import { useAuthStore } from '@/features/settings/store'
 import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
 import { toastInfo, toastSuccess } from '@/composables/useConfirm'
@@ -121,13 +121,13 @@ const completingIsLastInSite = computed(() => {
   return openInSite.length <= 1
 })
 
-// One list per tab — "all" merges the interaction logs (calls + visits);
-// planned next actions have their own tab (they are plans, not logs). The
+// One list per tab — "all" merges the interaction logs (calls + visits).
+// Planned next actions have no tab: the open one is the banner above, and
+// past versions stay nested under the logs they concluded into. The
 // per-entry rendering (version nesting, expand, detail) lives in LogTimeline.
 const tab = ref('all')
 const calls = computed(() => callEntries(store.timeline.calls))
 const visits = computed(() => visitEntries(store.timeline.visits))
-const actions = computed(() => actionEntries(store.timeline.next_action_history ?? []))
 // The work queue: visits still waiting for their completion report. Unlike the
 // story tabs it orders oldest first (the longest-waiting report on top), and
 // its tab exists only while there is work — selected by default on open.
@@ -144,7 +144,6 @@ const TABS = computed(() => [
   { value: 'calls', label: t('pipeline.tabCalls'), icon: 'pi pi-phone', entries: [...calls.value].sort(byNewest) },
   { value: 'office', label: t('pipeline.tabOfficeVisits'), icon: 'pi pi-building', entries: visits.value.filter((e) => e.data.type === 'office').sort(byNewest) },
   { value: 'in_site', label: t('pipeline.tabInSiteVisits'), icon: 'pi pi-map-marker', entries: visits.value.filter((e) => e.data.type === 'in_site').sort(byNewest) },
-  { value: 'actions', label: t('pipeline.tabNextActions'), icon: 'pi pi-flag', entries: [...actions.value].sort(byNewest) },
 ])
 const entries = computed(() => TABS.value.find((t) => t.value === tab.value)?.entries ?? [])
 
