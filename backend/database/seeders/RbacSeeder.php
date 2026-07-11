@@ -49,9 +49,12 @@ class RbacSeeder extends Seeder
         // see every queue company-wide (without view_all it self-scopes to the
         // user's own clients and projects).
         'reservations.view', 'reservations.view_all',
-        // Clients — the client record itself. clients.manage covers ONLY the
-        // client (edit / reassign / archive); projects have their own grants.
-        'clients.view', 'clients.create', 'clients.manage',
+        // Clients — the client record itself; projects have their own grants.
+        // clients.edit (split from clients.manage) edits the client's info on
+        // its own, so it can be granted to ordinary users; clients.manage keeps
+        // the back-office levers: reassign the follow-up agent, archive/cancel,
+        // see ownership (creator / agent).
+        'clients.view', 'clients.create', 'clients.edit', 'clients.manage',
         // Resolve duplicate-phone create attempts (deny / share a project) so no
         // user can silently take another user's client.
         'clients.duplicates.resolve',
@@ -152,7 +155,8 @@ class RbacSeeder extends Seeder
         // Clients
         'clients.view' => 'Open the clients area.',
         'clients.create' => 'Add new clients and capture what they are looking for.',
-        'clients.manage' => 'Edit, reassign and archive clients.',
+        'clients.edit' => 'Edit a client\'s information (name, phone, profile and identity details). Reassigning the follow-up agent stays with "Clients Manage".',
+        'clients.manage' => 'Reassign and archive clients, and see who created and follows up each client.',
         'clients.duplicates.resolve' => 'Decide what happens when a phone already belongs to another client (share or block).',
         'clients.view_all' => 'See every client in the company, not just your own.',
         'clients.view_details' => 'See a client\'s full profile (phone, details) — without it you see only the name.',
@@ -210,6 +214,7 @@ class RbacSeeder extends Seeder
     private array $permissionGroups = [
         'clients.view' => 'Clients',
         'clients.create' => 'Clients',
+        'clients.edit' => 'Clients',
         'clients.manage' => 'Clients',
         'clients.duplicates.resolve' => 'Clients',
         'clients.view_all' => 'Clients',
@@ -235,6 +240,9 @@ class RbacSeeder extends Seeder
      * @var array<string, string> new slug => legacy slug it was split from
      */
     private array $splitFromLegacy = [
+        // Split so plain client-info editing can be granted on its own; the
+        // manage grant keeps reassign / archive / ownership visibility.
+        'clients.edit' => 'clients.manage',
         'projects.create' => 'clients.create',
         'projects.manage' => 'clients.manage',
         'projects.advance' => 'clients.manage',
@@ -385,7 +393,7 @@ class RbacSeeder extends Seeder
             'oversight.clients', 'oversight.pipeline', 'oversight.deals', 'oversight.drafts',
             'oversight.archive', 'oversight.matches', 'oversight.office_program',
             'chat.view_project_chats', 'chat.participate_project_chats',
-            'clients.view', 'clients.create', 'clients.manage', 'clients.duplicates.resolve',
+            'clients.view', 'clients.create', 'clients.edit', 'clients.manage', 'clients.duplicates.resolve',
             'projects.create', 'projects.manage', 'projects.contributors', 'projects.freeze',
             'projects.advance', 'deals.direct', 'deals.manage', 'shortlist.manage',
             'calls.log', 'next_actions.plan',

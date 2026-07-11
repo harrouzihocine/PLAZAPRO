@@ -132,7 +132,9 @@ async function save() {
     rating_id: form.rating_id || null,
     referrer_name: isReferral.value ? form.referrer_name.trim() || null : null,
     referrer_phone: isReferral.value ? form.referrer_phone.trim() || null : null,
-    assigned_agent_id: form.assigned_agent_id || null,
+    // The follow-up agent is manage-only; a clients.edit-only user never sees
+    // the field (and the API masks the current value), so don't send it at all.
+    ...(canSeeOwnership.value ? { assigned_agent_id: form.assigned_agent_id || null } : {}),
     notes: form.notes.trim() || null,
     // Keep only documents that carry at least a type or a number.
     id_documents: form.id_documents

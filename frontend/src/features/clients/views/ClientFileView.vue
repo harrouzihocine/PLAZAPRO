@@ -45,7 +45,8 @@ const route = useRoute()
 // Client ownership (assigned agent + who created it/when) is back-office-only,
 // gated by clients.manage (super-admin / admin / manager).
 const canSeeOwnership = () => auth.can('clients.manage')
-const canManage = () => auth.can('clients.manage')
+// Editing the client's info rides its own grant, split from clients.manage.
+const canEdit = () => auth.can('clients.edit')
 // Opening a NEW project is part of the agent's lead workflow — its own grant,
 // held by agents alongside clients.create.
 const canCreateProject = () => auth.can('projects.create')
@@ -172,7 +173,7 @@ async function submitNewProject(callPayload) {
         </template>
         <template #actions>
           <Button
-            v-if="canManage()"
+            v-if="canEdit()"
             :label="$t('common.edit')"
             icon="pi pi-pencil"
             size="small"

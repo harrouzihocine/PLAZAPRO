@@ -32,7 +32,7 @@ class ClientTest extends TestCase
     {
         return $this->userWithPermissions([
             'clients.view', 'clients.view_all', 'clients.view_details',
-            'clients.create', 'clients.manage',
+            'clients.create', 'clients.edit', 'clients.manage',
         ]);
     }
 
@@ -198,10 +198,55 @@ class ClientTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_editing_requires_clients_manage(): void
+    public function test_editing_requires_clients_edit(): void
     {
         $client = Client::factory()->create();
         Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.create']));
+
+        $this->putJson("/api/v1/clients/{$client->id}", ['first_name' => 'Changed'])
+            ->assertForbidden();
+    }
+
+    public function test_clients_edit_alone_edits_info_but_cannot_reassign_or_cancel(): void
+    {
+        // clients.edit was split out of clients.manage so plain info editing can
+        // be granted on its own; the manage levers must stay out of reach.
+        $agent = $this->followUpAgent();
+        $client = Client::factory()->create(['assigned_agent_id' => $agent->id]);
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.edit']));
+
+        // Editing info works — and the assigned_agent_id the (ownership-masked)
+        // form echoes back as null is ignored, not applied: the agent is kept.
+        $this->putJson("/api/v1/clients/{$client->id}", [
+            'first_name' => 'Changed',
+            'assigned_agent_id' => null,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.first_name', 'Changed');
+
+        $this->assertDatabaseHas('clients', [
+            'id' => $client->id, 'first_name' => 'Changed', 'assigned_agent_id' => $agent->id,
+        ]);
+
+        // A deliberate reassignment attempt is ignored the same way…
+        $other = $this->followUpAgent();
+        $this->putJson("/api/v1/clients/{$client->id}", ['assigned_agent_id' => $other->id])
+            ->assertOk();
+        $this->assertDatabaseHas('clients', ['id' => $client->id, 'assigned_agent_id' => $agent->id]);
+
+        // …and the manage-only endpoints stay forbidden.
+        $this->postJson("/api/v1/clients/{$client->id}/assign-agent", ['agent_id' => $other->id])
+            ->assertForbidden();
+        $this->deleteJson("/api/v1/clients/{$client->id}")->assertForbidden();
+    }
+
+    public function test_clients_manage_alone_no_longer_edits_info(): void
+    {
+        // After the split, manage-without-edit covers reassign/cancel only. Live
+        // roles are backfilled with clients.edit on deploy, so this is the shape
+        // of a deliberately edit-less role built later in the role editor.
+        $client = Client::factory()->create();
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.manage']));
 
         $this->putJson("/api/v1/clients/{$client->id}", ['first_name' => 'Changed'])
             ->assertForbidden();

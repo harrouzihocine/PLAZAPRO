@@ -76,9 +76,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/clients/{client}/desire', [DesireController::class, 'upsert'])->middleware('idempotent');
     });
 
-    // Editing, reassigning and cancelling a CLIENT require its manage permission.
-    Route::middleware('can:clients.manage')->group(function () {
+    // Editing a client's info is its own grant (split from clients.manage so it
+    // can be handed to ordinary users). Reassigning the follow-up agent rides
+    // the same endpoint but stays manage-only (enforced in UpdateClientRequest).
+    Route::middleware('can:clients.edit')->group(function () {
         Route::put('/clients/{client}', [ClientController::class, 'update']);
+    });
+
+    // Reassigning and cancelling a CLIENT require its manage permission.
+    Route::middleware('can:clients.manage')->group(function () {
         Route::delete('/clients/{client}', [ClientController::class, 'destroy']);
         // Delegate a waiting client (a desire match) to the sales agent who will
         // reconnect — the manager triages, the agent does the calling.

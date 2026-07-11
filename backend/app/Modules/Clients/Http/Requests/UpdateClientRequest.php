@@ -10,14 +10,15 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Enum;
 
 /**
- * Edit a client, including (re)assigning the agent. Every field is `sometimes`
+ * Edit a client (clients.edit), including (re)assigning the agent — that one
+ * field stays back-office-only (clients.manage). Every field is `sometimes`
  * so a lean partial update (e.g. just assigned_agent_id) is accepted.
  */
 class UpdateClientRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->can('clients.manage');
+        return (bool) $this->user()?->can('clients.edit');
     }
 
     /**
@@ -34,7 +35,13 @@ class UpdateClientRequest extends FormRequest
             'rating_id' => ['sometimes', 'nullable', 'integer', 'exists:dynamic_list_items,id'],
             'referrer_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'referrer_phone' => ['sometimes', 'nullable', 'string', 'max:50'],
-            'assigned_agent_id' => ['sometimes', 'nullable', 'integer', new CanFollowUpClient($this->route('client')?->assigned_agent_id)],
+            // Reassigning the follow-up agent is clients.manage territory. With
+            // no rule the field never reaches validated(), so a clients.edit-only
+            // user (whose form echoes null — ownership is masked for them) can
+            // neither clear nor change the agent.
+            ...($this->user()?->can('clients.manage') ? [
+                'assigned_agent_id' => ['sometimes', 'nullable', 'integer', new CanFollowUpClient($this->route('client')?->assigned_agent_id)],
+            ] : []),
             'notes' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'id_documents' => ['sometimes', 'nullable', 'array'],
             'id_documents.*.type' => ['nullable', new Enum(IdDocumentType::class)],

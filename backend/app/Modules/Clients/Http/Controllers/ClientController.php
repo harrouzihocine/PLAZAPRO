@@ -20,9 +20,9 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
 
 /**
- * Clients. Reads require clients.view; create requires clients.create; edit /
- * reassign / cancel require clients.manage (see routes). Thin — logic lives in
- * the Actions.
+ * Clients. Reads require clients.view; create requires clients.create; edit
+ * requires clients.edit; reassign / cancel require clients.manage (see routes).
+ * Thin — logic lives in the Actions.
  */
 class ClientController extends Controller
 {
