@@ -14,7 +14,7 @@ import { useLocationsStore } from '@/features/inventory/locationsStore'
 // empty selection = no preference. Notes are REQUIRED — the story behind the
 // numbers. Emits a merged object so the parent owns the value: { wilaya_ids,
 // commune_ids, type_ids, room_number_ids, contract_type_ids, floor_ids,
-// area_min, area_max, rooms_min, budget_min, budget_max, location_ids, notes }.
+// area_min, area_max, budget_min, budget_max, location_ids, notes }.
 const props = defineProps({ modelValue: { type: Object, required: true } })
 const emit = defineEmits(['update:modelValue'])
 
@@ -131,12 +131,6 @@ const communeOptions = computed(() =>
       :label="$t('desire.areaMax')"
       type="number"
       @update:model-value="(v) => update('area_max', v)"
-    />
-    <BaseInput
-      :model-value="modelValue.rooms_min"
-      :label="$t('desire.roomsMin')"
-      type="number"
-      @update:model-value="(v) => update('rooms_min', v)"
     />
     <MoneyInput
       :model-value="modelValue.budget_min"

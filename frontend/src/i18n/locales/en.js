@@ -561,8 +561,6 @@ export default {
     areaMin: 'Area min (m²)',
     areaMax: 'Area max (m²)',
     area: 'Area',
-    roomsMin: 'Rooms (minimum)',
-    roomsMinShort: 'Rooms (min)',
     budgetMin: 'Budget min',
     budgetMax: 'Budget max',
     budget: 'Budget',

@@ -28,7 +28,7 @@ class Desire extends BaseModel
 
     protected $fillable = [
         'client_id', 'client_project_id', 'floor_pref',
-        'area_min', 'area_max', 'rooms_min', 'budget_min', 'budget_max', 'notes',
+        'area_min', 'area_max', 'budget_min', 'budget_max', 'notes',
     ];
 
     protected function casts(): array
@@ -38,7 +38,6 @@ class Desire extends BaseModel
             'budget_max' => 'decimal:2',
             'area_min' => 'decimal:2',
             'area_max' => 'decimal:2',
-            'rooms_min' => 'integer',
         ]);
     }
 

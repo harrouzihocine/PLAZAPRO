@@ -203,7 +203,6 @@ function desireFields(d) {
       value: rangeText(d.area_min, d.area_max, fmtArea) ?? any,
       numeric: true,
     },
-    { label: t('desire.roomsMinShort'), value: d.rooms_min ?? any, numeric: true },
     {
       label: t('desire.budget'),
       value: rangeText(d.budget_min, d.budget_max, formatMoney) ?? any,

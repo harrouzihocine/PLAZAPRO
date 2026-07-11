@@ -45,7 +45,6 @@ trait ValidatesDesireFields
             $p.'floor_pref' => ['nullable', 'string', 'max:255'],
             $p.'area_min' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
             $p.'area_max' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
-            $p.'rooms_min' => ['nullable', 'integer', 'min:0', 'max:50'],
             $p.'budget_min' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             $p.'budget_max' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             $p.'location_ids' => ['nullable', 'array'],

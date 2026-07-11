@@ -21,7 +21,6 @@ class DesireResource extends JsonResource
             'floor_pref' => $this->floor_pref,
             'area_min' => $this->area_min,
             'area_max' => $this->area_max,
-            'rooms_min' => $this->rooms_min,
             'budget_min' => $this->budget_min,
             'budget_max' => $this->budget_max,
             'notes' => $this->notes,

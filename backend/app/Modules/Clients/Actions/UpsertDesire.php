@@ -28,7 +28,7 @@ class UpsertDesire
     public function handle(Client $client, array $data): Desire
     {
         $attributes = Arr::only($data, [
-            'floor_pref', 'area_min', 'area_max', 'rooms_min',
+            'floor_pref', 'area_min', 'area_max',
             'budget_min', 'budget_max', 'notes',
         ]);
 

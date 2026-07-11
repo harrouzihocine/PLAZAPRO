@@ -560,8 +560,6 @@ export default {
     areaMin: 'المساحة الدنيا (م²)',
     areaMax: 'المساحة القصوى (م²)',
     area: 'المساحة',
-    roomsMin: 'الغرف (حد أدنى)',
-    roomsMinShort: 'الغرف (أدنى)',
     budgetMin: 'الميزانية الدنيا',
     budgetMax: 'الميزانية القصوى',
     budget: 'الميزانية',

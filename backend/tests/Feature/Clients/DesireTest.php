@@ -93,14 +93,13 @@ class DesireTest extends TestCase
         $this->putJson("/api/v1/clients/{$client->id}/desire", [
             'floor_ids' => $floors->pluck('id')->all(),
             'room_number_ids' => $rooms->pluck('id')->all(),
-            'area_min' => 80, 'area_max' => 120, 'rooms_min' => 3,
+            'area_min' => 80, 'area_max' => 120,
             'location_ids' => [$site->id],
             'notes' => 'F2/F3, 80-120sqm, prefers this site',
         ])
             ->assertOk()
             ->assertJsonPath('data.floor_ids.0', $floors[0]->id)
             ->assertJsonPath('data.floor_ids.1', $floors[1]->id)
-            ->assertJsonPath('data.rooms_min', 3)
             ->assertJsonPath('data.location_ids.0', $site->id);
 
         $this->assertDatabaseHas('desire_locations', ['location_id' => $site->id]);
