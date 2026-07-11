@@ -26,6 +26,9 @@ class AgentPositionController extends Controller
             // The device's cue to run real GPS (en-route leg live) or coast
             // on coarse fixes — the battery contract's server half.
             'precision' => $action->wantsPrecision,
+            // Path-snapshot cadence (one cheap fix, GPS released in between) —
+            // servers set the pace so a policy change never needs an APK.
+            'snapshot_s' => \App\Modules\Settings\Models\AppSetting::integer('dispatch_snapshot_minutes', 5) * 60,
         ]], 201);
     }
 }

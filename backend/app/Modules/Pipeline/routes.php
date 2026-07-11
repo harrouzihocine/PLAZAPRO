@@ -76,6 +76,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dispatch/replay', [DispatchLiveController::class, 'replay']);
         Route::post('/dispatch/locate', [DispatchLiveController::class, 'locate']);
         Route::post('/dispatch/nudge', [DispatchLiveController::class, 'nudge']);
+
+        // The assist trio: closest agents to one site (map pin panel), the
+        // day-plan optimizer preview (apply = ordinary /dispatch/assign moves),
+        // and the per-agent daily mileage report.
+        Route::get('/dispatch/nearest', [DispatchLiveController::class, 'nearest']);
+        Route::get('/dispatch/plan-preview', [DispatchLiveController::class, 'planPreview']);
+        Route::get('/dispatch/mileage', [DispatchLiveController::class, 'mileage']);
     });
 
     // The field agent's own day + duty switch + GPS fixes + visit lifecycle

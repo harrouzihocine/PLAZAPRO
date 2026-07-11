@@ -79,9 +79,9 @@ const hasPinnedSite = () => sites.value.some((s) => s.lat !== null && s.lng !== 
           <p class="truncate text-sm font-medium text-ink">{{ c.name }}</p>
           <p class="num flex flex-wrap gap-x-3 text-xs text-mute">
             <span>{{ statusLabel(c.status) }}</span>
-            <span v-if="c.distance_km !== null">
+            <span v-if="c.distance_km !== null" :title="c.routed ? $t('dispatch.roadDistance') : $t('dispatch.estimatedDistance')">
               <i class="pi pi-map-marker text-[10px]" aria-hidden="true" />
-              {{ $t('dispatch.distanceAway', { km: c.distance_km }) }}
+              <template v-if="!c.routed">≈ </template>{{ $t('dispatch.distanceAway', { km: c.distance_km }) }}
               <template v-if="c.eta_minutes !== null"> · {{ $t('dispatch.etaMin', { n: c.eta_minutes }) }}</template>
             </span>
             <span v-else>{{ $t('dispatch.noPosition') }}</span>

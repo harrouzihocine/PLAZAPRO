@@ -23,6 +23,9 @@ const geofenceRadius = ref('')
 const acceptSla = ref('')
 const arrivalGrace = ref('')
 const gpsRetention = ref('')
+const snapshotMinutes = ref('')
+const idleAlertMinutes = ref('')
+const offrouteMeters = ref('')
 const loading = ref(true)
 const saving = ref(false)
 
@@ -38,6 +41,9 @@ async function load() {
     acceptSla.value = settings.dispatch_accept_sla_minutes ?? '15'
     arrivalGrace.value = settings.dispatch_arrival_grace_minutes ?? '15'
     gpsRetention.value = settings.agent_position_retention_days ?? '30'
+    snapshotMinutes.value = settings.dispatch_snapshot_minutes ?? '5'
+    idleAlertMinutes.value = settings.dispatch_idle_alert_minutes ?? '45'
+    offrouteMeters.value = settings.dispatch_offroute_m ?? '1500'
   } catch {
     toastError(t('settings.loadFailed'))
   } finally {
@@ -74,11 +80,17 @@ async function save() {
   const sla = Number(acceptSla.value)
   const grace = Number(arrivalGrace.value)
   const retention = Number(gpsRetention.value)
+  const snapshot = Number(snapshotMinutes.value)
+  const idle = Number(idleAlertMinutes.value)
+  const offroute = Number(offrouteMeters.value)
   if (
     !Number.isInteger(radius) || radius < 50 || radius > 2000
     || !Number.isInteger(sla) || sla < 1
     || !Number.isInteger(grace) || grace < 1
     || !Number.isInteger(retention) || retention < 7
+    || !Number.isInteger(snapshot) || snapshot < 0 || snapshot > 30
+    || !Number.isInteger(idle) || idle < 0 || idle > 480
+    || !Number.isInteger(offroute) || offroute < 0 || offroute > 20000
   ) {
     toastError(t('settings.dispatchGpsInvalid'))
     return
@@ -95,6 +107,9 @@ async function save() {
       dispatch_accept_sla_minutes: sla,
       dispatch_arrival_grace_minutes: grace,
       agent_position_retention_days: retention,
+      dispatch_snapshot_minutes: snapshot,
+      dispatch_idle_alert_minutes: idle,
+      dispatch_offroute_m: offroute,
     })
     toastSuccess(t('settings.saved'))
   } catch (e) {
@@ -235,6 +250,43 @@ async function save() {
           />
           <p class="mt-1.5 text-xs text-mute">
             {{ $t('settings.retentionHint') }}
+          </p>
+        </div>
+        <div>
+          <BaseInput
+            v-model="snapshotMinutes"
+            :label="$t('settings.snapshotLabel')"
+            type="number"
+            min="0"
+            max="30"
+          />
+          <p class="mt-1.5 text-xs text-mute">
+            {{ $t('settings.snapshotHint') }}
+          </p>
+        </div>
+        <div>
+          <BaseInput
+            v-model="idleAlertMinutes"
+            :label="$t('settings.idleAlertLabel')"
+            type="number"
+            min="0"
+            max="480"
+          />
+          <p class="mt-1.5 text-xs text-mute">
+            {{ $t('settings.idleAlertHint') }}
+          </p>
+        </div>
+        <div>
+          <BaseInput
+            v-model="offrouteMeters"
+            :label="$t('settings.offrouteLabel')"
+            type="number"
+            min="0"
+            max="20000"
+            step="100"
+          />
+          <p class="mt-1.5 text-xs text-mute">
+            {{ $t('settings.offrouteHint') }}
           </p>
         </div>
         <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="saving" />

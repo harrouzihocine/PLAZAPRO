@@ -90,6 +90,9 @@ class DutyController extends Controller
         return response()->json(['data' => [
             'on' => $open !== null,
             'since' => $open?->started_at,
+            // Path-snapshot cadence for the duty stretch (0 = snapshots off):
+            // one cheap fix per interval so the day replay has a full trail.
+            'snapshot_s' => \App\Modules\Settings\Models\AppSetting::integer('dispatch_snapshot_minutes', 5) * 60,
         ]]);
     }
 }

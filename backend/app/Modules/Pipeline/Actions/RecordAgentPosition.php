@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Pipeline\Actions;
 
+use App\Modules\Collaboration\Notifications\DomainNotification;
 use App\Modules\Pipeline\Events\AgentPositionUpdated;
 use App\Modules\Pipeline\Events\VisitLifecycleUpdated;
 use App\Modules\Pipeline\Models\AgentPosition;
@@ -11,8 +12,10 @@ use App\Modules\Pipeline\Models\DutySession;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Pipeline\Support\AgentStatus;
 use App\Modules\Pipeline\Support\Geo;
+use App\Modules\Pipeline\Support\Router;
 use App\Modules\Settings\Models\AppSetting;
 use App\Modules\Settings\Models\User;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Ingest one GPS fix from an on-duty agent's device:
@@ -122,9 +125,88 @@ class RecordAgentPosition
                 $this->wantsPrecision = true;
                 $minutes = Geo::etaMinutes($meters / 1000);
                 $eta = $eta === null ? $minutes : min($eta, $minutes);
+
+                $this->checkOffRoute($agent, $visit, $position);
             }
         }
 
         return $eta;
+    }
+
+    /**
+     * Corridor watch on a live leg: the first en-route fix asks OSRM for the
+     * road to the site; later fixes measure their drift from that polyline.
+     * Two consecutive strikes beyond the threshold flag the dispatchers once
+     * (`offroute_alerted_at`, reset with the lifecycle on reassignment).
+     * No OSRM = no corridor = no check — never a false alert on estimates.
+     */
+    private function checkOffRoute(User $agent, Visit $visit, AgentPosition $position): void
+    {
+        $thresholdM = AppSetting::integer('dispatch_offroute_m', 1500);
+        if ($thresholdM <= 0 || $visit->offroute_alerted_at !== null) {
+            return;
+        }
+
+        $corridorKey = "dispatch:corridor:{$visit->id}";
+        $corridor = Cache::get($corridorKey);
+
+        if ($corridor === null) {
+            // Build it from where the agent actually is (throttled so a dead
+            // engine isn't hammered on every fix). Fresh corridor = on route.
+            if (Cache::add("{$corridorKey}:tried", 1, 120)) {
+                $route = Router::route(
+                    [(float) $position->latitude, (float) $position->longitude],
+                    [(float) $visit->unit->location->latitude, (float) $visit->unit->location->longitude],
+                );
+                if ($route !== null) {
+                    Cache::put($corridorKey, $route['polyline'], now()->addHours(6));
+                }
+            }
+
+            return;
+        }
+
+        $drift = Geo::distanceToPathMeters(
+            (float) $position->latitude,
+            (float) $position->longitude,
+            $corridor,
+        );
+
+        $strikesKey = "dispatch:offroute-strikes:{$visit->id}";
+
+        if ($drift === null || $drift <= $thresholdM) {
+            Cache::forget($strikesKey);
+
+            return;
+        }
+
+        $strikes = Cache::add($strikesKey, 1, now()->addMinutes(15))
+            ? 1
+            : (int) Cache::increment($strikesKey);
+
+        if ($strikes < 2) {
+            return; // one stray fix is GPS noise, not a detour
+        }
+
+        $visit->update(['offroute_alerted_at' => now()]);
+
+        $notification = new DomainNotification(
+            kind: 'visit_offroute',
+            key: 'visit_offroute',
+            params: [
+                'agent' => $agent->name,
+                'client' => $visit->client?->full_name ?? 'a client',
+                'site' => $visit->unit?->location?->name ?? '—',
+            ],
+            link: '/dispatch',
+            subjectType: 'visit',
+            subjectId: $visit->id,
+        );
+
+        User::query()
+            ->where('is_active', true)
+            ->whereHas('role.permissions', fn ($q) => $q->where('slug', 'visits.dispatch'))
+            ->get()
+            ->each(fn (User $dispatcher) => $dispatcher->notify($notification));
     }
 }

@@ -13,6 +13,7 @@ use App\Modules\Inventory\Console\ExpireHolds;
 use App\Modules\Inventory\Console\ExpireReserved;
 use App\Modules\Inventory\Console\OptimizeExistingMedia;
 use App\Modules\Payments\Console\MarkSchedulesOverdueCommand;
+use App\Modules\Pipeline\Console\AggregateAgentMileage;
 use App\Modules\Pipeline\Console\DispatchReminders;
 use App\Modules\Pipeline\Console\MarkActionsOverdue;
 use App\Modules\Pipeline\Console\SendUpcomingDigest;
@@ -47,6 +48,7 @@ return Application::configure(basePath: dirname(__DIR__))
         SnapshotKpis::class,
         SweepDispatchAlerts::class,
         RemindDutyStart::class,
+        AggregateAgentMileage::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         // Sanctum SPA (cookie) auth for the first-party frontend.

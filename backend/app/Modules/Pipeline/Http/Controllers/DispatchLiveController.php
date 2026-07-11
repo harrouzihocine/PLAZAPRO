@@ -5,14 +5,21 @@ declare(strict_types=1);
 namespace App\Modules\Pipeline\Http\Controllers;
 
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Pipeline\Actions\LocateOnDutyAgents;
+use App\Modules\Pipeline\Actions\ProposeDispatchPlan;
 use App\Modules\Pipeline\Actions\SuggestDispatchAgents;
 use App\Modules\Pipeline\Enums\NextActionType;
+use App\Modules\Pipeline\Models\AgentMileageDay;
 use App\Modules\Pipeline\Models\AgentPosition;
+use App\Modules\Pipeline\Models\DutySession;
 use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Pipeline\Support\AgentStatus;
+use App\Modules\Pipeline\Support\Geo;
+use App\Modules\Pipeline\Support\Mileage;
+use App\Modules\Pipeline\Support\Router;
 use App\Modules\Settings\Models\User;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\JsonResponse;
@@ -151,13 +158,23 @@ class DispatchLiveController extends Controller
         $data = $request->validate([
             'agent_id' => ['required', 'integer', 'exists:users,id'],
             'date' => ['required', 'date_format:Y-m-d'],
+            // Optional hour window: "where was he between 09:00 and 12:00"
+            // without scrubbing the whole day.
+            'from' => ['sometimes', 'date_format:H:i'],
+            'until' => ['sometimes', 'date_format:H:i', 'after:from'],
         ]);
 
         $day = Carbon::parse($data['date']);
+        $windowStart = isset($data['from'])
+            ? $day->copy()->setTimeFromTimeString($data['from'])
+            : $day->copy()->startOfDay();
+        $windowEnd = isset($data['until'])
+            ? $day->copy()->setTimeFromTimeString($data['until'])
+            : $day->copy()->endOfDay();
 
         $positions = AgentPosition::query()
             ->where('user_id', $data['agent_id'])
-            ->whereBetween('recorded_at', [$day->copy()->startOfDay(), $day->copy()->endOfDay()])
+            ->whereBetween('recorded_at', [$windowStart, $windowEnd])
             ->orderBy('recorded_at')
             ->limit(2000)
             ->get(['latitude', 'longitude', 'accuracy_m', 'recorded_at']);
@@ -182,6 +199,13 @@ class DispatchLiveController extends Controller
                 'departed_at' => $v->departed_at,
             ]);
 
+        $sessions = DutySession::query()
+            ->where('user_id', $data['agent_id'])
+            ->where('started_at', '<=', $day->copy()->endOfDay())
+            ->where(fn ($q) => $q->whereNull('ended_at')->orWhere('ended_at', '>=', $day->copy()->startOfDay()))
+            ->orderBy('started_at')
+            ->get(['started_at', 'ended_at']);
+
         return response()->json(['data' => [
             'positions' => $positions->map(fn (AgentPosition $p) => [
                 'lat' => (float) $p->latitude,
@@ -189,6 +213,177 @@ class DispatchLiveController extends Controller
                 'at' => $p->recorded_at,
             ])->values(),
             'visits' => $visits->values(),
+            // Driven km over the returned window (glitch-filtered) + the duty
+            // stretches — the replay header's context line.
+            'distance_km' => Mileage::pathKm($positions),
+            'sessions' => $sessions->map(fn (DutySession $s) => [
+                'started_at' => $s->started_at,
+                'ended_at' => $s->ended_at,
+            ])->values(),
+        ]]);
+    }
+
+    /**
+     * "Who is closest to THIS site, right now" — the map pin's assist panel.
+     * On-duty agents ranked by road minutes (OSRM; haversine estimate when the
+     * engine is down). Looking pings the on-duty phones like the map open.
+     */
+    public function nearest(Request $request, LocateOnDutyAgents $locate): JsonResponse
+    {
+        $data = $request->validate(['location_id' => ['required', 'integer', 'exists:locations,id']]);
+
+        $location = Location::query()->findOrFail($data['location_id']);
+        abort_if($location->latitude === null || $location->longitude === null, 422, 'This site has no map pin yet.');
+
+        $locate->handle();
+
+        $agents = User::query()->active()->where('is_active', true)
+            ->whereHas('role', fn ($q) => $q->where('is_agent', true))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $ids = $agents->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $live = AgentStatus::forUsers($ids);
+
+        $loads = Visit::query()->active()
+            ->whereIn('agent_id', $ids)
+            ->where('type', 'in_site')
+            ->whereNull('completed_at')
+            ->whereBetween('scheduled_at', [now()->startOfDay(), now()->endOfDay()])
+            ->selectRaw('agent_id, COUNT(*) as n')
+            ->groupBy('agent_id')
+            ->pluck('n', 'agent_id');
+
+        $positioned = $agents
+            ->map(fn (User $u) => ['id' => (int) $u->id, 'position' => $live->positionOf((int) $u->id)])
+            ->filter(fn (array $row) => $row['position'] !== null && $live->statusOf($row['id']) !== 'off_duty')
+            ->values();
+
+        $matrix = $positioned->isEmpty() ? null : Router::table(
+            $positioned->map(fn (array $row) => [
+                (float) $row['position']->latitude,
+                (float) $row['position']->longitude,
+            ])->all(),
+            [[(float) $location->latitude, (float) $location->longitude]],
+        );
+        $legs = $positioned->mapWithKeys(fn (array $row, int $i) => [
+            $row['id'] => $matrix[$i][0] ?? null,
+        ]);
+
+        $ranked = $agents
+            ->map(function (User $agent) use ($live, $loads, $legs, $location) {
+                $id = (int) $agent->id;
+                $status = $live->statusOf($id);
+                if ($status === 'off_duty') {
+                    return null;
+                }
+
+                $position = $live->positionOf($id);
+                $leg = $legs->get($id);
+                $km = $leg['km'] ?? null;
+                $minutes = $leg['minutes'] ?? null;
+                if ($km === null && $position !== null) {
+                    $km = round(Geo::distanceKm(
+                        (float) $position->latitude,
+                        (float) $position->longitude,
+                        (float) $location->latitude,
+                        (float) $location->longitude,
+                    ), 1);
+                    $minutes = Geo::etaMinutes($km);
+                }
+
+                return [
+                    'id' => $id,
+                    'name' => $agent->name,
+                    'status' => $status,
+                    'distance_km' => $km,
+                    'eta_minutes' => $minutes,
+                    'routed' => $leg !== null && ($leg['minutes'] ?? null) !== null,
+                    'position_age_minutes' => $position !== null
+                        ? (int) $position->recorded_at->diffInMinutes(now())
+                        : null,
+                    'today_load' => (int) $loads->get($id, 0),
+                ];
+            })
+            ->filter()
+            ->sortBy(fn (array $a) => $a['eta_minutes'] ?? PHP_INT_MAX)
+            ->values();
+
+        return response()->json(['data' => [
+            'site' => [
+                'id' => $location->id,
+                'name' => $location->name,
+                'lat' => (float) $location->latitude,
+                'lng' => (float) $location->longitude,
+            ],
+            'agents' => $ranked,
+        ]]);
+    }
+
+    /** The day optimizer's proposal — review-and-apply, never auto-dispatch. */
+    public function planPreview(ProposeDispatchPlan $action): JsonResponse
+    {
+        return response()->json(['data' => $action->handle()]);
+    }
+
+    /**
+     * Km driven per agent per day — fuel/allowance visibility. History reads
+     * the nightly aggregates; today is computed live from the breadcrumbs.
+     */
+    public function mileage(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'from' => ['required', 'date_format:Y-m-d'],
+            'until' => ['required', 'date_format:Y-m-d', 'after_or_equal:from'],
+        ]);
+
+        $from = Carbon::parse($data['from'])->startOfDay();
+        $until = Carbon::parse($data['until'])->endOfDay();
+        abort_if($from->diffInDays($until) > 92, 422, 'Pick a window of three months or less.');
+
+        $agents = User::query()->active()->where('is_active', true)
+            ->whereHas('role', fn ($q) => $q->where('is_agent', true))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $rows = AgentMileageDay::query()
+            ->whereIn('user_id', $agents->pluck('id'))
+            ->whereBetween('day', [$from->toDateString(), $until->toDateString()])
+            ->get()
+            ->groupBy('user_id');
+
+        // Today isn't aggregated yet — fold it in live when the window covers it.
+        $today = now()->startOfDay();
+        $includeToday = $today->betweenIncluded($from, $until);
+
+        return response()->json(['data' => [
+            'agents' => $agents->map(function (User $agent) use ($rows, $includeToday, $today) {
+                $days = $rows->get($agent->id, collect())
+                    ->map(fn (AgentMileageDay $d) => [
+                        'day' => $d->day->toDateString(),
+                        'km' => $d->km,
+                        'duty_minutes' => $d->duty_minutes,
+                    ]);
+
+                if ($includeToday) {
+                    $liveDay = Mileage::forDay((int) $agent->id, $today);
+                    if ($liveDay['fixes'] > 0 || $liveDay['duty_minutes'] > 0) {
+                        $days->push([
+                            'day' => $today->toDateString(),
+                            'km' => $liveDay['km'],
+                            'duty_minutes' => $liveDay['duty_minutes'],
+                        ]);
+                    }
+                }
+
+                return [
+                    'id' => $agent->id,
+                    'name' => $agent->name,
+                    'days' => $days->sortBy('day')->values(),
+                    'total_km' => round($days->sum('km'), 1),
+                    'total_duty_minutes' => (int) $days->sum('duty_minutes'),
+                ];
+            })->values(),
         ]]);
     }
 
@@ -202,10 +397,11 @@ class DispatchLiveController extends Controller
             ->where('subject_type', 'client_project')
             ->whereNull('assigned_to')
             ->with(['subject' => fn (MorphTo $m) => $m->morphWith([ClientProject::class => [
+                'client:id,first_name,last_name',
                 'shortlistItems' => fn ($q) => $q->active()
                     ->where('shortlistable_type', 'unit')
                     ->whereIn('state', ['shortlisted', 'not_visited'])
-                    ->with(['shortlistable' => fn (MorphTo $sm) => $sm->morphWith([Unit::class => ['location']])]),
+                    ->with(['shortlistable' => fn ($sm) => $sm->morphWith([Unit::class => ['location']])]),
             ]])])
             ->get();
 
@@ -219,15 +415,25 @@ class DispatchLiveController extends Controller
                     ? $project->shortlistItems->whereIn('shortlistable_id', $a->target_unit_ids)
                     : $project->shortlistItems;
 
-                return $items->map(fn ($item) => $item->shortlistable?->location)->filter();
+                return $items
+                    ->map(fn ($item) => $item->shortlistable?->location)
+                    ->filter()
+                    ->unique('id')
+                    ->map(fn ($location) => [
+                        'location' => $location,
+                        // The plan behind the hollow pin — lets the nearest-
+                        // agents panel assign it without a trip to the board.
+                        'plan' => ['action_id' => $a->id, 'client' => $project->client?->full_name],
+                    ]);
             })
-            ->unique('id')
-            ->filter(fn ($l) => $l->latitude !== null && $l->longitude !== null)
-            ->map(fn ($l) => [
-                'id' => $l->id,
-                'name' => $l->name,
-                'lat' => (float) $l->latitude,
-                'lng' => (float) $l->longitude,
+            ->filter(fn (array $row) => $row['location']->latitude !== null && $row['location']->longitude !== null)
+            ->groupBy(fn (array $row) => $row['location']->id)
+            ->map(fn ($group) => [
+                'id' => $group->first()['location']->id,
+                'name' => $group->first()['location']->name,
+                'lat' => (float) $group->first()['location']->latitude,
+                'lng' => (float) $group->first()['location']->longitude,
+                'plans' => $group->pluck('plan')->unique('action_id')->values(),
             ])
             ->values()
             ->all();

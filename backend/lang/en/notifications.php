@@ -217,6 +217,15 @@ return [
         'title' => 'Agent running late',
         'body' => ':agent has not arrived for the visit with :client (:when).',
     ],
+    'visit_offroute' => [
+        'title' => 'Agent off route',
+        'body' => ':agent drifted off the road to :site (visit with :client).',
+    ],
+    'agent_idle' => [
+        'title' => 'Agent idle',
+        'body' => ':agent has been stopped for :minutes minutes while available.',
+    ],
+
 
     // Dispatcher pulled a fresh fix (silent on new shells; older shells show
     // this quiet line — transparency, not spam).

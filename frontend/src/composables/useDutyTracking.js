@@ -6,9 +6,10 @@ import { useAuthStore } from '@/features/settings/store'
 // The agent-side half of live dispatch — DEMAND-DRIVEN, because continuous
 // GPS eats a field phone's battery:
 //
-//   idle on duty   NO location access at all — no watcher, no heartbeat, no
-//                  OS location indicator; the roster shows the age of the
-//                  last fix a look or a leg produced;
+//   idle on duty   one cheap SNAPSHOT fix per interval (server-paced via
+//                  `snapshot_s`, default 5 min, 0 = off) — the day replay
+//                  gets a full path without a standing watcher; between
+//                  snapshots there is no location access at all;
 //   precision      a real high-accuracy watch, ONLY while it's needed:
 //                    - a visit is en route (geofence arrival + live ETA),
 //                      flagged by My Day AND confirmed by the server on every
@@ -19,8 +20,8 @@ import { useAuthStore } from '@/features/settings/store'
 //   off duty       nothing, ever — the server refuses strays with a 409.
 //
 // APK shells ≥1.6 run this contract natively (foreground service, survives
-// the lock screen; ≥1.7 applies the same coarse/precision split) — when the
-// native bridge takes over, the web side stands down completely.
+// the lock screen; ≥2.0 runs the same snapshot cadence) — when the native
+// bridge takes over, the web side stands down completely.
 
 const onDuty = ref(false)
 const dutySince = ref(null)
@@ -31,9 +32,12 @@ const lastFixAt = ref(null)
 const PRECISION_MIN_POST_MS = 20_000
 const MOVE_METERS = 30
 const BURST_MS = 120_000 // dispatcher looked: precision for 2 minutes
+const DEFAULT_SNAPSHOT_MS = 300_000 // server-paced via snapshot_s
 
 let precisionWatchId = null
 let burstTimer = null
+let snapshotTimer = null
+let snapshotMs = DEFAULT_SNAPSHOT_MS
 let enRoute = false // My Day's flag: a leg is being driven
 let serverPrecision = false // the server's flag from the last post
 let burstUntil = 0 // dispatcher-pull window
@@ -75,6 +79,8 @@ async function postFix(coords) {
     // The server knows whether an en-route leg is live — obey its verdict.
     serverPrecision = Boolean(data?.precision)
     syncPrecisionWatch()
+    // The server also paces the path snapshots (settings change = no deploy).
+    if (Number.isFinite(data?.snapshot_s)) applySnapshotPace(data.snapshot_s * 1000)
   } catch (e) {
     if (e.response?.status === 409) {
       onDuty.value = false
@@ -98,6 +104,35 @@ function grabFix({ precise }) {
     },
     { enableHighAccuracy: precise, maximumAge: precise ? 10_000 : 120_000, timeout: 30_000 },
   )
+}
+
+// --- Path snapshots (the full-day trail) --------------------------------------
+// One cheap fix per interval so the dispatcher's replay shows the whole duty
+// stretch, not just en-route legs. Interval is the server's snapshot_s
+// (0 = snapshots off); the native shell runs its own twin of this loop.
+
+function syncSnapshots() {
+  const wanted = onDuty.value && supported && !nativeActive && snapshotMs > 0
+  if (wanted && snapshotTimer === null) {
+    grabFix({ precise: false }) // the path starts where duty starts
+    snapshotTimer = setInterval(() => {
+      // The precision watch is already posting fixes — don't double up.
+      if (!precisionNeeded()) grabFix({ precise: false })
+    }, snapshotMs)
+  } else if (!wanted && snapshotTimer !== null) {
+    clearInterval(snapshotTimer)
+    snapshotTimer = null
+  }
+}
+
+function applySnapshotPace(ms) {
+  if (ms === snapshotMs) return
+  snapshotMs = ms
+  if (snapshotTimer !== null) {
+    clearInterval(snapshotTimer)
+    snapshotTimer = null
+  }
+  syncSnapshots()
 }
 
 // --- The precision watch (en route / dispatcher looking) ---------------------
@@ -146,6 +181,8 @@ function listenForLocate() {
 }
 
 function stopAll() {
+  if (snapshotTimer !== null) clearInterval(snapshotTimer)
+  snapshotTimer = null
   if (burstTimer) clearTimeout(burstTimer)
   burstTimer = null
   if (precisionWatchId !== null && supported) navigator.geolocation.clearWatch(precisionWatchId)
@@ -203,12 +240,14 @@ function tryNativeTracking() {
 function apply(state) {
   onDuty.value = Boolean(state?.on)
   dutySince.value = state?.since ?? null
+  if (Number.isFinite(state?.snapshot_s)) snapshotMs = state.snapshot_s * 1000
   if (onDuty.value) {
     listenForLocate()
-    // Native shell or web alike: NOTHING starts here. Precision comes from
-    // an en-route leg or a dispatcher's locate ping — never from idling.
+    // Precision stays demand-driven (en-route leg / dispatcher's ping); the
+    // only standing schedule is the cheap path snapshot every few minutes.
     tryNativeTracking()
     syncPrecisionWatch()
+    syncSnapshots()
   } else {
     stopAll()
   }

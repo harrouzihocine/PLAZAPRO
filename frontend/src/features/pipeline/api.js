@@ -127,10 +127,34 @@ export const pipelineApi = {
     return data.data // { pinged }
   },
 
-  // One agent's breadcrumb trail + in-site visits for a day. visits.dispatch.
-  async dispatchReplay(agentId, date) {
-    const { data } = await useApi().get('/dispatch/replay', { params: { agent_id: agentId, date } })
-    return data.data // { positions, visits }
+  // One agent's breadcrumb trail + in-site visits for a day (optional H:i
+  // window: from/until). visits.dispatch.
+  async dispatchReplay(agentId, date, window = {}) {
+    const { data } = await useApi().get('/dispatch/replay', {
+      params: { agent_id: agentId, date, ...window },
+    })
+    return data.data // { positions, visits, distance_km, sessions }
+  },
+
+  // On-duty agents ranked by road minutes to one site — the map pin's
+  // "who is closest" panel. visits.dispatch.
+  async dispatchNearest(locationId) {
+    const { data } = await useApi().get('/dispatch/nearest', { params: { location_id: locationId } })
+    return data.data // { site, agents }
+  },
+
+  // The day optimizer's proposal: pending pool split across on-duty agents.
+  // Review-and-apply — applying sends ordinary /dispatch/assign moves.
+  async dispatchPlanPreview() {
+    const { data } = await useApi().get('/dispatch/plan-preview')
+    return data.data // { proposals, skipped, routed, pool_size }
+  },
+
+  // Km per agent per day between two dates (history = nightly aggregates,
+  // today live). visits.dispatch.
+  async dispatchMileage(from, until) {
+    const { data } = await useApi().get('/dispatch/mileage', { params: { from, until } })
+    return data.data // { agents: [{ id, name, days, total_km, total_duty_minutes }] }
   },
 
   // The field agent's own day: duty state + today's visits with lifecycle

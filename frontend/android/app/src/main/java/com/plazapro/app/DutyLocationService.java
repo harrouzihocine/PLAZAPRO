@@ -30,9 +30,13 @@ import java.util.concurrent.Executors;
  * The on-duty location share as a FOREGROUND service — DEMAND-DRIVEN, because
  * continuous GPS eats a field phone's battery:
  *
- *   idle       NO location listener AT ALL — the OS location indicator is
- *              dark, battery cost is zero; the service only stays alive to
- *              answer bursts and en-route legs;
+ *   idle       one cheap SNAPSHOT fix per interval (server-paced via the
+ *              `snapshot_s` cue on each post response, default 5 min, 0 = off)
+ *              so the dispatcher's day replay shows the whole path; between
+ *              snapshots there is NO listener at all — the OS location
+ *              indicator only blinks for the seconds a fix takes (v2.0
+ *              reverses the v1.8 zero-idle rule by the owner's call:
+ *              full-day paths beat a dark indicator);
  *   precision  listeners registered ONLY while needed, dropped after:
  *                - the app said an en-route leg started (bridge
  *                  setDutyPrecision), confirmed by the server's
@@ -56,6 +60,10 @@ public class DutyLocationService extends Service implements LocationListener {
     private static final float MIN_POST_M = 30f;
     private static final long BURST_MS = 120_000;
 
+    // Path snapshots: one single-shot fix per interval, server-adjustable.
+    private static final long DEFAULT_SNAPSHOT_MS = 300_000;
+    private static final long FIRST_SNAPSHOT_MS = 5_000; // the path starts at duty-on
+
     private static volatile DutyLocationService instance;
     /** A locate ping that arrived while the service was dead (OS killed it). */
     private static volatile boolean pendingBurst = false;
@@ -69,6 +77,8 @@ public class DutyLocationService extends Service implements LocationListener {
     private volatile boolean appWantsPrecision = false; // My Day: a leg is en route
     private volatile boolean serverWantsPrecision = false;
     private volatile long burstUntilMs = 0;
+    private volatile long snapshotMs = DEFAULT_SNAPSHOT_MS; // 0 = server said off
+    private boolean snapshotScheduled = false;
     private long lastPostMs = 0;
     private Location lastPosted = null;
 
@@ -166,6 +176,12 @@ public class DutyLocationService extends Service implements LocationListener {
         handler.removeCallbacks(locationCheck);
         handler.post(locationCheck);
 
+        // Path snapshots: the first fix lands moments after duty-on so the
+        // trail starts where the day did; then one per interval.
+        handler.removeCallbacks(snapshotTick);
+        snapshotScheduled = true;
+        handler.postDelayed(snapshotTick, FIRST_SNAPSHOT_MS);
+
         if (pendingBurst) {
             pendingBurst = false;
             handler.post(() -> requestBurst(this));
@@ -173,6 +189,23 @@ public class DutyLocationService extends Service implements LocationListener {
 
         return START_STICKY;
     }
+
+    /**
+     * One cheap fix per interval while idle (precision windows already post
+     * plenty). The server re-paces the loop via `snapshot_s` on each post
+     * response; 0 parks it until a later response revives it.
+     */
+    private final Runnable snapshotTick = new Runnable() {
+        @Override
+        public void run() {
+            if (snapshotMs <= 0) {
+                snapshotScheduled = false;
+                return;
+            }
+            if (!precisionActive()) requestOneFix();
+            handler.postDelayed(this, snapshotMs);
+        }
+    };
 
     private final Runnable locationCheck = new Runnable() {
         @Override
@@ -264,6 +297,21 @@ public class DutyLocationService extends Service implements LocationListener {
                         serverWantsPrecision = wants;
                         syncListeners();
                     }
+                    // …and the snapshot pace (settings change = no APK).
+                    java.util.regex.Matcher m = java.util.regex.Pattern
+                            .compile("\"snapshot_s\":(\\d+)").matcher(result.body);
+                    if (m.find()) {
+                        long ms = Long.parseLong(m.group(1)) * 1000L;
+                        if (ms != snapshotMs) {
+                            snapshotMs = ms;
+                            handler.post(() -> {
+                                if (snapshotMs > 0 && !snapshotScheduled) {
+                                    snapshotScheduled = true;
+                                    handler.postDelayed(snapshotTick, snapshotMs);
+                                }
+                            });
+                        }
+                    }
                 }
             } catch (Exception ignored) {
             }
@@ -300,6 +348,8 @@ public class DutyLocationService extends Service implements LocationListener {
     public void onDestroy() {
         instance = null;
         handler.removeCallbacks(locationCheck);
+        handler.removeCallbacks(snapshotTick);
+        snapshotScheduled = false;
         if (locationManager != null) locationManager.removeUpdates(this);
         if (poster != null) poster.shutdown();
         super.onDestroy();

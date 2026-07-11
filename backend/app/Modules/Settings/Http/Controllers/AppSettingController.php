@@ -34,6 +34,12 @@ class AppSettingController extends Controller
         'dispatch_accept_sla_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
         'dispatch_arrival_grace_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
         'agent_position_retention_days' => ['required', 'integer', 'min:7', 'max:365'],
+        // Path tracking: duty-snapshot cadence (0 = no path, en-route legs
+        // only), the parked-while-available alert, and the en-route drift
+        // corridor (0 disables either alert).
+        'dispatch_snapshot_minutes' => ['required', 'integer', 'min:0', 'max:30'],
+        'dispatch_idle_alert_minutes' => ['required', 'integer', 'min:0', 'max:480'],
+        'dispatch_offroute_m' => ['required', 'integer', 'min:0', 'max:20000'],
     ];
 
     public function index(): JsonResponse

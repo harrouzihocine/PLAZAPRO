@@ -41,4 +41,46 @@ final class Geo
     {
         return max(1, (int) round($distanceKm * self::ROAD_FACTOR / self::URBAN_SPEED_KMH * 60));
     }
+
+    /**
+     * Shortest distance from a point to a polyline (the off-route check).
+     * Equirectangular projection around the point — exact enough at city
+     * scale, and cheap enough to run on every en-route fix.
+     *
+     * @param  list<array{0: float, 1: float}>  $path  [lat, lng] vertices
+     */
+    public static function distanceToPathMeters(float $lat, float $lng, array $path): ?float
+    {
+        $count = count($path);
+        if ($count === 0) {
+            return null;
+        }
+
+        $mPerLat = 110_574.0;
+        $mPerLng = 111_320.0 * cos(deg2rad($lat));
+        $px = $lng * $mPerLng;
+        $py = $lat * $mPerLat;
+
+        $best = null;
+        $ax = $path[0][1] * $mPerLng;
+        $ay = $path[0][0] * $mPerLat;
+
+        for ($i = 1; $i < $count; $i++) {
+            $bx = $path[$i][1] * $mPerLng;
+            $by = $path[$i][0] * $mPerLat;
+
+            $dx = $bx - $ax;
+            $dy = $by - $ay;
+            $lenSq = $dx * $dx + $dy * $dy;
+            $t = $lenSq > 0 ? max(0.0, min(1.0, (($px - $ax) * $dx + ($py - $ay) * $dy) / $lenSq)) : 0.0;
+
+            $d = hypot($px - ($ax + $t * $dx), $py - ($ay + $t * $dy));
+            $best = $best === null ? $d : min($best, $d);
+
+            $ax = $bx;
+            $ay = $by;
+        }
+
+        return $best;
+    }
 }

@@ -28,6 +28,7 @@ class Visit extends BaseModel
         'next_action_id', 'scheduled_at', 'completed_at', 'visited_at', 'outcome_id', 'notes', 'checklist', 'objections',
         'assigned_at', 'accepted_at', 'en_route_at', 'arrived_at', 'departed_at',
         'declined_at', 'decline_reason', 'acceptance_alerted_at', 'late_alerted_at',
+        'offroute_alerted_at',
     ];
 
     protected function casts(): array
@@ -47,6 +48,7 @@ class Visit extends BaseModel
             'declined_at' => 'datetime',
             'acceptance_alerted_at' => 'datetime',
             'late_alerted_at' => 'datetime',
+            'offroute_alerted_at' => 'datetime',
         ]);
     }
 
@@ -72,6 +74,7 @@ class Visit extends BaseModel
                 $visit->departed_at = null;
                 $visit->acceptance_alerted_at = null;
                 $visit->late_alerted_at = null;
+                $visit->offroute_alerted_at = null;
             }
         });
     }

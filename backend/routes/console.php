@@ -51,6 +51,11 @@ Schedule::command('dispatch:sweep')->everyFiveMinutes()->withoutOverlapping();
 // 07:20 duty nudge for field agents (the command itself skips Fridays).
 Schedule::command('duty:remind')->dailyAt('07:20')->withoutOverlapping();
 
+// Fold yesterday's breadcrumbs into per-agent mileage rows (km / fixes / duty
+// minutes) — deliberately BEFORE positions:prune, so mileage history outlives
+// the breadcrumbs' short retention.
+Schedule::command('dispatch:mileage')->dailyAt('03:40')->withoutOverlapping();
+
 // GPS breadcrumbs are operational telemetry, not an archive: drop rows older
 // than the retention window (configurable in Settings → General).
 Schedule::call(function () {

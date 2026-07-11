@@ -8,6 +8,7 @@ import Tag from 'primevue/tag'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import { pipelineApi } from '@/features/pipeline/api'
+import PlanDayDialog from '@/features/pipeline/components/PlanDayDialog.vue'
 import SuggestAgentsDialog from '@/features/pipeline/components/SuggestAgentsDialog.vue'
 import {
   AGENT_STATUS_DOTS,
@@ -47,9 +48,12 @@ const cells = ref({}) // `${agentId}|${day}` -> draggable list (week view)
 // every intermediate hop would assign/notify agents the card merely passed by.
 const moves = ref(new Map())
 
-// Board | live map tab — the map (and its Leaflet chunk) only loads on demand.
+// Board | live map | mileage tabs — heavy chunks only load on demand.
 const DispatchMapTab = defineAsyncComponent(
   () => import('@/features/pipeline/components/DispatchMapTab.vue'),
+)
+const MileageTab = defineAsyncComponent(
+  () => import('@/features/pipeline/components/MileageTab.vue'),
 )
 const tab = ref('board')
 
@@ -63,16 +67,15 @@ function openSuggest(item) {
   suggestVisible.value = true
 }
 
-function onSuggestPick(agentId) {
-  const item = suggestItem.value
-  suggestVisible.value = false
-  if (!item) return
+// A pool card landing on an agent — the shared half of every assist (suggest
+// dialog, map panel, day optimizer). Mirrors a drag: records the move, the
+// card leaves the pool and lands on the agent's day. Save still applies.
+function placeOnAgent(item, agentId) {
   const today = localToday()
   const day = (item.due_at ?? '').slice(0, 10) >= today ? item.due_at.slice(0, 10) : today
   const move = { kind: 'action', id: item.id, agent_id: agentId, due_date: day }
   if (item.time) move.due_time = item.time
   recordMove(item, move)
-  // Mirror a drag: the card leaves the pool and lands on the agent's day.
   pending.value = pending.value.filter((el) => el !== item)
   item.type = 'in_site'
   item.agent_id = agentId
@@ -83,7 +86,47 @@ function onSuggestPick(agentId) {
   cells.value[key].push(item)
   cells.value[key].sort(byTime)
   if (viewDay.value === day) showDay(day) // re-bucket the zoomed hours
+}
+
+function onSuggestPick(agentId) {
+  const item = suggestItem.value
+  suggestVisible.value = false
+  if (!item) return
+  placeOnAgent(item, agentId)
   toastSuccess(t('dispatch.suggestRecorded'))
+}
+
+// The map panel's "assign the plan behind this pin to this agent".
+function onMapAssign({ actionId, agentId }) {
+  const item = pending.value.find((el) => el.id === actionId)
+  if (item) {
+    placeOnAgent(item, agentId)
+    toastSuccess(t('dispatch.suggestRecorded'))
+    return
+  }
+  // The pool card isn't loaded (another session assigned meanwhile) — apply
+  // the move directly through the standard endpoint.
+  pipelineApi
+    .dispatchAssign([{ kind: 'action', id: actionId, agent_id: agentId, due_date: localToday() }])
+    .then(() => {
+      toastSuccess(t('dispatch.saved'))
+      load()
+    })
+    .catch((e) => toastError(e.response?.data?.message ?? t('dispatch.saveFailed')))
+}
+
+// The day optimizer: every proposed stop becomes an ordinary recorded move.
+const planVisible = ref(false)
+
+function onPlanApply(stops) {
+  let recorded = 0
+  for (const stop of stops) {
+    const item = pending.value.find((el) => el.id === stop.action_id)
+    if (!item) continue
+    placeOnAgent(item, stop.agent_id)
+    recorded++
+  }
+  if (recorded) toastSuccess(t('dispatch.planDayRecorded', { n: recorded }))
 }
 
 const agentStatusDot = (s) => AGENT_STATUS_DOTS[s] ?? AGENT_STATUS_DOTS.off_duty
@@ -485,6 +528,26 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
           :outlined="tab !== 'map'"
           @click="tab = 'map'"
         />
+        <Button
+          :label="$t('dispatch.mileageTab')"
+          icon="pi pi-gauge"
+          size="small"
+          :severity="tab === 'mileage' ? 'primary' : 'secondary'"
+          :outlined="tab !== 'mileage'"
+          @click="tab = 'mileage'"
+        />
+        <!-- The day optimizer: propose a split of the pending pool across the
+             on-duty agents (review-and-apply, recorded as board moves). -->
+        <Button
+          v-if="tab === 'board'"
+          :label="$t('dispatch.planDay')"
+          icon="pi pi-sparkles"
+          size="small"
+          severity="secondary"
+          outlined
+          :disabled="loading || !pending.length"
+          @click="planVisible = true"
+        />
         <!-- Week navigation, or day navigation when zoomed into hours. -->
         <template v-if="tab === 'board' && !viewDay">
           <Button icon="pi pi-chevron-left" severity="secondary" text :aria-label="$t('pipeline.previousWeek')" @click="shiftWeek(-7)" />
@@ -522,7 +585,10 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
     </PageHeader>
 
     <!-- Live map tab: agents + today's sites + replay (Leaflet, lazy). -->
-    <DispatchMapTab v-if="tab === 'map'" />
+    <DispatchMapTab v-if="tab === 'map'" @assign="onMapAssign" />
+
+    <!-- Mileage tab: km per agent per day, from the duty paths. -->
+    <MileageTab v-else-if="tab === 'mileage'" />
 
     <template v-else>
     <!-- Pending pool -->
@@ -917,6 +983,9 @@ const TYPE_ICONS = { in_site: 'pi pi-map-marker', office: 'pi pi-building', call
       :action-id="suggestItem?.id ?? null"
       @pick="onSuggestPick"
     />
+
+    <!-- The day optimizer (whole pool split across on-duty agents). -->
+    <PlanDayDialog v-model:visible="planVisible" @apply="onPlanApply" />
   </div>
 </template>
 

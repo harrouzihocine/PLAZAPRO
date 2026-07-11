@@ -275,6 +275,21 @@ services:
       timeout: 5s
       retries: 5
 
+  osrm: # road routing (dispatch km/ETA) — Algeria graph, built by scripts/setup-osrm.sh
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    environment: { TZ: Africa/Algiers }
+    # Waits politely until the graph exists (run scripts/setup-osrm.sh once on
+    # this machine); the backend treats an absent engine as "estimate instead".
+    entrypoint: >
+      sh -c 'while [ ! -f /data/algeria-latest.osrm.partition ]; do
+        echo "osrm: graph not built yet — run scripts/setup-osrm.sh"; sleep 60;
+      done; exec osrm-routed --algorithm mld --max-table-size 200 /data/algeria-latest.osrm'
+    volumes: ["./docker/osrm/data:/data"]
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+    networks: [internal]
+
   redis:
     image: redis:7.4-alpine
     # AOF (everysec): queued jobs survive a container restart, not just snapshots.

@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\Modules\Pipeline\Console;
 
 use App\Modules\Collaboration\Notifications\DomainNotification;
+use App\Modules\Pipeline\Models\AgentPosition;
 use App\Modules\Pipeline\Models\DutySession;
 use App\Modules\Pipeline\Models\Visit;
+use App\Modules\Pipeline\Support\AgentStatus;
+use App\Modules\Pipeline\Support\Geo;
 use App\Modules\Settings\Models\AppSetting;
 use App\Modules\Settings\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * The dispatcher's watchdog (every 5 minutes, like the hold sweepers):
@@ -37,11 +41,95 @@ class SweepDispatchAlerts extends Command
 
         $nagged = $this->sweepUnaccepted($dispatchers);
         $late = $this->sweepLateArrivals($dispatchers);
+        $idle = $this->sweepIdleStops($dispatchers);
         $closed = $this->closeForgottenSessions();
 
-        $this->info("Unaccepted nudges: {$nagged}, late flags: {$late}, sessions auto-closed: {$closed}.");
+        $this->info("Unaccepted nudges: {$nagged}, late flags: {$late}, idle flags: {$idle}, sessions auto-closed: {$closed}.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * An AVAILABLE on-duty agent parked somewhere for longer than the idle
+     * threshold — not at a visit site (that's on-site, skipped by status) —
+     * gets flagged to the dispatchers once per stop. The 5-minute duty
+     * snapshots supply the evidence; the stop's first still fix identifies it,
+     * so one stop never nags twice however long it lasts.
+     *
+     * @param  Collection<int, User>  $dispatchers
+     */
+    private function sweepIdleStops(Collection $dispatchers): int
+    {
+        $threshold = AppSetting::integer('dispatch_idle_alert_minutes', 45);
+        if ($threshold <= 0) {
+            return 0;
+        }
+
+        $onDuty = DutySession::query()->open()->pluck('user_id')->map(fn ($id) => (int) $id)->all();
+        if ($onDuty === []) {
+            return 0;
+        }
+
+        $live = AgentStatus::forUsers($onDuty);
+        $flagged = 0;
+
+        foreach ($onDuty as $userId) {
+            // En route / on site = working; only a supposedly-roaming agent
+            // sitting still is worth a look.
+            if ($live->statusOf($userId) !== 'available') {
+                continue;
+            }
+
+            // The whole day's trail (~150 rows at 5-min cadence), so the
+            // stop's first still fix is a STABLE identity — a sliding window
+            // would rename long stops each sweep and nag again.
+            $positions = AgentPosition::query()
+                ->where('user_id', $userId)
+                ->where('recorded_at', '>=', now()->startOfDay())
+                ->orderByDesc('recorded_at')
+                ->get(['latitude', 'longitude', 'recorded_at']);
+
+            if ($positions->count() < 3 || $positions->first()->recorded_at->lt(now()->subMinutes(15))) {
+                continue; // no fresh evidence — snapshots off or phone dark
+            }
+
+            $anchor = $positions->first();
+            $still = $positions->takeWhile(fn (AgentPosition $p) => Geo::distanceMeters(
+                (float) $anchor->latitude, (float) $anchor->longitude,
+                (float) $p->latitude, (float) $p->longitude,
+            ) <= 150);
+
+            $stopStart = $still->last()->recorded_at;
+            if ($still->count() < 3 || $stopStart->gt(now()->subMinutes($threshold))) {
+                continue; // moving, or not parked long enough yet
+            }
+
+            // One alert per stop, ever — keyed by the stop's first still fix.
+            if (! Cache::add("dispatch:idle-alert:{$userId}:{$stopStart->timestamp}", 1, now()->addDay())) {
+                continue;
+            }
+
+            $agent = User::query()->find($userId);
+            if ($agent === null) {
+                continue;
+            }
+
+            $notification = new DomainNotification(
+                kind: 'agent_idle',
+                key: 'agent_idle',
+                params: [
+                    'agent' => $agent->name,
+                    'minutes' => (string) (int) $stopStart->diffInMinutes(now()),
+                ],
+                link: '/dispatch?tab=map',
+            );
+            foreach ($dispatchers as $dispatcher) {
+                $dispatcher->notify($notification);
+            }
+            $flagged++;
+        }
+
+        return $flagged;
     }
 
     /** @param  Collection<int, User>  $dispatchers */

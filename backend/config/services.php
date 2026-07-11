@@ -50,4 +50,11 @@ return [
         'bin' => env('SOFFICE_BIN', 'soffice'),
     ],
 
+    // Self-hosted OSRM routing engine (docker `osrm` service, Algeria OSM
+    // extract) — road distances/ETAs for the dispatch assist. Unreachable =
+    // Support\Router returns null and callers fall back to haversine.
+    'osrm' => [
+        'url' => env('OSRM_URL', 'http://osrm:5000'),
+    ],
+
 ];

@@ -22,7 +22,13 @@ import { t } from '@/i18n'
 // The dispatcher's live map: agent dots coloured by status (moving over
 // Reverb without polling), today's site pins with their visits, pending pool
 // sites hollow. A replay mode swaps the live layer for one agent's breadcrumb
-// trail on a chosen day — dispute resolution, not surveillance.
+// trail on a chosen day (optionally narrowed to an hour window) with an
+// animated playback cursor — dispute resolution, not surveillance. Clicking
+// any site pin opens the "who is closest" panel: on-duty agents ranked by
+// road minutes; a pending site's panel can assign on the spot (recorded as an
+// ordinary board move).
+
+const emit = defineEmits(['assign'])
 
 const siteIconDef = L.icon({
   iconRetinaUrl: markerIcon2x,
@@ -47,8 +53,27 @@ const unpinned = ref([])
 const mode = ref('live') // 'live' | 'replay'
 const replayAgentId = ref(null)
 const replayDate = ref(todayInput())
+const replayFrom = ref('') // optional HH:MM window
+const replayUntil = ref('')
 const replayLoading = ref(false)
 const replayEmpty = ref(false)
+const replayDistance = ref(null)
+
+// Playback: a cursor dot walking the trail like a video scrubber.
+const playing = ref(false)
+const playSpeed = ref(300) // simulated seconds per real second
+const cursorMs = ref(0)
+const playbackBounds = ref(null) // { start, end } in ms
+let replayPoints = [] // [{ lat, lng, atMs }]
+let rafId = null
+let lastFrameTs = 0
+let playbackMarker = null
+let playbackTrail = null
+
+// "Who is closest to this site" panel (any site pin).
+const nearest = ref(null) // { site, agents, plans }
+const nearestLoading = ref(false)
+const nearestPlanId = ref(null)
 
 let map = null
 let agentLayer = null
@@ -170,6 +195,7 @@ function renderSites() {
     if (site.lat === null || site.lng === null) continue
     L.marker([site.lat, site.lng], { icon: siteIconDef })
       .bindPopup(sitePopup(site))
+      .on('popupopen', () => openNearest(site, []))
       .addTo(siteLayer)
   }
   for (const site of pendingCache) {
@@ -181,8 +207,34 @@ function renderSites() {
       fillOpacity: 0.15,
     })
       .bindTooltip(`${site.name} — ${t('dispatch.pendingSite')}`)
+      .on('click', () => openNearest(site, site.plans ?? []))
       .addTo(siteLayer)
   }
+}
+
+// --- "Who is closest" -----------------------------------------------------------
+
+async function openNearest(site, plans) {
+  nearestLoading.value = true
+  nearestPlanId.value = plans.length === 1 ? plans[0].action_id : null
+  nearest.value = { site, agents: [], plans }
+  try {
+    const data = await pipelineApi.dispatchNearest(site.id)
+    // Still looking at the same site? (A quick second click swaps the panel.)
+    if (nearest.value?.site?.id === site.id) nearest.value = { ...nearest.value, agents: data.agents }
+  } catch (e) {
+    toastError(e.response?.data?.message ?? t('common.actionFailed'))
+    nearest.value = null
+  } finally {
+    nearestLoading.value = false
+  }
+}
+
+function assignNearest(agent) {
+  const plan = nearest.value?.plans.find((p) => p.action_id === nearestPlanId.value)
+  if (!plan) return
+  emit('assign', { actionId: plan.action_id, agentId: agent.id, agentName: agent.name })
+  nearest.value = null
 }
 
 function fitToContent() {
@@ -216,18 +268,41 @@ async function loadReplay() {
   if (!replayAgentId.value || !replayDate.value) return
   replayLoading.value = true
   replayEmpty.value = false
+  stopPlayback()
   try {
-    const data = await pipelineApi.dispatchReplay(replayAgentId.value, replayDate.value)
+    const window = {}
+    if (replayFrom.value) window.from = replayFrom.value
+    if (replayUntil.value && (!replayFrom.value || replayUntil.value > replayFrom.value)) {
+      window.until = replayUntil.value
+    }
+    const data = await pipelineApi.dispatchReplay(replayAgentId.value, replayDate.value, window)
     replayLayer.clearLayers()
-    const points = data.positions.map((p) => [p.lat, p.lng])
+    playbackMarker = null
+    playbackTrail = null
+    replayDistance.value = data.distance_km ?? null
+    replayPoints = data.positions.map((p) => ({ lat: p.lat, lng: p.lng, atMs: new Date(p.at).getTime() }))
+    const points = replayPoints.map((p) => [p.lat, p.lng])
     if (points.length) {
-      L.polyline(points, { color: '#8b5cf6', weight: 3, opacity: 0.8 }).addTo(replayLayer)
+      // The faint whole-trail context; playback draws the bold half on top.
+      L.polyline(points, { color: '#8b5cf6', weight: 3, opacity: 0.35 }).addTo(replayLayer)
       L.circleMarker(points[0], { radius: 6, color: '#10b981', fillOpacity: 1 })
         .bindTooltip(formatDateTime(data.positions[0].at))
         .addTo(replayLayer)
       L.circleMarker(points[points.length - 1], { radius: 6, color: '#ef4444', fillOpacity: 1 })
         .bindTooltip(formatDateTime(data.positions[data.positions.length - 1].at))
         .addTo(replayLayer)
+      playbackTrail = L.polyline([points[0]], { color: '#8b5cf6', weight: 4, opacity: 0.9 }).addTo(replayLayer)
+      playbackMarker = L.circleMarker(points[0], {
+        radius: 8,
+        color: '#fff',
+        weight: 2.5,
+        fillColor: '#8b5cf6',
+        fillOpacity: 1,
+      }).addTo(replayLayer)
+      playbackBounds.value = { start: replayPoints[0].atMs, end: replayPoints[replayPoints.length - 1].atMs }
+      cursorMs.value = playbackBounds.value.start
+    } else {
+      playbackBounds.value = null
     }
     for (const v of data.visits) {
       if (v.lat === null || v.lng === null) continue
@@ -249,10 +324,79 @@ async function loadReplay() {
   }
 }
 
+// --- Playback (the day as a video) --------------------------------------------
+
+function renderCursor() {
+  if (!playbackMarker || !replayPoints.length) return
+  const at = cursorMs.value
+  let i = 0
+  while (i < replayPoints.length - 1 && replayPoints[i + 1].atMs <= at) i++
+  const a = replayPoints[i]
+  const b = replayPoints[Math.min(i + 1, replayPoints.length - 1)]
+  const span = b.atMs - a.atMs
+  const f = span > 0 ? Math.min(1, Math.max(0, (at - a.atMs) / span)) : 0
+  const pos = [a.lat + (b.lat - a.lat) * f, a.lng + (b.lng - a.lng) * f]
+  playbackMarker.setLatLng(pos)
+  playbackTrail.setLatLngs([...replayPoints.slice(0, i + 1).map((p) => [p.lat, p.lng]), pos])
+}
+
+function frame(ts) {
+  if (!playing.value) return
+  const dt = lastFrameTs ? (ts - lastFrameTs) / 1000 : 0
+  lastFrameTs = ts
+  cursorMs.value = Math.min(cursorMs.value + dt * playSpeed.value * 1000, playbackBounds.value.end)
+  renderCursor()
+  if (cursorMs.value >= playbackBounds.value.end) {
+    playing.value = false
+    return
+  }
+  rafId = requestAnimationFrame(frame)
+}
+
+function togglePlayback() {
+  if (!playbackBounds.value) return
+  if (playing.value) {
+    stopPlayback()
+    return
+  }
+  if (cursorMs.value >= playbackBounds.value.end) cursorMs.value = playbackBounds.value.start
+  playing.value = true
+  lastFrameTs = 0
+  rafId = requestAnimationFrame(frame)
+}
+
+function stopPlayback() {
+  playing.value = false
+  if (rafId) cancelAnimationFrame(rafId)
+  rafId = null
+  lastFrameTs = 0
+}
+
+function scrub(e) {
+  cursorMs.value = Number(e.target.value)
+  renderCursor()
+}
+
+function cursorLabel() {
+  return new Date(cursorMs.value).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+}
+
+const speedOptions = computed(() => [
+  { label: t('dispatch.speedSlow'), value: 60 },
+  { label: t('dispatch.speedMedium'), value: 300 },
+  { label: t('dispatch.speedFast'), value: 900 },
+])
+
 function setMode(next) {
   mode.value = next
+  stopPlayback()
+  nearest.value = null
   if (next === 'live') {
     replayLayer.clearLayers()
+    playbackMarker = null
+    playbackTrail = null
+    playbackBounds.value = null
+    replayDistance.value = null
     map.addLayer(agentLayer)
     map.addLayer(siteLayer)
     fitToContent()
@@ -319,6 +463,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  stopPlayback()
   window.removeEventListener('keydown', onKeydown)
   document.body.style.overflow = ''
   channel?.stopListening('.agent.position')
@@ -370,17 +515,70 @@ defineExpose({ reload: loadLive })
           class="rounded-md border border-line bg-card px-2 py-1.5 text-sm text-ink outline-none focus:border-primary"
           :aria-label="$t('dispatch.replayDate')"
         />
+        <!-- Optional hour window: "where was he between 09:00 and 12:00". -->
+        <input
+          v-model="replayFrom"
+          type="time"
+          class="rounded-md border border-line bg-card px-2 py-1.5 text-sm text-ink outline-none focus:border-primary"
+          :aria-label="$t('dispatch.replayFrom')"
+          :title="$t('dispatch.replayFrom')"
+        />
+        <span class="text-xs text-mute">→</span>
+        <input
+          v-model="replayUntil"
+          type="time"
+          class="rounded-md border border-line bg-card px-2 py-1.5 text-sm text-ink outline-none focus:border-primary"
+          :aria-label="$t('dispatch.replayUntil')"
+          :title="$t('dispatch.replayUntil')"
+        />
         <Button
           :label="$t('dispatch.replayLoad')"
-          icon="pi pi-play"
+          icon="pi pi-search"
           size="small"
           :loading="replayLoading"
           :disabled="!replayAgentId"
           @click="loadReplay"
         />
         <span v-if="replayEmpty" class="text-xs text-mute">{{ $t('dispatch.replayEmpty') }}</span>
+        <span v-else-if="replayDistance !== null" class="num text-xs text-mute">
+          {{ $t('dispatch.replayDistance', { km: replayDistance }) }}
+        </span>
       </template>
       <span v-else-if="loading" class="text-xs text-mute">{{ $t('common.loading') }}</span>
+    </div>
+
+    <!-- Playback: scrub the loaded trail like a video. -->
+    <div
+      v-if="mode === 'replay' && playbackBounds"
+      class="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-card px-3 py-2"
+    >
+      <Button
+        :icon="playing ? 'pi pi-pause' : 'pi pi-play'"
+        size="small"
+        rounded
+        :aria-label="playing ? $t('dispatch.replayPause') : $t('dispatch.replayPlay')"
+        @click="togglePlayback"
+      />
+      <input
+        type="range"
+        class="min-w-32 flex-1 accent-primary-500"
+        :min="playbackBounds.start"
+        :max="playbackBounds.end"
+        :step="1000"
+        :value="cursorMs"
+        :aria-label="$t('dispatch.replayScrub')"
+        @input="scrub"
+      />
+      <span class="num w-12 text-center text-sm font-medium text-ink">{{ cursorLabel() }}</span>
+      <Select
+        v-model="playSpeed"
+        :options="speedOptions"
+        option-label="label"
+        option-value="value"
+        size="small"
+        class="w-28"
+        :aria-label="$t('dispatch.replaySpeed')"
+      />
     </div>
 
     <!-- Sites referenced today with no pin: the fix lives on the location page. -->
@@ -416,6 +614,70 @@ defineExpose({ reload: loadLive })
         class="absolute inset-0 z-[500] flex items-center justify-center rounded-xl border border-line bg-card"
       >
         <p class="text-sm text-mute">{{ $t('dispatch.mapOffline') }}</p>
+      </div>
+
+      <!-- "Who is closest" — on-duty agents ranked by road minutes to the
+           clicked site; pending sites can assign right here (recorded as an
+           ordinary board move, Save still applies). -->
+      <div
+        v-if="nearest"
+        class="absolute bottom-2 start-2 top-2 z-[1001] flex w-72 max-w-[85%] flex-col overflow-hidden rounded-xl border border-line bg-card shadow-card"
+      >
+        <div class="flex items-center gap-2 border-b border-line px-3 py-2">
+          <i class="pi pi-compass text-primary-500" aria-hidden="true" />
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-sm font-semibold text-ink">{{ nearest.site.name }}</p>
+            <p class="text-[11px] text-mute">{{ $t('dispatch.nearestTitle') }}</p>
+          </div>
+          <button type="button" class="text-mute hover:text-ink" :aria-label="$t('common.close')" @click="nearest = null">
+            <i class="pi pi-times" aria-hidden="true" />
+          </button>
+        </div>
+
+        <!-- Which pending plan the Assign buttons act on (usually just one). -->
+        <div v-if="nearest.plans.length > 1" class="border-b border-line px-3 py-2">
+          <Select
+            v-model="nearestPlanId"
+            :options="nearest.plans"
+            option-value="action_id"
+            :option-label="(p) => p.client ?? '—'"
+            size="small"
+            class="w-full"
+            :placeholder="$t('dispatch.nearestPickPlan')"
+          />
+        </div>
+
+        <div class="min-h-0 flex-1 overflow-y-auto px-3 py-1">
+          <p v-if="nearestLoading" class="py-4 text-center text-sm text-mute">{{ $t('common.loading') }}</p>
+          <p v-else-if="!nearest.agents.length" class="py-4 text-center text-sm text-mute">
+            {{ $t('dispatch.nearestEmpty') }}
+          </p>
+          <ul v-else class="divide-y divide-line">
+            <li v-for="(a, i) in nearest.agents" :key="a.id" class="flex items-center gap-2 py-2">
+              <span class="num w-4 text-center text-xs text-mute">{{ i + 1 }}</span>
+              <span class="inline-block h-2 w-2 shrink-0 rounded-full" :class="rosterDot(a.status)" />
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-medium text-ink">{{ a.name }}</p>
+                <p class="num text-[11px] text-mute">
+                  <template v-if="a.eta_minutes !== null">
+                    <template v-if="!a.routed">≈ </template>{{ $t('dispatch.etaMin', { n: a.eta_minutes }) }}
+                    <template v-if="a.distance_km !== null"> · {{ $t('dispatch.distanceAway', { km: a.distance_km }) }}</template>
+                  </template>
+                  <template v-else>{{ $t('dispatch.noPosition') }}</template>
+                  · {{ $t('dispatch.loadToday', { n: a.today_load }) }}
+                </p>
+              </div>
+              <Button
+                v-if="nearest.plans.length"
+                :label="$t('dispatch.suggestAssign')"
+                size="small"
+                :outlined="i !== 0"
+                :disabled="!nearestPlanId"
+                @click="assignNearest(a)"
+              />
+            </li>
+          </ul>
+        </div>
       </div>
       <!-- Full-screen toggle (above Leaflet's controls). -->
       <button

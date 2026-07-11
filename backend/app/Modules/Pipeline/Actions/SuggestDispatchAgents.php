@@ -10,6 +10,7 @@ use App\Modules\Pipeline\Models\NextAction;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Pipeline\Support\AgentStatus;
 use App\Modules\Pipeline\Support\Geo;
+use App\Modules\Pipeline\Support\Router;
 use App\Modules\Settings\Models\User;
 use Illuminate\Support\Collection;
 
@@ -46,19 +47,25 @@ class SuggestDispatchAgents
         $live = AgentStatus::forUsers($ids);
         $loads = $this->todayLoads($ids);
         $familiarity = $this->familiarity($ids, $sites->pluck('id')->all());
+        $roads = $this->roadLegs($agents, $live, $pinned);
 
-        $candidates = $agents->map(function (User $agent) use ($live, $loads, $familiarity, $pinned) {
+        $candidates = $agents->map(function (User $agent) use ($live, $loads, $familiarity, $pinned, $roads) {
             $id = (int) $agent->id;
             $position = $live->positionOf($id);
 
-            $distanceKm = null;
-            if ($position !== null && $pinned->isNotEmpty()) {
+            // Road-true km/ETA from the OSRM matrix when the engine answered;
+            // haversine × road-factor otherwise (the launch behaviour).
+            $road = $roads->get($id);
+            $distanceKm = $road['km'] ?? null;
+            $etaMinutes = $road['minutes'] ?? null;
+            if ($distanceKm === null && $position !== null && $pinned->isNotEmpty()) {
                 $distanceKm = $pinned->map(fn (Location $l) => Geo::distanceKm(
                     (float) $position->latitude,
                     (float) $position->longitude,
                     (float) $l->latitude,
                     (float) $l->longitude,
                 ))->min();
+                $etaMinutes = Geo::etaMinutes($distanceKm);
             }
 
             $load = $loads->get($id, 0);
@@ -75,7 +82,8 @@ class SuggestDispatchAgents
                 'name' => $agent->name,
                 'status' => $live->statusOf($id),
                 'distance_km' => $distanceKm !== null ? round($distanceKm, 1) : null,
-                'eta_minutes' => $distanceKm !== null ? Geo::etaMinutes($distanceKm) : null,
+                'eta_minutes' => $etaMinutes,
+                'routed' => $road !== null,
                 'position_age_minutes' => $position !== null
                     ? (int) $position->recorded_at->diffInMinutes(now())
                     : null,
@@ -101,6 +109,48 @@ class SuggestDispatchAgents
             ])->values()->all(),
             'candidates' => $ranked->all(),
         ];
+    }
+
+    /**
+     * One OSRM matrix for every positioned agent × every pinned site → the
+     * best (nearest-site) road leg per agent. Null rows (engine down, agent
+     * without a fix) leave the caller on the haversine path.
+     *
+     * @param  Collection<int, User>  $agents
+     * @param  Collection<int, Location>  $pinned
+     * @return Collection<int, array{km: float, minutes: int}>
+     */
+    private function roadLegs(Collection $agents, AgentStatus $live, Collection $pinned): Collection
+    {
+        $positioned = $agents
+            ->map(fn (User $agent) => ['id' => (int) $agent->id, 'position' => $live->positionOf((int) $agent->id)])
+            ->filter(fn (array $row) => $row['position'] !== null)
+            ->values();
+
+        if ($positioned->isEmpty() || $pinned->isEmpty()) {
+            return new Collection;
+        }
+
+        $matrix = Router::table(
+            $positioned->map(fn (array $row) => [
+                (float) $row['position']->latitude,
+                (float) $row['position']->longitude,
+            ])->all(),
+            $pinned->map(fn (Location $l) => [(float) $l->latitude, (float) $l->longitude])->values()->all(),
+        );
+
+        if ($matrix === null) {
+            return new Collection;
+        }
+
+        return $positioned->mapWithKeys(function (array $row, int $i) use ($matrix) {
+            $best = collect($matrix[$i] ?? [])
+                ->filter(fn (array $leg) => $leg['minutes'] !== null)
+                ->sortBy('minutes')
+                ->first();
+
+            return $best === null ? [] : [$row['id'] => $best];
+        });
     }
 
     /**

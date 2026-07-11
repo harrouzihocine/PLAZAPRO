@@ -215,6 +215,15 @@ return [
         'title' => 'Agent en retard',
         'body' => ":agent n'est pas encore arrivé pour la visite avec :client (:when).",
     ],
+    'visit_offroute' => [
+        'title' => 'Agent hors itinéraire',
+        'body' => ":agent s'est écarté de la route vers :site (visite avec :client).",
+    ],
+    'agent_idle' => [
+        'title' => 'Agent à l\'arrêt',
+        'body' => ':agent est à l\'arrêt depuis :minutes minutes alors qu\'il est disponible.',
+    ],
+
 
     'locate_request' => [
         'title' => 'Vérification de position',

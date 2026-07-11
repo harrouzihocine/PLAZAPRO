@@ -214,6 +214,15 @@ return [
         'title' => 'الوكيل متأخر',
         'body' => 'لم يصل :agent بعد إلى موقع الزيارة مع :client (:when).',
     ],
+    'visit_offroute' => [
+        'title' => 'الوكيل خارج المسار',
+        'body' => 'انحرف :agent عن الطريق نحو :site (زيارة مع :client).',
+    ],
+    'agent_idle' => [
+        'title' => 'الوكيل متوقف',
+        'body' => ':agent متوقف منذ :minutes دقيقة وهو في وضع متاح.',
+    ],
+
 
     'locate_request' => [
         'title' => 'تحديث الموقع',
