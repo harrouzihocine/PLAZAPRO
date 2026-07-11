@@ -42,6 +42,23 @@ function swPrecache() {
           .replace('__PLAZA_BUILD__', build)
           .replace('/*__PLAZA_PRECACHE__*/ []', JSON.stringify(urls)),
       )
+      // The same manifest for the Android shell's NATIVE offline mirror
+      // (OfflineShellStore.java): the WebView cannot route a cold-boot
+      // navigation through the service worker, so the shell keeps its own
+      // on-disk copy of the build and serves it when the device is offline.
+      writeFileSync(
+        resolve(outDir, 'precache.json'),
+        JSON.stringify({
+          build,
+          urls: [
+            '/',
+            '/manifest.webmanifest',
+            '/icons/icon-192.png',
+            '/icons/icon-512.png',
+            ...urls,
+          ],
+        }),
+      )
     },
   }
 }

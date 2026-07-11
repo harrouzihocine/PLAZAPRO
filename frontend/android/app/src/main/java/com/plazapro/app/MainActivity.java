@@ -83,6 +83,10 @@ public class MainActivity extends BridgeActivity {
         fetchPushToken(pushSupported);
         stashLink(getIntent());
 
+        // Keep the native offline mirror of the web build fresh (throttled;
+        // no-op when the build is current) — cold-boot offline serves from it.
+        OfflineShellStore.sync(this);
+
         // Hardware back, Facebook-style (Capacitor 7 ships no handling at all,
         // so without this the first press killed the activity from anywhere).
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -133,6 +137,7 @@ public class MainActivity extends BridgeActivity {
         super.onResume();
         inForeground = true;
         current = new java.lang.ref.WeakReference<>(this);
+        OfflineShellStore.sync(this);
     }
 
     @Override

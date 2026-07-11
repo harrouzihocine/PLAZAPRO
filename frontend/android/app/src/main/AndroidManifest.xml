@@ -71,6 +71,10 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The offline shell mirror checks whether the device has any internet-
+         capable network before serving the app from disk (normal permission,
+         no runtime prompt). -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- On-duty location share: runtime-prompted when the duty switch first
          flips on; the foreground service type is mandatory from Android 14. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />

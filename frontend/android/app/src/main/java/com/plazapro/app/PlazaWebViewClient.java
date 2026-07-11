@@ -3,6 +3,7 @@ package com.plazapro.app;
 import android.net.Uri;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 
 import com.getcapacitor.Bridge;
@@ -40,6 +41,41 @@ class PlazaWebViewClient extends BridgeWebViewClient {
 
     PlazaWebViewClient(Bridge bridge) {
         super(bridge);
+    }
+
+    /**
+     * TRUE cold-boot offline: Android's WebView never routes a MAIN-FRAME
+     * navigation through the service worker, so with no network the app died
+     * on its own error page before any web code ran. While the device reports
+     * no internet, the shell answers app-origin requests from its native
+     * mirror of the build (OfflineShellStore, synced in the background):
+     * index.html for any SPA route, mirrored files for assets. Online, this
+     * returns to Capacitor untouched — including the "internet up, server
+     * down" case, which stays the origin walk's job (onReceivedError below).
+     */
+    @Override
+    public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+        if ("GET".equalsIgnoreCase(request.getMethod())
+                && originIndex(request.getUrl()) >= 0
+                && OfflineShellStore.isDeviceOffline(view.getContext())) {
+            String path = request.getUrl().getPath();
+            if (path != null && servableOffline(path, request.isForMainFrame())) {
+                WebResourceResponse local =
+                        OfflineShellStore.serve(view.getContext(), path, request.isForMainFrame());
+                if (local != null) return local;
+            }
+        }
+        return super.shouldInterceptRequest(view, request);
+    }
+
+    /** SPA routes boot the index; only the mirrored static files otherwise. */
+    private static boolean servableOffline(String path, boolean mainFrame) {
+        if (mainFrame) {
+            return !(path.startsWith("/api") || path.startsWith("/downloads")
+                    || path.startsWith("/storage") || path.startsWith("/broadcasting"));
+        }
+        return path.startsWith("/assets/") || path.startsWith("/icons/")
+                || path.equals("/manifest.webmanifest");
     }
 
     @Override
