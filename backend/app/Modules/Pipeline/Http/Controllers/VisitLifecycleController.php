@@ -27,7 +27,29 @@ class VisitLifecycleController extends Controller
     {
         $this->authorizeOwn($request, $visit);
 
-        return $this->stamp($visit, ['accepted_at' => $visit->accepted_at ?? now()]);
+        $stamps = ['accepted_at' => $visit->accepted_at ?? now()];
+
+        // Accepting an IMMINENT visit means "I'm going now" — save the second
+        // tap. A far-future slot stays accepted-only: precision GPS must not
+        // burn the battery all day (motion detection flips it once the drive
+        // actually starts — RecordAgentPosition).
+        if ($visit->en_route_at === null && $this->isImminent($visit)) {
+            $stamps['en_route_at'] = now();
+        }
+
+        return $this->stamp($visit, $stamps);
+    }
+
+    /** Untimed-today (midnight sentinel), overdue, or due within the hour. */
+    private function isImminent(Visit $visit): bool
+    {
+        $at = $visit->scheduled_at;
+
+        if ($at->hour === 0 && $at->minute === 0) {
+            return $at->isToday() || $at->isPast();
+        }
+
+        return $at->lte(now()->addMinutes(60));
     }
 
     public function enRoute(Request $request, Visit $visit): JsonResponse

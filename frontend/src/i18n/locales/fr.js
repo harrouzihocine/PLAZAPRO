@@ -1063,6 +1063,7 @@ export default {
     mapLoadFailed: 'Impossible de charger la carte live.',
     mapOffline: 'La carte nécessite internet — les données sont intactes, elle revient avec la connexion.',
     pendingSite: 'Site d\u2019une tâche en attente',
+    enRoutePath: 'Trajet en cours',
     unpinnedWarning: 'Pas encore de repère carte : {names} — placez-le sur la page du site pour les distances et le pointage auto.',
     lastSeen: 'Dernière position {time}',
     statusAvailable: 'Disponible',

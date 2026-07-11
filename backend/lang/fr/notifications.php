@@ -223,6 +223,10 @@ return [
         'title' => 'Agent hors itinéraire',
         'body' => ":agent s'est écarté de la route vers :site (visite avec :client).",
     ],
+    'visit_log_prompt' => [
+        'title' => 'Visite terminée — l\'enregistrer ?',
+        'body' => 'Vous venez de quitter le site de votre visite avec :client. Consignez le résultat tant que c\'est frais.',
+    ],
     'agent_idle' => [
         'title' => 'Agent à l\'arrêt',
         'body' => ':agent est à l\'arrêt depuis :minutes minutes alors qu\'il est disponible.',

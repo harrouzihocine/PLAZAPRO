@@ -33,6 +33,9 @@ class RecordAgentPosition
     /** Leaving = beyond radius × this — so GPS jitter at the fence never flaps. */
     private const DEPARTURE_HYSTERESIS = 1.5;
 
+    /** Closing on an accepted site by at least this = the drive started. */
+    private const AUTO_EN_ROUTE_CLOSING_M = 250.0;
+
     /**
      * @param  array{latitude: float, longitude: float, accuracy_m?: int|null, recorded_at?: string|null}  $data
      */
@@ -92,6 +95,14 @@ class RecordAgentPosition
 
         $eta = null;
 
+        // The previous recent fix — the motion evidence for auto en-route.
+        $previous = AgentPosition::query()
+            ->where('user_id', $agent->id)
+            ->where('id', '<', $position->id)
+            ->where('recorded_at', '>=', now()->subMinutes(15))
+            ->orderByDesc('recorded_at')
+            ->first(['latitude', 'longitude']);
+
         foreach ($visits as $visit) {
             $meters = Geo::distanceMeters(
                 (float) $position->latitude,
@@ -116,7 +127,36 @@ class RecordAgentPosition
                 $visit->update(['departed_at' => now()]);
                 VisitLifecycleUpdated::dispatch($visit->fresh());
 
+                // Leaving the site is the natural "log it while it's fresh"
+                // moment — one nudge to the agent, deep-linked to My Day.
+                $agent->notify(new DomainNotification(
+                    kind: 'visit_log_prompt',
+                    key: 'visit_log_prompt',
+                    params: ['client' => $visit->client?->full_name ?? 'a client'],
+                    link: '/my-day',
+                    subjectType: 'visit',
+                    subjectId: $visit->id,
+                ));
+
                 continue;
+            }
+
+            // An ACCEPTED visit whose agent is visibly closing on the site:
+            // the drive started — stamp en route without a tap (the snapshot
+            // cadence alone is enough evidence at driving speed).
+            if ($visit->accepted_at !== null && $visit->en_route_at === null
+                && $previous !== null) {
+                $prevMeters = Geo::distanceMeters(
+                    (float) $previous->latitude,
+                    (float) $previous->longitude,
+                    (float) $visit->unit->location->latitude,
+                    (float) $visit->unit->location->longitude,
+                );
+
+                if ($prevMeters - $meters >= self::AUTO_EN_ROUTE_CLOSING_M) {
+                    $visit->update(['en_route_at' => now()]);
+                    VisitLifecycleUpdated::dispatch($visit->fresh());
+                }
             }
 
             if ($visit->en_route_at !== null && $visit->arrived_at === null) {

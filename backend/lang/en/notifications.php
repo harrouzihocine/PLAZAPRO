@@ -225,6 +225,10 @@ return [
         'title' => 'Agent off route',
         'body' => ':agent drifted off the road to :site (visit with :client).',
     ],
+    'visit_log_prompt' => [
+        'title' => 'Visit over — log it now?',
+        'body' => 'You just left the site of your visit with :client. Record the outcome while it is fresh.',
+    ],
     'agent_idle' => [
         'title' => 'Agent idle',
         'body' => ':agent has been stopped for :minutes minutes while available.',

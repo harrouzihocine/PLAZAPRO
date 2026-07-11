@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import Swal from 'sweetalert2'
 import Button from 'primevue/button'
-import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
@@ -93,6 +92,24 @@ async function step(visit, action) {
   } finally {
     busyId.value = null
   }
+}
+
+// Navigate = "I'm going" — opening the maps app stamps accept + en route in
+// the same tap (idempotent server-side), so driving never needs the stepper.
+function navigate(visit) {
+  if (visit.status !== 'assigned' && visit.status !== 'accepted') return
+  pipelineApi
+    .enRouteVisit(visit.id)
+    .then((data) => {
+      Object.assign(visit, {
+        status: data.status,
+        accepted_at: data.accepted_at,
+        en_route_at: data.en_route_at,
+        arrived_at: data.arrived_at,
+      })
+      syncEnRouteCadence()
+    })
+    .catch(() => {}) // the link still opened maps — the geofence self-heals
 }
 
 async function decline(visit) {
@@ -273,6 +290,7 @@ const statusLabel = (s) => t(VISIT_STATUS_LABEL_KEYS[s] ?? VISIT_STATUS_LABEL_KE
               target="_blank"
               rel="noopener"
               class="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-highlight dark:text-primary-400"
+              @click="navigate(visit)"
             >
               <i class="pi pi-map" aria-hidden="true" /> {{ $t('myday.navigate') }}
             </a>

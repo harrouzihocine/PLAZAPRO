@@ -1064,6 +1064,7 @@ export default {
     mapLoadFailed: 'Could not load the live map.',
     mapOffline: 'The map needs internet — the data is safe, it reappears with the connection.',
     pendingSite: 'Pending task site',
+    enRoutePath: 'En-route path',
     unpinnedWarning: 'No map pin yet: {names} — set it on the location page for distances and auto check-in.',
     lastSeen: 'Last fix {time}',
     statusAvailable: 'Available',

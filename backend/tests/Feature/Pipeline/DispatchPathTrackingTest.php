@@ -158,9 +158,12 @@ class DispatchPathTrackingTest extends TestCase
         $far = $this->userWith([], isAgent: true);
         $near = $this->userWith([], isAgent: true);
         $offDuty = $this->userWith([], isAgent: true);
+        // The controller lists agents by NAME — pin the names so the faked
+        // matrix rows (far = 900 s, near = 300 s) line up deterministically.
+        $far->update(['name' => 'Aaa Far']);
+        $near->update(['name' => 'Bbb Near']);
         $site = Location::factory()->create(['latitude' => self::SITE_LAT, 'longitude' => self::SITE_LNG]);
 
-        // Insertion order = matrix row order (far first, then near).
         $this->onDutyAt($far, self::SITE_LAT + 0.1, self::SITE_LNG);
         $this->onDutyAt($near, self::SITE_LAT + 0.02, self::SITE_LNG);
 
@@ -317,6 +320,134 @@ class DispatchPathTrackingTest extends TestCase
         Notification::assertNothingSent();
 
         Carbon::setTestNow();
+    }
+
+    public function test_accepting_an_imminent_visit_stamps_en_route_too(): void
+    {
+        Carbon::setTestNow(now()->setTime(10, 0));
+        $agent = $this->userWith([], isAgent: true);
+
+        $site = Location::factory()->create(['latitude' => self::SITE_LAT, 'longitude' => self::SITE_LNG]);
+        $unit = Unit::factory()->for($site)->create();
+        $project = ClientProject::factory()->create(['client_id' => Client::factory()->create()->id]);
+
+        $later = Visit::factory()->inSite()->create([
+            'client_id' => $project->client_id, 'client_project_id' => $project->id,
+            'unit_id' => $unit->id, 'agent_id' => $agent->id,
+            'scheduled_at' => now()->setTime(20, 0), 'completed_at' => null,
+        ]);
+        $soon = Visit::factory()->inSite()->create([
+            'client_id' => $project->client_id, 'client_project_id' => $project->id,
+            'unit_id' => $unit->id, 'agent_id' => $agent->id,
+            'scheduled_at' => now()->addMinutes(30), 'completed_at' => null,
+        ]);
+
+        Sanctum::actingAs($agent);
+
+        // A tonight slot accepted in the morning: accepted only — precision
+        // GPS must not burn the battery all day.
+        $this->postJson("/api/v1/visits/{$later->id}/accept")->assertOk()
+            ->assertJsonPath('data.status', 'accepted');
+
+        // Due in 30 minutes: accepting means "I'm going now".
+        $this->postJson("/api/v1/visits/{$soon->id}/accept")->assertOk()
+            ->assertJsonPath('data.status', 'en_route');
+
+        Carbon::setTestNow();
+    }
+
+    public function test_motion_toward_an_accepted_site_stamps_en_route_without_a_tap(): void
+    {
+        Carbon::setTestNow(now()->setTime(10, 0));
+        $agent = $this->userWith([], isAgent: true);
+
+        $site = Location::factory()->create(['latitude' => self::SITE_LAT, 'longitude' => self::SITE_LNG]);
+        $unit = Unit::factory()->for($site)->create();
+        $project = ClientProject::factory()->create(['client_id' => Client::factory()->create()->id]);
+        $visit = Visit::factory()->inSite()->create([
+            'client_id' => $project->client_id, 'client_project_id' => $project->id,
+            'unit_id' => $unit->id, 'agent_id' => $agent->id,
+            'scheduled_at' => now()->setTime(20, 0), 'completed_at' => null,
+            'accepted_at' => now(),
+        ]);
+
+        Sanctum::actingAs($agent);
+        $this->postJson('/api/v1/me/duty', ['on' => true]);
+
+        // Parked ~6.6 km out: one fix alone proves nothing.
+        $this->postJson('/api/v1/me/positions', [
+            'latitude' => self::SITE_LAT + 0.06, 'longitude' => self::SITE_LNG,
+        ])->assertCreated();
+        $this->assertNull($visit->fresh()->en_route_at);
+
+        // Next snapshot ~1.1 km closer: the drive started — en route, and the
+        // server asks the device for precision GPS on the same breath.
+        $this->postJson('/api/v1/me/positions', [
+            'latitude' => self::SITE_LAT + 0.05, 'longitude' => self::SITE_LNG,
+        ])->assertCreated()->assertJsonPath('data.precision', true);
+        $this->assertNotNull($visit->fresh()->en_route_at);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_the_live_map_draws_en_route_legs(): void
+    {
+        $dispatcher = $this->userWith(['visits.dispatch']);
+        $agent = $this->userWith([], isAgent: true);
+
+        $site = Location::factory()->create(['latitude' => self::SITE_LAT, 'longitude' => self::SITE_LNG]);
+        $unit = Unit::factory()->for($site)->create();
+        $project = ClientProject::factory()->create(['client_id' => Client::factory()->create()->id]);
+        $visit = Visit::factory()->inSite()->create([
+            'client_id' => $project->client_id, 'client_project_id' => $project->id,
+            'unit_id' => $unit->id, 'agent_id' => $agent->id,
+            'scheduled_at' => now()->startOfDay()->addHours(20), 'completed_at' => null,
+            'accepted_at' => now(), 'en_route_at' => now(),
+        ]);
+        $this->onDutyAt($agent, self::SITE_LAT + 0.05, self::SITE_LNG);
+
+        Sanctum::actingAs($dispatcher);
+        $data = $this->getJson('/api/v1/dispatch/map')->assertOk()->json('data');
+
+        $leg = collect($data['legs'])->firstWhere('visit_id', $visit->id);
+        $this->assertNotNull($leg);
+        $this->assertSame($agent->id, $leg['agent_id']);
+        $this->assertSame($site->id, $leg['site']['id']);
+        $this->assertNotNull($leg['eta_minutes']);
+        // Engine down → the leg degrades to a straight two-point line, flagged.
+        $this->assertFalse($leg['routed']);
+        $this->assertCount(2, $leg['polyline']);
+    }
+
+    public function test_departure_prompts_the_agent_to_log_the_visit(): void
+    {
+        Notification::fake();
+        $agent = $this->userWith([], isAgent: true);
+
+        $site = Location::factory()->create(['latitude' => self::SITE_LAT, 'longitude' => self::SITE_LNG]);
+        $unit = Unit::factory()->for($site)->create();
+        $project = ClientProject::factory()->create(['client_id' => Client::factory()->create()->id]);
+        $visit = Visit::factory()->inSite()->create([
+            'client_id' => $project->client_id, 'client_project_id' => $project->id,
+            'unit_id' => $unit->id, 'agent_id' => $agent->id,
+            'scheduled_at' => now()->startOfDay()->addHours(20), 'completed_at' => null,
+            'accepted_at' => now(), 'en_route_at' => now(), 'arrived_at' => now(),
+        ]);
+
+        Sanctum::actingAs($agent);
+        $this->postJson('/api/v1/me/duty', ['on' => true]);
+
+        // ~700 m away — beyond radius × hysteresis: departure + the nudge.
+        $this->postJson('/api/v1/me/positions', [
+            'latitude' => self::SITE_LAT + 0.0063, 'longitude' => self::SITE_LNG,
+        ])->assertCreated();
+
+        $this->assertNotNull($visit->fresh()->departed_at);
+        Notification::assertSentTo(
+            $agent,
+            DomainNotification::class,
+            fn ($n) => $n->kind === 'visit_log_prompt' && $n->subjectId === $visit->id,
+        );
     }
 
     public function test_offroute_drift_flags_the_dispatchers_once(): void

@@ -26,6 +26,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * The dispatcher's live layer (visits.dispatch, like the board):
@@ -99,6 +100,9 @@ class DispatchLiveController extends Controller
                 ...$live->payloadFor((int) $u->id),
             ])->values(),
             'sites' => $sites,
+            // Live en-route legs: the road each driving agent is on, drawn
+            // from their freshest fix to the target site — "where is he going".
+            'legs' => $this->enRouteLegs($visits, $live),
             'pending_sites' => $pendingSites,
             // Sites referenced today with no pin — the dispatcher's cue to go
             // drop the marker on the location form.
@@ -385,6 +389,89 @@ class DispatchLiveController extends Controller
                 ];
             })->values(),
         ]]);
+    }
+
+    /**
+     * The live legs: for every en-route, not-yet-arrived visit whose agent has
+     * a fix, the road to the site (the off-route corridor doubles as the
+     * drawing — computed here when a leg went en route without one, e.g. the
+     * motion auto-stamp). Engine down = a straight dashed line, flagged.
+     *
+     * @param  \Illuminate\Support\Collection<int, Visit>  $visits
+     * @return list<array<string, mixed>>
+     */
+    private function enRouteLegs($visits, AgentStatus $live): array
+    {
+        return $visits
+            ->filter(fn (Visit $v) => $v->en_route_at !== null && $v->arrived_at === null
+                && $v->completed_at === null
+                && $v->unit?->location?->latitude !== null && $v->unit->location->longitude !== null)
+            ->map(function (Visit $v) use ($live) {
+                $position = $live->positionOf((int) $v->agent_id);
+                if ($position === null) {
+                    return null;
+                }
+
+                $from = [(float) $position->latitude, (float) $position->longitude];
+                $to = [(float) $v->unit->location->latitude, (float) $v->unit->location->longitude];
+
+                $corridorKey = "dispatch:corridor:{$v->id}";
+                $polyline = Cache::get($corridorKey);
+                if ($polyline === null) {
+                    $route = Router::route($from, $to);
+                    if ($route !== null) {
+                        $polyline = $route['polyline'];
+                        Cache::put($corridorKey, $polyline, now()->addHours(6));
+                    }
+                }
+
+                $routed = $polyline !== null;
+                $polyline ??= [$from, $to];
+
+                return [
+                    'visit_id' => $v->id,
+                    'agent_id' => (int) $v->agent_id,
+                    'agent' => $v->agent?->name,
+                    'client' => $v->client?->full_name,
+                    'site' => [
+                        'id' => $v->unit->location->id,
+                        'name' => $v->unit->location->name,
+                        'lat' => $to[0],
+                        'lng' => $to[1],
+                    ],
+                    'eta_minutes' => Geo::etaMinutes(Geo::distanceKm($from[0], $from[1], $to[0], $to[1])),
+                    'routed' => $routed,
+                    'polyline' => $this->decimate($polyline),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Cap a polyline at ~150 points (ends kept) — plenty for drawing.
+     *
+     * @param  list<array{0: float, 1: float}>  $points
+     * @return list<array{0: float, 1: float}>
+     */
+    private function decimate(array $points): array
+    {
+        $count = count($points);
+        if ($count <= 150) {
+            return $points;
+        }
+
+        $step = (int) ceil($count / 150);
+        $kept = [];
+        for ($i = 0; $i < $count; $i += $step) {
+            $kept[] = $points[$i];
+        }
+        if (end($kept) !== $points[$count - 1]) {
+            $kept[] = $points[$count - 1];
+        }
+
+        return $kept;
     }
 
     /**

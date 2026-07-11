@@ -78,10 +78,12 @@ const nearestPlanId = ref(null)
 let map = null
 let agentLayer = null
 let siteLayer = null
+let legLayer = null
 let replayLayer = null
 let channel = null
 let sitesCache = []
 let pendingCache = []
+let legsCache = [] // live en-route legs: agent → target site roads
 // Marker per agent id, so the roster's "show me" can fly to and open one.
 const agentMarkers = new Map()
 
@@ -161,7 +163,12 @@ function agentPopup(agent) {
   const seen = agent.position?.at
     ? `<div style="opacity:.7">${t('dispatch.lastSeen', { time: formatDateTime(agent.position.at) })}</div>`
     : ''
-  return `<div style="min-width:150px"><strong>${agent.name}</strong><div>${status}</div>${seen}</div>`
+  // Driving somewhere? Say where, and how far out he is.
+  const leg = legsCache.find((l) => l.agent_id === agent.id)
+  const heading = leg
+    ? `<div style="color:#d97706;font-weight:600">→ ${leg.site.name} · ${t('dispatch.etaMin', { n: leg.eta_minutes })}</div>`
+    : ''
+  return `<div style="min-width:150px"><strong>${agent.name}</strong><div>${status}</div>${heading}${seen}</div>`
 }
 
 function renderAgents() {
@@ -244,17 +251,34 @@ function fitToContent() {
   if (bounds.isValid()) map.fitBounds(bounds.pad(0.2), { maxZoom: 14 })
 }
 
-async function loadLive() {
+// The dashed amber roads en-route agents are driving — "where is he going".
+function renderLegs() {
+  legLayer.clearLayers()
+  for (const leg of legsCache) {
+    L.polyline(leg.polyline, {
+      color: '#d97706',
+      weight: 3.5,
+      opacity: 0.8,
+      dashArray: leg.routed ? '8 10' : '2 8', // dotted = straight-line estimate
+    })
+      .bindTooltip(`${leg.agent ?? ''} → ${leg.site.name} · ${t('dispatch.etaMin', { n: leg.eta_minutes })}`)
+      .addTo(legLayer)
+  }
+}
+
+async function loadLive(fit = true) {
   loading.value = true
   try {
     const data = await pipelineApi.dispatchMap()
     agents.value = data.agents
     sitesCache = data.sites
     pendingCache = data.pending_sites ?? []
+    legsCache = data.legs ?? []
     unpinned.value = data.unpinned_site_names ?? []
     renderAgents()
     renderSites()
-    fitToContent()
+    renderLegs()
+    if (fit) fitToContent()
   } catch (e) {
     toastError(e.response?.data?.message ?? t('dispatch.mapLoadFailed'))
   } finally {
@@ -399,10 +423,12 @@ function setMode(next) {
     replayDistance.value = null
     map.addLayer(agentLayer)
     map.addLayer(siteLayer)
+    map.addLayer(legLayer)
     fitToContent()
   } else {
     map.removeLayer(agentLayer)
     map.removeLayer(siteLayer)
+    map.removeLayer(legLayer)
   }
 }
 
@@ -430,7 +456,12 @@ function subscribe() {
       const visit = site.visits.find((v) => v.id === e.visit_id)
       if (visit) visit.status = e.status
     }
-    if (mode.value === 'live') renderSites()
+    if (mode.value === 'live') {
+      renderSites()
+      // A leg started or ended — refetch so the road (dis)appears, without
+      // yanking the viewport around.
+      loadLive(false)
+    }
   })
 }
 
@@ -450,6 +481,7 @@ onMounted(() => {
 
   agentLayer = L.layerGroup().addTo(map)
   siteLayer = L.layerGroup().addTo(map)
+  legLayer = L.layerGroup().addTo(map)
   replayLayer = L.layerGroup().addTo(map)
 
   // Leaflet measures its container before layout settles — re-measure after paint.
@@ -700,6 +732,10 @@ defineExpose({ reload: loadLive })
       <span class="inline-flex items-center gap-1.5">
         <span class="inline-block h-2.5 w-2.5 rounded-full border-2 border-amber-500 bg-amber-500/15" />
         {{ $t('dispatch.pendingSite') }}
+      </span>
+      <span class="inline-flex items-center gap-1.5">
+        <span class="inline-block h-0.5 w-5 border-t-2 border-dashed border-amber-600" />
+        {{ $t('dispatch.enRoutePath') }}
       </span>
     </div>
   </div>
