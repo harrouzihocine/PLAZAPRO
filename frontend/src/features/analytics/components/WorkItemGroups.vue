@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import Popover from 'primevue/popover'
 import { formatDateTime, humanize } from '@/utils/format'
 import { copyToClipboard } from '@/composables/useClipboard'
+import OfficeVisitInviteButton from '@/features/pipeline/components/OfficeVisitInviteButton.vue'
 import { t } from '@/i18n'
 
 // Renders personal work (calls / office visits / in-site visits / tasks) as one
@@ -65,6 +66,15 @@ function openLabel(item) {
               <span v-if="item.location" class="text-mute">· {{ item.location }}</span>
             </span>
           </RouterLink>
+          <!-- Office visits: invite the client to come to us, right from here. -->
+          <OfficeVisitInviteButton
+            v-if="item.kind === 'office_visit'"
+            :client-name="item.client"
+            :phone="item.phone"
+            :scheduled-at="item.due_at"
+            size="sm"
+            class="me-0.5"
+          />
           <button
             type="button"
             class="me-1 shrink-0 text-mute transition-colors hover:text-ink"

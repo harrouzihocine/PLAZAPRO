@@ -133,7 +133,7 @@ class BuildDashboard
             ->where(fn ($q) => $q
                 ->where('agent_id', $user->id)
                 ->orWhereIn('client_project_id', $projectIds))
-            ->with(['client:id,first_name,last_name', 'unit.location'])
+            ->with(['client:id,first_name,last_name,phone', 'unit.location'])
             ->orderBy('scheduled_at')
             ->get()
             ->map(fn (Visit $v) => [
@@ -142,6 +142,8 @@ class BuildDashboard
                 'due_at' => $v->scheduled_at,
                 'is_overdue' => true,
                 'client' => $v->client?->full_name,
+                // Powers the "invite to office" action on office-visit items.
+                'phone' => $v->client?->phone,
                 'unit' => $v->unit?->reference,
                 'location' => $v->unit?->location?->name,
                 'maps_url' => $v->unit?->location?->mapsUrl(),

@@ -19,6 +19,11 @@ const reservedHours = ref('')
 const maxAttempts = ref('')
 const lockoutMinutes = ref('')
 const officeWindowDays = ref('')
+// The company / office profile, printed into the office-visit invitation.
+const companyName = ref('')
+const officeAddress = ref('')
+const officeMapsUrl = ref('')
+const officePhone = ref('')
 const geofenceRadius = ref('')
 const acceptSla = ref('')
 const arrivalGrace = ref('')
@@ -28,6 +33,7 @@ const idleAlertMinutes = ref('')
 const offrouteMeters = ref('')
 const loading = ref(true)
 const saving = ref(false)
+const savingCompany = ref(false)
 
 async function load() {
   try {
@@ -37,6 +43,10 @@ async function load() {
     maxAttempts.value = settings.login_max_attempts ?? '3'
     lockoutMinutes.value = settings.login_lockout_minutes ?? '0'
     officeWindowDays.value = settings.office_visit_max_days ?? '1'
+    companyName.value = settings.company_name ?? ''
+    officeAddress.value = settings.office_address ?? ''
+    officeMapsUrl.value = settings.office_maps_url ?? ''
+    officePhone.value = settings.office_phone ?? ''
     geofenceRadius.value = settings.dispatch_geofence_radius_m ?? '200'
     acceptSla.value = settings.dispatch_accept_sla_minutes ?? '15'
     arrivalGrace.value = settings.dispatch_arrival_grace_minutes ?? '15'
@@ -118,12 +128,61 @@ async function save() {
     saving.value = false
   }
 }
+
+// The company / office profile saves on its own — a partial PUT, so it never
+// depends on the numeric fields validating. Empty fields are sent as null so
+// the server clears them (and skips the URL check on a blank maps link).
+async function saveCompany() {
+  const maps = officeMapsUrl.value.trim()
+  if (maps && !/^https?:\/\//i.test(maps)) {
+    toastError(t('settings.mapsUrlInvalid'))
+    return
+  }
+  savingCompany.value = true
+  try {
+    await appSettingsApi.save({
+      company_name: companyName.value.trim() || null,
+      office_address: officeAddress.value.trim() || null,
+      office_maps_url: maps || null,
+      office_phone: officePhone.value.trim() || null,
+    })
+    toastSuccess(t('settings.saved'))
+  } catch (e) {
+    toastError(e.response?.data?.message ?? t('settings.saveFailed'))
+  } finally {
+    savingCompany.value = false
+  }
+}
 </script>
 
 <template>
   <div>
     <PageHeader :title="$t('settings.general')" :subtitle="$t('settings.generalSubtitle')" />
-    <SectionCard :title="$t('settings.holds')" icon="pi pi-clock">
+
+    <!-- The company / office profile: printed into the office-visit invitation
+         agents send clients ("come to us"). Every field is optional. -->
+    <SectionCard :title="$t('settings.companyProfile')" icon="pi pi-building">
+      <p v-if="loading" class="text-sm text-mute">{{ $t('common.loading') }}</p>
+      <form v-else class="max-w-md space-y-4" @submit.prevent="saveCompany">
+        <p class="text-xs text-mute">{{ $t('settings.companyProfileHint') }}</p>
+        <BaseInput v-model="companyName" :label="$t('settings.companyNameLabel')" maxlength="120" />
+        <BaseInput v-model="officeAddress" :label="$t('settings.officeAddressLabel')" maxlength="255" />
+        <div>
+          <BaseInput
+            v-model="officeMapsUrl"
+            :label="$t('settings.officeMapsLabel')"
+            type="url"
+            placeholder="https://maps.google.com/…"
+            maxlength="500"
+          />
+          <p class="mt-1.5 text-xs text-mute">{{ $t('settings.officeMapsHint') }}</p>
+        </div>
+        <BaseInput v-model="officePhone" :label="$t('settings.officePhoneLabel')" maxlength="40" />
+        <Button type="submit" :label="$t('common.save')" icon="pi pi-check" :loading="savingCompany" />
+      </form>
+    </SectionCard>
+
+    <SectionCard :title="$t('settings.holds')" icon="pi pi-clock" class="mt-6">
       <p v-if="loading" class="text-sm text-mute">{{ $t('common.loading') }}</p>
       <form v-else class="max-w-md space-y-4" @submit.prevent="save">
         <div>

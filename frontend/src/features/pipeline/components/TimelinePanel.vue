@@ -15,11 +15,12 @@ import CallLogForm from '@/features/pipeline/components/CallLogForm.vue'
 import CompleteVisitForm from '@/features/pipeline/components/CompleteVisitForm.vue'
 import LogTimeline from '@/features/pipeline/components/LogTimeline.vue'
 import NextActionFields from '@/features/pipeline/components/NextActionFields.vue'
+import OfficeVisitInviteButton from '@/features/pipeline/components/OfficeVisitInviteButton.vue'
 import { pipelineApi } from '@/features/pipeline/api'
 import { byNewest, callEntries, visitEntries } from '@/features/pipeline/timeline'
 import { useAuthStore } from '@/features/settings/store'
 import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
-import { toastInfo, toastSuccess } from '@/composables/useConfirm'
+import { confirmAction, toastInfo, toastSuccess } from '@/composables/useConfirm'
 import { dateInputValue, formatDate, formatTimeIfSet, humanize, timeInputValue } from '@/utils/format'
 import { i18n, t } from '@/i18n'
 
@@ -94,6 +95,12 @@ async function submitPlanNa() {
   planNa.open = false
   planNa.form = emptyNextAction()
   emit('changed')
+}
+
+// Wipe everything picked in the plan-next-action form back to a blank plan.
+async function resetPlanNa() {
+  if (!(await confirmAction({ text: t('common.resetFormConfirm') }))) return
+  planNa.form = emptyNextAction()
 }
 
 // In-site plans may stay unassigned — the dispatch board picks the agent.
@@ -358,6 +365,17 @@ async function submitEditNa() {
           outlined
           @click="planNa.open = false"
         />
+        <Button
+          type="button"
+          :label="$t('common.reset')"
+          icon="pi pi-refresh"
+          size="small"
+          severity="secondary"
+          text
+          class="ms-auto"
+          :disabled="store.saving"
+          @click="resetPlanNa"
+        />
       </div>
     </form>
 
@@ -403,6 +421,14 @@ async function submitEditNa() {
             <span v-if="na.assigned_to?.name" class="text-xs text-mute">
               {{ na.assigned_to.name }}
             </span>
+            <!-- Planned office visit: invite the client to come to us. -->
+            <OfficeVisitInviteButton
+              v-if="na.type === 'office_visit'"
+              :client-name="store.current?.full_name"
+              :phone="store.current?.phone"
+              :scheduled-at="na.due_at"
+              size="sm"
+            />
             <Button
               v-if="canLogCall()"
               icon="pi pi-pencil"

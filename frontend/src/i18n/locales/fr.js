@@ -1343,6 +1343,14 @@ export default {
     officeWindowHint:
       '0 = aujourd’hui uniquement, 1 = aujourd’hui ou demain. Une visite bureau planifiée plus loin est créée « en attente d’accord » et un dispatcheur doit l’approuver, la refuser ou la replanifier.',
     officeWindowInvalid: 'La fenêtre de visite bureau doit être de 0 jour ou plus.',
+    companyProfile: 'Société / bureau',
+    companyProfileHint: "Utilisé dans l'invitation de visite au bureau que les agents envoient aux clients. Chaque champ est facultatif — un champ vide est omis du message.",
+    companyNameLabel: 'Nom de la société',
+    officeAddressLabel: 'Adresse du bureau',
+    officeMapsLabel: 'Lien Google Maps',
+    officeMapsHint: 'Collez un lien Google Maps vers votre bureau pour donner aux clients un itinéraire en un clic.',
+    officePhoneLabel: 'Téléphone du bureau',
+    mapsUrlInvalid: 'Le lien Google Maps doit commencer par http:// ou https://.',
     listNames: {
       project_payment_methods: 'Modes de paiement du projet',
       payment_methods: 'Modes de paiement',
@@ -2072,5 +2080,23 @@ export default {
   workItems: {
     openTask: 'Ouvrir la tâche',
     openClient: 'Ouvrir le client',
+  },
+  officeInvite: {
+    action: 'Inviter au bureau',
+    ariaSend: 'Envoyer une invitation de visite au bureau à {name}',
+    noPhone: 'Aucun numéro de téléphone enregistré',
+    whatsapp: 'WhatsApp',
+    sms: 'SMS',
+    copy: 'Copier le message',
+    copied: 'Invitation copiée.',
+    greeting: 'Bonjour,',
+    greetingNamed: 'Bonjour {name},',
+    body: 'Nous serions ravis de vous accueillir dans nos bureaux.',
+    bodyCompany: 'Nous serions ravis de vous accueillir dans les bureaux de {company}.',
+    when: 'Votre rendez-vous : {datetime}',
+    address: 'Adresse : {address}',
+    maps: 'Itinéraire : {maps}',
+    phone: 'Téléphone : {phone}',
+    close: 'À très bientôt !',
   },
 }

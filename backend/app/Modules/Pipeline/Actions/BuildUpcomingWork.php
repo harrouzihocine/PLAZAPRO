@@ -69,7 +69,7 @@ class BuildUpcomingWork
             ->where(fn ($q) => $q
                 ->where('agent_id', $user->id)
                 ->orWhereIn('client_project_id', $projectIds))
-            ->with(['client:id,first_name,last_name', 'unit.location', 'agent:id,name'])
+            ->with(['client:id,first_name,last_name,phone', 'unit.location', 'agent:id,name'])
             ->orderBy('scheduled_at')
             ->get()
             ->map(fn (Visit $v) => [
@@ -79,6 +79,8 @@ class BuildUpcomingWork
                 'is_overdue' => $v->scheduled_at->isPast(),
                 'assigned_to' => $v->agent?->name,
                 'client' => $v->client?->full_name,
+                // Powers the "invite to office" action on office-visit items.
+                'phone' => $v->client?->phone,
                 'unit' => $v->unit?->reference,
                 'location' => $v->unit?->location?->name,
                 // The field agent opens the site straight in Google Maps.

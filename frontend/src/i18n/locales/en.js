@@ -1344,6 +1344,14 @@ export default {
     officeWindowHint:
       '0 = today only, 1 = today or tomorrow. An office visit planned further out is created as "awaiting approval" and a dispatcher must approve, deny or reschedule it.',
     officeWindowInvalid: 'The office-visit window must be 0 or more days.',
+    companyProfile: 'Company / office',
+    companyProfileHint: 'Used in the office-visit invitation agents send clients. Every field is optional — a blank one is left out of the message.',
+    companyNameLabel: 'Company name',
+    officeAddressLabel: 'Office address',
+    officeMapsLabel: 'Google Maps link',
+    officeMapsHint: 'Paste a Google Maps link to your office so clients get one-tap directions.',
+    officePhoneLabel: 'Office phone',
+    mapsUrlInvalid: 'The Google Maps link must start with http:// or https://.',
     listNames: {
       project_payment_methods: 'Project Payment Methods',
       payment_methods: 'Payment Methods',
@@ -2073,5 +2081,23 @@ export default {
   workItems: {
     openTask: 'Open task',
     openClient: 'Open client',
+  },
+  officeInvite: {
+    action: 'Invite to office',
+    ariaSend: 'Send an office-visit invitation to {name}',
+    noPhone: 'No phone number on file',
+    whatsapp: 'WhatsApp',
+    sms: 'SMS',
+    copy: 'Copy message',
+    copied: 'Invitation copied.',
+    greeting: 'Hello,',
+    greetingNamed: 'Hello {name},',
+    body: 'We would be glad to welcome you at our office.',
+    bodyCompany: 'We would be glad to welcome you at the offices of {company}.',
+    when: 'Your appointment: {datetime}',
+    address: 'Address: {address}',
+    maps: 'Directions: {maps}',
+    phone: 'Phone: {phone}',
+    close: 'See you soon!',
   },
 }

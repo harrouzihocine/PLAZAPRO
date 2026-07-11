@@ -1343,6 +1343,14 @@ export default {
     officeWindowHint:
       '0 = اليوم فقط، 1 = اليوم أو غدًا. زيارة المكتب المخططة أبعد من ذلك تُنشأ «بانتظار الموافقة» وعلى موزّع أن يوافق عليها أو يرفضها أو يعيد جدولتها.',
     officeWindowInvalid: 'يجب أن تكون نافذة زيارة المكتب 0 يومًا أو أكثر.',
+    companyProfile: 'الشركة / المكتب',
+    companyProfileHint: 'تُستخدم في دعوة زيارة المكتب التي يرسلها الوكلاء للعملاء. كل الحقول اختيارية — يُحذف الحقل الفارغ من الرسالة.',
+    companyNameLabel: 'اسم الشركة',
+    officeAddressLabel: 'عنوان المكتب',
+    officeMapsLabel: 'رابط خرائط Google',
+    officeMapsHint: 'الصق رابط خرائط Google لمكتبك ليحصل العملاء على الاتجاهات بنقرة واحدة.',
+    officePhoneLabel: 'هاتف المكتب',
+    mapsUrlInvalid: 'يجب أن يبدأ رابط خرائط Google بـ http:// أو https://.',
     listNames: {
       project_payment_methods: 'طرق دفع المشروع',
       payment_methods: 'طرق الدفع',
@@ -2072,5 +2080,23 @@ export default {
   workItems: {
     openTask: 'فتح المهمة',
     openClient: 'فتح العميل',
+  },
+  officeInvite: {
+    action: 'دعوة إلى المكتب',
+    ariaSend: 'إرسال دعوة لزيارة المكتب إلى {name}',
+    noPhone: 'لا يوجد رقم هاتف مسجّل',
+    whatsapp: 'واتساب',
+    sms: 'رسالة SMS',
+    copy: 'نسخ الرسالة',
+    copied: 'تم نسخ الدعوة.',
+    greeting: 'مرحبًا،',
+    greetingNamed: 'مرحبًا {name}،',
+    body: 'يسعدنا استقبالكم في مكتبنا.',
+    bodyCompany: 'يسعدنا استقبالكم في مكاتب {company}.',
+    when: 'موعدكم: {datetime}',
+    address: 'العنوان: {address}',
+    maps: 'الاتجاهات: {maps}',
+    phone: 'الهاتف: {phone}',
+    close: 'نراكم قريبًا!',
   },
 }
