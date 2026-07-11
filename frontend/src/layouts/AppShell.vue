@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
@@ -87,8 +87,29 @@ watch(
     // it heals without a manual refresh. Handler-registered views only: the
     // full-reload PTR fallback must never fire on its own mid-session.
     if (hasRefreshHandler(route.name)) runRefresh(route.name)
+    // The link is back: refresh the offline working set while it lasts.
+    prewarmSoon()
   },
 )
+
+// Offline pre-warm (features/offline/prewarm.js): snapshot the user's working
+// set — agenda, clients, tasks, chat, inventory — in an idle slot so a later
+// no-signal open has data, not just code. Dynamic import: the feature stores
+// it touches must not ride in the boot chunk.
+function prewarmSoon() {
+  const idle = window.requestIdleCallback ?? ((fn) => setTimeout(fn, 3000))
+  idle(() => {
+    import('@/features/offline/prewarm')
+      .then((m) => m.prewarmOfflineData())
+      .catch(() => {})
+  })
+}
+
+// The service worker's Background Sync hands the outbox replay to a live page
+// when one exists (full Sync Center UI); this is that hand-off listener.
+function onSwMessage(event) {
+  if (event.data?.type === 'plaza-outbox-sync') outbox.sync()
+}
 // A fresh login (including re-login after a mid-sync 401) resumes the queue.
 watch(
   () => auth.user?.id,
@@ -107,6 +128,8 @@ onMounted(async () => {
   initAppUpdateCheck()
   await outbox.load(auth.user?.id)
   if (network.online) outbox.sync()
+  navigator.serviceWorker?.addEventListener('message', onSwMessage)
+  prewarmSoon()
   announcements.subscribe()
   // Everyone joins the `online` presence channel so the app's green "Active
   // now" dots reflect web users too; the web UI itself never shows them.
@@ -121,6 +144,10 @@ onMounted(async () => {
   } catch {
     /* badges are best-effort */
   }
+})
+
+onBeforeUnmount(() => {
+  navigator.serviceWorker?.removeEventListener('message', onSwMessage)
 })
 
 const search = ref(null)

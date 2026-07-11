@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\EnsureUserActive;
+use App\Http\Middleware\EtagOnGet;
 use App\Http\Middleware\IdempotencyKey;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
@@ -69,7 +70,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // it runs after Sanctum's stateful session is resolved.
         // SetLocale then answers in the caller's language (Accept-Language from
         // the SPA, or the user's saved locale) — validation errors included.
-        $middleware->api(append: [EnsureUserActive::class, SetLocale::class]);
+        // EtagOnGet turns unchanged JSON GETs into empty 304s (reconnect
+        // refetches on weak links cost headers, not payloads).
+        $middleware->api(append: [EnsureUserActive::class, SetLocale::class, EtagOnGet::class]);
 
         // Global API rate limiting (named limiter defined in RbacServiceProvider).
         $middleware->throttleApi('api');

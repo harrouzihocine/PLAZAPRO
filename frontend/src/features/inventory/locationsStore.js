@@ -15,6 +15,7 @@ export const useLocationsStore = defineStore('locations', {
     loading: false,
     saving: false,
     error: '',
+    offlineAt: null, // data served from the offline snapshot (views show a stamp)
     filters: { q: '', wilaya_id: '', commune_id: '', priority: '' },
   }),
 
@@ -35,13 +36,15 @@ export const useLocationsStore = defineStore('locations', {
         const items = await locationsApi.list(params)
         if (ticket !== this._fetchTicket) return
         this.items = items
+        this.offlineAt = null
         if (defaultView) cacheSnapshot('locations:list', items)
       } catch (e) {
         if (ticket !== this._fetchTicket) return
         const served =
           defaultView &&
-          (await serveSnapshot(e, 'locations:list', (data) => {
+          (await serveSnapshot(e, 'locations:list', (data, at) => {
             this.items = data
+            this.offlineAt = at
           }))
         if (!served) throw e
       } finally {
@@ -108,3 +111,9 @@ export const useLocationsStore = defineStore('locations', {
     },
   },
 })
+
+// Offline pre-warm twin of fetch()'s default-view snapshot (same key + shape,
+// no reactive state) — see features/offline/prewarm.js.
+export async function prewarmLocations() {
+  await cacheSnapshot('locations:list', await locationsApi.list({}))
+}

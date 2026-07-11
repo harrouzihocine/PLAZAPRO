@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { toRaw } from 'vue'
 import { idb } from '@/features/offline/idb'
+import { registerOutboxSync } from '@/features/offline/backgroundSync'
 import { useNetworkStore } from '@/features/offline/networkStore'
 import { useApi } from '@/composables/useApi'
 import { toastError, toastSuccess } from '@/composables/useConfirm'
@@ -57,6 +58,9 @@ export const useOutboxStore = defineStore('outbox', {
           .filter((i) => i.userId === userId)
           .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
           .map((i) => ({ ...i, status: i.status === 'syncing' ? 'pending' : i.status }))
+        // Leftovers from a killed app: arm the SW replay in case the app is
+        // closed again before the connection returns.
+        if (this.items.some((i) => i.status === 'pending')) registerOutboxSync()
       } catch {
         this.items = []
       }
@@ -80,6 +84,9 @@ export const useOutboxStore = defineStore('outbox', {
       }
       await idb.put('outbox', record).catch(() => {})
       this.items.push(record)
+      // Replay survives an app kill: the SW's Background Sync fires when
+      // connectivity returns even with no page open.
+      registerOutboxSync()
       return record
     },
 
@@ -122,9 +129,11 @@ export const useOutboxStore = defineStore('outbox', {
             applied++
           } catch (e) {
             if (!e.response) {
-              // Connection dropped again — stop here, keep FIFO order intact.
+              // Connection dropped again — stop here, keep FIFO order intact,
+              // and re-arm the SW replay for the next connectivity window.
               item.status = 'pending'
               await this._persist(item)
+              registerOutboxSync()
               break
             }
             if (e.response.status === 401) {

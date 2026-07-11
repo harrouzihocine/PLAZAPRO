@@ -161,3 +161,10 @@ export const useUnitsStore = defineStore('units', {
     },
   },
 })
+
+// Offline pre-warm twin of fetch()'s default-view snapshot (same key + shape,
+// no reactive state) — see features/offline/prewarm.js.
+export async function prewarmUnits() {
+  const { items, total } = await unitsApi.listPaged({ page: 1, per_page: 25 })
+  await cacheSnapshot('units:list', { items, total })
+}

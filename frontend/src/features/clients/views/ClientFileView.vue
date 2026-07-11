@@ -7,6 +7,7 @@ import Badge from 'primevue/badge'
 import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
 import BaseModal from '@/components/base/BaseModal.vue'
+import OfflineStamp from '@/components/ui/OfflineStamp.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
@@ -150,6 +151,7 @@ async function submitNewProject(callPayload) {
     />
 
     <template v-else>
+      <OfflineStamp :at="store.offlineAt" />
       <PageHeader :title="store.current.full_name" :back="{ name: 'clients' }">
         <template #back-label>{{ $t('clients.allClients') }}</template>
         <template #badges>

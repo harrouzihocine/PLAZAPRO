@@ -15,6 +15,6 @@ defineProps({
     role="status"
   >
     <i class="pi pi-history text-[11px]" aria-hidden="true" />
-    Offline — showing data saved {{ formatDateTime(at) }}
+    {{ $t('offline.showingSaved', { time: formatDateTime(at) }) }}
   </p>
 </template>

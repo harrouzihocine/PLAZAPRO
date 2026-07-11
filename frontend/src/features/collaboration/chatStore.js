@@ -612,3 +612,18 @@ export const useChatStore = defineStore('chat', {
     },
   },
 })
+
+// Offline pre-warm twin of fetchConversations()/loadThread()'s snapshots (same
+// keys + shapes, no reactive state) — see features/offline/prewarm.js. The
+// most recent threads are what an agent reads back offline.
+export async function prewarmChat(threadCount = 5) {
+  const conversations = await chatApi.conversations()
+  await cacheSnapshot('chat:conversations', conversations)
+  for (const c of conversations.slice(0, threadCount)) {
+    try {
+      cacheSnapshot(`chat:thread:${Number(c.id)}`, await chatApi.messages(c.id))
+    } catch {
+      /* silent: pre-warm is best-effort */
+    }
+  }
+}

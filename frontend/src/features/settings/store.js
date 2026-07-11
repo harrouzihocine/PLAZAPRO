@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { authApi } from '@/features/settings/api'
 import { useDraftsStore } from '@/features/drafts/draftsStore'
+import { idb } from '@/features/offline/idb'
 import { currentLocale, setLocale, SUPPORTED_LOCALES } from '@/i18n'
 
 // Authentication + current-user state (Sanctum SPA cookie mode). Holds no token.
@@ -43,6 +44,16 @@ export const useAuthStore = defineStore('auth', {
       } catch {
         /* storage full/blocked — offline boot simply won't have a session */
       }
+      // Mirror who is signed in into IDB for the service worker: its
+      // Background Sync replay (sw.js) must scope the outbox to the current
+      // user — and speak their language — with no page to ask.
+      idb
+        .put(
+          'kv',
+          { userId: user?.id ?? null, locale: user?.locale ?? currentLocale() },
+          'session:current',
+        )
+        .catch(() => {})
     },
 
     clear() {
@@ -69,6 +80,9 @@ export const useAuthStore = defineStore('auth', {
         teardownDutyTracking(),
       )
       import('@/composables/useEcho').then(({ disconnectEcho }) => disconnectEcho())
+      // No user, no background replay: the SW must never post a signed-out
+      // (or the NEXT user's) session against the old queue.
+      idb.del('kv', 'session:current').catch(() => {})
     },
 
     async login(login, password) {

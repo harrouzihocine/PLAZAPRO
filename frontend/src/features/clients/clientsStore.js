@@ -487,3 +487,43 @@ export const useClientsStore = defineStore('clients', {
     },
   },
 })
+
+// --- Offline pre-warm (features/offline/prewarm.js) ---------------------------
+// Twins of the snapshots the store writes above, WITHOUT touching reactive
+// state (a background pre-warm must never overwrite what the user is looking
+// at). Same api calls, same keys, same shapes — keep in lockstep with
+// fetch() / load() / loadProjects() / loadDesire() / loadTimeline().
+
+export async function prewarmClientsList() {
+  const [clients, agents, followUpAgents] = await Promise.all([
+    clientsApi.list({ page: 1, per_page: 25 }),
+    agentsApi.list(),
+    followUpAgentsApi.list(),
+  ])
+  await cacheSnapshot('clients:list', {
+    items: clients.items,
+    total: clients.total,
+    agents,
+    followUpAgents,
+  })
+}
+
+// One client's whole offline file: identity, projects, desire, timeline. Each
+// piece lands independently — a failure on one must not void the other three.
+export async function prewarmClientFile(id) {
+  const pieces = [
+    [`clients:file:${id}`, () => clientsApi.get(id)],
+    [`clients:projects:${id}`, () => projectsApi.list(id)],
+    [`clients:desire:${id}`, () => desireApi.get(id)],
+    [`clients:timeline:${id}:all`, () => pipelineApi.timeline(id, null)],
+  ]
+  await Promise.all(
+    pieces.map(async ([key, run]) => {
+      try {
+        await cacheSnapshot(key, await run())
+      } catch {
+        /* silent: pre-warm is best-effort */
+      }
+    }),
+  )
+}

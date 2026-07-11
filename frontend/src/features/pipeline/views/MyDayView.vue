@@ -6,7 +6,10 @@ import Button from 'primevue/button'
 import ToggleSwitch from 'primevue/toggleswitch'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
+import OfflineStamp from '@/components/ui/OfflineStamp.vue'
 import { pipelineApi } from '@/features/pipeline/api'
+import { MY_DAY_SNAPSHOT, myDaySnapshotShape } from '@/features/pipeline/myDayOffline'
+import { cacheSnapshot, serveSnapshot } from '@/features/offline/snapshots'
 import { VISIT_STATUS_LABEL_KEYS, VISIT_STATUS_TONES } from '@/features/pipeline/dispatchStatus'
 import { useAuthStore } from '@/features/settings/store'
 import { BASE_SWAL_OPTS, toastError, toastSuccess } from '@/composables/useConfirm'
@@ -30,6 +33,7 @@ const routeOrder = ref([])
 const orderMode = ref('time') // 'time' | 'route'
 const busyId = ref(null)
 const dutyBusy = ref(false)
+const offlineAt = ref(null)
 
 async function load() {
   loading.value = true
@@ -37,7 +41,19 @@ async function load() {
     const data = await pipelineApi.myDay()
     visits.value = data.visits
     routeOrder.value = data.route_order ?? []
+    offlineAt.value = null
+    cacheSnapshot(MY_DAY_SNAPSHOT, myDaySnapshotShape(data))
     syncEnRouteCadence()
+  } catch (e) {
+    // A no-signal morning still shows the agenda: the snapshot written on the
+    // last load — or by the offline pre-warm pass — stands in (read-only: the
+    // lifecycle buttons need the server anyway).
+    const served = await serveSnapshot(e, MY_DAY_SNAPSHOT, (data, at) => {
+      visits.value = data.visits
+      routeOrder.value = data.route_order ?? []
+      offlineAt.value = at
+    })
+    if (!served) throw e
   } finally {
     loading.value = false
   }
@@ -218,6 +234,8 @@ const statusLabel = (s) => t(VISIT_STATUS_LABEL_KEYS[s] ?? VISIT_STATUS_LABEL_KE
           />
         </div>
       </template>
+
+      <OfflineStamp :at="offlineAt" />
 
       <p v-if="loading" class="py-6 text-center text-sm text-mute">{{ $t('common.loading') }}</p>
       <p v-else-if="!visits.length" class="py-6 text-center text-sm text-mute">

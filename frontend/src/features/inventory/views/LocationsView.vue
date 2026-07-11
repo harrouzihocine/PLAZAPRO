@@ -9,6 +9,7 @@ import BaseInput from '@/components/base/BaseInput.vue'
 import BaseMultiSelect from '@/components/base/BaseMultiSelect.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
+import OfflineStamp from '@/components/ui/OfflineStamp.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import FilterPanel from '@/components/ui/FilterPanel.vue'
@@ -206,6 +207,8 @@ function toggleArchived() {
         />
       </template>
     </PageHeader>
+
+    <OfflineStamp :at="store.offlineAt" />
 
     <!-- Filter toolbar -->
     <FilterPanel card :active-count="activeFilterCount" class="mb-5">

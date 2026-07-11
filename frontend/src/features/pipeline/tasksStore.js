@@ -95,3 +95,13 @@ export const useTasksStore = defineStore('tasks', {
     },
   },
 })
+
+// Offline pre-warm twin of fetch()'s default-view snapshot (same key + shape,
+// no reactive state) — see features/offline/prewarm.js.
+export async function prewarmTasks() {
+  const [items, agents] = await Promise.all([
+    tasksApi.list({ scope: 'mine' }),
+    useAuthStore().can('tasks.assign') ? agentsApi.list() : Promise.resolve([]),
+  ])
+  await cacheSnapshot('tasks:list', { items, agents })
+}
