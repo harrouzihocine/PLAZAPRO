@@ -15,6 +15,7 @@ import { formatMoney } from '@/features/payments/money'
 import DraftBanner from '@/features/drafts/DraftBanner.vue'
 import NextActionFields from '@/features/pipeline/components/NextActionFields.vue'
 import { useModalDraft } from '@/composables/useModalDraft'
+import { confirmAction } from '@/composables/useConfirm'
 import { unitLine } from '@/utils/format'
 import { t } from '@/i18n'
 
@@ -162,6 +163,27 @@ const draft = props.draftKey
 
 function cancel() {
   emit('cancel')
+}
+
+// Wipe everything the agent selected or typed, back to a blank call log. The
+// loaded interested list (dealChoices) stays visible — only its picks clear.
+async function reset() {
+  if (!(await confirmAction({ text: t('common.resetFormConfirm') }))) return
+  direction.value = 'outbound'
+  notes.value = ''
+  topics.value = []
+  objections.value = []
+  conclusion.value = 'next_action'
+  nextAction.value = { type: 'call', due_date: '', due_time: '', assigned_to: '' }
+  archive.value = { reason_id: '', note: '' }
+  dealAdditions.value = []
+  branch.value = null
+  properties.value = []
+  desireForm.value = makeDesireForm(props.desire)
+  dealChoices.value.forEach((c) => {
+    c.include = false
+    c.box_ids = []
+  })
 }
 
 function toggleTopic(id) {
@@ -472,6 +494,9 @@ function submit() {
     <div class="flex gap-2 pt-1">
       <BaseButton type="submit" :disabled="saving || !ready">{{ $t('calls.saveCall') }}</BaseButton>
       <BaseButton type="button" variant="ghost" @click="cancel">{{ $t('common.cancel') }}</BaseButton>
+      <BaseButton type="button" variant="ghost" class="ms-auto" :disabled="saving" @click="reset">
+        <i class="pi pi-refresh text-[11px]" aria-hidden="true" /> {{ $t('common.reset') }}
+      </BaseButton>
     </div>
   </form>
 </template>

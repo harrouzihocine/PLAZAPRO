@@ -84,6 +84,10 @@ return [
         'title' => 'عُيّن وكيل الميدان',
         'body' => 'سيتولى :agent الزيارة الـ:type مع :client:extra.',
     ],
+    'visit_completed' => [
+        'title' => 'اكتمل سجل الزيارة',
+        'body' => 'أكمل :agent سجل الزيارة الـ:type مع :client:extra.',
+    ],
     'office_visit_scheduled' => [
         'title' => 'زيارة مكتب قادمة',
         'body' => 'زيارة :type مع :client:extra — مع :agent.',

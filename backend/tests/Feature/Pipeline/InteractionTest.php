@@ -7,6 +7,7 @@ namespace Tests\Feature\Pipeline;
 use App\Modules\Clients\Models\Client;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Clients\Models\ShortlistItem;
+use App\Modules\Collaboration\Notifications\DomainNotification;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Pipeline\Models\Call;
 use App\Modules\Pipeline\Models\NextAction;
@@ -17,6 +18,7 @@ use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -455,6 +457,42 @@ class InteractionTest extends TestCase
         ])->assertOk();
 
         $this->assertSame('visited_interested', $item->fresh()->state->value);
+    }
+
+    public function test_completing_a_visit_notifies_the_owner_and_dispatchers_but_not_the_completer(): void
+    {
+        Notification::fake();
+
+        // The client belongs to a sales agent (owner); a dispatched FIELD agent
+        // fills the in-site log on their behalf. The owner and the dispatchers
+        // should hear that the log task is done — the completer should not.
+        $owner = $this->agent();
+        $dispatcher = $this->userWithPermissions(['visits.dispatch']);
+        $actor = $this->userWithPermissions(['clients.view', 'visits.conduct']);
+
+        $client = Client::factory()->create(['assigned_agent_id' => $owner->id]);
+        $project = ClientProject::factory()->create(['client_id' => $client->id]);
+        $unit = Unit::factory()->create();
+        ShortlistItem::factory()->create([
+            'client_project_id' => $project->id, 'shortlistable_type' => 'unit', 'shortlistable_id' => $unit->id,
+        ]);
+        $interested = $this->insiteOutcome('visited_interested');
+        $visit = Visit::factory()->inSite()->create([
+            'client_id' => $client->id, 'client_project_id' => $project->id,
+            'unit_id' => $unit->id, 'agent_id' => $actor->id,
+        ]);
+
+        Sanctum::actingAs($actor);
+        $this->postJson("/api/v1/visits/{$visit->id}/complete", [
+            'outcome_id' => $interested->id,
+            'visited_at' => now()->subMinutes(30)->toDateTimeString(),
+            'next_action' => $this->nextActionPayload($owner),
+        ])->assertOk();
+
+        $isDone = fn ($n) => $n->kind === 'visit_completed';
+        Notification::assertSentTo($owner, DomainNotification::class, $isDone);
+        Notification::assertSentTo($dispatcher, DomainNotification::class, $isDone);
+        Notification::assertNotSentTo($actor, DomainNotification::class, $isDone);
     }
 
     /** A next_action_change_reasons list item id — the reason a plan was corrected. */

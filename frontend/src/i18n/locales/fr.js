@@ -37,6 +37,7 @@ export default {
     copied: 'Copié',
     select: 'Sélectionner',
     reset: 'Réinitialiser',
+    resetFormConfirm: 'Effacer tout ce que vous avez sélectionné ou saisi dans ce formulaire ?',
     loading: 'Chargement…',
     noResults: 'Aucun résultat',
     all: 'Tous',

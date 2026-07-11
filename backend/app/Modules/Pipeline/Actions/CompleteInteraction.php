@@ -8,6 +8,7 @@ use App\Modules\Clients\Actions\SyncShortlist;
 use App\Modules\Clients\Models\Client;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Pipeline\Enums\VisitType;
+use App\Modules\Pipeline\Events\VisitCompleted;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Settings\Models\User;
 use Illuminate\Support\Carbon;
@@ -52,7 +53,7 @@ class CompleteInteraction
             );
         }
 
-        return DB::transaction(function () use ($visit, $data, $actor) {
+        $completed = DB::transaction(function () use ($visit, $data, $actor) {
             $visit->update([
                 'completed_at' => now(),
                 // Agent-stated actual visit time (required for in-site logs);
@@ -151,6 +152,15 @@ class CompleteInteraction
 
             return $visit->fresh();
         });
+
+        // Tell the people who didn't fill the log (the client's owner and the
+        // dispatchers) that this visit's log task is done. Fired for both the
+        // interim (open siblings) and final completion paths above — each
+        // in-site visit a field agent closes is a task done on the owner's
+        // behalf. The listener skips the completer.
+        VisitCompleted::dispatch($completed, (int) $actor->id);
+
+        return $completed;
     }
 
     /**

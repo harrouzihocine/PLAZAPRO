@@ -84,6 +84,10 @@ return [
         'title' => 'Agent sur site assigné',
         'body' => ':agent s’occupera de la visite :type avec :client:extra.',
     ],
+    'visit_completed' => [
+        'title' => 'Compte rendu de visite terminé',
+        'body' => ':agent a terminé le compte rendu de la visite :type avec :client:extra.',
+    ],
     'office_visit_scheduled' => [
         'title' => 'Visite bureau à venir',
         'body' => 'Visite :type avec :client:extra — avec :agent.',

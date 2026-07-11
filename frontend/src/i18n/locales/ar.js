@@ -37,6 +37,7 @@ export default {
     copied: 'تم النسخ',
     select: 'اختيار',
     reset: 'إعادة تعيين',
+    resetFormConfirm: 'مسح كل ما اخترته أو كتبته في هذا النموذج؟',
     loading: 'جارٍ التحميل…',
     noResults: 'لا توجد نتائج',
     all: 'الكل',

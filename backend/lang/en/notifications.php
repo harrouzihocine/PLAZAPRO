@@ -86,6 +86,10 @@ return [
         'title' => 'In-site agent assigned',
         'body' => ':agent will handle the :type visit with :client:extra.',
     ],
+    'visit_completed' => [
+        'title' => 'Visit log completed',
+        'body' => ':agent completed the :type visit log with :client:extra.',
+    ],
     'office_visit_scheduled' => [
         'title' => 'Upcoming office visit',
         'body' => ':type visit with :client:extra — with :agent.',

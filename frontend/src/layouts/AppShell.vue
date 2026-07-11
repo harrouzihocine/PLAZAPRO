@@ -517,12 +517,17 @@ async function logout() {
           </kbd>
         </button>
 
-        <!-- Right cluster, pinned to the end: transient status first (sync /
-             drafts only render while something is pending), then the always-on
-             controls, with the account menu at the extreme edge. -->
+        <!-- Left of the gap, beside search: the "work" indicators — the bell
+             and unsaved drafts (drafts only renders while something is pending). -->
+        <div class="flex items-center gap-1">
+          <NotificationBell v-if="auth.can('notifications.view')" />
+          <DraftsIndicator />
+        </div>
+
+        <!-- Right cluster, pinned to the end: transient sync status, then the
+             always-on controls, with the account menu at the extreme edge. -->
         <div class="ms-auto flex items-center gap-1">
           <SyncIndicator />
-          <DraftsIndicator />
           <ServerIndicator />
           <Button
             :icon="isNight ? 'pi pi-sun' : 'pi pi-moon'"
@@ -533,7 +538,6 @@ async function logout() {
             @click="toggle"
           />
           <LanguageSwitcher />
-          <NotificationBell v-if="auth.can('notifications.view')" />
 
           <span class="mx-1 hidden h-6 w-px bg-line sm:block" aria-hidden="true" />
 

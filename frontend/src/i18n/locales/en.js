@@ -38,6 +38,7 @@ export default {
     copied: 'Copied',
     select: 'Select',
     reset: 'Reset',
+    resetFormConfirm: 'Clear everything you selected or wrote on this form?',
     loading: 'Loading…',
     noResults: 'No results',
     all: 'All',

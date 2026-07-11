@@ -6,7 +6,7 @@ import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import TimeField from '@/components/base/TimeField.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
-import { toastError } from '@/composables/useConfirm'
+import { confirmAction, toastError } from '@/composables/useConfirm'
 import { shortlistApi } from '@/features/clients/api'
 import FinishToggle from '@/features/inventory/components/FinishToggle.vue'
 import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPicker.vue'
@@ -123,6 +123,26 @@ function cancel() {
   emit('cancel')
 }
 
+// Wipe everything the agent selected or typed. The office shortlist reloads
+// from the server (so removed rows come back); deal picks/additions clear.
+async function reset() {
+  if (!(await confirmAction({ text: t('common.resetFormConfirm') }))) return
+  outcomeId.value = ''
+  notes.value = ''
+  checklist.value = []
+  objections.value = []
+  visitedDate.value = today
+  visitedTime.value = nowTime()
+  conclusion.value = props.dealSettled ? 'none' : 'next_action'
+  interimDeal.value = false
+  nextAction.value = { type: 'call', due_date: '', due_time: '', assigned_to: '' }
+  archive.value = { reason_id: '', note: '' }
+  desireForm.value = makeDesireForm(null)
+  additions.value = []
+  dealUnits.value = []
+  loadShortlist()
+}
+
 // Office shortlist manager state: the deal's current active list, editable.
 const shortlist = ref([])
 const additions = ref([])
@@ -145,24 +165,24 @@ const priceText = (p, finish) => {
 const propertyLabel = (p, finish) =>
   p ? unitLine(p, { price: priceText(p, finish) }) : null
 
-onMounted(async () => {
-  if (isOffice.value && hasDeal.value) {
-    const items = await shortlistApi.list(props.visit.client_project_id)
-    shortlist.value = items
-      .filter((i) => !['won', 'lost'].includes(i.state))
-      .map((i) => ({
-        shortlistable_type: i.shortlistable_type,
-        shortlistable_id: i.shortlistable_id,
-        label: propertyLabel(i.property, i.finish_type) ?? `${i.shortlistable_type} #${i.shortlistable_id}`,
-        state: i.state,
-        location_id: i.property?.location_id ?? null,
-        locked_reason: i.locked_reason ?? null,
-        finish_type: i.finish_type ?? null,
-        price_semi_fini: i.property?.price_semi_fini ?? null,
-        price_fini: i.property?.price_fini ?? null,
-      }))
-  }
-})
+async function loadShortlist() {
+  if (!(isOffice.value && hasDeal.value)) return
+  const items = await shortlistApi.list(props.visit.client_project_id)
+  shortlist.value = items
+    .filter((i) => !['won', 'lost'].includes(i.state))
+    .map((i) => ({
+      shortlistable_type: i.shortlistable_type,
+      shortlistable_id: i.shortlistable_id,
+      label: propertyLabel(i.property, i.finish_type) ?? `${i.shortlistable_type} #${i.shortlistable_id}`,
+      state: i.state,
+      location_id: i.property?.location_id ?? null,
+      locked_reason: i.locked_reason ?? null,
+      finish_type: i.finish_type ?? null,
+      price_semi_fini: i.property?.price_semi_fini ?? null,
+      price_fini: i.property?.price_fini ?? null,
+    }))
+}
+onMounted(loadShortlist)
 
 const selectedInsiteOutcome = computed(() =>
   insiteOutcomes.value.find((o) => o.id === outcomeId.value),
@@ -618,6 +638,9 @@ function submit() {
     <div class="flex gap-2 pt-1">
       <BaseButton type="submit" :disabled="saving || !ready">{{ $t('visits.completeVisit') }}</BaseButton>
       <BaseButton type="button" variant="ghost" @click="cancel">{{ $t('common.cancel') }}</BaseButton>
+      <BaseButton type="button" variant="ghost" class="ms-auto" :disabled="saving" @click="reset">
+        <i class="pi pi-refresh text-[11px]" aria-hidden="true" /> {{ $t('common.reset') }}
+      </BaseButton>
     </div>
   </form>
 </template>

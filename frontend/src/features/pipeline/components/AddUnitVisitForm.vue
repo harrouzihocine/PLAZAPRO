@@ -5,7 +5,9 @@ import BaseSelect from '@/components/base/BaseSelect.vue'
 import TimeField from '@/components/base/TimeField.vue'
 import ProjectUnitsPicker from '@/features/inventory/components/ProjectUnitsPicker.vue'
 import { useAuthStore } from '@/features/settings/store'
+import { confirmAction } from '@/composables/useConfirm'
 import { todayInput } from '@/utils/format'
+import { t } from '@/i18n'
 
 // "Add unit to visit" — the standalone twin of the "another apartment" step in
 // visit completion, freed from its "only on the last open visit" gate. Pick the
@@ -37,6 +39,15 @@ const unitIds = computed(() =>
   picks.value.filter((p) => p.shortlistable_type === 'unit').map((p) => p.shortlistable_id),
 )
 const ready = computed(() => unitIds.value.length > 0 && !!dueDate.value)
+
+// Wipe everything the agent picked or typed, back to a blank form.
+async function reset() {
+  if (!(await confirmAction({ text: t('common.resetFormConfirm') }))) return
+  picks.value = []
+  dueDate.value = ''
+  dueTime.value = ''
+  assignedTo.value = ''
+}
 
 function submit() {
   if (!ready.value) return
@@ -91,6 +102,9 @@ function submit() {
     <div class="flex gap-2 pt-1">
       <BaseButton type="submit" :disabled="saving || !ready">{{ $t('pipeline.addToVisits') }}</BaseButton>
       <BaseButton type="button" variant="ghost" @click="emit('cancel')">{{ $t('common.cancel') }}</BaseButton>
+      <BaseButton type="button" variant="ghost" class="ms-auto" :disabled="saving" @click="reset">
+        <i class="pi pi-refresh text-[11px]" aria-hidden="true" /> {{ $t('common.reset') }}
+      </BaseButton>
     </div>
   </form>
 </template>

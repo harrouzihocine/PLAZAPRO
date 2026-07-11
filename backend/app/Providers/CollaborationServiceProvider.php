@@ -23,6 +23,7 @@ use App\Modules\Collaboration\Listeners\SendDueReminderNotification;
 use App\Modules\Collaboration\Listeners\SendOfficeVisitApprovalRequestNotification;
 use App\Modules\Collaboration\Listeners\SendPaymentNotification;
 use App\Modules\Collaboration\Listeners\SendVisitAssignedNotification;
+use App\Modules\Collaboration\Listeners\SendVisitCompletedNotification;
 use App\Modules\Collaboration\Listeners\SendVisitDeclinedNotification;
 use App\Modules\Inventory\Events\BackupHoldsCancelled;
 use App\Modules\Inventory\Events\BoxEdited;
@@ -40,6 +41,7 @@ use App\Modules\Pipeline\Events\InSiteDispatchRequested;
 use App\Modules\Pipeline\Events\OfficeVisitApprovalRequested;
 use App\Modules\Pipeline\Events\ReminderDue;
 use App\Modules\Pipeline\Events\VisitAssigned;
+use App\Modules\Pipeline\Events\VisitCompleted;
 use App\Modules\Pipeline\Events\VisitDeclined;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -59,6 +61,7 @@ class CollaborationServiceProvider extends ServiceProvider
     private array $listen = [
         ReminderDue::class => [SendDueReminderNotification::class],
         VisitAssigned::class => [SendVisitAssignedNotification::class, GrantFieldAgentChatAccess::class],
+        VisitCompleted::class => [SendVisitCompletedNotification::class],
         InSiteDispatchRequested::class => [SendDispatchRequestNotification::class],
         VisitDeclined::class => [SendVisitDeclinedNotification::class],
         OfficeVisitApprovalRequested::class => [SendOfficeVisitApprovalRequestNotification::class],
