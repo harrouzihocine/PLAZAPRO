@@ -29,7 +29,12 @@ if [[ "${1:-}" != "--no-pull" ]]; then
 fi
 
 echo "==> Building images and frontend"
-docker compose build app
+# ALL php services, not just app: they share the same Dockerfile but compose
+# tags each image separately — building only app leaves the workers on a stale
+# image whenever the Dockerfile changes (bind-mounted code hides this until a
+# tool the image ships, like soffice/ffmpeg, is missing). Cache makes the
+# extra builds free when nothing changed.
+docker compose build app queue media-queue scheduler reverb
 # Build the SPA with a throwaway node container (prod stack has no node service).
 # npm_config_cache: a UID-mapped user has no writable $HOME in the stock image,
 # and npm dies on its cache dir without it.
