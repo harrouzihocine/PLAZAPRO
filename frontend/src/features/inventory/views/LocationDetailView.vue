@@ -26,6 +26,7 @@ import { gtmPriorityOptions, locationsApi, mediaFileUrl, reservationsApi } from 
 import BoxesPanel from '@/features/inventory/components/BoxesPanel.vue'
 import FinishPrices from '@/features/inventory/components/FinishPrices.vue'
 import GtmPriorityBadge from '@/features/inventory/components/GtmPriorityBadge.vue'
+import LocationFormDrawer from '@/features/inventory/components/LocationFormDrawer.vue'
 import LocationMap from '@/features/inventory/components/LocationMap.vue'
 import MediaGallery from '@/features/inventory/components/MediaGallery.vue'
 import SaleStatusBadge from '@/features/inventory/components/SaleStatusBadge.vue'
@@ -55,7 +56,11 @@ const { items: roomNumbers } = useDynamicList('room_numbers')
 const { items: floors } = useDynamicList('floors')
 
 const canManage = auth.can('units.manage')
+// Editing the project (name, location, website settings…) is its own grant,
+// separate from managing the units inside it.
+const canManageProject = auth.can('locations.manage')
 const canMarkInterest = auth.can('units.interest')
+const showEditProject = ref(false)
 // Voice-of-Client analytics is manager-level commercial intelligence.
 const canSeeFeedback = auth.can('reports.view')
 
@@ -350,6 +355,15 @@ async function remove(u) {
           >
         </template>
         <template #actions>
+          <Button
+            v-if="canManageProject"
+            :label="$t('inventory.editProject')"
+            icon="pi pi-pencil"
+            severity="secondary"
+            outlined
+            size="small"
+            @click="showEditProject = true"
+          />
           <template v-if="!isNative">
             <Button
               :label="$t('inventory.exportExcel')"
@@ -902,5 +916,12 @@ async function remove(u) {
         </div>
       </form>
     </BaseModal>
+
+    <!-- Edit this project (name, location, website settings…) -->
+    <LocationFormDrawer
+      v-if="canManageProject"
+      v-model:visible="showEditProject"
+      :location="locations.current"
+    />
   </div>
 </template>
