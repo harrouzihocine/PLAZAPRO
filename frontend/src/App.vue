@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { usePrimeVue } from 'primevue/config'
 import { useTheme } from '@/composables/useTheme'
 import { PRIMEVUE_LOCALES } from '@/i18n/primevue'
+import KeyboardDismisser from '@/components/shell/KeyboardDismisser.vue'
 
 onMounted(() => {
   useTheme().init()
@@ -21,4 +22,7 @@ watch(locale, (l) => {
 
 <template>
   <RouterView />
+  <!-- APK: floating hide-keyboard chevron for every text field (login page
+       included — that's why it lives here and not in AppShell). -->
+  <KeyboardDismisser />
 </template>

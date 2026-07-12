@@ -196,6 +196,7 @@ export default {
   // ── Coque de l'app (topbar, menus, bannières) ────────────────────────
   shell: {
     realEstateCrm: 'CRM immobilier',
+    hideKeyboard: 'Masquer le clavier',
     openMenu: 'Ouvrir le menu',
     homeAria: 'PLAZA PRO — accueil',
     searchAria: 'Rechercher',

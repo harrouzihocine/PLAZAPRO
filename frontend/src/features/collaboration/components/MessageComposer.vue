@@ -113,7 +113,10 @@ const replyExcerpt = messagePreview
 </script>
 
 <template>
-  <div>
+  <!-- data-kb-dismiss-local: this composer ships its own hide-keyboard
+       chevron in the row — the global floating one (KeyboardDismisser)
+       stands down here so it never covers the send button. -->
+  <div data-kb-dismiss-local>
     <!-- Edit banner -->
     <div
       v-if="editing"

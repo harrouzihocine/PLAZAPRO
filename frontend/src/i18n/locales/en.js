@@ -197,6 +197,7 @@ export default {
   // ── App shell (topbar, menus, banners) ───────────────────────────────
   shell: {
     realEstateCrm: 'Real-estate CRM',
+    hideKeyboard: 'Hide keyboard',
     openMenu: 'Open menu',
     homeAria: 'PLAZA PRO — home',
     searchAria: 'Search',

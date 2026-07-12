@@ -196,6 +196,7 @@ export default {
   // ── هيكل التطبيق (الشريط العلوي، القوائم) ────────────────────────────
   shell: {
     realEstateCrm: 'نظام إدارة عقاري',
+    hideKeyboard: 'إخفاء لوحة المفاتيح',
     openMenu: 'فتح القائمة',
     homeAria: 'PLAZA PRO — الرئيسية',
     searchAria: 'بحث',
