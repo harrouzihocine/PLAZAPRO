@@ -106,7 +106,7 @@ useSeoMeta(() => ({
 
     <template v-else-if="project">
       <!-- Hero -->
-      <section class="relative flex min-h-[55vh] items-end overflow-hidden bg-surface-950">
+      <section class="relative flex min-h-[55vh] items-end overflow-hidden bg-surface-950 supports-[height:1svh]:min-h-[55svh]">
         <img
           v-if="heroImage"
           :src="heroImage.file_url"
@@ -187,7 +187,7 @@ useSeoMeta(() => ({
             <dl class="space-y-3 text-sm">
               <div v-if="project.show_availability" class="flex justify-between gap-3">
                 <dt class="text-mute">{{ $t('showcase.project.factAvailable') }}</dt>
-                <dd class="num font-semibold text-ink">{{ units.filter((u) => u.available).length }} / {{ units.length }}</dd>
+                <dd class="num whitespace-nowrap font-semibold text-ink">{{ units.filter((u) => u.available).length }} / {{ units.length }}</dd>
               </div>
               <div v-if="project.type" class="flex justify-between gap-3">
                 <dt class="text-mute">{{ $t('showcase.project.factType') }}</dt>

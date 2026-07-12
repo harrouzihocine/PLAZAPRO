@@ -122,7 +122,7 @@ useSeoMeta(() => ({
 
     <template v-else-if="unit">
       <!-- Hero -->
-      <section class="relative flex min-h-[45vh] items-end overflow-hidden bg-surface-950">
+      <section class="relative flex min-h-[45vh] items-end overflow-hidden bg-surface-950 supports-[height:1svh]:min-h-[45svh]">
         <img
           v-if="heroImage"
           :src="heroImage.file_url"
@@ -234,10 +234,12 @@ useSeoMeta(() => ({
         <PaymentSimulator v-if="simulatorUnits.length" :units="simulatorUnits" />
       </div>
 
-      <!-- Sticky mobile CTA (pe-20 keeps the WhatsApp float clear of the button) -->
+      <!-- Sticky mobile CTA (pe-24 keeps the WhatsApp float clear of the button).
+           sticky, not fixed: it pins while the page scrolls, then yields so the
+           footer is reachable instead of permanently covered. -->
       <div
         v-if="unit.available"
-        class="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 p-3 pe-24 backdrop-blur sm:hidden"
+        class="sticky bottom-0 z-30 border-t border-line bg-card/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pe-24 backdrop-blur sm:hidden"
       >
         <Button :label="$t('showcase.units.interested')" icon="pi pi-send" fluid rounded @click="leadOpen = true" />
       </div>

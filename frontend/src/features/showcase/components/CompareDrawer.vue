@@ -40,9 +40,9 @@ const ROWS = [
   <Transition name="showcase-tray">
     <div
       v-if="picked.length"
-      class="fixed bottom-5 start-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-line bg-card py-2 pe-2 ps-4 shadow-pop rtl:translate-x-1/2"
+      class="fixed bottom-24 start-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2 rounded-full border border-line bg-card py-2 pe-2 ps-4 shadow-pop rtl:translate-x-1/2 sm:bottom-5"
     >
-      <span class="num text-sm font-semibold text-ink">{{ $t('showcase.compare.count', { n: picked.length }) }}</span>
+      <span class="num whitespace-nowrap text-sm font-semibold text-ink">{{ $t('showcase.compare.count', { n: picked.length }) }}</span>
       <Button :label="$t('showcase.compare.open')" size="small" rounded icon="pi pi-arrows-h" @click="open = true" />
       <Button
         icon="pi pi-trash"

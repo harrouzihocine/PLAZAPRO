@@ -48,7 +48,7 @@ const statItems = computed(() => {
 </script>
 
 <template>
-  <section class="relative flex min-h-[92vh] items-center justify-center overflow-hidden bg-surface-950">
+  <section class="relative flex min-h-[92vh] items-center justify-center overflow-hidden bg-surface-950 supports-[height:1svh]:min-h-[92svh]">
     <!-- Cinematic backdrop: owner's pick (video or photo) > best cover > gradient -->
     <video
       v-if="hero?.type === 'video'"
@@ -92,7 +92,9 @@ const statItems = computed(() => {
     <!-- Cinematic scrim: readable type on any photo. -->
     <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70" aria-hidden="true" />
 
-    <div class="relative mx-auto max-w-4xl px-6 py-28 text-center">
+    <!-- w-full + min-w-0: a bare flex item floors at its min-content width
+         (the stats row), overflowing + clipping on phones. -->
+    <div class="relative mx-auto w-full min-w-0 max-w-4xl px-6 py-28 text-center">
       <p class="text-sm font-semibold uppercase tracking-[0.25em] text-primary-400">
         {{ showcase.company.name || 'PLAZA PRO' }}
       </p>
@@ -113,10 +115,10 @@ const statItems = computed(() => {
       </div>
 
       <dl v-if="statItems.length" class="mx-auto mt-14 flex max-w-xl items-stretch justify-center divide-x divide-white/20 rtl:divide-x-reverse">
-        <div v-for="item in statItems" :key="item.key" class="flex-1 px-6">
+        <div v-for="item in statItems" :key="item.key" class="min-w-0 flex-1 px-2 sm:px-6">
           <dt class="sr-only">{{ $t(item.key) }}</dt>
-          <dd class="num text-3xl font-bold text-white">{{ item.value }}</dd>
-          <dd class="mt-1 text-xs font-medium uppercase tracking-wider text-white/70">{{ $t(item.key) }}</dd>
+          <dd class="num text-2xl font-bold text-white sm:text-3xl">{{ item.value }}</dd>
+          <dd class="mt-1 text-[10px] font-medium uppercase tracking-wider text-white/70 sm:text-xs">{{ $t(item.key) }}</dd>
         </div>
       </dl>
     </div>
