@@ -114,9 +114,9 @@ useSeoMeta(() => ({
           class="absolute inset-0 h-full w-full object-cover"
           :style="cover ? { objectPosition: `${project.cover_focus_x}% ${project.cover_focus_y}%` } : null"
         />
-        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/40" aria-hidden="true" />
+        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/50" aria-hidden="true" />
 
-        <div class="relative mx-auto w-full max-w-6xl px-4 pb-10 pt-36 sm:px-6">
+        <div class="relative mx-auto w-full max-w-6xl px-4 pb-10 pt-28 sm:px-6 sm:pt-36">
           <p v-if="project.type" class="text-sm font-semibold uppercase tracking-widest text-primary-400">
             {{ project.type }}
           </p>

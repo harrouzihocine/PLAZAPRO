@@ -58,7 +58,7 @@ const navLinks = [
     <header
       class="fixed inset-x-0 top-0 z-40 transition-all duration-300"
       :class="overHero
-        ? 'bg-gradient-to-b from-black/70 via-black/30 to-transparent text-white'
+        ? 'bg-gradient-to-b from-black/85 via-black/45 to-transparent text-white'
         : 'border-b border-line bg-card/90 text-ink shadow-card backdrop-blur'"
     >
       <div class="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">

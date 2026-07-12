@@ -134,9 +134,9 @@ useSeoMeta(() => ({
           class="absolute inset-0 bg-gradient-to-br from-surface-950 via-surface-900 to-primary-950"
           aria-hidden="true"
         />
-        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/40" aria-hidden="true" />
+        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/50" aria-hidden="true" />
 
-        <div class="relative mx-auto w-full max-w-6xl px-4 pb-10 pt-32 sm:px-6">
+        <div class="relative mx-auto w-full max-w-6xl px-4 pb-10 pt-28 sm:px-6 sm:pt-32">
           <!-- Breadcrumb back to the project -->
           <RouterLink
             :to="{ name: 'showcase.project', params: { id: project.id } }"

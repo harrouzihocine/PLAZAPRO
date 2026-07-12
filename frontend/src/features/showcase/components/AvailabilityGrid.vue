@@ -34,15 +34,20 @@ const blocks = computed(() => {
   return [...byBlock.entries()]
     .sort(([a], [b]) => String(a).localeCompare(String(b)))
     .map(([block, units]) => {
-      const columns = Math.max(...units.map((u) => u.position))
+      // Trim columns to the positions the block actually uses: real stacking
+      // data is sparse (units at positions 4-6 only), and rendering from
+      // column 1 fills phones with dashed ghost cells and forces h-scroll.
+      // Interior gaps stay — they are the true shape of the building.
+      const first = Math.min(...units.map((u) => u.position))
+      const last = Math.max(...units.map((u) => u.position))
       const floors = [...new Set(units.map((u) => u.stack_floor))]
         .sort((a, b) => b - a) // top floor first, like a real building
         .map((floor) => ({
           floor,
-          cells: Array.from({ length: columns }, (_, i) =>
-            units.find((u) => u.stack_floor === floor && u.position === i + 1) ?? null),
+          cells: Array.from({ length: last - first + 1 }, (_, i) =>
+            units.find((u) => u.stack_floor === floor && u.position === first + i) ?? null),
         }))
-      return { block, floors, columns }
+      return { block, floors, columns: last - first + 1 }
     })
 })
 
@@ -66,7 +71,7 @@ function cellTitle(unit) {
 </script>
 
 <template>
-  <section v-if="placeable.length" class="rounded-3xl border border-line bg-card p-6 shadow-card sm:p-8">
+  <section v-if="placeable.length" class="rounded-3xl border border-line bg-card p-4 shadow-card sm:p-8">
     <div class="flex flex-wrap items-end justify-between gap-4">
       <div>
         <p class="text-sm font-semibold uppercase tracking-widest text-primary-500">
@@ -86,7 +91,7 @@ function cellTitle(unit) {
       </div>
     </div>
 
-    <div class="mt-6 grid gap-8" :class="blocks.length > 1 ? 'lg:grid-cols-2' : ''">
+    <div class="mt-6 grid gap-x-8 gap-y-6 sm:gap-y-8" :class="blocks.length > 1 ? 'sm:grid-cols-2' : ''">
       <div v-for="group in blocks" :key="group.block">
         <h3 v-if="group.block" class="mb-3 text-sm font-semibold text-mute">
           {{ $t('showcase.units.block', { block: group.block }) }}
@@ -95,15 +100,15 @@ function cellTitle(unit) {
         <!-- One row per floor, top down; horizontal scroll guards wide blocks -->
         <div class="overflow-x-auto pb-1">
           <div class="inline-flex min-w-full flex-col gap-1.5">
-            <div v-for="row in group.floors" :key="row.floor" class="flex items-center gap-1.5">
-              <span class="num w-7 shrink-0 text-end text-xs text-mute" :title="$t('showcase.grid.floor')">
+            <div v-for="row in group.floors" :key="row.floor" class="flex items-center gap-1 sm:gap-1.5">
+              <span class="num w-5 shrink-0 text-end text-[10px] text-mute sm:w-7 sm:text-xs" :title="$t('showcase.grid.floor')">
                 {{ row.floor }}
               </span>
               <template v-for="(unit, i) in row.cells" :key="i">
                 <button
                   v-if="unit"
                   type="button"
-                  class="h-10 w-14 shrink-0 rounded-md text-[11px] font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  class="h-9 w-11 shrink-0 rounded-md text-[10px] font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:h-10 sm:w-14 sm:text-[11px]"
                   :class="[
                     unit.available
                       ? 'bg-primary-500 text-primary-contrast hover:scale-105 hover:shadow-pop'
@@ -116,7 +121,7 @@ function cellTitle(unit) {
                 >
                   {{ unit.rooms || '·' }}
                 </button>
-                <span v-else class="h-10 w-14 shrink-0 rounded-md border border-dashed border-line" aria-hidden="true" />
+                <span v-else class="h-9 w-11 shrink-0 rounded-md border border-dashed border-line sm:h-10 sm:w-14" aria-hidden="true" />
               </template>
             </div>
           </div>
