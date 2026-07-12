@@ -1252,6 +1252,7 @@ export default {
     cancelReply: 'إلغاء الرد',
     attach: 'إرفاق صورة أو ملف',
     messagePlaceholder: 'رسالة…',
+    hideKeyboard: 'إخفاء لوحة المفاتيح',
     saveChanges: 'حفظ التعديلات',
     sendMessage: 'إرسال الرسالة',
     replyingTo: 'رد على {name}',

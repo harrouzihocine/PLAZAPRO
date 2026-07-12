@@ -1253,6 +1253,7 @@ export default {
     cancelReply: 'Cancel reply',
     attach: 'Attach a photo or file',
     messagePlaceholder: 'Message…',
+    hideKeyboard: 'Hide keyboard',
     saveChanges: 'Save changes',
     sendMessage: 'Send message',
     replyingTo: 'Replying to {name}',

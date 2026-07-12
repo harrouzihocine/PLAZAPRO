@@ -49,6 +49,15 @@ watch(text, () => nextTick(autogrow))
 // composer row (timer + slide-to-cancel), Messenger-style.
 const recordingVoice = ref(false)
 
+// APK: a chevron beside the input drops the soft keyboard on demand — the
+// only stock way out is tapping empty page, which a full-height thread barely
+// has. pointerdown.prevent keeps the tap from re-focusing anything; the blur
+// is what closes the keyboard.
+const inputFocused = ref(false)
+function dismissKeyboard() {
+  textInput.value?.blur()
+}
+
 // Android shell: the paperclip opens a WhatsApp-style source sheet (camera /
 // gallery multi-select / document) instead of the bare file manager. No video
 // source here — chat's backend reads video containers as voice notes.
@@ -147,6 +156,16 @@ const replyExcerpt = messagePreview
 
     <div class="flex items-end gap-1.5">
     <button
+      v-if="isNative"
+      v-show="inputFocused && !recordingVoice"
+      type="button"
+      class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink dark:hover:bg-surface-800"
+      :aria-label="$t('chat.hideKeyboard')"
+      @pointerdown.prevent="dismissKeyboard"
+    >
+      <i class="pi pi-chevron-down" aria-hidden="true" />
+    </button>
+    <button
       v-show="!recordingVoice && !editing"
       type="button"
       class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-mute transition-colors hover:bg-surface-100 hover:text-ink disabled:opacity-50 dark:hover:bg-surface-800"
@@ -203,6 +222,8 @@ const replyExcerpt = messagePreview
       :disabled="disabled"
       @input="emit('typing')"
       @keydown.enter.exact.prevent="submitText"
+      @focus="inputFocused = true"
+      @blur="inputFocused = false"
     ></textarea>
 
     <VoiceRecorder v-if="!editing" @recorded="onVoice" @recording="(v) => (recordingVoice = v)" />

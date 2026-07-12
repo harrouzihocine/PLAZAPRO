@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import MessageBubble from '@/features/collaboration/components/MessageBubble.vue'
 import ChatMediaViewer from '@/features/collaboration/components/ChatMediaViewer.vue'
 import { useChatStore } from '@/features/collaboration/chatStore'
@@ -90,7 +90,11 @@ const rows = computed(() => {
 
 // ── Scrolling: pin to bottom on open/own sends/near-bottom arrivals; load
 // older history at the top, keeping the viewport anchored. ──
+// Where the user last was, from the last scroll event (see onViewportResize).
+let wasAtBottom = true
+
 function scrollToBottom() {
+  wasAtBottom = true
   nextTick(() => {
     const el = scroller.value
     if (el) el.scrollTop = el.scrollHeight
@@ -130,7 +134,19 @@ watch(
 )
 onMounted(scrollToBottom)
 
+// The soft keyboard (windowSoftInputMode=adjustResize) shrinks the viewport
+// out from under the scroller. `nearBottom()` can't decide AFTER the shrink —
+// the distance to the bottom just grew by the keyboard's height — so lean on
+// wasAtBottom from before the resize, and keep a reader of the latest
+// messages pinned to them (also covers rotation).
+function onViewportResize() {
+  if (wasAtBottom) scrollToBottom()
+}
+onMounted(() => window.addEventListener('resize', onViewportResize))
+onBeforeUnmount(() => window.removeEventListener('resize', onViewportResize))
+
 async function onScroll() {
+  wasAtBottom = nearBottom()
   const el = scroller.value
   if (!el || el.scrollTop > 60) return
   const t = thread.value

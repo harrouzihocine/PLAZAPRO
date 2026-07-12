@@ -11,9 +11,17 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+        <!-- fullUser: phones and tablets rotate freely (auto-rotate lock still
+             wins). configChanges above keeps rotation from recreating the
+             activity, so the WebView just reflows.
+             adjustResize: the window shrinks above the soft keyboard — the
+             chat composer (and any focused field) stays visible while typing.
+             Android 15+ needs the values-v35 edge-to-edge opt-out for this
+             mode to keep working. -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
-            android:screenOrientation="userPortrait"
+            android:screenOrientation="fullUser"
+            android:windowSoftInputMode="adjustResize"
             android:name=".MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"

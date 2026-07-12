@@ -9,6 +9,7 @@ import { isNativeApp } from '@/utils/nativeApp'
 const TRAVEL = 64 // horizontal px that commit the gesture
 const DOMINANCE = 1.5 // horizontal travel must beat vertical by this much
 const ABORT_DY = 32 // this much vertical lead = it's a scroll, stand down
+const EDGE = 32 // left-edge grab zone: opens even over a sideways scroller
 
 export function useNavSwipe({ enabled, isOpen, open, close }) {
   let startX = 0
@@ -49,7 +50,12 @@ export function useNavSwipe({ enabled, isOpen, open, close }) {
     if (isOpen()) {
       mode = 'close' // swiping back left anywhere (drawer or mask) closes it
     } else {
-      if (overlayOpen() || dragInProgress() || insideHorizontalScroller(e.target)) return
+      if (overlayOpen() || dragInProgress()) return
+      // A swipe that starts inside a sideways scroller belongs to it — EXCEPT
+      // from the screen's left edge, the Android drawer grab zone. Without the
+      // exception the tablet pages (desktop layouts, wide tables everywhere)
+      // could hardly ever open the drawer by gesture.
+      if (e.touches[0].clientX > EDGE && insideHorizontalScroller(e.target)) return
       mode = 'open'
     }
     startX = e.touches[0].clientX

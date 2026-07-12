@@ -12,23 +12,20 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import ConversationList from '@/features/collaboration/components/ConversationList.vue'
 import ThreadPane from '@/features/collaboration/components/ThreadPane.vue'
 import { useChatStore } from '@/features/collaboration/chatStore'
-import { useIsPhone, useNativePhone } from '@/composables/useNativeMode'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { isNativeApp } from '@/utils/nativeApp'
 import { initials } from '@/utils/format'
 
 // The chat surface, one view for both routes (/chat and /chat/:id):
-// • native tablet → WhatsApp-style TWO-PANE (inbox beside the open thread);
-// • native phone  → inbox page ↔ full-bleed thread (AppShell chatTakeover);
-// • web           → the classic list page ↔ thread card, same components.
+// • APK (phone + tablet) → Messenger-style: full-screen inbox ↔ full-bleed
+//   thread (AppShell chatTakeover). The old tablet two-pane split the screen
+//   in half and cramped both sides — owner asked for the Messenger flow;
+// • web → the classic list page ↔ thread card, same components.
 const route = useRoute()
 const router = useRouter()
 const store = useChatStore()
 
 const isNative = isNativeApp()
-const isPhone = useIsPhone()
-const nativePhone = useNativePhone()
-const twoPane = computed(() => isNative && !isPhone.value)
 
 const selectedId = computed(() => (route.params.id ? Number(route.params.id) : null))
 
@@ -45,9 +42,7 @@ useRefreshable(async () => {
 
 function select(id) {
   if (id === selectedId.value) return
-  // Two-pane: replace so Back leaves chat instead of unwinding every selection.
-  if (twoPane.value) router.replace(`/chat/${id}`)
-  else router.push(`/chat/${id}`)
+  router.push(`/chat/${id}`)
 }
 
 function back() {
@@ -95,52 +90,12 @@ function resetModal() {
          inside a <Transition mode="out-in">, which cannot animate a fragment
          root — leaving this page would hang the swap and blank the next view.
          Even a comment BESIDE the root element re-creates the fragment. -->
-    <!-- Native tablet: two-pane (inbox | thread), WhatsApp-style -->
+    <!-- APK thread: full-bleed takeover (Messenger-style); web thread: the classic card -->
     <div
-      v-if="twoPane"
-      class="flex h-[calc(100dvh-11.5rem)] min-h-[24rem] overflow-hidden rounded-xl border border-line bg-card shadow-card lg:h-[calc(100vh-7.5rem)]"
-    >
-      <div class="flex w-[21rem] shrink-0 flex-col border-e border-line xl:w-[24rem]">
-        <div class="flex items-center justify-between px-4 pb-1 pt-3">
-          <h1 class="text-lg font-bold text-ink">{{ $t('chat.chats') }}</h1>
-          <Button
-            v-tooltip.bottom="$t('chat.newConversation')"
-            icon="pi pi-pen-to-square"
-            rounded
-            text
-            :aria-label="$t('chat.newConversation')"
-            @click="modalOpen = true"
-          />
-        </div>
-        <ConversationList :selected-id="selectedId" @select="select" />
-      </div>
-
-      <ThreadPane
-        v-if="selectedId"
-        :key="selectedId"
-        :conversation-id="selectedId"
-        :show-back="false"
-        @back="back"
-      />
-      <div v-else class="flex flex-1 flex-col items-center justify-center gap-3 bg-ground text-mute">
-        <span
-          class="flex h-20 w-20 items-center justify-center rounded-full bg-surface-100 dark:bg-surface-800"
-        >
-          <i class="pi pi-comments text-3xl" aria-hidden="true" />
-        </span>
-        <p class="text-sm font-medium">{{ $t('chat.selectConversation') }}</p>
-        <p class="max-w-[26ch] text-center text-xs">
-          {{ $t('chat.selectConversationHint') }}
-        </p>
-      </div>
-    </div>
-
-    <!-- Phone (native) thread: full-bleed takeover; web thread: the classic card -->
-    <div
-      v-else-if="selectedId"
+      v-if="selectedId"
       class="flex flex-col overflow-hidden bg-card"
       :class="
-        nativePhone
+        isNative
           ? 'h-[calc(100dvh-4rem)]'
           : 'h-[calc(100dvh-10.5rem)] rounded-xl border border-line shadow-card lg:h-[calc(100dvh-7.5rem)]'
       "

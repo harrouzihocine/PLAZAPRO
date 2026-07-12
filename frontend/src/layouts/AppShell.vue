@@ -7,7 +7,7 @@ import Drawer from 'primevue/drawer'
 import Popover from 'primevue/popover'
 import Tag from 'primevue/tag'
 import { useTheme } from '@/composables/useTheme'
-import { useNativePhone } from '@/composables/useNativeMode'
+import { useIsBelowLg } from '@/composables/useNativeMode'
 import { useNavSwipe } from '@/composables/useNavSwipe'
 import { hasRefreshHandler, runRefresh } from '@/composables/useRefreshRegistry'
 import { isNativeApp } from '@/utils/nativeApp'
@@ -46,10 +46,10 @@ const router = useRouter()
 // APK-only design: the Android shell gets an app-grade chrome (Chat in the
 // bottom bar, pill highlights, edge-to-edge chat) while the web keeps today's.
 const isNative = isNativeApp()
-const nativePhone = useNativePhone()
-// A chat thread on a native phone takes over the viewport like a messaging
-// app: no page padding, no bottom bar — just the conversation.
-const chatTakeover = computed(() => nativePhone.value && route.name === 'chat.thread')
+const belowLg = useIsBelowLg()
+// A chat thread in the APK (phone AND tablet) takes over the viewport like a
+// messaging app: no page padding, no bottom bar — just the conversation.
+const chatTakeover = computed(() => isNative && route.name === 'chat.thread')
 
 // Unread-chat counter for the shell's bottom-bar Chat tab (the web shows the
 // same number on the dock launcher instead). ChatDock keeps it live: it stays
@@ -168,10 +168,11 @@ const mobileNav = ref(false)
 const showProfile = ref(false)
 const showNotifPrefs = ref(false)
 
-// APK phones: swipe left→right anywhere opens the nav drawer, right→left
-// closes it (the chat takeover thread owns its own gestures and stands down).
+// APK, any screen still on drawer navigation (below lg — phones AND portrait
+// tablets): swipe left→right anywhere opens the nav drawer, right→left closes
+// it (the chat takeover thread owns its own gestures and stands down).
 useNavSwipe({
-  enabled: () => nativePhone.value && !chatTakeover.value,
+  enabled: () => belowLg.value && !chatTakeover.value,
   isOpen: () => mobileNav.value,
   open: () => (mobileNav.value = true),
   close: () => (mobileNav.value = false),

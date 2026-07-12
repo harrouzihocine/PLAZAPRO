@@ -1252,6 +1252,7 @@ export default {
     cancelReply: 'Annuler la réponse',
     attach: 'Joindre une photo ou un fichier',
     messagePlaceholder: 'Message…',
+    hideKeyboard: 'Masquer le clavier',
     saveChanges: 'Enregistrer les modifications',
     sendMessage: 'Envoyer le message',
     replyingTo: 'Réponse à {name}',
