@@ -55,4 +55,26 @@ class ImageOptimizer
 
         return $size === false ? [0, 0] : [(int) $size[0], (int) $size[1]];
     }
+
+    /**
+     * Page count of a local PDF via `vipsheader -f n-pages` (needs the
+     * vips-poppler loader — the same one toWebp() uses to rasterize pages
+     * with a `file.pdf[page=N,dpi=…]` source).
+     */
+    public function pdfPageCount(string $path): int
+    {
+        $process = new Process([
+            (string) config('media.optimize.bins.vipsheader', 'vipsheader'),
+            '-f', 'n-pages', $path,
+        ]);
+        $process->setTimeout($this->timeout);
+        $process->run();
+
+        $pages = (int) trim($process->getOutput());
+        if (! $process->isSuccessful() || $pages < 1) {
+            throw new \RuntimeException('vipsheader n-pages failed: '.trim($process->getErrorOutput()));
+        }
+
+        return $pages;
+    }
 }

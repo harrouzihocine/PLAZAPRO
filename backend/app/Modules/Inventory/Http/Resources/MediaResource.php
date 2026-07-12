@@ -51,6 +51,15 @@ class MediaResource extends JsonResource
                 ? route('media.thumb', $this->id).$v
                 : null,
             'preview_url' => $hasPreview ? route('media.preview', $this->id) : $fileUrl,
+            // Presentation decks: one URL per rasterized slide (WebP), in order.
+            // Empty until MakeMediaPreview has rendered them.
+            'slide_count' => $this->slide_count,
+            'slide_urls' => $this->slide_count
+                ? array_map(
+                    fn (int $page) => route('media.slide', ['media' => $this->id, 'page' => $page]).$v,
+                    range(1, $this->slide_count),
+                )
+                : [],
             'created_at' => $this->created_at,
         ];
     }

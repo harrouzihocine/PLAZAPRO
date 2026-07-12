@@ -93,6 +93,15 @@ export const useMediaStore = defineStore('media', {
       })
     },
 
+    // Metadata-only: patch the row in place instead of re-fetching the list, so
+    // the gallery doesn't flash while thumbnails re-resolve.
+    rename(id, name) {
+      return this.run(async () => {
+        const updated = await mediaApi.rename(id, name)
+        this.items = this.items.map((m) => (m.id === id ? { ...m, ...updated } : m))
+      })
+    },
+
     remove(id) {
       return this.run(async () => {
         await mediaApi.cancel(id)

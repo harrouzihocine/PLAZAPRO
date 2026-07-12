@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Jobs;
 
+use App\Core\Media\ImageOptimizer;
+use App\Core\Media\InteractsWithMediaFiles;
+use App\Modules\Inventory\Enums\MediaType;
 use App\Modules\Inventory\Models\Media;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,60 +18,70 @@ use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
 
 /**
- * Render a PPTX to a PDF (via LibreOffice headless) so it can be viewed inline
- * in the SPA, exactly like a native PDF. Runs on the queue worker, which has the
- * `soffice` binary installed. On success it stores the derived PDF and marks the
- * media preview ready; on failure it marks it failed (the original is unaffected).
+ * Render an office document to a PDF (via LibreOffice headless) so it can be
+ * viewed inline in the SPA, exactly like a native PDF. Presentations go one
+ * step further: every PDF page is rasterized to its own WebP (SlideShare-style)
+ * so the frontend can page through the deck fullscreen like PowerPoint, and the
+ * first slide becomes the gallery thumbnail.
+ *
+ * Runs on the dedicated `media` worker (its image ships `soffice`, the
+ * vips-poppler PDF loader and the fonts decks need). On success it stores the
+ * derived files and marks the preview ready; on failure it marks it failed
+ * (the original is unaffected and still downloadable).
  */
 class MakeMediaPreview implements ShouldQueue
 {
     use Dispatchable;
+    use InteractsWithMediaFiles;
     use InteractsWithQueue;
     use Queueable;
     use SerializesModels;
 
-    public int $timeout = 180;
+    public int $timeout = 900;
 
     public int $tries = 2;
 
-    public function __construct(public int $mediaId) {}
+    public function __construct(public int $mediaId)
+    {
+        $this->connection = 'media';
+        $this->queue = 'media';
+    }
 
-    public function handle(): void
+    public function handle(ImageOptimizer $images): void
     {
         $media = Media::find($this->mediaId);
-        if ($media === null || $media->preview_status === 'ready') {
+        if ($media === null || $this->alreadyDone($media)) {
             return;
         }
 
-        $disk = Storage::disk($media->disk);
-        $work = rtrim(sys_get_temp_dir(), '/').'/media-preview-'.Str::uuid();
+        $work = $this->makeWorkDir('media-preview');
 
         try {
-            @mkdir($work, 0700, true);
-            $source = $work.'/'.basename($media->path);
-            file_put_contents($source, $disk->get($media->path));
-
-            $process = new Process([
-                config('services.libreoffice.bin'),
-                '--headless', '--convert-to', 'pdf', '--outdir', $work, $source,
-            ]);
-            $process->setTimeout($this->timeout);
-            $process->run();
-
-            $pdf = $work.'/'.pathinfo($source, PATHINFO_FILENAME).'.pdf';
-            if (! $process->isSuccessful() || ! is_file($pdf)) {
-                throw new \RuntimeException('LibreOffice conversion failed: '.$process->getErrorOutput());
+            // Rows converted before the slide pipeline existed reuse their
+            // stored PDF — no need to run LibreOffice again on a backfill.
+            if ($media->preview_status === 'ready' && $media->preview_path !== null) {
+                $pdf = $work.'/preview.pdf';
+                $this->copyFromDisk($media->disk, $media->preview_path, $pdf);
+            } else {
+                $pdf = $this->convertToPdf($media, $work);
+                $previewPath = 'previews/'.now()->format('Y/m').'/'.Str::uuid()->toString().'.pdf';
+                $this->putToDisk($media->disk, $previewPath, $pdf);
+                $media->preview_path = $previewPath;
             }
 
-            $previewPath = 'previews/'.now()->format('Y/m').'/'.Str::uuid()->toString().'.pdf';
-            $disk->put($previewPath, file_get_contents($pdf));
+            if ($media->type === MediaType::Pptx) {
+                $this->renderSlides($media, $images, $work, $pdf);
+            }
 
-            $media->update(['preview_path' => $previewPath, 'preview_status' => 'ready']);
+            $media->preview_status = 'ready';
+            $media->save();
         } catch (\Throwable $e) {
-            $media->update(['preview_status' => 'failed']);
+            // Query update, not $media->update(): the model may carry half-set
+            // slide/preview attributes from before the failure — never persist those.
+            Media::whereKey($media->id)->update(['preview_status' => 'failed']);
             report($e);
         } finally {
-            $this->cleanup($work);
+            $this->cleanupWorkDir($work);
         }
     }
 
@@ -77,14 +90,71 @@ class MakeMediaPreview implements ShouldQueue
         Media::whereKey($this->mediaId)->update(['preview_status' => 'failed']);
     }
 
-    private function cleanup(string $dir): void
+    /** Ready rows only re-run when a presentation still lacks its slides. */
+    private function alreadyDone(Media $media): bool
     {
-        if (! is_dir($dir)) {
-            return;
+        return $media->preview_status === 'ready'
+            && ($media->type !== MediaType::Pptx || $media->slide_count !== null);
+    }
+
+    private function convertToPdf(Media $media, string $work): string
+    {
+        $source = $work.'/'.basename($media->path);
+        $this->copyFromDisk($media->disk, $media->path, $source);
+
+        $process = new Process([
+            config('services.libreoffice.bin'),
+            '--headless',
+            // Private profile per run: concurrent conversions sharing the
+            // default profile deadlock on its lock file.
+            '-env:UserInstallation=file://'.$work.'/lo-profile',
+            '--convert-to', 'pdf', '--outdir', $work, $source,
+        ]);
+        $process->setTimeout($this->timeout);
+        $process->run();
+
+        $pdf = $work.'/'.pathinfo($source, PATHINFO_FILENAME).'.pdf';
+        if (! $process->isSuccessful() || ! is_file($pdf)) {
+            throw new \RuntimeException('LibreOffice conversion failed: '.$process->getErrorOutput());
         }
-        foreach ((array) glob($dir.'/*') as $file) {
-            @unlink($file);
+
+        return $pdf;
+    }
+
+    /**
+     * Rasterize every PDF page into `{slides_path}/0001.webp`, `0002.webp`, …
+     * on the media disk and make the first slide the gallery thumbnail.
+     */
+    private function renderSlides(Media $media, ImageOptimizer $images, string $work, string $pdf): void
+    {
+        $cfg = config('media.slides');
+        $pages = min($images->pdfPageCount($pdf), max(1, (int) $cfg['max_pages']));
+
+        $dir = 'slides/'.now()->format('Y/m').'/'.Str::uuid()->toString();
+        for ($page = 1; $page <= $pages; $page++) {
+            $slide = $work.'/slide.webp';
+            // vips page indices are 0-based; dpi renders dense enough that the
+            // max_edge cap downscales (crisp) instead of upscaling (soft).
+            $images->toWebp(
+                sprintf('%s[page=%d,dpi=%d]', $pdf, $page - 1, $cfg['dpi']),
+                $slide, $cfg['max_edge'], $cfg['quality'],
+            );
+            $this->putToDisk($media->disk, sprintf('%s/%04d.webp', $dir, $page), $slide);
+            @unlink($slide);
         }
-        @rmdir($dir);
+
+        if ($media->thumb_path === null) {
+            $thumbCfg = config('media.optimize.image');
+            $images->toWebp(
+                sprintf('%s[page=0,dpi=%d]', $pdf, $cfg['dpi']),
+                $work.'/thumb.webp', $thumbCfg['thumb_edge'], $thumbCfg['thumb_quality'],
+            );
+            $thumbPath = 'thumbs/'.now()->format('Y/m').'/'.Str::uuid()->toString().'.webp';
+            $this->putToDisk($media->disk, $thumbPath, $work.'/thumb.webp');
+            $media->thumb_path = $thumbPath;
+        }
+
+        $media->slides_path = $dir;
+        $media->slide_count = $pages;
     }
 }

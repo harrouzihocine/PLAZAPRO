@@ -239,6 +239,12 @@ export const mediaApi = {
     return useApi().post(`/${mediableType}/${mediableId}/media/reorder`, { order })
   },
 
+  // Display-name only — the stored file (and its download bytes) are untouched.
+  async rename(id, name) {
+    const { data } = await useApi().patch(`/media/${id}`, { original_name: name })
+    return data.data
+  },
+
   cancel(id) {
     return useApi().delete(`/media/${id}`)
   },

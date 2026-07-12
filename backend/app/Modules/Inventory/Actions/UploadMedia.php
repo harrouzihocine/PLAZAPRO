@@ -60,12 +60,12 @@ class UploadMedia
             $media->uploaded_by = $user->id; // privileged field, set by the Action
             $media->save();
 
+            // afterCommit on both: the media worker is a separate process —
+            // don't let it race the transaction and find no row.
             if ($type->needsPreview()) {
-                MakeMediaPreview::dispatch($media->id);
+                MakeMediaPreview::dispatch($media->id)->afterCommit();
             }
 
-            // afterCommit: the media worker is a separate process — don't let it
-            // race the transaction and find no row.
             if ($type->needsOptimization()) {
                 OptimizeMedia::dispatch($media->id)->afterCommit();
             }

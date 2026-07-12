@@ -271,7 +271,9 @@ class DispatchTest extends TestCase
         ]])->assertOk();
 
         $this->assertSame($day.' 11:00:00', $undone->fresh()->scheduled_at->toDateTimeString());
-        $board = $this->getJson('/api/v1/dispatch/board')->assertOk()->json('data');
+        // Ask for the week holding the new day: on Sundays "tomorrow" is next
+        // week, and the default (current) week would never grid it.
+        $board = $this->getJson('/api/v1/dispatch/board?week='.$day)->assertOk()->json('data');
         $this->assertNotContains($undone->id, array_column($board['overdue'], 'id'));
         $this->assertContains($undone->id, array_column($board['items'], 'id'));
     }

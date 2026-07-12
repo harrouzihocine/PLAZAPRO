@@ -5,10 +5,19 @@ FROM php:8.3-fpm-alpine
 # linux-headers provides <linux/sock_diag.h>, required to compile the sockets ext.
 # vips-tools (vipsthumbnail) + ffmpeg power the media-optimization pipeline
 # (OptimizeMedia job): WebP re-encode for photos, 1080p H.264 for videos.
+# libreoffice (headless soffice) renders PPTX/DOCX/XLSX -> PDF and vips-poppler
+# adds the PDF loader vipsthumbnail uses to rasterize each page into the WebP
+# slides behind the media library's presentation mode (MakeMediaPreview job).
+# NOTE: impress alone bootstrap-crashes on Alpine (uno::RuntimeException) —
+# writer ships the component it needs; calc covers spreadsheet previews.
+# The font set keeps decks looking like PowerPoint: liberation = Arial/Times
+# metrics, carlito = Calibri metrics, noto(+arabic) = French/Arabic coverage.
 RUN apk add --no-cache \
       git curl zip unzip icu-dev oniguruma-dev libzip-dev \
       libpng-dev libjpeg-turbo-dev freetype-dev mysql-client linux-headers tzdata \
       vips-tools ffmpeg \
+      libreoffice-impress libreoffice-writer libreoffice-calc vips-poppler poppler-utils \
+      fontconfig font-liberation font-carlito font-noto font-noto-arabic font-noto-naskh-arabic \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     # pcntl: signal handling for `queue:work --timeout` and the Reverb server's
     # graceful shutdown. sockets: transport for the Reverb websocket loop.

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Core\Media;
 
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -30,10 +31,8 @@ trait InteractsWithMediaFiles
         if (! is_dir($dir)) {
             return;
         }
-        foreach ((array) glob($dir.'/*') as $file) {
-            @unlink($file);
-        }
-        @rmdir($dir);
+        // Recursive: LibreOffice runs leave a nested profile dir in the workdir.
+        File::deleteDirectory($dir);
     }
 
     /** Stream a stored file into the local workdir without loading it into memory. */

@@ -7,7 +7,7 @@ import { MEDIA_COLLECTIONS, mediaCollectionLabel, mediaDownloadUrl } from '@/fea
 import MediaViewer from '@/features/inventory/components/MediaViewer.vue'
 import AttachSheet from '@/components/ui/AttachSheet.vue'
 import { useMediaStore } from '@/features/inventory/mediaStore'
-import { confirmAction } from '@/composables/useConfirm'
+import { confirmAction, promptText } from '@/composables/useConfirm'
 import { isNativeApp } from '@/utils/nativeApp'
 import { t } from '@/i18n'
 
@@ -69,9 +69,12 @@ const countFor = (key) => (media.byCollection[key] ?? []).length
 
 onMounted(() => media.load(props.mediableType, props.mediableId))
 
-// While anything is still in the optimization pipeline (a 4K video can encode
-// for a few minutes), refresh gently so posters/thumbnails appear on their own.
-const hasPending = computed(() => media.items.some((m) => m.optimize_status === 'pending'))
+// While anything is still in the optimization or preview pipeline (a 4K video
+// or a big deck can take minutes), refresh gently so posters/thumbnails/slides
+// appear on their own.
+const hasPending = computed(() =>
+  media.items.some((m) => m.optimize_status === 'pending' || m.preview_status === 'pending'),
+)
 let pollTimer = null
 watch(
   hasPending,
@@ -126,6 +129,16 @@ async function remove(item) {
   ) {
     media.remove(item.id)
   }
+}
+
+async function rename(item) {
+  const name = await promptText({
+    title: t('media.renameTitle'),
+    value: item.original_name,
+    confirmText: t('media.rename'),
+    selectBasename: true,
+  })
+  if (name && name !== item.original_name) media.rename(item.id, name)
 }
 </script>
 
@@ -262,6 +275,23 @@ async function remove(item) {
               {{ formatDuration(item.duration_seconds) }}
             </span>
           </template>
+          <!-- Presentations show their first slide once rendered (Drive-style),
+               with a slide-count badge. -->
+          <template v-else-if="item.type === 'pptx' && item.thumb_url">
+            <img
+              :src="item.thumb_url"
+              :alt="item.original_name"
+              loading="lazy"
+              class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+            <span
+              v-if="item.slide_count"
+              class="num absolute bottom-1 end-1 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[11px] text-white"
+            >
+              <i class="pi pi-clone text-[10px]" aria-hidden="true" />
+              {{ item.slide_count }}
+            </span>
+          </template>
           <template v-else>
             <i
               :class="typeIcon[item.type] ?? 'pi pi-file'"
@@ -269,7 +299,7 @@ async function remove(item) {
               :aria-label="item.type"
             />
             <span
-              v-if="item.optimize_status === 'pending'"
+              v-if="item.optimize_status === 'pending' || item.preview_status === 'pending'"
               class="absolute bottom-1 start-1 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[11px] text-white"
             >
               <i class="pi pi-spin pi-spinner text-[10px]" aria-hidden="true" />
@@ -292,6 +322,13 @@ async function remove(item) {
               <i class="pi pi-download" aria-hidden="true" />
             </a>
             <template v-if="canManage">
+              <button
+                class="flex min-h-[32px] min-w-[28px] items-center justify-center text-xs text-mute hover:text-ink"
+                :aria-label="$t('media.rename')"
+                @click="rename(item)"
+              >
+                <i class="pi pi-pencil" aria-hidden="true" />
+              </button>
               <button
                 class="flex min-h-[32px] min-w-[28px] items-center justify-center text-xs text-mute hover:text-ink disabled:opacity-30"
                 :disabled="i === 0 || media.busy"

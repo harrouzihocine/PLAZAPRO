@@ -1161,6 +1161,12 @@ export default {
     previous: 'Précédent',
     next: 'Suivant',
     documentPreview: 'Aperçu du document',
+    present: 'Présenter',
+    exitPresent: 'Quitter',
+    rename: 'Renommer',
+    renameTitle: 'Renommer le fichier',
+    converting: 'Conversion du document pour l’aperçu… revenez dans un instant.',
+    previewUnavailable: 'Aperçu indisponible pour ce fichier — utilisez Télécharger pour l’ouvrir.',
   },
 
   // ── Célébration de vente ─────────────────────────────────────────────

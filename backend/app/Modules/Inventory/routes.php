@@ -44,6 +44,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/media/{media}/file', [MediaController::class, 'file'])->name('media.file');
         Route::get('/media/{media}/thumb', [MediaController::class, 'thumb'])->name('media.thumb');
         Route::get('/media/{media}/preview', [MediaController::class, 'preview'])->name('media.preview');
+        Route::get('/media/{media}/slide/{page}', [MediaController::class, 'slide'])
+            ->whereNumber('page')->name('media.slide');
         Route::get('/media/{media}/download', [MediaController::class, 'download'])->name('media.download');
     });
 
@@ -72,13 +74,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/boxes/{box}', [BoxController::class, 'destroy']);
     });
 
-    // Media writes (upload / reorder / replace / remove) require media.manage.
+    // Media writes (upload / reorder / replace / rename / remove) require media.manage.
     Route::middleware('can:media.manage')->group(function () {
         Route::post('/{mediableType}/{mediableId}/media', [MediaController::class, 'store'])
             ->whereIn('mediableType', ['locations', 'units'])->whereNumber('mediableId');
         Route::post('/{mediableType}/{mediableId}/media/reorder', [MediaController::class, 'reorder'])
             ->whereIn('mediableType', ['locations', 'units'])->whereNumber('mediableId');
         Route::post('/media/{media}/replace', [MediaController::class, 'replace']);
+        Route::patch('/media/{media}', [MediaController::class, 'rename']);
         Route::delete('/media/{media}', [MediaController::class, 'destroy']);
     });
 

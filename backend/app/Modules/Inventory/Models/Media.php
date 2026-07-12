@@ -28,6 +28,8 @@ class Media extends BaseModel
     protected $fillable = [
         'collection', 'type', 'disk', 'path', 'original_name', 'mime_type',
         'size_bytes', 'cdn_url', 'preview_path', 'preview_status', 'sort_order',
+        // Presentation slides (MakeMediaPreview): per-page WebP dir + count.
+        'slides_path', 'slide_count',
         // Optimization pipeline (OptimizeMedia): status + derivative + facts.
         'optimize_status', 'thumb_path', 'original_size_bytes',
         'width', 'height', 'duration_seconds',
@@ -41,6 +43,7 @@ class Media extends BaseModel
             'size_bytes' => 'integer',
             'version' => 'integer',
             'sort_order' => 'integer',
+            'slide_count' => 'integer',
             'original_size_bytes' => 'integer',
             'width' => 'integer',
             'height' => 'integer',

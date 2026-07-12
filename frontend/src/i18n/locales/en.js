@@ -1162,6 +1162,12 @@ export default {
     previous: 'Previous',
     next: 'Next',
     documentPreview: 'Document preview',
+    present: 'Present',
+    exitPresent: 'Exit',
+    rename: 'Rename',
+    renameTitle: 'Rename file',
+    converting: 'Converting document for preview… check back shortly.',
+    previewUnavailable: 'Preview unavailable for this file — use Download to open it.',
   },
 
   // ── Unit-sold celebration ────────────────────────────────────────────

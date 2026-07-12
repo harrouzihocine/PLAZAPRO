@@ -39,6 +39,43 @@ export function confirmAction({
   }).then((result) => result.isConfirmed)
 }
 
+// Ask for a single line of text (replaces prompt()). Resolves to the trimmed
+// value, or null when cancelled / left empty. The basename (before the last
+// dot) is pre-selected so renaming a file keeps its extension by default.
+export function promptText({
+  title = '',
+  value = '',
+  confirmText = undefined,
+  cancelText = undefined,
+  selectBasename = false,
+} = {}) {
+  confirmText ??= t('common.confirm')
+  cancelText ??= t('common.cancel')
+  return Swal.fire({
+    ...BASE_SWAL_OPTS,
+    title,
+    input: 'text',
+    inputValue: value,
+    showCancelButton: true,
+    confirmButtonText: confirmText,
+    cancelButtonText: cancelText,
+    reverseButtons: true,
+    customClass: {
+      confirmButton: 'plaza-swal-confirm',
+      cancelButton: 'plaza-swal-cancel',
+    },
+    didOpen: () => {
+      const input = Swal.getInput()
+      if (!input || !selectBasename) return
+      const dot = value.lastIndexOf('.')
+      input.setSelectionRange(0, dot > 0 ? dot : value.length)
+    },
+  }).then((result) => {
+    const text = (result.value ?? '').trim()
+    return result.isConfirmed && text ? text : null
+  })
+}
+
 // Show a simple informational/error message (replaces alert()).
 export function alertMessage({ title = '', text = '', icon = 'info' } = {}) {
   return Swal.fire({

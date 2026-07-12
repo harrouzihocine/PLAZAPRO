@@ -56,11 +56,11 @@ class ReplaceMedia
 
             $media->cancel('Replaced by version '.$replacement->version);
 
+            // afterCommit on both: the media worker must not race the transaction.
             if ($type->needsPreview()) {
-                MakeMediaPreview::dispatch($replacement->id);
+                MakeMediaPreview::dispatch($replacement->id)->afterCommit();
             }
 
-            // afterCommit: the media worker must not race the transaction.
             if ($type->needsOptimization()) {
                 OptimizeMedia::dispatch($replacement->id)->afterCommit();
             }

@@ -2,7 +2,6 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from 'primevue/button'
-import { useI18n } from 'vue-i18n'
 import { formatDate } from '@/utils/format'
 import { useShowcaseStore } from '../store'
 import { pickLocalized } from '../localized'
@@ -19,7 +18,6 @@ const props = defineProps({
 })
 
 const showcase = useShowcaseStore()
-const { t } = useI18n()
 
 const project = ref(null)
 const notFound = ref(false)

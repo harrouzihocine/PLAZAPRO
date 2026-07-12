@@ -1,20 +1,20 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { mediaDownloadUrl, mediaFileUrl, mediaPreviewUrl } from '@/features/inventory/api'
-import { isNativeApp } from '@/utils/nativeApp'
 
 const props = defineProps({
   media: { type: Object, required: true },
-  // The gallery tab's items — enables prev/next + swipe between them (shell).
+  // The gallery tab's items — enables prev/next + swipe between them.
   items: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['close', 'navigate'])
 
-// Messenger-style browsing in the Android shell: chevrons + swipe move
-// through the current tab's media. Web keeps the single-item lightbox.
-const isNative = isNativeApp()
+const root = ref(null)
+
+// ---- Browsing the tab (photos/videos/documents alike) -------------------
+// Messenger-style: chevrons, ←/→ and swipe move through the current tab.
 const index = computed(() => props.items.findIndex((i) => i.id === props.media.id))
-const canNavigate = computed(() => isNative && props.items.length > 1 && index.value !== -1)
+const canNavigate = computed(() => props.items.length > 1 && index.value !== -1)
 
 function go(delta) {
   if (!canNavigate.value) return
@@ -22,12 +22,78 @@ function go(delta) {
   emit('navigate', n)
 }
 
-// Escape closes — also how the shell's hardware back dismisses the viewer.
-function onKey(e) {
-  if (e.key === 'Escape') emit('close')
+// ---- Presentation deck (PPTX rasterized to per-slide WebP) ---------------
+const isPhoto = computed(() => props.media.type === 'photo')
+const isDeck = computed(() => props.media.type === 'pptx' && (props.media.slide_urls?.length ?? 0) > 0)
+const slide = ref(0)
+const slideCount = computed(() => props.media.slide_urls?.length ?? 0)
+
+function goSlide(delta) {
+  slide.value = Math.min(slideCount.value - 1, Math.max(0, slide.value + delta))
 }
-onMounted(() => window.addEventListener('keydown', onKey))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
+
+// ---- Preload neighbours so paging feels instant ---------------------------
+// (the browser caches them; slides especially must not flash white mid-deck)
+function preload(urls) {
+  for (const url of urls) {
+    if (!url) continue
+    const img = new Image()
+    img.src = url
+  }
+}
+watch(
+  [() => props.media?.id, slide],
+  () => {
+    if (isDeck.value) {
+      preload([props.media.slide_urls[slide.value + 1], props.media.slide_urls[slide.value - 1]])
+    } else if (isPhoto.value && canNavigate.value) {
+      const next = props.items[(index.value + 1) % props.items.length]
+      const prev = props.items[(index.value - 1 + props.items.length) % props.items.length]
+      preload([next?.type === 'photo' && mediaFileUrl(next.id), prev?.type === 'photo' && mediaFileUrl(prev.id)])
+    }
+  },
+  { immediate: true },
+)
+
+// ---- Fullscreen presentation (native Fullscreen API) ----------------------
+const fullscreen = ref(false)
+const fullscreenSupported = !!document.documentElement.requestFullscreen
+
+function toggleFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen()
+  else root.value?.requestFullscreen?.().catch(() => {})
+}
+function onFullscreenChange() {
+  fullscreen.value = document.fullscreenElement === root.value
+}
+
+// ---- Keyboard: PowerPoint-style driving -----------------------------------
+// Escape closes (also how the shell's hardware back dismisses the viewer);
+// in fullscreen the browser eats the first Esc to exit fullscreen — natural.
+function onKey(e) {
+  if (e.key === 'Escape') return emit('close')
+  if (isDeck.value) {
+    if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(e.key)) {
+      e.preventDefault()
+      goSlide(1)
+    } else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) {
+      e.preventDefault()
+      goSlide(-1)
+    } else if (e.key === 'Home') slide.value = 0
+    else if (e.key === 'End') slide.value = slideCount.value - 1
+  } else {
+    if (e.key === 'ArrowRight') go(1)
+    else if (e.key === 'ArrowLeft') go(-1)
+  }
+}
+onMounted(() => {
+  window.addEventListener('keydown', onKey)
+  document.addEventListener('fullscreenchange', onFullscreenChange)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKey)
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
+})
 
 let touchStartX = null
 function onTouchStart(e) {
@@ -38,15 +104,15 @@ function onTouchEnd(e) {
   const dx = (e.changedTouches[0]?.clientX ?? touchStartX) - touchStartX
   touchStartX = null
   // A zoomed photo pans instead of paging.
-  if (Math.abs(dx) > 60 && zoom.value === 1) go(dx < 0 ? 1 : -1)
+  if (Math.abs(dx) <= 60 || zoom.value !== 1) return
+  if (isDeck.value) goSlide(dx < 0 ? 1 : -1)
+  else go(dx < 0 ? 1 : -1)
 }
 
 const ZOOM_MIN = 1
 const ZOOM_MAX = 4
 const ZOOM_STEP = 0.5
 const zoom = ref(1)
-
-const isPhoto = computed(() => props.media.type === 'photo')
 
 // At 1× the image fits (contain); above that we grow the real height so the
 // scroll container can pan — CSS transforms don't create scrollbars.
@@ -73,24 +139,42 @@ function onWheel(e) {
   else zoomOut()
 }
 
-// Reset zoom when a different item is opened in the same viewer instance.
-watch(() => props.media?.id, resetZoom)
+// Reset per-item state when a different item is opened in the same viewer.
+watch(
+  () => props.media?.id,
+  () => {
+    resetZoom()
+    slide.value = 0
+  },
+)
 </script>
 
 <template>
   <!-- data-gesture-surface: owns its photo-swipe — the nav drawer swipe stands
        down. data-app-overlay: hardware back closes it (via Escape) first. -->
   <div
+    ref="root"
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 backdrop-blur-sm sm:p-6"
+    :class="fullscreen && 'bg-black p-0 sm:p-0'"
     data-gesture-surface
     data-app-overlay
     @click.self="$emit('close')"
   >
     <div
-      class="relative flex max-h-full w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-card shadow-pop native:max-md:h-full native:max-md:max-h-none native:max-md:rounded-none"
+      class="relative flex flex-col overflow-hidden bg-card shadow-pop"
+      :class="
+        fullscreen
+          ? 'h-full max-h-none w-full max-w-none rounded-none bg-black'
+          : 'max-h-full w-full max-w-5xl rounded-xl native:max-md:h-full native:max-md:max-h-none native:max-md:rounded-none'
+      "
     >
-      <div class="flex items-center justify-between gap-2 border-b border-line px-4 py-2">
-        <span class="truncate text-sm font-medium text-ink">{{ media.original_name }}</span>
+      <div
+        class="flex items-center justify-between gap-2 border-b border-line px-4 py-2"
+        :class="fullscreen && 'border-white/10 bg-black/60 text-white'"
+      >
+        <span class="truncate text-sm font-medium" :class="fullscreen ? 'text-white' : 'text-ink'">
+          {{ media.original_name }}
+        </span>
         <div class="flex shrink-0 items-center gap-0.5">
           <!-- Zoom controls (photos only) -->
           <template v-if="isPhoto">
@@ -118,13 +202,23 @@ watch(() => props.media?.id, resetZoom)
               <i class="pi pi-search-plus" aria-hidden="true" />
             </button>
           </template>
+          <!-- Present / fullscreen (photos + decks) -->
+          <button
+            v-if="fullscreenSupported && (isPhoto || isDeck || media.type === 'video')"
+            class="flex min-h-[44px] items-center gap-1.5 px-2 text-sm text-mute hover:text-ink"
+            :aria-label="fullscreen ? $t('media.exitPresent') : $t('media.present')"
+            @click="toggleFullscreen"
+          >
+            <i :class="fullscreen ? 'pi pi-window-minimize' : 'pi pi-play-circle'" aria-hidden="true" />
+            <span class="max-sm:hidden">{{ fullscreen ? $t('media.exitPresent') : $t('media.present') }}</span>
+          </button>
           <a
             :href="mediaDownloadUrl(media.id)"
             :download="media.original_name"
             class="flex min-h-[44px] items-center gap-1.5 px-2 text-sm text-mute hover:text-ink"
           >
             <i class="pi pi-download" aria-hidden="true" />
-            Download
+            <span class="max-sm:hidden">{{ $t('common.download') }}</span>
           </a>
           <button
             class="flex min-h-[44px] min-w-[44px] items-center justify-center text-mute hover:text-ink"
@@ -136,41 +230,67 @@ watch(() => props.media?.id, resetZoom)
         </div>
       </div>
 
-      <!-- Prev / next through the tab's media (Android shell only) -->
-      <template v-if="canNavigate">
+      <!-- Prev / next through the tab's media (hidden while a deck drives its own slides) -->
+      <template v-if="canNavigate && !isDeck">
         <button
-          class="absolute start-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white active:bg-black/60"
+          class="absolute start-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 active:bg-black/60"
           :aria-label="$t('media.previous')"
           @click.stop="go(-1)"
         >
-          <i class="pi pi-chevron-left" aria-hidden="true" />
+          <i class="pi pi-chevron-left rtl:rotate-180" aria-hidden="true" />
         </button>
         <button
-          class="absolute end-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white active:bg-black/60"
+          class="absolute end-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 active:bg-black/60"
           :aria-label="$t('media.next')"
           @click.stop="go(1)"
         >
-          <i class="pi pi-chevron-right" aria-hidden="true" />
+          <i class="pi pi-chevron-right rtl:rotate-180" aria-hidden="true" />
         </button>
         <span
-          class="num absolute bottom-2 start-1/2 z-10 -translate-x-1/2 rounded-full bg-black/40 px-2.5 py-0.5 text-xs text-white"
+          class="num absolute bottom-2 start-1/2 z-10 -translate-x-1/2 rounded-full bg-black/40 px-2.5 py-0.5 text-xs text-white rtl:translate-x-1/2"
         >
           {{ index + 1 }} / {{ items.length }}
         </span>
       </template>
 
+      <!-- Slide chevrons + counter (deck mode) -->
+      <template v-if="isDeck">
+        <button
+          class="absolute start-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 active:bg-black/60 disabled:opacity-30"
+          :disabled="slide === 0"
+          :aria-label="$t('media.previous')"
+          @click.stop="goSlide(-1)"
+        >
+          <i class="pi pi-chevron-left rtl:rotate-180" aria-hidden="true" />
+        </button>
+        <button
+          class="absolute end-1 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 active:bg-black/60 disabled:opacity-30"
+          :disabled="slide === slideCount - 1"
+          :aria-label="$t('media.next')"
+          @click.stop="goSlide(1)"
+        >
+          <i class="pi pi-chevron-right rtl:rotate-180" aria-hidden="true" />
+        </button>
+        <span
+          class="num absolute bottom-2 start-1/2 z-10 -translate-x-1/2 rounded-full bg-black/40 px-2.5 py-0.5 text-xs text-white rtl:translate-x-1/2"
+        >
+          {{ slide + 1 }} / {{ slideCount }}
+        </span>
+      </template>
+
       <div
         class="flex min-h-[50vh] flex-1 items-center justify-center overflow-auto p-2"
+        :class="fullscreen && 'bg-black p-0'"
         @wheel="onWheel"
         @touchstart.passive="onTouchStart"
         @touchend.passive="onTouchEnd"
       >
         <img
-          v-if="media.type === 'photo'"
+          v-if="isPhoto"
           :src="mediaFileUrl(media.id)"
           :alt="media.original_name"
-          class="max-h-[80vh] max-w-full object-contain"
-          :class="zoom > 1 ? 'cursor-zoom-out' : 'cursor-zoom-in'"
+          class="max-w-full object-contain"
+          :class="[zoom > 1 ? 'cursor-zoom-out' : 'cursor-zoom-in', fullscreen ? 'max-h-full' : 'max-h-[80vh]']"
           :style="imgStyle"
           @click="zoom === 1 ? zoomIn() : resetZoom()"
         />
@@ -180,8 +300,19 @@ watch(() => props.media?.id, resetZoom)
           :src="mediaFileUrl(media.id)"
           :poster="media.thumb_url ?? undefined"
           controls
-          class="max-h-[80vh] max-w-full"
+          class="max-w-full"
+          :class="fullscreen ? 'max-h-full' : 'max-h-[80vh]'"
         ></video>
+
+        <!-- Presentation deck: pre-rendered slides, click to advance (PowerPoint style) -->
+        <img
+          v-else-if="isDeck"
+          :src="media.slide_urls[slide]"
+          :alt="`${media.original_name} — ${slide + 1}`"
+          class="max-w-full cursor-pointer select-none object-contain"
+          :class="fullscreen ? 'max-h-full' : 'max-h-[80vh]'"
+          @click="goSlide(1)"
+        />
 
         <iframe
           v-else-if="media.type === 'pdf'"
@@ -190,8 +321,8 @@ watch(() => props.media?.id, resetZoom)
           :title="$t('media.documentPreview')"
         ></iframe>
 
-        <!-- Office docs (presentations, Word, spreadsheets) are shown via their
-             LibreOffice-rendered PDF preview; the original is available to download. -->
+        <!-- Office docs without slides (Word, spreadsheets, legacy decks) are
+             shown via their LibreOffice-rendered PDF; the original stays downloadable. -->
         <template v-else-if="['pptx', 'docx', 'xlsx'].includes(media.type)">
           <iframe
             v-if="media.preview_status === 'ready'"
@@ -200,10 +331,10 @@ watch(() => props.media?.id, resetZoom)
             :title="$t('media.documentPreview')"
           ></iframe>
           <p v-else-if="media.preview_status === 'pending'" class="p-8 text-center opacity-70">
-            Converting document for preview… check back shortly.
+            {{ $t('media.converting') }}
           </p>
           <p v-else class="p-8 text-center opacity-70">
-            Preview unavailable for this file — use Download to open it.
+            {{ $t('media.previewUnavailable') }}
           </p>
         </template>
       </div>

@@ -76,8 +76,28 @@ return [
 
         'bins' => [
             'vipsthumbnail' => env('VIPSTHUMBNAIL_BIN', 'vipsthumbnail'),
+            'vipsheader' => env('VIPSHEADER_BIN', 'vipsheader'),
             'ffmpeg' => env('FFMPEG_BIN', 'ffmpeg'),
             'ffprobe' => env('FFPROBE_BIN', 'ffprobe'),
         ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Presentation slides (PPTX -> per-slide WebP)
+    |--------------------------------------------------------------------------
+    |
+    | After MakeMediaPreview converts a presentation to PDF, each page is
+    | rasterized to its own WebP (vipsthumbnail + poppler) so the frontend can
+    | page through the deck fullscreen, PowerPoint-style. `dpi` is the poppler
+    | render density before the max_edge cap; `max_pages` bounds runaway decks.
+    |
+    */
+
+    'slides' => [
+        'max_edge' => (int) env('MEDIA_SLIDE_MAX_EDGE', 1920),
+        'quality' => (int) env('MEDIA_SLIDE_QUALITY', 82),
+        'dpi' => (int) env('MEDIA_SLIDE_DPI', 200),
+        'max_pages' => (int) env('MEDIA_SLIDE_MAX_PAGES', 300),
     ],
 ];
