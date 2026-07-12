@@ -20,7 +20,9 @@ enum MediaType: string
     /**
      * Map a validated mime type to a MediaType, or null if unsupported. Office
      * formats collapse to one type per family (MS + OpenDocument alike) since
-     * they share the same PDF-preview path.
+     * they share the same PDF-preview path. Each family lists what PowerPoint /
+     * Word / Excel actually emit: plain, slideshow/template, and macro-enabled
+     * variants — LibreOffice converts them all.
      */
     public static function fromMime(string $mime): ?self
     {
@@ -29,13 +31,21 @@ enum MediaType: string
             'video/mp4', 'video/webm', 'video/quicktime' => self::Video,
             'application/pdf' => self::Pdf,
             'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/vnd.openxmlformats-officedocument.presentationml.slideshow',
+            'application/vnd.openxmlformats-officedocument.presentationml.template',
+            'application/vnd.ms-powerpoint.presentation.macroEnabled.12',
+            'application/vnd.ms-powerpoint.slideshow.macroEnabled.12',
             'application/vnd.ms-powerpoint',
             'application/vnd.oasis.opendocument.presentation' => self::Pptx,
             'application/msword',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.template',
+            'application/vnd.ms-word.document.macroEnabled.12',
             'application/vnd.oasis.opendocument.text' => self::Docx,
             'application/vnd.ms-excel',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.template',
+            'application/vnd.ms-excel.sheet.macroEnabled.12',
             'application/vnd.oasis.opendocument.spreadsheet' => self::Xlsx,
             default => null,
         };
@@ -59,30 +69,4 @@ enum MediaType: string
         return in_array($this, [self::Photo, self::Video], true);
     }
 
-    /**
-     * The server-side mime allow-list. Anything not here (e.g. executables) is
-     * rejected at validation — the extension is never trusted.
-     *
-     * @return list<string>
-     */
-    public static function allowedMimes(): array
-    {
-        return [
-            'image/jpeg', 'image/png', 'image/webp', 'image/gif',
-            'video/mp4', 'video/webm', 'video/quicktime',
-            'application/pdf',
-            // Presentations (PowerPoint + OpenDocument)
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            'application/vnd.ms-powerpoint',
-            'application/vnd.oasis.opendocument.presentation',
-            // Word-processor documents (Word + OpenDocument)
-            'application/msword',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'application/vnd.oasis.opendocument.text',
-            // Spreadsheets (Excel + OpenDocument)
-            'application/vnd.ms-excel',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'application/vnd.oasis.opendocument.spreadsheet',
-        ];
-    }
 }

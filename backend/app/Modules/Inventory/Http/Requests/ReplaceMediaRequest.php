@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Http\Requests;
 
-use App\Modules\Inventory\Enums\MediaType;
+use App\Modules\Inventory\Rules\SupportedMediaFile;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ReplaceMediaRequest extends FormRequest
@@ -24,7 +24,7 @@ class ReplaceMediaRequest extends FormRequest
                 'required', 'file',
                 // Ceiling from config/media.php — see the Cloudflare edge-cap note there.
                 'max:'.(int) config('media.max_upload_kb', 200 * 1024),
-                'mimetypes:'.implode(',', MediaType::allowedMimes()),
+                new SupportedMediaFile,
             ],
         ];
     }

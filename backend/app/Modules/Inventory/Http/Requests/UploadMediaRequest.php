@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Http\Requests;
 
 use App\Modules\Inventory\Enums\MediaCollection;
-use App\Modules\Inventory\Enums\MediaType;
+use App\Modules\Inventory\Rules\SupportedMediaFile;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -28,9 +28,10 @@ class UploadMediaRequest extends FormRequest
                 // php must match). Cap it below Cloudflare's 100 MB edge limit via
                 // MEDIA_MAX_UPLOAD_KB when the tunnel is the primary upload path.
                 'max:'.(int) config('media.max_upload_kb', 200 * 1024),
-                // `mimetypes` validates the file's *detected* MIME (content-based),
-                // never the extension — per the security baseline.
-                'mimetypes:'.implode(',', MediaType::allowedMimes()),
+                // Content-based type gate (never the extension) — canonical mime
+                // via UploadMimeDetector, so real Office files that libmagic can
+                // only call "zip"/OLE still resolve. Security baseline unchanged.
+                new SupportedMediaFile,
             ],
             // The semantic bucket (tab). Unknown values are rejected — the enum
             // is the single source of truth. Omitted => UploadMedia's default.

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Actions;
 
+use App\Core\Media\UploadMimeDetector;
 use App\Modules\Inventory\Enums\MediaCollection;
 use App\Modules\Inventory\Enums\MediaType;
 use App\Modules\Inventory\Jobs\MakeMediaPreview;
@@ -25,7 +26,12 @@ class UploadMedia
 {
     public function handle(Model $mediable, UploadedFile $file, ?string $collection, User $user): Media
     {
-        $type = MediaType::fromMime($file->getMimeType());
+        // Canonical mime (zip/OLE-sniffed when libmagic is vague) — the same
+        // resolution SupportedMediaFile validated, stored so viewers/converters
+        // see the real type, never "application/zip".
+        $detector = app(UploadMimeDetector::class);
+        $mime = $detector->detect($file);
+        $type = MediaType::fromMime($mime);
         abort_if($type === null, 422, 'Unsupported media type.');
 
         // Land in the catch-all bucket when no tab was specified. Resolved before
@@ -34,9 +40,9 @@ class UploadMedia
             ? MediaCollection::default()->value
             : $collection;
 
-        return DB::transaction(function () use ($mediable, $file, $collection, $user, $type) {
-            // Derive the extension from the detected mime, never the client name.
-            $ext = strtolower((string) $file->extension());
+        return DB::transaction(function () use ($mediable, $file, $collection, $user, $type, $detector, $mime) {
+            // Derive the extension from the canonical mime, never the client name.
+            $ext = strtolower($detector->extensionFor($mime) ?? (string) $file->extension());
             $path = $file->storeAs(
                 'uploads/'.now()->format('Y/m'),
                 Str::uuid()->toString().($ext !== '' ? '.'.$ext : ''),
@@ -51,7 +57,7 @@ class UploadMedia
                 'disk' => 'media',
                 'path' => $path,
                 'original_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getMimeType(),
+                'mime_type' => $mime,
                 'size_bytes' => $file->getSize(),
                 'sort_order' => $nextSort,
                 'preview_status' => $type->needsPreview() ? 'pending' : null,

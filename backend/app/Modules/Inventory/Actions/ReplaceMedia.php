@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Actions;
 
+use App\Core\Media\UploadMimeDetector;
 use App\Modules\Inventory\Enums\MediaType;
 use App\Modules\Inventory\Jobs\MakeMediaPreview;
 use App\Modules\Inventory\Jobs\OptimizeMedia;
@@ -23,12 +24,15 @@ class ReplaceMedia
 {
     public function handle(Media $media, UploadedFile $file, User $user): Media
     {
-        $type = MediaType::fromMime($file->getMimeType());
+        // Canonical mime — see UploadMedia; identical resolution on both paths.
+        $detector = app(UploadMimeDetector::class);
+        $mime = $detector->detect($file);
+        $type = MediaType::fromMime($mime);
         abort_if($type === null, 422, 'Unsupported media type.');
 
-        return DB::transaction(function () use ($media, $file, $user, $type) {
-            // Derive the extension from the detected mime, never the client name.
-            $ext = strtolower((string) $file->extension());
+        return DB::transaction(function () use ($media, $file, $user, $type, $detector, $mime) {
+            // Derive the extension from the canonical mime, never the client name.
+            $ext = strtolower($detector->extensionFor($mime) ?? (string) $file->extension());
             $path = $file->storeAs(
                 'uploads/'.now()->format('Y/m'),
                 Str::uuid()->toString().($ext !== '' ? '.'.$ext : ''),
@@ -41,7 +45,7 @@ class ReplaceMedia
                 'disk' => 'media',
                 'path' => $path,
                 'original_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getMimeType(),
+                'mime_type' => $mime,
                 'size_bytes' => $file->getSize(),
                 'sort_order' => $media->sort_order,
                 'preview_status' => $type->needsPreview() ? 'pending' : null,

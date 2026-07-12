@@ -183,7 +183,7 @@ async function rename(item) {
     <input
       ref="documentInput"
       type="file"
-      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pps,.pptx,.ppsx,.pptm,.odp,.odt,.ods"
       multiple
       class="hidden"
       @change="onPick"
