@@ -98,7 +98,7 @@ function cellTitle(unit) {
         </h3>
 
         <!-- One row per floor, top down; horizontal scroll guards wide blocks -->
-        <div class="overflow-x-auto pb-1">
+        <div class="grid-scroller overflow-x-auto pb-1">
           <div class="inline-flex min-w-full flex-col gap-1.5">
             <div v-for="row in group.floors" :key="row.floor" class="flex items-center gap-1 sm:gap-1.5">
               <span class="num w-5 shrink-0 text-end text-[10px] text-mute sm:w-7 sm:text-xs" :title="$t('showcase.grid.floor')">
@@ -160,6 +160,24 @@ function cellTitle(unit) {
 </template>
 
 <style scoped>
+/* Scroll shadows: edge hints that appear only while columns are hidden on
+   that side (pure CSS — the card-colored cover layers scroll with the
+   content and mask the shadows at the extremes). */
+.grid-scroller {
+  background:
+    linear-gradient(to right, var(--p-content-background) 30%, transparent),
+    linear-gradient(to left, var(--p-content-background) 30%, transparent) 100% 0,
+    radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / 0.22), transparent),
+    radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 0.22), transparent) 100% 0;
+  background-repeat: no-repeat;
+  background-size:
+    40px 100%,
+    40px 100%,
+    12px 100%,
+    12px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+
 .showcase-tray-enter-active,
 .showcase-tray-leave-active {
   transition: opacity 0.2s ease, transform 0.2s ease;
