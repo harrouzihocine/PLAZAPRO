@@ -22,14 +22,30 @@ function upsert(attr, name, content) {
   el.setAttribute('content', content)
 }
 
+// Structured data (schema.org JSON-LD) — one managed script per page.
+function upsertJsonLd(data) {
+  let el = document.head.querySelector('script[type="application/ld+json"][data-seo-managed]')
+  if (!data) {
+    el?.remove()
+    return
+  }
+  if (!el) {
+    el = document.createElement('script')
+    el.type = 'application/ld+json'
+    el.setAttribute('data-seo-managed', '')
+    document.head.appendChild(el)
+  }
+  el.textContent = JSON.stringify(data)
+}
+
 /**
- * @param {() => {title?: string, description?: string, image?: string}} source
+ * @param {() => {title?: string, description?: string, image?: string, jsonLd?: object}} source
  *   Reactive getter — re-applied whenever its dependencies (locale, loaded
  *   project…) change.
  */
 export function useSeoMeta(source) {
   watchEffect(() => {
-    const { title, description, image } = source() ?? {}
+    const { title, description, image, jsonLd } = source() ?? {}
 
     document.title = title ? `${title}` : DEFAULT_TITLE
     upsert('name', 'description', description)
@@ -40,6 +56,7 @@ export function useSeoMeta(source) {
     upsert('property', 'og:url', window.location.href)
     upsert('property', 'og:type', 'website')
     upsert('name', 'twitter:card', image ? 'summary_large_image' : 'summary')
+    upsertJsonLd(jsonLd)
   })
 
   onUnmounted(() => {

@@ -17,3 +17,11 @@ export const webLeadsApi = {
   // 409 (duplicate phone) is a normal outcome here — the modal handles it.
   convert: (id, payload) => useApi().post(`/web-leads/${id}/convert`, payload),
 }
+
+// The website statistics board (permission web.stats).
+export const webStatsApi = {
+  async get(days = 30) {
+    const { data } = await useApi().get('/web-stats', { params: { days } })
+    return data.data
+  },
+}

@@ -237,6 +237,8 @@ const SECTIONS = [
     items: [
       { to: '/analytics/kpi', labelKey: 'nav.kpi', icon: 'pi pi-chart-bar', permission: 'analytics.kpi' },
       { to: '/analytics', labelKey: 'nav.reports', icon: 'pi pi-chart-line', permission: 'reports.view' },
+      // The public website's own traffic board (visits, project/unit views).
+      { to: '/website-stats', labelKey: 'nav.websiteStats', icon: 'pi pi-wave-pulse', permission: 'web.stats' },
       // Open to everyone: a user without logs.view_all sees only their own logs
       // (the label reads "My logs" for them, "Team logs" for the company-wide view).
       { to: '/team-logs', labelKey: 'nav.teamLogs', icon: 'pi pi-list-check' },

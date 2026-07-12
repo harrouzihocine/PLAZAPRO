@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { useShowcaseStore } from '../store'
 import { pickLocalized } from '../localized'
 import { useSeoMeta } from '../composables/useSeoMeta'
+import { track } from '../composables/useTracker'
 import HeroSection from '../components/HeroSection.vue'
 import ProjectCard from '../components/ProjectCard.vue'
 import LeadForm from '../components/LeadForm.vue'
@@ -27,6 +28,20 @@ useSeoMeta(() => ({
   title: `${company.value.name || 'PLAZA PRO'} — ${t('showcase.seo.homeTitle')}`,
   description: aboutText.value || t('showcase.hero.subtitle'),
   image: featured.value.find((p) => p.cover)?.cover.file_url,
+  // The company as structured data: search engines link the site, the phone
+  // numbers and the social profiles into one entity card.
+  jsonLd: {
+    '@context': 'https://schema.org',
+    '@type': 'RealEstateAgent',
+    name: company.value.name || 'PLAZA PRO',
+    url: window.location.origin,
+    telephone: showcase.phones[0] || undefined,
+    email: company.value.email || undefined,
+    address: company.value.address
+      ? { '@type': 'PostalAddress', streetAddress: company.value.address, addressCountry: 'DZ' }
+      : undefined,
+    sameAs: showcase.socialLinks.map((s) => s.url),
+  },
 }))
 </script>
 
@@ -116,11 +131,15 @@ useSeoMeta(() => ({
           <p class="mt-4 text-mute">{{ $t('showcase.contact.body') }}</p>
 
           <ul class="mt-8 space-y-4 text-sm">
-            <li v-if="company.phone" class="flex items-center gap-3">
+            <li v-for="phone in showcase.phones" :key="phone" class="flex items-center gap-3">
               <span class="flex h-10 w-10 items-center justify-center rounded-full bg-primary-500/15 text-primary-500">
                 <i class="pi pi-phone" aria-hidden="true" />
               </span>
-              <a :href="`tel:${company.phone}`" class="ltr-data font-medium text-ink hover:text-primary-500">{{ company.phone }}</a>
+              <a
+                :href="`tel:${phone}`"
+                class="ltr-data font-medium text-ink hover:text-primary-500"
+                @click="track('phone_click')"
+              >{{ phone }}</a>
             </li>
             <li v-if="company.address" class="flex items-center gap-3">
               <span class="flex h-10 w-10 items-center justify-center rounded-full bg-primary-500/15 text-primary-500">

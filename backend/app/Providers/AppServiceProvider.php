@@ -21,6 +21,7 @@ use App\Modules\Payments\Support\Contracts\PdfRenderer;
 use App\Modules\Payments\Support\DomPdfRenderer;
 use App\Modules\Pipeline\Models\Call;
 use App\Modules\Pipeline\Models\Visit;
+use App\Modules\Web\Models\WebsiteSpace;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -78,6 +79,7 @@ class AppServiceProvider extends ServiceProvider
             'document' => Document::class,
             'conversation' => Conversation::class,
             'message' => Message::class,
+            'website_space' => WebsiteSpace::class,
         ]);
     }
 }

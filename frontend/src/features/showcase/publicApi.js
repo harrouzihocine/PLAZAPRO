@@ -10,6 +10,7 @@ export const publicApi = {
   config: () => api.get('/public/config'),
   projects: (params = {}) => api.get('/public/projects', { params }),
   project: (id) => api.get(`/public/projects/${id}`),
+  unit: (projectId, unitId) => api.get(`/public/projects/${projectId}/units/${unitId}`),
   submitLead: (payload) => api.post('/public/leads', payload),
 }
 

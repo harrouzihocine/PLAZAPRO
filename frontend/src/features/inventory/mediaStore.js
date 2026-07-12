@@ -102,6 +102,14 @@ export const useMediaStore = defineStore('media', {
       })
     },
 
+    // The public-showcase globe toggle (metadata-only, patched in place).
+    setPublic(id, isPublic) {
+      return this.run(async () => {
+        const updated = await mediaApi.setPublic(id, isPublic)
+        this.items = this.items.map((m) => (m.id === id ? { ...m, ...updated } : m))
+      })
+    },
+
     remove(id) {
       return this.run(async () => {
         await mediaApi.cancel(id)

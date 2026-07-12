@@ -41,15 +41,26 @@ class AppSettingController extends Controller
         // office_phone. Served to anonymous visitors via GET /public/config.
         'website_whatsapp' => ['sometimes', 'nullable', 'string', 'max:40'],
         'website_email' => ['sometimes', 'nullable', 'email', 'max:120'],
+        // Extra contact numbers, one per line (the site lists them all; the
+        // first doubles as the legacy singular `phone`).
+        'website_phones' => ['sometimes', 'nullable', 'string', 'max:1000'],
         'website_facebook_url' => ['sometimes', 'nullable', 'url', 'max:500'],
         'website_instagram_url' => ['sometimes', 'nullable', 'url', 'max:500'],
+        'website_tiktok_url' => ['sometimes', 'nullable', 'url', 'max:500'],
+        'website_youtube_url' => ['sometimes', 'nullable', 'url', 'max:500'],
+        'website_linkedin_url' => ['sometimes', 'nullable', 'url', 'max:500'],
+        'website_x_url' => ['sometimes', 'nullable', 'url', 'max:500'],
         'website_about_en' => ['sometimes', 'nullable', 'string', 'max:5000'],
         'website_about_fr' => ['sometimes', 'nullable', 'string', 'max:5000'],
         'website_about_ar' => ['sometimes', 'nullable', 'string', 'max:5000'],
-        // Landing hero video: a media id (video, public collection) living on a
-        // PUBLISHED project — PublicConfigController re-checks all of that
-        // before emitting URLs, so a stale id degrades to the photo hero.
+        // Landing hero (legacy single pick): a media id on a PUBLISHED project —
+        // PublicConfigController re-checks everything before emitting URLs, so
+        // a stale id degrades to the default cover hero.
         'website_hero_media_id' => ['sometimes', 'nullable', 'integer', 'exists:media,id'],
+        // Landing hero, curated set: ordered comma-separated media ids from the
+        // hero library (photos → slideshow, a leading video → video hero).
+        // Takes precedence over the legacy single id when non-empty.
+        'website_hero_media_ids' => ['sometimes', 'nullable', 'string', 'max:400', 'regex:/^\d+(,\d+)*$/'],
         // The dispatch GPS layer: site geofence radius (auto check-in/out),
         // how long an assignment may sit unaccepted / an arrival may run late
         // before the dispatchers are nudged, and breadcrumb retention.

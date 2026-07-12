@@ -470,18 +470,30 @@ function toggleArchived() {
                 <ToggleSwitch v-model="form.show_availability" />
               </label>
 
-              <!-- Trilingual marketing copy, one language tab at a time -->
-              <div class="flex gap-1 pt-1">
+              <!-- Trilingual marketing copy, one language tab at a time. The
+                   dot flags languages still missing their text (visitors in
+                   that language fall back to another one). -->
+              <div class="flex items-center gap-1 pt-1">
                 <button
                   v-for="lang in ['fr', 'ar', 'en']"
                   :key="lang"
                   type="button"
-                  class="rounded-full px-3 py-1 text-xs font-semibold uppercase transition-colors"
+                  class="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold uppercase transition-colors"
                   :class="marketingLang === lang
                     ? 'bg-primary-500 text-primary-contrast'
                     : 'bg-surface-100 text-mute hover:text-ink dark:bg-surface-800'"
                   @click="marketingLang = lang"
-                >{{ lang }}</button>
+                >
+                  {{ lang }}
+                  <span
+                    class="h-1.5 w-1.5 rounded-full"
+                    :class="(form.marketing_description[lang] || '').trim() || (form.marketing_tagline[lang] || '').trim()
+                      ? 'bg-success'
+                      : 'border border-current opacity-60'"
+                    aria-hidden="true"
+                  />
+                </button>
+                <span class="ms-1 text-[11px] text-mute">{{ $t('inventory.websiteLangsHint') }}</span>
               </div>
               <BaseInput
                 v-model="form.marketing_tagline[marketingLang]"

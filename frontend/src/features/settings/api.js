@@ -80,6 +80,15 @@ export const appSettingsApi = {
   },
 }
 
+// The public site's hero library anchor (Settings → Website drives the
+// standard media endpoints with mediableType 'website' + this id).
+export const websiteSpaceApi = {
+  async get() {
+    const { data } = await useApi().get('/website-space')
+    return data.data
+  },
+}
+
 // Dynamic-lists admin (the dropdown backbone). Read of a single list is done via
 // the useDynamicList composable; these cover the management screen.
 export const dynamicListsApi = {

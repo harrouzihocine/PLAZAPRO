@@ -34,6 +34,8 @@ class MediaResource extends JsonResource
             'size_bytes' => $this->size_bytes,
             'version' => $this->version,
             'sort_order' => $this->sort_order,
+            // Public-showcase visibility (the globe toggle in the gallery).
+            'is_public' => (bool) $this->is_public,
             'preview_status' => $this->preview_status,
             // Optimization pipeline: pending | ready | failed | skipped (null =
             // untouched types / rows predating the pipeline).

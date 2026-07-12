@@ -51,6 +51,12 @@ class RbacServiceProvider extends ServiceProvider
         RateLimiter::for('public', fn (Request $request) => Limit::perMinute(60)
             ->by('pub|'.$request->ip()));
 
+        // Media streaming is fan-out traffic: a single project page pulls tens
+        // of thumbnails and the hero slideshow more, so it gets a much wider
+        // per-IP budget than the JSON reads above.
+        RateLimiter::for('public-media', fn (Request $request) => Limit::perMinute(300)
+            ->by('pubmedia|'.$request->ip()));
+
         // Lead submissions are the abuse magnet: a human sends one or two,
         // never dozens. Hourly + daily ceilings per IP (an office NAT sharing
         // one IP still fits — leads come from the public internet, not staff).
@@ -58,5 +64,10 @@ class RbacServiceProvider extends ServiceProvider
             Limit::perHour(5)->by('publead-h|'.$request->ip()),
             Limit::perDay(15)->by('publead-d|'.$request->ip()),
         ]);
+
+        // The analytics sink: the tracker batches, so a real visitor posts a
+        // handful of requests per minute; anything past this is a bot.
+        RateLimiter::for('public-track', fn (Request $request) => Limit::perMinute(30)
+            ->by('pubtrack|'.$request->ip()));
     }
 }

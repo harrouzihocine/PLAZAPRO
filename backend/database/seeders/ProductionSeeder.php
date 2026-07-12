@@ -34,6 +34,7 @@ class ProductionSeeder extends Seeder
             TasksAssignPermissionSeeder::class,
             ClientEditPermissionSeeder::class,
             WebLeadsPermissionSeeder::class,
+            WebStatsPermissionSeeder::class,
         ]);
     }
 }

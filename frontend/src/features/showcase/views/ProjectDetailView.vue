@@ -12,6 +12,7 @@ import UnitExplorer from '../components/UnitExplorer.vue'
 import PaymentSimulator from '../components/PaymentSimulator.vue'
 import CompareDrawer from '../components/CompareDrawer.vue'
 import LeadFormModal from '../components/LeadFormModal.vue'
+import ShareButton from '../components/ShareButton.vue'
 
 const props = defineProps({
   id: { type: [String, Number], required: true },
@@ -61,6 +62,24 @@ useSeoMeta(() => ({
   title: project.value ? `${project.value.name} — ${showcase.company.name || 'PLAZA PRO'}` : null,
   description: tagline.value || description.value?.slice(0, 160),
   image: heroImage.value?.file_url,
+  // Structured data so search engines read the listing as real estate.
+  jsonLd: project.value
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'ApartmentComplex',
+        name: project.value.name,
+        description: description.value || tagline.value || undefined,
+        url: window.location.href,
+        image: heroImage.value ? new URL(heroImage.value.file_url, window.location.origin).href : undefined,
+        address: {
+          '@type': 'PostalAddress',
+          streetAddress: project.value.address || undefined,
+          addressLocality: project.value.commune || undefined,
+          addressRegion: project.value.wilaya || undefined,
+          addressCountry: 'DZ',
+        },
+      }
+    : null,
 }))
 </script>
 
@@ -134,6 +153,7 @@ useSeoMeta(() => ({
               class="!border-white/40 !text-white hover:!bg-white/10"
               @click="openLead('interest')"
             />
+            <ShareButton :title="project.name" :location-id="project.id" />
           </div>
         </div>
       </section>

@@ -129,6 +129,9 @@ class RbacSeeder extends Seeder
         // Website (the public showcase, /plaza): the web-leads inbox — visitor
         // form submissions, notified on arrival, converted into real clients.
         'web.leads',
+        // The website-stats board: traffic, most-viewed projects/units and
+        // contact clicks — aggregate numbers only, no visitor identities.
+        'web.stats',
     ];
 
     /**
@@ -204,6 +207,7 @@ class RbacSeeder extends Seeder
         'oversight.office_program' => 'Open the Office Visits Program page — the week grid of scheduled office visits. View only: own clients by name, colleagues\' slots masked as booked. Deciding approval requests needs "Visits Dispatch".',
         'logs.view_all' => 'Open the company-wide Team Logs (everyone\'s calls & visits).',
         'web.leads' => 'Open the website leads inbox: visitor requests from the public site, with notifications on arrival and one-click conversion into clients.',
+        'web.stats' => 'Open the website statistics board: visits, most-viewed projects and units, and contact clicks on the public site.',
     ];
 
     /**
@@ -233,6 +237,7 @@ class RbacSeeder extends Seeder
         'deals.manage' => 'Client Project Details',
         'shortlist.manage' => 'Client Project Details',
         'web.leads' => 'Website',
+        'web.stats' => 'Website',
     ];
 
     /**
@@ -281,6 +286,8 @@ class RbacSeeder extends Seeder
         // The website-leads inbox starts with the back-office desk that already
         // owns client intake (reassign/archive) — the owner widens it per role.
         'web.leads' => 'clients.manage',
+        // The stats board starts with whoever already reads the leads inbox.
+        'web.stats' => 'web.leads',
     ];
 
     /**
@@ -410,7 +417,7 @@ class RbacSeeder extends Seeder
             'units.view', 'units.interest', 'units.manage', 'media.manage',
             'reservations.view', 'reservations.view_all',
             'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
-            'web.leads',
+            'web.leads', 'web.stats',
         ];
 
         $definitions = [

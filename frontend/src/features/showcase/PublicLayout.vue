@@ -1,11 +1,12 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import Button from 'primevue/button'
 import LanguageSwitcher from '@/components/shell/LanguageSwitcher.vue'
 import { useTheme } from '@/composables/useTheme'
 import { useShowcaseStore } from './store'
 import { pickLocalized } from './localized'
+import { track, trackPage } from './composables/useTracker'
 import WhatsAppFloat from './components/WhatsAppFloat.vue'
 
 // The public site's chrome — deliberately NOT AppShell: no echo, no push, no
@@ -29,6 +30,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => window.removeEventListener('scroll', onScroll))
+
+// Anonymous analytics: one view event per public route (project/unit ids ride
+// along), batched + beaconed by the tracker.
+watch(() => route.fullPath, () => trackPage(route), { immediate: true })
 
 // Over a hero image the bar floats transparent with white text; everywhere
 // else (and once scrolled) it is a solid, blurred card.
@@ -160,9 +165,13 @@ const navLinks = [
               >{{ company.address }}</a>
               <span v-else>{{ company.address }}</span>
             </li>
-            <li v-if="company.phone" class="flex items-center gap-2.5">
+            <li v-for="phone in showcase.phones" :key="phone" class="flex items-center gap-2.5">
               <i class="pi pi-phone text-primary-500" aria-hidden="true" />
-              <a :href="`tel:${company.phone}`" class="ltr-data hover:text-primary-500">{{ company.phone }}</a>
+              <a
+                :href="`tel:${phone}`"
+                class="ltr-data hover:text-primary-500"
+                @click="track('phone_click')"
+              >{{ phone }}</a>
             </li>
             <li v-if="company.email" class="flex items-center gap-2.5">
               <i class="pi pi-envelope text-primary-500" aria-hidden="true" />
@@ -180,23 +189,17 @@ const navLinks = [
               <RouterLink :to="link.to" class="hover:text-primary-500">{{ $t(link.key) }}</RouterLink>
             </li>
           </ul>
-          <div class="mt-5 flex items-center gap-2">
+          <div class="mt-5 flex flex-wrap items-center gap-2">
             <a
-              v-if="company.facebook_url"
-              :href="company.facebook_url"
+              v-for="social in showcase.socialLinks"
+              :key="social.key"
+              :href="social.url"
               target="_blank"
               rel="noopener"
               class="flex h-9 w-9 items-center justify-center rounded-full border border-line text-mute transition-colors hover:border-primary-500 hover:text-primary-500"
-              aria-label="Facebook"
-            ><i class="pi pi-facebook" aria-hidden="true" /></a>
-            <a
-              v-if="company.instagram_url"
-              :href="company.instagram_url"
-              target="_blank"
-              rel="noopener"
-              class="flex h-9 w-9 items-center justify-center rounded-full border border-line text-mute transition-colors hover:border-primary-500 hover:text-primary-500"
-              aria-label="Instagram"
-            ><i class="pi pi-instagram" aria-hidden="true" /></a>
+              :aria-label="social.label"
+              @click="track('social_click')"
+            ><i :class="social.icon" aria-hidden="true" /></a>
           </div>
         </div>
       </div>

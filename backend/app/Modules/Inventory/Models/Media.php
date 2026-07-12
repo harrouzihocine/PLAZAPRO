@@ -28,6 +28,9 @@ class Media extends BaseModel
     protected $fillable = [
         'collection', 'type', 'disk', 'path', 'original_name', 'mime_type',
         'size_bytes', 'cdn_url', 'preview_path', 'preview_status', 'sort_order',
+        // Public-showcase visibility: owners untick assets that must stay
+        // internal even when the owning project is published.
+        'is_public',
         // Presentation slides (MakeMediaPreview): per-page WebP dir + count.
         'slides_path', 'slide_count',
         // Optimization pipeline (OptimizeMedia): status + derivative + facts.
@@ -43,6 +46,7 @@ class Media extends BaseModel
             'size_bytes' => 'integer',
             'version' => 'integer',
             'sort_order' => 'integer',
+            'is_public' => 'boolean',
             'slide_count' => 'integer',
             'original_size_bytes' => 'integer',
             'width' => 'integer',

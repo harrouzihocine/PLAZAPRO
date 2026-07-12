@@ -22,6 +22,14 @@ export const showcaseRoutes = [
         meta: { hero: true },
         component: () => import('./views/ProjectDetailView.vue'),
       },
+      {
+        // One apartment's own page: full specs + its gallery.
+        path: 'projects/:id/units/:unitId',
+        name: 'showcase.unit',
+        props: true,
+        meta: { hero: true },
+        component: () => import('./views/UnitDetailView.vue'),
+      },
       // Unknown public paths stay on the public site (never bounce to /login).
       { path: ':pathMatch(.*)*', redirect: { name: 'showcase.home' } },
     ],

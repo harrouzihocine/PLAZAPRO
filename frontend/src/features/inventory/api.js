@@ -245,6 +245,12 @@ export const mediaApi = {
     return data.data
   },
 
+  // The public-showcase globe toggle: may anonymous visitors see this asset?
+  async setPublic(id, isPublic) {
+    const { data } = await useApi().patch(`/media/${id}/public`, { is_public: isPublic })
+    return data.data
+  },
+
   cancel(id) {
     return useApi().delete(`/media/${id}`)
   },

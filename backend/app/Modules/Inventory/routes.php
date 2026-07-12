@@ -39,8 +39,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/boxes', [BoxController::class, 'index']);
 
         // Media: list + permission-gated streaming of the private files.
+        // 'website' = the public site's hero library (WebsiteSpace anchor rows).
         Route::get('/{mediableType}/{mediableId}/media', [MediaController::class, 'index'])
-            ->whereIn('mediableType', ['locations', 'units'])->whereNumber('mediableId');
+            ->whereIn('mediableType', ['locations', 'units', 'website'])->whereNumber('mediableId');
         Route::get('/media/{media}/file', [MediaController::class, 'file'])->name('media.file');
         Route::get('/media/{media}/thumb', [MediaController::class, 'thumb'])->name('media.thumb');
         Route::get('/media/{media}/preview', [MediaController::class, 'preview'])->name('media.preview');
@@ -77,11 +78,12 @@ Route::middleware('auth:sanctum')->group(function () {
     // Media writes (upload / reorder / replace / rename / remove) require media.manage.
     Route::middleware('can:media.manage')->group(function () {
         Route::post('/{mediableType}/{mediableId}/media', [MediaController::class, 'store'])
-            ->whereIn('mediableType', ['locations', 'units'])->whereNumber('mediableId');
+            ->whereIn('mediableType', ['locations', 'units', 'website'])->whereNumber('mediableId');
         Route::post('/{mediableType}/{mediableId}/media/reorder', [MediaController::class, 'reorder'])
-            ->whereIn('mediableType', ['locations', 'units'])->whereNumber('mediableId');
+            ->whereIn('mediableType', ['locations', 'units', 'website'])->whereNumber('mediableId');
         Route::post('/media/{media}/replace', [MediaController::class, 'replace']);
         Route::patch('/media/{media}', [MediaController::class, 'rename']);
+        Route::patch('/media/{media}/public', [MediaController::class, 'setPublic']);
         Route::delete('/media/{media}', [MediaController::class, 'destroy']);
     });
 

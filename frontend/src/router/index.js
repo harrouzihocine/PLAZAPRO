@@ -67,6 +67,13 @@ const routes = [
         meta: { permission: 'web.leads' },
       },
       {
+        // The public site's statistics board (visits, project/unit views).
+        path: 'website-stats',
+        name: 'website-stats',
+        component: () => import('@/features/webleads/views/WebsiteStatsView.vue'),
+        meta: { permission: 'web.stats' },
+      },
+      {
         path: 'desires/matches',
         name: 'desires.matches',
         component: () => import('@/features/clients/views/DesireMatchesView.vue'),
@@ -230,6 +237,14 @@ const routes = [
             path: 'general',
             name: 'settings.general',
             component: () => import('@/features/settings/views/GeneralView.vue'),
+            meta: { permission: 'settings.manage' },
+          },
+          {
+            // Everything the public showcase presents: contacts, socials,
+            // trilingual about, landing-hero library.
+            path: 'website',
+            name: 'settings.website',
+            component: () => import('@/features/settings/views/WebsiteView.vue'),
             meta: { permission: 'settings.manage' },
           },
           {

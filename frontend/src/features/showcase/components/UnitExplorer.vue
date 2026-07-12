@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
 import ToggleButton from 'primevue/togglebutton'
@@ -161,6 +162,10 @@ function priceLine(unit) {
             rounded
             @click="emit('interested', unit)"
           />
+          <!-- The unit's own page: full specs + its gallery -->
+          <RouterLink :to="{ name: 'showcase.unit', params: { id: projectId, unitId: unit.id } }">
+            <Button :label="$t('showcase.units.details')" size="small" rounded outlined severity="secondary" />
+          </RouterLink>
           <!-- Heart: add to the visitor's compare shortlist (localStorage) -->
           <button
             type="button"

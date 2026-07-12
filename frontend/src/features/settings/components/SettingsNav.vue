@@ -16,6 +16,7 @@ const groups = computed(() =>
       label: t('settings.groupWorkspace'),
       items: [
         { to: { name: 'settings.general' }, label: t('settings.general'), icon: 'pi pi-cog', permission: 'settings.manage' },
+        { to: { name: 'settings.website' }, label: t('settings.website'), icon: 'pi pi-globe', permission: 'settings.manage' },
         { to: { name: 'settings.lists' }, label: t('settings.lists'), icon: 'pi pi-list', permission: 'settings.manage' },
         { to: { name: 'settings.wilayas' }, label: t('settings.geography'), icon: 'pi pi-map', permission: 'settings.manage' },
         { to: { name: 'settings.departments' }, label: t('settings.departments'), icon: 'pi pi-sitemap', permission: 'settings.manage' },

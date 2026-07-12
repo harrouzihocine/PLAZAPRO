@@ -1,12 +1,12 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from 'primevue/button'
 import { useShowcaseStore } from '../store'
 
-// Full-viewport landing hero. Uses the first published project's cover as the
-// backdrop (the owner curates covers anyway); a branded gradient carries the
-// page when nothing is published yet. A <video> slot is the Phase-2 hook.
+// Full-viewport landing hero. The owner curates the backdrop in Settings →
+// Website: a video, a single photo, or a Ken-Burns slideshow of several. A
+// published cover (then a branded gradient) carries the page otherwise.
 
 const props = defineProps({
   projects: { type: Array, default: () => [] },
@@ -15,17 +15,34 @@ const props = defineProps({
 const showcase = useShowcaseStore()
 
 const backdrop = computed(() => props.projects.find((p) => p.cover)?.cover ?? null)
-// The owner-picked hero backdrop — photo or video (config re-validates it is
-// publicly streamable before emitting URLs).
+// The owner-picked hero backdrop — video / photo / slideshow (config
+// re-validates everything is publicly streamable before emitting URLs).
 const hero = computed(() => showcase.config?.hero ?? null)
 const stats = computed(() => showcase.stats)
+
+// ── Slideshow: slow crossfade + drift between the curated photos ────────────
+const slides = computed(() => (hero.value?.type === 'slideshow' ? hero.value.slides : []))
+const slide = ref(0)
+let slideTimer = null
+
+watch(
+  () => slides.value.length,
+  (count) => {
+    clearInterval(slideTimer)
+    slide.value = 0
+    if (count > 1) slideTimer = setInterval(() => (slide.value = (slide.value + 1) % count), 6000)
+  },
+  { immediate: true },
+)
+onBeforeUnmount(() => clearInterval(slideTimer))
 
 const statItems = computed(() => {
   if (!stats.value) return []
   return [
     { value: stats.value.projects, key: 'showcase.hero.statProjects' },
     { value: stats.value.available_units, key: 'showcase.hero.statUnits' },
-    { value: stats.value.wilayas, key: 'showcase.hero.statWilayas' },
+    // Communes (not wilayas) — the finer-grained footprint reads better.
+    { value: stats.value.communes, key: 'showcase.hero.statCommunes' },
   ].filter((s) => s.value > 0)
 })
 </script>
@@ -49,6 +66,17 @@ const statItems = computed(() => {
       alt=""
       class="absolute inset-0 h-full w-full object-cover"
     />
+    <!-- Slideshow: stacked slides crossfade; the visible one drifts (Ken Burns) -->
+    <template v-else-if="slides.length">
+      <img
+        v-for="(s, i) in slides"
+        :key="s.image_url"
+        :src="s.image_url"
+        alt=""
+        class="absolute inset-0 h-full w-full object-cover transition-opacity duration-[1500ms]"
+        :class="[i === slide ? 'opacity-100' : 'opacity-0', i === slide ? 'hero-kenburns' : '']"
+      />
+    </template>
     <img
       v-else-if="backdrop"
       :src="backdrop.file_url"
@@ -103,3 +131,24 @@ const statItems = computed(() => {
     </a>
   </section>
 </template>
+
+<style scoped>
+/* Ken Burns: a slow drift-and-zoom on the visible slide. Restarts each time a
+   slide becomes active because the class is re-applied with the crossfade. */
+.hero-kenburns {
+  animation: hero-kenburns 9s ease-out forwards;
+}
+@keyframes hero-kenburns {
+  from {
+    transform: scale(1) translateX(0);
+  }
+  to {
+    transform: scale(1.08) translateX(1.5%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-kenburns {
+    animation: none;
+  }
+}
+</style>

@@ -62,6 +62,11 @@ const typeIcon = {
   xlsx: 'pi pi-file-excel',
 }
 
+// Only these collections can reach the public showcase, so only they carry
+// the globe toggle (documents/presentations are internal by construction).
+const PUBLIC_COLLECTIONS = ['photos', 'videos', 'plans']
+const canTogglePublic = (item) => props.canManage && PUBLIC_COLLECTIONS.includes(item.collection)
+
 // Only the active tab's assets; `byCollection` keeps the gallery order.
 const tabItems = computed(() => media.byCollection[activeTab.value] ?? [])
 const activeLabel = computed(() => mediaCollectionLabel(activeTab.value))
@@ -322,6 +327,16 @@ async function rename(item) {
               <i class="pi pi-download" aria-hidden="true" />
             </a>
             <template v-if="canManage">
+              <button
+                v-if="canTogglePublic(item)"
+                class="flex min-h-[32px] min-w-[28px] items-center justify-center text-xs"
+                :class="item.is_public ? 'text-mute hover:text-ink' : 'text-warning hover:text-ink'"
+                :aria-label="item.is_public ? $t('media.hideFromWebsite') : $t('media.showOnWebsite')"
+                :title="item.is_public ? $t('media.hideFromWebsite') : $t('media.showOnWebsite')"
+                @click="media.setPublic(item.id, !item.is_public)"
+              >
+                <i :class="item.is_public ? 'pi pi-globe' : 'pi pi-eye-slash'" aria-hidden="true" />
+              </button>
               <button
                 class="flex min-h-[32px] min-w-[28px] items-center justify-center text-xs text-mute hover:text-ink"
                 :aria-label="$t('media.rename')"

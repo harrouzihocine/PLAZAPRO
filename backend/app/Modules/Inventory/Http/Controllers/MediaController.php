@@ -18,6 +18,7 @@ use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Media;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Inventory\Support\StreamsMediaFiles;
+use App\Modules\Web\Models\WebsiteSpace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -37,6 +38,9 @@ class MediaController extends Controller
     private const MEDIABLES = [
         'locations' => Location::class,
         'units' => Unit::class,
+        // The public site's own hero library — mediableId is the space's row id
+        // (the Settings UI gets it from GET /website-space).
+        'website' => WebsiteSpace::class,
     ];
 
     public function index(Request $request, string $mediableType, int $mediableId): AnonymousResourceCollection
@@ -123,6 +127,20 @@ class MediaController extends Controller
     public function rename(RenameMediaRequest $request, Media $media): MediaResource
     {
         $media->update(['original_name' => $request->validated('original_name')]);
+
+        return new MediaResource($media);
+    }
+
+    /**
+     * Flip the public-showcase visibility of one asset (the globe toggle).
+     * Only matters once the owning project is published — PublicMediaGate and
+     * every public query honour the flag.
+     */
+    public function setPublic(Request $request, Media $media): MediaResource
+    {
+        $validated = $request->validate(['is_public' => ['required', 'boolean']]);
+
+        $media->update(['is_public' => $validated['is_public']]);
 
         return new MediaResource($media);
     }

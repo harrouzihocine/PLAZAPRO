@@ -11,6 +11,7 @@ use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Web\Http\Resources\PublicProjectResource;
 use App\Modules\Web\Http\Resources\PublicProjectSummaryResource;
+use App\Modules\Web\Http\Resources\PublicUnitResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
@@ -59,6 +60,7 @@ class PublicProjectController extends Controller
 
         $location->load([
             'media' => fn ($q) => $q->active()
+                ->where('is_public', true)
                 ->whereIn('collection', array_map(fn ($c) => $c->value, self::PUBLIC_COLLECTIONS))
                 ->orderBy('collection')->orderBy('sort_order'),
         ]);
@@ -72,5 +74,34 @@ class PublicProjectController extends Controller
         }
 
         return new PublicProjectResource($location);
+    }
+
+    /**
+     * One apartment's public page: full specs + its own gallery. Only exists
+     * while the project is published AND advertises availability — the same
+     * boundary the project payload draws for its unit list (404 otherwise, so
+     * a hidden unit is indistinguishable from a nonexistent one).
+     */
+    public function unit(int $id, int $unitId): PublicUnitResource
+    {
+        $location = Location::query()->published()
+            ->where('show_availability', true)
+            ->with(['wilaya:id,code,name', 'commune:id,wilaya_id,name'])
+            ->findOrFail($id);
+
+        $unit = $location->units()->active()
+            ->with(['roomNumber', 'floor'])
+            ->findOrFail($unitId);
+
+        $unit->load([
+            'media' => fn ($q) => $q->active()
+                ->where('is_public', true)
+                ->whereIn('collection', array_map(fn ($c) => $c->value, self::PUBLIC_COLLECTIONS))
+                ->orderBy('collection')->orderBy('sort_order'),
+        ]);
+
+        $unit->setRelation('location', $location);
+
+        return new PublicUnitResource($unit);
     }
 }
