@@ -92,7 +92,10 @@ function cellTitle(unit) {
     </div>
 
     <div class="mt-6 grid gap-x-8 gap-y-6 sm:gap-y-8" :class="blocks.length > 1 ? 'sm:grid-cols-2' : ''">
-      <div v-for="group in blocks" :key="group.block">
+      <!-- min-w-0: a grid item's min-width:auto makes the implicit track grow
+           to the widest row, blowing the page out sideways instead of letting
+           the scroller scroll. -->
+      <div v-for="group in blocks" :key="group.block" class="min-w-0">
         <h3 v-if="group.block" class="mb-3 text-sm font-semibold text-mute">
           {{ $t('showcase.units.block', { block: group.block }) }}
         </h3>
