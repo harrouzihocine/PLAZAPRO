@@ -22,10 +22,12 @@ class Transform
 
     /**
      * Normalize a legacy phone (99.3% look like `tel:+213-540-78-26-88`).
-     * DZ numbers land as the app convention `0540 782 688` (4-3-3); foreign
-     * numbers keep `+E164`; garbage is passed through with ok=false so the
-     * caller can warn. `nsn` is informational only — clients.phone_nsn is a
-     * stored generated column derived from `phone`.
+     * DZ numbers land as the app convention `+213 540 78 26 88` (+213 then the
+     * 9 significant digits grouped 3-2-2-2; 8-digit landlines grouped 2-2-2-2);
+     * foreign numbers keep `+E164`; garbage is passed through with ok=false so
+     * the caller can warn. `nsn` is informational only — clients.phone_nsn is a
+     * stored generated column (last 9 digits), so the +213 form leaves duplicate
+     * matching untouched.
      *
      * @return array{phone: ?string, nsn: ?string, ok: bool, foreign: bool}
      */
@@ -58,14 +60,19 @@ class Transform
         }
 
         if (str_starts_with($digits, '0') && strlen($digits) === 10) {
-            $formatted = substr($digits, 0, 4).' '.substr($digits, 4, 3).' '.substr($digits, 7, 3);
+            // Mobile / 10-digit national → "+213 XXX XX XX XX" (NSN grouped 3-2-2-2).
+            $nsn = substr($digits, 1);
+            $formatted = '+213 '.substr($nsn, 0, 3).' '.substr($nsn, 3, 2).' '.substr($nsn, 5, 2).' '.substr($nsn, 7, 2);
 
-            return ['phone' => $formatted, 'nsn' => substr($digits, 1), 'ok' => true, 'foreign' => false];
+            return ['phone' => $formatted, 'nsn' => $nsn, 'ok' => true, 'foreign' => false];
         }
 
         if (str_starts_with($digits, '0') && strlen($digits) === 9) {
-            // Landline-length national number — keep unformatted digits.
-            return ['phone' => $digits, 'nsn' => null, 'ok' => true, 'foreign' => false];
+            // Landline-length national (0 + 8 digits) → "+213 XX XX XX XX" (2-2-2-2).
+            $nsn = substr($digits, 1);
+            $formatted = '+213 '.substr($nsn, 0, 2).' '.substr($nsn, 2, 2).' '.substr($nsn, 4, 2).' '.substr($nsn, 6, 2);
+
+            return ['phone' => $formatted, 'nsn' => $nsn, 'ok' => true, 'foreign' => false];
         }
 
         if ($hasPlus) {
