@@ -2188,6 +2188,10 @@ export default {
       kicker: "اختر شقتك",
       title: "العمارة في لمحة",
       floor: "الطابق",
+      rdc: "أرضي",
+      basement: "ق{n}",
+      emptyFloor: "لا توجد شقق",
+      sold: "مباعة",
     },
     nav: {
       home: "الرئيسية",

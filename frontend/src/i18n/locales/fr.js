@@ -2188,6 +2188,10 @@ export default {
       kicker: "Choisissez votre appartement",
       title: "L'immeuble en un coup d'œil",
       floor: "Étage",
+      rdc: "RDC",
+      basement: "S{n}",
+      emptyFloor: "Aucun appartement",
+      sold: "Vendu",
     },
     nav: {
       home: "Accueil",

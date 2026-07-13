@@ -215,12 +215,12 @@ useSeoMeta(() => ({
         <!-- Gallery -->
         <PublicGallery v-if="project.media?.length" :media="project.media" />
 
-        <!-- The building at a glance (units carrying stacking coordinates) -->
+        <!-- The building elevation: every floor RDC → top, apartments in place -->
         <AvailabilityGrid
           v-if="project.show_availability && units.length"
           :units="units"
           :show-prices="project.show_prices"
-          @interested="(unit) => openLead('interest', unit)"
+          :project-id="project.id"
         />
 
         <!-- Units -->

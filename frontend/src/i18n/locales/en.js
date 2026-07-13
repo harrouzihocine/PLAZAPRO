@@ -2189,6 +2189,10 @@ export default {
       kicker: "Pick your apartment",
       title: "The building at a glance",
       floor: "Floor",
+      rdc: "GF",
+      basement: "B{n}",
+      emptyFloor: "No apartments",
+      sold: "Sold",
     },
     nav: {
       home: "Home",
