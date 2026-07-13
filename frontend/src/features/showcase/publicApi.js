@@ -13,6 +13,8 @@ export const publicApi = {
   unit: (projectId, unitId) => api.get(`/public/projects/${projectId}/units/${unitId}`),
   desireOptions: () => api.get('/public/desire-options'),
   submitLead: (payload) => api.post('/public/leads', payload),
+  // A media bundle an agent sent by WhatsApp — the token is the authorization.
+  share: (token) => api.get(`/public/shares/${token}`),
 }
 
 /** Public media URLs (unauthenticated streaming; ?v= comes from the API). */

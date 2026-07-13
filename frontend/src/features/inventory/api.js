@@ -208,6 +208,11 @@ export const mediaDownloadUrl = (id) => `/api/v1/media/${id}/download`
 export const MEDIA_COLLECTIONS = ['photos', 'videos', 'plans', 'presentations', 'documents', 'others']
 export const mediaCollectionLabel = (key) => t(`media.${key}`)
 
+// Collections that may ever leave the CRM — the showcase globe toggle and the
+// send-to-client share both draw the line here (documents/presentations are
+// internal by construction). Mirrors PublicProjectController::PUBLIC_COLLECTIONS.
+export const SHAREABLE_COLLECTIONS = ['photos', 'videos', 'plans']
+
 // Largest file the media library accepts, mirroring the UploadMediaRequest
 // 'max' rule (200 MB) and the PHP upload_max_filesize in docker/php/uploads.ini.
 // Enforced client-side so oversized files fail instantly with a clear message
@@ -253,5 +258,16 @@ export const mediaApi = {
 
   cancel(id) {
     return useApi().delete(`/media/${id}`)
+  },
+}
+
+// Tokened share bundles — "send these photos to my client on WhatsApp". The
+// backend mints the public /plaza/share/{token} link; the message itself is
+// composed client-side (mediaShare.js) and sent over wa.me, like the office
+// invite.
+export const mediaShareApi = {
+  async create(payload) {
+    const { data } = await useApi().post('/media-shares', payload)
+    return data.data
   },
 }

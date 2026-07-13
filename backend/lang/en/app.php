@@ -42,4 +42,7 @@ return [
     'units_guide_stack_floor' => 'Floor number used by the stacking plan.',
     'units_guide_position' => 'Position on the floor (stacking plan).',
     'units_example_project' => 'Example project — replace me',
+
+    // Media share (WhatsApp send-to-client)
+    'media_share_bad_items' => 'Some selected items can no longer be shared (removed, or not photos/videos/plans).',
 ];

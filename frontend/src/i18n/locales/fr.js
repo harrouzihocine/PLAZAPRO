@@ -1327,7 +1327,12 @@ export default {
     heroLibraryUpload: "Téléverser",
     heroLibraryEmpty: "Aucun média d'accueil pour l'instant — téléversez des photos ou une vidéo pour commencer.",
     heroLibraryHint: "Cliquez sur les éléments pour choisir ce que montre l'accueil : les numéros donnent l'ordre du diaporama ; une vidéo joue toujours seule. Enregistrez pour appliquer.",
-    heroLibraryLoadFailed: "Impossible de charger la bibliothèque d'accueil.",
+    heroLibraryLoadFailed: "Impossible de charger la bibliothèque du site.",
+    websiteAboutPhotosTitle: "Photos « Qui sommes-nous »",
+    websiteAboutPhotosIntro: "La mosaïque de photos à côté du texte « Qui sommes-nous » sur la page d'accueil. Téléversez vos propres photos (bureau, équipe, immeubles…) et choisissez-en jusqu'à 4 — sans sélection, le site affiche les couvertures des projets à la une.",
+    aboutLibraryDrop: "Glissez des photos ici, ou",
+    aboutLibraryEmpty: "Aucune photo pour l'instant — téléversez des photos du bureau, de l'équipe ou des immeubles.",
+    aboutLibraryHint: "Cliquez sur les photos pour en choisir jusqu'à 4 : les numéros donnent l'ordre, la première s'affiche en grand. Enregistrez pour appliquer.",
     // --- Dispatch & GPS ---
     dispatchGps: 'Dispatch & GPS',
     geofenceLabel: 'Rayon du géorepérage du site (mètres)',
@@ -2172,6 +2177,28 @@ export default {
     close: 'À très bientôt !',
   },
 
+  // ── Partage de médias (envoi de photos/vidéos à un client sur WhatsApp) ─
+  mediaShare: {
+    action: 'Envoyer au client',
+    count: '{n} sélectionné(s)',
+    send: 'Envoyer',
+    tabNotShareable: 'Seuls les photos, vidéos et plans peuvent être envoyés à un client.',
+    title: 'Envoyer des médias à un client',
+    summary: '{n} média(s) sélectionné(s) — choisissez le destinataire.',
+    pickClient: 'Quel client ?',
+    creating: 'Préparation du lien…',
+    whatsapp: 'Envoyer sur WhatsApp',
+    copyLink: 'Copier le lien',
+    linkCopied: 'Lien copié.',
+    expires: 'Le lien fonctionne jusqu’au {date}.',
+    sent: 'Envoyé vers WhatsApp.',
+    greeting: 'Bonjour,',
+    greetingNamed: 'Bonjour {name},',
+    body: 'Voici une galerie de {title} :',
+    bodyCompany: 'Voici une galerie de {title}, de la part de {company} :',
+    close: 'Nous restons à votre disposition !',
+  },
+
   // ── Public showcase site (/plaza) ─────────────────────────────────
   showcase: {
     compare: {
@@ -2210,6 +2237,15 @@ export default {
     whatsapp: {
       chat: "Discuter sur WhatsApp",
       prefill: "Bonjour ! Je suis intéressé par vos projets immobiliers.",
+    },
+    sharePage: {
+      title: "Galerie partagée",
+      kicker: "Votre sélection",
+      loading: "Chargement…",
+      subtitle: "{n} photos et vidéos choisies pour vous par votre conseiller.",
+      goneTitle: "Ce lien a expiré",
+      goneBody: "Demandez un nouveau lien à votre conseiller, ou découvrez nos projets en cours.",
+      browse: "Découvrir nos projets",
     },
     hero: {
       title: "Votre prochain chez-vous, construit avec soin",

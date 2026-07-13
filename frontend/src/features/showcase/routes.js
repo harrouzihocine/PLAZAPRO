@@ -32,6 +32,13 @@ export const showcaseRoutes = [
         meta: { hero: true },
         component: () => import('./views/UnitDetailView.vue'),
       },
+      {
+        // A media bundle an agent sent a client over WhatsApp (tokened link).
+        path: 'share/:token',
+        name: 'showcase.share',
+        props: true,
+        component: () => import('./views/ShareView.vue'),
+      },
       // Unknown public paths stay on the public site (never bounce to /login).
       { path: ':pathMatch(.*)*', redirect: { name: 'showcase.home' } },
     ],

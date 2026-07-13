@@ -1328,7 +1328,12 @@ export default {
     heroLibraryUpload: "Upload",
     heroLibraryEmpty: "No hero media yet — upload photos or a video to get started.",
     heroLibraryHint: "Click items to choose what the hero shows: numbers give the slideshow order; a video always plays alone. Save to apply.",
-    heroLibraryLoadFailed: "Could not load the hero library.",
+    heroLibraryLoadFailed: "Could not load the website library.",
+    websiteAboutPhotosTitle: "“Who we are” photos",
+    websiteAboutPhotosIntro: "The photo mosaic beside the “Who we are” text on the landing page. Upload your own photos (office, team, buildings…) and pick up to 4 — with no selection the site shows featured-project covers.",
+    aboutLibraryDrop: "Drag photos here, or",
+    aboutLibraryEmpty: "No photos yet — upload office, team or building shots to get started.",
+    aboutLibraryHint: "Click photos to pick up to 4: numbers give the order and the first shows wide. Save to apply.",
     // --- Dispatch & GPS ---
     dispatchGps: 'Dispatch & GPS',
     geofenceLabel: 'Site geofence radius (meters)',
@@ -2173,6 +2178,28 @@ export default {
     close: 'See you soon!',
   },
 
+  // ── Media share (send photos/videos to a client on WhatsApp) ────────
+  mediaShare: {
+    action: 'Send to client',
+    count: '{n} selected',
+    send: 'Send',
+    tabNotShareable: 'Only photos, videos and plans can be sent to a client.',
+    title: 'Send media to a client',
+    summary: '{n} media selected — pick who receives them.',
+    pickClient: 'Which client?',
+    creating: 'Preparing the link…',
+    whatsapp: 'Send on WhatsApp',
+    copyLink: 'Copy the link',
+    linkCopied: 'Link copied.',
+    expires: 'The link works until {date}.',
+    sent: 'Sent to WhatsApp.',
+    greeting: 'Hello,',
+    greetingNamed: 'Hello {name},',
+    body: 'Here is a gallery of {title}:',
+    bodyCompany: 'Here is a gallery of {title}, from {company}:',
+    close: 'We remain at your disposal!',
+  },
+
   // ── Public showcase site (/plaza) ─────────────────────────────────
   showcase: {
     compare: {
@@ -2211,6 +2238,15 @@ export default {
     whatsapp: {
       chat: "Chat on WhatsApp",
       prefill: "Hello! I'm interested in your real-estate projects.",
+    },
+    sharePage: {
+      title: "Shared gallery",
+      kicker: "Your selection",
+      loading: "Loading…",
+      subtitle: "{n} photos & videos hand-picked for you by your agent.",
+      goneTitle: "This link has expired",
+      goneBody: "Ask your agent for a fresh link, or browse our current projects.",
+      browse: "Explore our projects",
     },
     hero: {
       title: "Your next home, built with care",

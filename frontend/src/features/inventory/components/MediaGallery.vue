@@ -3,11 +3,18 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import { MEDIA_COLLECTIONS, mediaCollectionLabel, mediaDownloadUrl } from '@/features/inventory/api'
+import {
+  MEDIA_COLLECTIONS,
+  SHAREABLE_COLLECTIONS,
+  mediaCollectionLabel,
+  mediaDownloadUrl,
+} from '@/features/inventory/api'
 import MediaViewer from '@/features/inventory/components/MediaViewer.vue'
+import ShareMediaModal from '@/features/inventory/components/ShareMediaModal.vue'
 import AttachSheet from '@/components/ui/AttachSheet.vue'
 import { useMediaStore } from '@/features/inventory/mediaStore'
-import { confirmAction, promptText } from '@/composables/useConfirm'
+import { useAuthStore } from '@/features/settings/store'
+import { confirmAction, promptText, toastSuccess } from '@/composables/useConfirm'
 import { isNativeApp } from '@/utils/nativeApp'
 import { t } from '@/i18n'
 
@@ -64,8 +71,57 @@ const typeIcon = {
 
 // Only these collections can reach the public showcase, so only they carry
 // the globe toggle (documents/presentations are internal by construction).
-const PUBLIC_COLLECTIONS = ['photos', 'videos', 'plans']
-const canTogglePublic = (item) => props.canManage && PUBLIC_COLLECTIONS.includes(item.collection)
+const canTogglePublic = (item) => props.canManage && SHAREABLE_COLLECTIONS.includes(item.collection)
+
+// ── Send-to-client selection ─────────────────────────────────────────────
+// Multi-select across the shareable tabs (photos/videos/plans), then hand the
+// picked ids to ShareMediaModal (own-client search → wa.me deep link). The
+// selection Set is reassigned on every toggle so computeds stay reactive.
+const auth = useAuthStore()
+const SHARE_MAX = 40 // mirrors the media_ids cap in StoreMediaShareRequest
+const selecting = ref(false)
+const selectedIds = ref(new Set())
+const shareOpen = ref(false)
+
+// Sharing needs a client to address — media visibility alone isn't enough.
+const canShare = computed(() => auth.can('clients.view'))
+const shareableTab = computed(() => SHAREABLE_COLLECTIONS.includes(activeTab.value))
+const hasShareable = computed(() =>
+  media.items.some((m) => SHAREABLE_COLLECTIONS.includes(m.collection)),
+)
+const isSelected = (item) => selectedIds.value.has(item.id)
+
+function startSelecting() {
+  // Entering from an internal tab jumps to the first shareable one with items.
+  if (!shareableTab.value) {
+    activeTab.value = SHAREABLE_COLLECTIONS.find((c) => countFor(c)) ?? SHAREABLE_COLLECTIONS[0]
+  }
+  selecting.value = true
+}
+
+function stopSelecting() {
+  selecting.value = false
+  selectedIds.value = new Set()
+}
+
+function toggleSelected(item) {
+  const next = new Set(selectedIds.value)
+  if (next.has(item.id)) next.delete(item.id)
+  else if (next.size < SHARE_MAX) next.add(item.id)
+  selectedIds.value = next
+}
+
+function onTileClick(item) {
+  if (selecting.value && shareableTab.value) toggleSelected(item)
+  else viewing.value = item
+}
+
+function onShareDone(kind) {
+  shareOpen.value = false
+  // Copy already toasts from the clipboard composable.
+  if (kind === 'whatsapp') toastSuccess(t('mediaShare.sent'))
+  stopSelecting()
+}
 
 // Only the active tab's assets; `byCollection` keeps the gallery order.
 const tabItems = computed(() => media.byCollection[activeTab.value] ?? [])
@@ -150,13 +206,43 @@ async function rename(item) {
 <template>
   <SectionCard :title="$t('inventory.tabMedia')" icon="pi pi-images">
     <template #actions>
-      <Button
-        v-if="canManage"
-        :label="$t('media.uploadTo', { collection: activeLabel })"
-        icon="pi pi-upload"
-        size="small"
-        @click="openUpload"
-      />
+      <template v-if="selecting">
+        <span class="num self-center text-sm text-mute">
+          {{ $t('mediaShare.count', { n: selectedIds.size }) }}
+        </span>
+        <Button
+          :label="$t('mediaShare.send')"
+          icon="pi pi-whatsapp"
+          size="small"
+          :disabled="!selectedIds.size"
+          @click="shareOpen = true"
+        />
+        <Button
+          :label="$t('common.cancel')"
+          size="small"
+          severity="secondary"
+          text
+          @click="stopSelecting"
+        />
+      </template>
+      <template v-else>
+        <Button
+          v-if="canShare && hasShareable"
+          :label="$t('mediaShare.action')"
+          icon="pi pi-whatsapp"
+          size="small"
+          severity="secondary"
+          outlined
+          @click="startSelecting"
+        />
+        <Button
+          v-if="canManage"
+          :label="$t('media.uploadTo', { collection: activeLabel })"
+          icon="pi pi-upload"
+          size="small"
+          @click="openUpload"
+        />
+      </template>
     </template>
     <input ref="fileInput" type="file" multiple class="hidden" @change="onPick" />
     <input ref="replaceInput" type="file" class="hidden" @change="onReplacePick" />
@@ -219,9 +305,15 @@ async function rename(item) {
       </button>
     </nav>
 
+    <!-- Selecting on an internal tab: nothing here can be sent to a client. -->
+    <p v-if="selecting && !shareableTab" class="mt-3 text-sm text-mute">
+      <i class="pi pi-info-circle me-1" aria-hidden="true" />
+      {{ $t('mediaShare.tabNotShareable') }}
+    </p>
+
     <!-- Drag-drop upload zone — targets the active tab -->
     <div
-      v-if="canManage"
+      v-if="canManage && !selecting"
       class="mt-4 rounded-xl border-2 border-dashed p-6 text-center text-sm transition-colors"
       :class="dragging ? 'border-primary bg-highlight text-ink' : 'border-line text-mute'"
       @dragover.prevent="dragging = true"
@@ -244,8 +336,26 @@ async function rename(item) {
         <button
           type="button"
           class="relative flex aspect-video w-full items-center justify-center bg-surface-100 dark:bg-surface-800"
-          @click="viewing = item"
+          :aria-pressed="selecting && shareableTab ? isSelected(item) : undefined"
+          @click="onTileClick(item)"
         >
+          <!-- Select-mode affordances: check badge + tint on the chosen ones -->
+          <template v-if="selecting && shareableTab">
+            <span
+              class="absolute start-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 text-xs transition-colors"
+              :class="isSelected(item)
+                ? 'border-primary-500 bg-primary-500 text-primary-contrast'
+                : 'border-white/90 bg-black/30 text-transparent'"
+              aria-hidden="true"
+            >
+              <i class="pi pi-check" />
+            </span>
+            <span
+              v-if="isSelected(item)"
+              class="absolute inset-0 z-[5] bg-primary-500/25 ring-2 ring-inset ring-primary-500"
+              aria-hidden="true"
+            />
+          </template>
           <!-- Photos stream the WebP thumbnail (server falls back to the
                original until the optimization job has produced one). thumb_url
                carries a version param, so when optimization finishes the poll
@@ -317,7 +427,7 @@ async function rename(item) {
             {{ item.original_name }}
             <span v-if="item.version > 1" class="text-mute">v{{ item.version }}</span>
           </span>
-          <div class="flex shrink-0 items-center">
+          <div v-if="!selecting" class="flex shrink-0 items-center">
             <a
               :href="mediaDownloadUrl(item.id)"
               :download="item.original_name"
@@ -390,6 +500,15 @@ async function rename(item) {
       :items="tabItems"
       @navigate="viewing = $event"
       @close="viewing = null"
+    />
+
+    <ShareMediaModal
+      v-if="shareOpen"
+      :mediable-type="mediableType"
+      :mediable-id="mediableId"
+      :media-ids="[...selectedIds]"
+      @close="shareOpen = false"
+      @done="onShareDone"
     />
   </SectionCard>
 </template>

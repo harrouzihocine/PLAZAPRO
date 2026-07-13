@@ -41,8 +41,10 @@ function onQuery(value) {
   debounce = setTimeout(async () => {
     searching.value = true
     try {
+      // clientsApi.list returns { items, total } — res.data was always
+      // undefined here, so the picker showed "no results" for everything.
       const res = await clientsApi.list({ search: term, per_page: 8 })
-      results.value = res.data ?? []
+      results.value = res.items ?? []
     } catch {
       results.value = []
     } finally {

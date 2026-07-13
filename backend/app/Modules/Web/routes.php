@@ -14,11 +14,13 @@ declare(strict_types=1);
 | IP; the lead POST gets its own, much tighter limiter.
 */
 
+use App\Modules\Web\Http\Controllers\MediaShareController;
 use App\Modules\Web\Http\Controllers\PublicConfigController;
 use App\Modules\Web\Http\Controllers\PublicDesireOptionsController;
 use App\Modules\Web\Http\Controllers\PublicLeadController;
 use App\Modules\Web\Http\Controllers\PublicMediaController;
 use App\Modules\Web\Http\Controllers\PublicProjectController;
+use App\Modules\Web\Http\Controllers\PublicShareController;
 use App\Modules\Web\Http\Controllers\PublicTrackController;
 use App\Modules\Web\Http\Controllers\WebLeadController;
 use App\Modules\Web\Http\Controllers\WebsiteSpaceController;
@@ -34,6 +36,9 @@ Route::prefix('public')->middleware('throttle:public')->group(function () {
     Route::get('/projects/{id}', [PublicProjectController::class, 'show'])->whereNumber('id');
     Route::get('/projects/{id}/units/{unitId}', [PublicProjectController::class, 'unit'])
         ->whereNumber('id')->whereNumber('unitId');
+    // The WhatsApp share page's payload — the token is the authorization.
+    Route::get('/shares/{token}', [PublicShareController::class, 'show'])
+        ->where('token', '[A-Za-z0-9]{40,64}');
 });
 
 // Media streaming gets its own, wider limiter: one project page fetches tens
@@ -42,6 +47,12 @@ Route::prefix('public')->middleware('throttle:public')->group(function () {
 Route::prefix('public')->middleware('throttle:public-media')->group(function () {
     Route::get('/media/{media}/file', [PublicMediaController::class, 'file'])->name('public.media.file');
     Route::get('/media/{media}/thumb', [PublicMediaController::class, 'thumb'])->name('public.media.thumb');
+    // Share-scoped streaming: the same files, authorized by share membership
+    // instead of the published-project gate.
+    Route::get('/shares/{token}/media/{media}/file', [PublicShareController::class, 'file'])
+        ->where('token', '[A-Za-z0-9]{40,64}')->name('public.share.file');
+    Route::get('/shares/{token}/media/{media}/thumb', [PublicShareController::class, 'thumb'])
+        ->where('token', '[A-Za-z0-9]{40,64}')->name('public.share.thumb');
 });
 
 Route::prefix('public')->middleware('throttle:public-leads')->group(function () {
@@ -51,6 +62,13 @@ Route::prefix('public')->middleware('throttle:public-leads')->group(function () 
 // The anonymous analytics sink (batched page/project/unit views + clicks).
 Route::prefix('public')->middleware('throttle:public-track')->group(function () {
     Route::post('/track', PublicTrackController::class);
+});
+
+// Minting a share link: an agent picks media in a gallery and addresses one
+// of their own clients (visibleTo re-checked in the controller). The wa.me
+// send itself happens on the frontend, exactly like the office invite.
+Route::middleware(['auth:sanctum', 'can:units.view', 'can:clients.view'])->group(function () {
+    Route::post('/media-shares', [MediaShareController::class, 'store']);
 });
 
 // The staff inbox: triage + one-click convert (convert also checks

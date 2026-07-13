@@ -41,4 +41,7 @@ return [
     'units_guide_stack_floor' => 'Numéro d’étage utilisé par le plan d’empilement.',
     'units_guide_position' => 'Position sur l’étage (plan d’empilement).',
     'units_example_project' => 'Projet exemple — à remplacer',
+
+    // Partage de médias (envoi WhatsApp au client)
+    'media_share_bad_items' => 'Certains éléments sélectionnés ne peuvent plus être partagés (supprimés, ou ni photos/vidéos/plans).',
 ];
