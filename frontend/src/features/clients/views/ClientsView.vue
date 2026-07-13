@@ -34,10 +34,11 @@ const { items: sources } = useDynamicList('sources')
 const { items: ratings } = useDynamicList('client_ratings')
 
 const canCreate = computed(() => auth.can('clients.create'))
-// Editing a client's info (clients.edit) is split from the manage levers
-// (clients.manage: reassign / cancel) so it can be granted on its own.
+// Editing a client's info (clients.edit) and cancelling one (clients.cancel)
+// are each split from the manage lever (clients.manage: reassign / ownership)
+// so they can be granted on their own.
 const canEdit = computed(() => auth.can('clients.edit'))
-const canManage = computed(() => auth.can('clients.manage'))
+const canCancel = computed(() => auth.can('clients.cancel'))
 // Without clients.view_details a user sees only who the client IS (the name).
 const canSeeDetails = computed(() => auth.can('clients.view_details'))
 // Client ownership (assigned agent + who created it/when) is back-office-only,
@@ -343,7 +344,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
           </template>
         </Column>
 
-        <Column v-if="canEdit || canManage" header="" class="w-24">
+        <Column v-if="canEdit || canCancel" header="" class="w-24">
           <template #body="{ data }">
             <span class="flex justify-end gap-1">
               <Button
@@ -357,7 +358,7 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
                 @click.stop="openEdit(data)"
               />
               <Button
-                v-if="canManage"
+                v-if="canCancel"
                 icon="pi pi-ban"
                 text
                 rounded

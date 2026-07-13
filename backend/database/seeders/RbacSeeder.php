@@ -54,9 +54,10 @@ class RbacSeeder extends Seeder
         // Clients — the client record itself; projects have their own grants.
         // clients.edit (split from clients.manage) edits the client's info on
         // its own, so it can be granted to ordinary users; clients.manage keeps
-        // the back-office levers: reassign the follow-up agent, archive/cancel,
-        // see ownership (creator / agent).
-        'clients.view', 'clients.create', 'clients.edit', 'clients.manage',
+        // the back-office levers: reassign the follow-up agent and see ownership
+        // (creator / agent). clients.cancel (also split from clients.manage)
+        // cancels a client — its own grant so it can be withheld independently.
+        'clients.view', 'clients.create', 'clients.edit', 'clients.manage', 'clients.cancel',
         // Resolve duplicate-phone create attempts (deny / share a project) so no
         // user can silently take another user's client.
         'clients.duplicates.resolve',
@@ -165,7 +166,8 @@ class RbacSeeder extends Seeder
         'clients.view' => 'Open the clients area.',
         'clients.create' => 'Add new clients and capture what they are looking for.',
         'clients.edit' => 'Edit a client\'s information (name, phone, profile and identity details). Reassigning the follow-up agent stays with "Clients Manage".',
-        'clients.manage' => 'Reassign and archive clients, and see who created and follows up each client.',
+        'clients.manage' => 'Reassign a client to another follow-up agent and see who created and follows up each client. Cancelling a client is its own "Clients Cancel" permission.',
+        'clients.cancel' => 'Cancel a client (marks the record cancelled — it is kept and audited, never deleted).',
         'clients.duplicates.resolve' => 'Decide what happens when a phone already belongs to another client (share or block).',
         'clients.view_all' => 'See every client in the company, not just your own.',
         'clients.view_details' => 'See a client\'s full profile (phone, details) — without it you see only the name.',
@@ -227,6 +229,7 @@ class RbacSeeder extends Seeder
         'clients.create' => 'Clients',
         'clients.edit' => 'Clients',
         'clients.manage' => 'Clients',
+        'clients.cancel' => 'Clients',
         'clients.duplicates.resolve' => 'Clients',
         'clients.view_all' => 'Clients',
         'clients.view_details' => 'Clients',
@@ -254,8 +257,11 @@ class RbacSeeder extends Seeder
      */
     private array $splitFromLegacy = [
         // Split so plain client-info editing can be granted on its own; the
-        // manage grant keeps reassign / archive / ownership visibility.
+        // manage grant keeps reassign / ownership visibility.
         'clients.edit' => 'clients.manage',
+        // Split so cancelling a client is its own lever; every role that could
+        // cancel via manage (super-admin / admin / manager) keeps doing so.
+        'clients.cancel' => 'clients.manage',
         'projects.create' => 'clients.create',
         'projects.manage' => 'clients.manage',
         'projects.advance' => 'clients.manage',
@@ -416,7 +422,7 @@ class RbacSeeder extends Seeder
             'oversight.clients', 'oversight.pipeline', 'oversight.deals', 'oversight.drafts',
             'oversight.archive', 'oversight.matches', 'oversight.office_program',
             'chat.view_project_chats', 'chat.participate_project_chats',
-            'clients.view', 'clients.create', 'clients.edit', 'clients.manage', 'clients.duplicates.resolve',
+            'clients.view', 'clients.create', 'clients.edit', 'clients.manage', 'clients.cancel', 'clients.duplicates.resolve',
             'projects.create', 'projects.manage', 'projects.contributors', 'projects.freeze',
             'projects.advance', 'deals.direct', 'deals.manage', 'shortlist.manage',
             'calls.log', 'next_actions.plan',

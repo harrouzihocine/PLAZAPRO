@@ -33,6 +33,7 @@ class ProductionSeeder extends Seeder
             OfficeProgramPermissionSeeder::class,
             TasksAssignPermissionSeeder::class,
             ClientEditPermissionSeeder::class,
+            CancelClientPermissionSeeder::class,
             WebLeadsPermissionSeeder::class,
             WebStatsPermissionSeeder::class,
             UnitStatsPermissionSeeder::class,

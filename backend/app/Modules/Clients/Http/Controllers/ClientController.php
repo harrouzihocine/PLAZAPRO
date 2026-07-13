@@ -21,8 +21,8 @@ use Illuminate\Routing\Controller;
 
 /**
  * Clients. Reads require clients.view; create requires clients.create; edit
- * requires clients.edit; reassign / cancel require clients.manage (see routes).
- * Thin — logic lives in the Actions.
+ * requires clients.edit; reassign requires clients.manage; cancel requires
+ * clients.cancel (see routes). Thin — logic lives in the Actions.
  */
 class ClientController extends Controller
 {

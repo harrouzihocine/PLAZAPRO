@@ -32,7 +32,7 @@ class ClientTest extends TestCase
     {
         return $this->userWithPermissions([
             'clients.view', 'clients.view_all', 'clients.view_details',
-            'clients.create', 'clients.edit', 'clients.manage',
+            'clients.create', 'clients.edit', 'clients.manage', 'clients.cancel',
         ]);
     }
 
@@ -264,14 +264,32 @@ class ClientTest extends TestCase
 
     public function test_clients_manage_alone_no_longer_edits_info(): void
     {
-        // After the split, manage-without-edit covers reassign/cancel only. Live
-        // roles are backfilled with clients.edit on deploy, so this is the shape
-        // of a deliberately edit-less role built later in the role editor.
+        // After the split, manage-without-edit covers reassign / ownership only.
+        // Live roles are backfilled with clients.edit on deploy, so this is the
+        // shape of a deliberately edit-less role built later in the role editor.
         $client = Client::factory()->create();
         Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.manage']));
 
         $this->putJson("/api/v1/clients/{$client->id}", ['first_name' => 'Changed'])
             ->assertForbidden();
+    }
+
+    public function test_cancelling_requires_its_own_clients_cancel_grant(): void
+    {
+        // Cancel was split out of clients.manage into its own lever. Live roles
+        // that could cancel via manage are backfilled on deploy, so this is the
+        // shape of a manage role deliberately built without cancel.
+        $client = Client::factory()->create();
+
+        // manage-without-cancel can no longer cancel a client…
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.manage']));
+        $this->deleteJson("/api/v1/clients/{$client->id}")->assertForbidden();
+
+        // …the dedicated clients.cancel grant does.
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'clients.cancel']));
+        $this->deleteJson("/api/v1/clients/{$client->id}", ['reason' => 'Duplicate'])
+            ->assertOk();
+        $this->assertDatabaseHas('clients', ['id' => $client->id, 'status' => 'cancelled']);
     }
 
     public function test_created_by_is_stamped_and_visible_to_manager(): void

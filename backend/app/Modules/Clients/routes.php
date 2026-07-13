@@ -83,12 +83,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/clients/{client}', [ClientController::class, 'update']);
     });
 
-    // Reassigning and cancelling a CLIENT require its manage permission.
+    // Reassigning a CLIENT (and delegating a waiting desire match to a sales
+    // agent) requires its manage permission.
     Route::middleware('can:clients.manage')->group(function () {
-        Route::delete('/clients/{client}', [ClientController::class, 'destroy']);
         // Delegate a waiting client (a desire match) to the sales agent who will
         // reconnect — the manager triages, the agent does the calling.
         Route::post('/clients/{client}/assign-agent', [ClientController::class, 'assignAgent']);
+    });
+
+    // Cancelling a CLIENT is its own grant (split from clients.manage) so it can
+    // be handed out — or withheld — independently of the other back-office levers.
+    Route::middleware('can:clients.cancel')->group(function () {
+        Route::delete('/clients/{client}', [ClientController::class, 'destroy']);
     });
 
     // Opening a NEW project is part of the agent's lead workflow (the "New
