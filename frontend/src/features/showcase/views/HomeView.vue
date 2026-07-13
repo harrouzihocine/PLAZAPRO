@@ -75,6 +75,28 @@ useSeoMeta(() => ({
       </RouterLink>
     </section>
 
+    <!-- Didn't find it? Describe it — the desire wizard -->
+    <section class="bg-gradient-to-br from-primary-600 to-primary-800 dark:from-primary-700 dark:to-primary-950">
+      <div class="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 py-14 text-center sm:px-6 md:flex-row md:text-start">
+        <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-white">
+          <i class="pi pi-search text-2xl" aria-hidden="true" />
+        </span>
+        <div class="md:flex-1">
+          <h2 class="text-2xl font-bold text-white">{{ $t('showcase.desire.bannerTitle') }}</h2>
+          <p class="mt-1.5 text-white/80">{{ $t('showcase.desire.bannerBody') }}</p>
+        </div>
+        <RouterLink :to="{ name: 'showcase.desire' }" class="shrink-0">
+          <Button
+            :label="$t('showcase.desire.bannerCta')"
+            severity="contrast"
+            rounded
+            icon="pi pi-arrow-right"
+            icon-pos="right"
+          />
+        </RouterLink>
+      </div>
+    </section>
+
     <!-- About -->
     <section id="about" class="scroll-mt-20 border-y border-line bg-card">
       <div class="mx-auto grid max-w-6xl items-center gap-10 px-4 py-20 sm:px-6 md:grid-cols-2">

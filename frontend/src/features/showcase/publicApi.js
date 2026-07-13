@@ -11,6 +11,7 @@ export const publicApi = {
   projects: (params = {}) => api.get('/public/projects', { params }),
   project: (id) => api.get(`/public/projects/${id}`),
   unit: (projectId, unitId) => api.get(`/public/projects/${projectId}/units/${unitId}`),
+  desireOptions: () => api.get('/public/desire-options'),
   submitLead: (payload) => api.post('/public/leads', payload),
 }
 

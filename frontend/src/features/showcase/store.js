@@ -12,9 +12,11 @@ export const useShowcaseStore = defineStore('showcase', {
     projects: null, // null = never loaded; [] = loaded, none published
     projectCache: {},
     unitCache: {},
+    desireOptions: null, // geography + type/rooms vocabularies for the desire form
     formToken: null,
     loadingConfig: false,
     loadingProjects: false,
+    loadingDesireOptions: false,
   }),
 
   getters: {
@@ -66,6 +68,18 @@ export const useShowcaseStore = defineStore('showcase', {
       this.projectCache[project.id] = project
       this.formToken = project.form_token ?? this.formToken
       return project
+    },
+
+    async loadDesireOptions() {
+      if (this.desireOptions || this.loadingDesireOptions) return
+      this.loadingDesireOptions = true
+      try {
+        const { data } = await publicApi.desireOptions()
+        this.desireOptions = data.data
+        this.formToken = data.data.form_token ?? this.formToken
+      } finally {
+        this.loadingDesireOptions = false
+      }
     },
 
     async loadUnit(projectId, unitId) {

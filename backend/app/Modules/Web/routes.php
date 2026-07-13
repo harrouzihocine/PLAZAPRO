@@ -15,6 +15,7 @@ declare(strict_types=1);
 */
 
 use App\Modules\Web\Http\Controllers\PublicConfigController;
+use App\Modules\Web\Http\Controllers\PublicDesireOptionsController;
 use App\Modules\Web\Http\Controllers\PublicLeadController;
 use App\Modules\Web\Http\Controllers\PublicMediaController;
 use App\Modules\Web\Http\Controllers\PublicProjectController;
@@ -26,6 +27,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('public')->middleware('throttle:public')->group(function () {
     Route::get('/config', PublicConfigController::class);
+    // The desire form's option lists (official geography + generic
+    // type/rooms vocabularies) — fetched once, when the form opens.
+    Route::get('/desire-options', PublicDesireOptionsController::class);
     Route::get('/projects', [PublicProjectController::class, 'index']);
     Route::get('/projects/{id}', [PublicProjectController::class, 'show'])->whereNumber('id');
     Route::get('/projects/{id}/units/{unitId}', [PublicProjectController::class, 'unit'])

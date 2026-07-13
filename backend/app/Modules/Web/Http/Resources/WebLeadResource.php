@@ -22,6 +22,9 @@ class WebLeadResource extends JsonResource
             'name' => $this->name,
             'phone' => $this->phone,
             'message' => $this->message,
+            // Desire leads only: the visitor's criteria, ids already resolved
+            // to labels in the viewer's locale.
+            'criteria' => $this->when($this->criteria !== null, fn () => $this->resolvedCriteria()),
             'type' => $this->type?->value,
             'lead_status' => $this->lead_status?->value,
             'location_id' => $this->location_id,

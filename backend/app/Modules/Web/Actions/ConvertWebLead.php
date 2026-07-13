@@ -6,7 +6,9 @@ namespace App\Modules\Web\Actions;
 
 use App\Modules\Clients\Actions\CreateClient;
 use App\Modules\Clients\Actions\CreateClientProject;
+use App\Modules\Clients\Actions\UpsertDesire;
 use App\Modules\Clients\Models\Client;
+use App\Modules\Clients\Models\Desire;
 use App\Modules\Settings\Models\User;
 use App\Modules\Web\Enums\WebLeadStatus;
 use App\Modules\Web\Models\WebLead;
@@ -15,10 +17,12 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Turn a web lead into a real Client — composing the SAME actions the manual
- * flow uses (CreateClient / CreateClientProject), never the HTTP endpoint.
- * The phone-NSN duplicate guard mirrors ClientController::store: an existing
- * client with this phone blocks creation; the caller then either links the
- * lead to that client (when visible) or leaves it to the duplicate desk.
+ * flow uses (CreateClient / CreateClientProject / UpsertDesire), never the
+ * HTTP endpoint. The phone-NSN duplicate guard mirrors ClientController::store:
+ * an existing client with this phone blocks creation; the caller then either
+ * links the lead to that client (when visible) or leaves it to the duplicate
+ * desk. A desire lead's criteria become the client's real Desire, so the
+ * Matches board picks the client up with no re-typing.
  *
  * Returns a result array the controller maps onto HTTP:
  *  - ['converted' => Client]                        → 200
@@ -29,6 +33,7 @@ class ConvertWebLead
     public function __construct(
         private CreateClient $createClient,
         private CreateClientProject $createProject,
+        private UpsertDesire $upsertDesire,
     ) {}
 
     public function handle(WebLead $lead, array $options, User $user): array
@@ -43,9 +48,12 @@ class ConvertWebLead
                 ->visibleTo($user)
                 ->findOrFail($options['existing_client_id']);
 
-            $this->markConverted($lead, $client, $user);
+            return DB::transaction(function () use ($lead, $client, $user) {
+                $this->captureDesire($lead, $client);
+                $this->markConverted($lead, $client, $user);
 
-            return ['converted' => $client];
+                return ['converted' => $client];
+            });
         }
 
         // Same duplicate-phone guard as the manual "New client" flow.
@@ -76,10 +84,58 @@ class ConvertWebLead
                 ]);
             }
 
+            $this->captureDesire($lead, $client);
             $this->markConverted($lead, $client, $user);
 
             return ['converted' => $client];
         });
+    }
+
+    /**
+     * A desire lead's criteria become the client's client-level Desire — the
+     * Matches board then surfaces this client the moment inventory fits.
+     * Never clobbers a profile an agent already captured: only a blank slate
+     * (or a closed-out desire UpsertDesire revives) is written; skipped
+     * criteria still reach the client card via provenanceNotes.
+     */
+    private function captureDesire(WebLead $lead, Client $client): void
+    {
+        $criteria = $lead->criteria;
+
+        if ($criteria === null) {
+            return;
+        }
+
+        $hasActiveDesire = Desire::query()->active()
+            ->where('client_id', $client->id)
+            ->whereNull('client_project_id')
+            ->exists();
+
+        if ($hasActiveDesire) {
+            return;
+        }
+
+        $this->upsertDesire->handle($client, [
+            'wilaya_ids' => $criteria['wilaya_ids'] ?? [],
+            'commune_ids' => $criteria['commune_ids'] ?? [],
+            'type_ids' => $criteria['type_ids'] ?? [],
+            'room_number_ids' => $criteria['room_number_ids'] ?? [],
+            'budget_min' => $criteria['budget_min'] ?? null,
+            'budget_max' => $criteria['budget_max'] ?? null,
+            'notes' => $this->desireNotes($lead),
+        ]);
+    }
+
+    /** The desire's required story: where it came from + the visitor's words. */
+    private function desireNotes(WebLead $lead): string
+    {
+        $lines = ['Website desire request — '.$lead->created_at?->format('Y-m-d H:i')];
+
+        if ($lead->message !== null && $lead->message !== '') {
+            $lines[] = $lead->message;
+        }
+
+        return implode("\n", $lines);
     }
 
     private function markConverted(WebLead $lead, Client $client, User $user): void
@@ -99,6 +155,12 @@ class ConvertWebLead
 
         if ($lead->message !== null && $lead->message !== '') {
             $lines[] = 'Message: '.$lead->message;
+        }
+
+        // The desire criteria in the converter's language — readable even when
+        // the structured Desire was skipped (client already had one).
+        foreach ($lead->resolvedCriteria() ?? [] as $key => $value) {
+            $lines[] = $key.': '.(is_array($value) ? implode(', ', $value) : number_format((float) $value, 0, '.', ' '));
         }
 
         if ($lead->preferred_date !== null) {

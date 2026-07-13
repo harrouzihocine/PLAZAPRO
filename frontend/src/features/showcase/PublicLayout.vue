@@ -47,6 +47,7 @@ const year = new Date().getFullYear()
 const navLinks = [
   { to: { name: 'showcase.home' }, key: 'showcase.nav.home' },
   { to: { name: 'showcase.projects' }, key: 'showcase.nav.projects' },
+  { to: { name: 'showcase.desire' }, key: 'showcase.nav.desire' },
   { to: { name: 'showcase.home', hash: '#about' }, key: 'showcase.nav.about' },
   { to: { name: 'showcase.home', hash: '#contact' }, key: 'showcase.nav.contact' },
 ]

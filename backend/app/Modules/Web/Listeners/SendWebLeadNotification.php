@@ -6,6 +6,7 @@ namespace App\Modules\Web\Listeners;
 
 use App\Modules\Collaboration\Notifications\DomainNotification;
 use App\Modules\Settings\Models\User;
+use App\Modules\Web\Enums\WebLeadType;
 use App\Modules\Web\Events\WebLeadCreated;
 use App\Modules\Web\Models\WebLead;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -39,9 +40,11 @@ class SendWebLeadNotification implements ShouldQueue
                 key: 'web_lead',
                 params: [
                     'name' => $lead->name,
-                    'about' => $lead->unit?->reference
-                        ?? $lead->location?->name
-                        ?? '@notifications.web_lead_about_general',
+                    'about' => $lead->type === WebLeadType::Desire
+                        ? '@notifications.web_lead_about_desire'
+                        : ($lead->unit?->reference
+                            ?? $lead->location?->name
+                            ?? '@notifications.web_lead_about_general'),
                 ],
                 link: '/web-leads',
                 subjectType: WebLead::class,

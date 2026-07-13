@@ -112,6 +112,11 @@ async function convert(existingClientId = null) {
         <ToggleSwitch v-model="createProject" />
       </label>
 
+      <p v-if="lead.criteria" class="flex items-start gap-2.5 rounded-lg bg-primary-500/10 p-3 text-sm text-ink">
+        <i class="pi pi-sparkles mt-0.5 text-primary-500" aria-hidden="true" />
+        {{ $t('webleads.desireHint') }}
+      </p>
+
       <div class="flex gap-2 pt-1">
         <Button :label="$t('webleads.convert')" icon="pi pi-user-plus" :loading="saving" @click="convert()" />
         <Button :label="$t('common.cancel')" severity="secondary" outlined @click="emit('close')" />

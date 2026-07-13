@@ -6,12 +6,15 @@ namespace App\Modules\Web\Http\Controllers;
 
 use App\Core\Enums\RecordStatus;
 use App\Modules\Inventory\Models\Unit;
+use App\Modules\Settings\Models\Commune;
+use App\Modules\Settings\Models\DynamicList;
 use App\Modules\Web\Actions\CreateWebLead;
 use App\Modules\Web\Enums\WebLeadType;
 use App\Modules\Web\Support\FormToken;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\ValidationException;
@@ -27,6 +30,12 @@ use Illuminate\Validation\ValidationException;
  */
 class PublicLeadController extends Controller
 {
+    /** The desire form's flat payload keys — packed into `criteria` on save. */
+    private const CRITERIA_KEYS = [
+        'wilaya_ids', 'commune_ids', 'type_ids', 'room_number_ids',
+        'budget_min', 'budget_max',
+    ];
+
     public function __invoke(Request $request, CreateWebLead $action): JsonResponse
     {
         // Layer 2 — honeypot. The `website` field is invisible to humans.
@@ -38,6 +47,8 @@ class PublicLeadController extends Controller
         if (! FormToken::passes($request->input('form_token'))) {
             throw ValidationException::withMessages(['form_token' => 'Please try again.']);
         }
+
+        $isDesire = $request->input('type') === WebLeadType::Desire->value;
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
@@ -53,13 +64,109 @@ class PublicLeadController extends Controller
             'preferred_date' => ['nullable', 'date', 'after_or_equal:today'],
             'preferred_time' => ['nullable', 'string', 'max:8'],
             'source_url' => ['nullable', 'string', 'max:500'],
+            ...($isDesire ? $this->desireRules() : []),
         ]);
 
         $this->assertUnitIsPublic($data);
 
-        $action->handle($data, $request);
+        if ($isDesire) {
+            $this->assertCommunesMatchWilayas($data);
+            $this->assertBudgetRange($data);
+            $data['criteria'] = $this->packCriteria($data);
+        }
+
+        $action->handle(Arr::except($data, self::CRITERIA_KEYS), $request);
 
         return $this->accepted();
+    }
+
+    /**
+     * The desire criteria — every selector multi-valued like the internal
+     * desire profile, but only what a visitor can meaningfully answer (the
+     * agent captures the rest on the qualifying call). Dynamic-list ids are
+     * scoped to THEIR list, so an id from an unrelated vocabulary 422s.
+     */
+    private function desireRules(): array
+    {
+        return [
+            'wilaya_ids' => ['nullable', 'array', 'max:5'],
+            'wilaya_ids.*' => ['integer', 'distinct', Rule::exists('wilayas', 'id')
+                ->where('status', RecordStatus::Active->value)],
+            'commune_ids' => ['nullable', 'array', 'max:10'],
+            'commune_ids.*' => ['integer', 'distinct', Rule::exists('communes', 'id')
+                ->where('status', RecordStatus::Active->value)],
+            'type_ids' => ['nullable', 'array', 'max:5'],
+            'type_ids.*' => ['integer', 'distinct', $this->listItemRule('project_types')],
+            'room_number_ids' => ['nullable', 'array', 'max:5'],
+            'room_number_ids.*' => ['integer', 'distinct', $this->listItemRule('room_numbers')],
+            'budget_min' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
+            'budget_max' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
+        ];
+    }
+
+    private function listItemRule(string $listKey): \Illuminate\Validation\Rules\Exists
+    {
+        return Rule::exists('dynamic_list_items', 'id')
+            ->where('dynamic_list_id', DynamicList::query()->where('key', $listKey)->value('id') ?? 0)
+            ->where('is_active', true)
+            ->where('status', RecordStatus::Active->value);
+    }
+
+    /** Same coherence rule as the internal form: communes ⊆ chosen wilayas. */
+    private function assertCommunesMatchWilayas(array $data): void
+    {
+        $communeIds = array_filter($data['commune_ids'] ?? []);
+
+        if ($communeIds === []) {
+            return;
+        }
+
+        $wilayaIds = array_filter($data['wilaya_ids'] ?? []);
+
+        $allBelong = $wilayaIds !== []
+            && Commune::whereIn('id', $communeIds)
+                ->whereIn('wilaya_id', $wilayaIds)
+                ->count() === count($communeIds);
+
+        if (! $allBelong) {
+            throw ValidationException::withMessages([
+                'commune_ids' => 'Every selected commune must belong to one of the chosen wilayas.',
+            ]);
+        }
+    }
+
+    /** Min ≤ max, checked only when both ends were answered. */
+    private function assertBudgetRange(array $data): void
+    {
+        $min = $data['budget_min'] ?? null;
+        $max = $data['budget_max'] ?? null;
+
+        if ($min !== null && $max !== null && (float) $max < (float) $min) {
+            throw ValidationException::withMessages([
+                'budget_max' => 'The maximum budget must be greater than or equal to the minimum.',
+            ]);
+        }
+    }
+
+    /** Only the answered criteria are stored; nothing answered → null. */
+    private function packCriteria(array $data): ?array
+    {
+        $criteria = [];
+
+        foreach (['wilaya_ids', 'commune_ids', 'type_ids', 'room_number_ids'] as $key) {
+            $ids = array_values(array_filter($data[$key] ?? []));
+            if ($ids !== []) {
+                $criteria[$key] = array_map(intval(...), $ids);
+            }
+        }
+
+        foreach (['budget_min', 'budget_max'] as $key) {
+            if (($data[$key] ?? null) !== null) {
+                $criteria[$key] = (float) $data[$key];
+            }
+        }
+
+        return $criteria === [] ? null : $criteria;
     }
 
     /** The unit must belong to a published project — and to the sent project. */

@@ -259,4 +259,5 @@ return [
         'body' => ':name s\'intéresse à :about sur le site — ouvrez la boîte des prospects.',
     ],
     'web_lead_about_general' => 'vos projets',
+    'web_lead_about_desire' => 'un bien introuvable sur le site (demande de recherche)',
 ];

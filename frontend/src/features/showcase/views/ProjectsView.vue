@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import Button from 'primevue/button'
 import Select from 'primevue/select'
 import ToggleButton from 'primevue/togglebutton'
 import { useI18n } from 'vue-i18n'
@@ -96,8 +97,20 @@ useSeoMeta(() => ({
       <ProjectCard v-for="project in filtered" :key="project.id" :project="project" />
     </div>
 
-    <p v-else class="mt-10 rounded-xl border border-line bg-card p-10 text-center text-mute">
-      {{ $t('showcase.projects.empty') }}
-    </p>
+    <div v-else class="mt-10 rounded-xl border border-line bg-card p-10 text-center">
+      <p class="text-mute">{{ $t('showcase.projects.empty') }}</p>
+      <RouterLink :to="{ name: 'showcase.desire' }" class="mt-5 inline-block">
+        <Button :label="$t('showcase.desire.bannerCta')" outlined icon="pi pi-search" />
+      </RouterLink>
+    </div>
+
+    <!-- Even with results: the visitor scanning for something we don't list -->
+    <div v-if="filtered.length" class="mt-12 flex flex-col items-center gap-3 rounded-2xl bg-primary-500/5 p-8 text-center">
+      <p class="font-semibold text-ink">{{ $t('showcase.desire.bannerTitle') }}</p>
+      <p class="max-w-xl text-sm text-mute">{{ $t('showcase.desire.bannerBody') }}</p>
+      <RouterLink :to="{ name: 'showcase.desire' }">
+        <Button :label="$t('showcase.desire.bannerCta')" rounded icon="pi pi-arrow-right" icon-pos="right" />
+      </RouterLink>
+    </div>
   </div>
 </template>

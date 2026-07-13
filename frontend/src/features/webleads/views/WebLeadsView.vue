@@ -6,6 +6,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import OfflineStamp from '@/components/ui/OfflineStamp.vue'
 import { confirmAction, toastError, toastSuccess } from '@/composables/useConfirm'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
+import { formatMoney } from '@/features/payments/money'
 import { formatDate, formatDateTime, timeAgo } from '@/utils/format'
 import { t } from '@/i18n'
 import { webLeadsApi } from '../api'
@@ -25,6 +26,20 @@ const TYPE_META = {
   interest: { labelKey: 'webleads.typeInterest', icon: 'pi pi-heart', class: 'bg-primary-500/10 text-primary-600 dark:text-primary-400' },
   visit_request: { labelKey: 'webleads.typeVisit', icon: 'pi pi-calendar', class: 'bg-info/10 text-info' },
   callback: { labelKey: 'webleads.typeCallback', icon: 'pi pi-phone', class: 'bg-success/10 text-success' },
+  desire: { labelKey: 'webleads.typeDesire', icon: 'pi pi-search', class: 'bg-warning/10 text-warning' },
+}
+
+// A desire lead's criteria (labels resolved server-side) as display chips.
+function criteriaChips(lead) {
+  const c = lead.criteria
+  if (!c) return []
+  const chips = [...(c.types ?? []), ...(c.room_numbers ?? []), ...(c.wilayas ?? []), ...(c.communes ?? [])]
+  if (c.budget_min != null || c.budget_max != null) {
+    const min = c.budget_min != null ? formatMoney(c.budget_min) : null
+    const max = c.budget_max != null ? formatMoney(c.budget_max) : null
+    chips.push(min && max ? `${min} – ${max}` : `${t('webleads.budgetUpTo')} ${min || max}`)
+  }
+  return chips
 }
 
 async function load() {
@@ -148,6 +163,15 @@ function onConverted() {
                 {{ $t('webleads.preferred') }}: {{ formatDate(lead.preferred_date) }}
                 <template v-if="lead.preferred_time"> {{ lead.preferred_time }}</template>
               </span>
+            </div>
+
+            <!-- Desire criteria: what the visitor is looking for -->
+            <div v-if="criteriaChips(lead).length" class="mt-2 flex flex-wrap gap-1.5">
+              <span
+                v-for="(chip, i) in criteriaChips(lead)"
+                :key="i"
+                class="rounded-full bg-warning/10 px-2.5 py-0.5 text-xs font-medium text-ink"
+              >{{ chip }}</span>
             </div>
 
             <p v-if="lead.message" class="mt-2 whitespace-pre-line rounded-lg bg-ground p-3 text-sm text-ink">

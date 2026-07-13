@@ -15,6 +15,8 @@ export const showcaseRoutes = [
       // topbar starts transparent (white text) and solidifies on scroll.
       { path: '', name: 'showcase.home', meta: { hero: true }, component: () => import('./views/HomeView.vue') },
       { path: 'projects', name: 'showcase.projects', component: () => import('./views/ProjectsView.vue') },
+      // "Didn't find it? Describe it" — the desire wizard.
+      { path: 'find', name: 'showcase.desire', component: () => import('./views/DesireView.vue') },
       {
         path: 'projects/:id',
         name: 'showcase.project',

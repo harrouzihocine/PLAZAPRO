@@ -258,4 +258,5 @@ return [
         'body' => 'استفسر :name عن :about عبر الموقع — افتح صندوق العملاء المحتملين.',
     ],
     'web_lead_about_general' => 'مشاريعكم',
+    'web_lead_about_desire' => 'سكن لم يجده على الموقع (طلب بحث)',
 ];
