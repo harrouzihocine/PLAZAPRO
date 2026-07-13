@@ -9,6 +9,7 @@ use App\Modules\Pipeline\Enums\VisitType;
 use App\Modules\Pipeline\Models\Call;
 use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\User;
+use App\Support\DzPhone;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -59,6 +60,18 @@ class Client extends BaseModel
         return Attribute::make(
             get: fn (?string $value) => self::normalizeName($value),
             set: fn (?string $value) => self::normalizeName($value),
+        );
+    }
+
+    /**
+     * Normalize DZ phone input to the "+213 …" convention on write so manually
+     * entered clients match the imported ones (App\Support\DzPhone). Foreign and
+     * unrecognized numbers are stored as typed; read is passthrough.
+     */
+    protected function phone(): Attribute
+    {
+        return Attribute::make(
+            set: fn (?string $value) => DzPhone::normalize($value),
         );
     }
 

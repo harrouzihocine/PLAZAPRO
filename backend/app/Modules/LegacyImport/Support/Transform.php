@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\LegacyImport\Support;
 
+use App\Support\DzPhone;
 use Illuminate\Support\Str;
 
 /**
@@ -59,20 +60,9 @@ class Transform
             $digits = '0'.$digits;
         }
 
-        if (str_starts_with($digits, '0') && strlen($digits) === 10) {
-            // Mobile / 10-digit national → "+213 XXX XX XX XX" (NSN grouped 3-2-2-2).
-            $nsn = substr($digits, 1);
-            $formatted = '+213 '.substr($nsn, 0, 3).' '.substr($nsn, 3, 2).' '.substr($nsn, 5, 2).' '.substr($nsn, 7, 2);
-
-            return ['phone' => $formatted, 'nsn' => $nsn, 'ok' => true, 'foreign' => false];
-        }
-
-        if (str_starts_with($digits, '0') && strlen($digits) === 9) {
-            // Landline-length national (0 + 8 digits) → "+213 XX XX XX XX" (2-2-2-2).
-            $nsn = substr($digits, 1);
-            $formatted = '+213 '.substr($nsn, 0, 2).' '.substr($nsn, 2, 2).' '.substr($nsn, 4, 2).' '.substr($nsn, 6, 2);
-
-            return ['phone' => $formatted, 'nsn' => $nsn, 'ok' => true, 'foreign' => false];
+        // DZ national number (0 + 9 mobile / 0 + 8 landline) → shared "+213 …" form.
+        if ($formatted = DzPhone::format($digits)) {
+            return ['phone' => $formatted, 'nsn' => substr($digits, 1), 'ok' => true, 'foreign' => false];
         }
 
         if ($hasPlus) {

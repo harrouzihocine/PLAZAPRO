@@ -112,15 +112,15 @@ class DesireFlexTest extends TestCase
         $this->getJson('/api/v1/desires/matches?search=chafik')
             ->assertOk()
             ->assertJsonCount(1, 'data.items')
-            ->assertJsonPath('data.items.0.client.phone', '0551000003');
+            ->assertJsonPath('data.items.0.client.phone', '+213 551 00 00 03');
 
         $this->getJson('/api/v1/desires/matches?search=51000002')
             ->assertOk()
             ->assertJsonCount(1, 'data.items')
-            ->assertJsonPath('data.items.0.client.phone', '0551000002');
+            ->assertJsonPath('data.items.0.client.phone', '+213 551 00 00 02');
 
         // The waiting-since window keys on the desire's capture date.
-        Desire::query()->whereHas('client', fn ($c) => $c->where('phone', '0551000001'))
+        Desire::query()->whereHas('client', fn ($c) => $c->where('first_name', 'Amine'))
             ->update(['created_at' => now()->subDays(30)]);
 
         $this->getJson('/api/v1/desires/matches?from='.now()->subDay()->toDateString())
@@ -130,7 +130,7 @@ class DesireFlexTest extends TestCase
         $this->getJson('/api/v1/desires/matches?to='.now()->subDays(7)->toDateString())
             ->assertOk()
             ->assertJsonCount(1, 'data.items')
-            ->assertJsonPath('data.items.0.client.phone', '0551000001');
+            ->assertJsonPath('data.items.0.client.phone', '+213 551 00 00 01');
     }
 
     public function test_desire_matches_board_is_company_wide_for_oversight(): void

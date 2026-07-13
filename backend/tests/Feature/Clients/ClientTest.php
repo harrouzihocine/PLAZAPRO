@@ -62,8 +62,9 @@ class ClientTest extends TestCase
             ->assertJsonPath('data.full_name', 'Khaled Amine')
             ->assertJsonPath('data.status', 'active');
 
+        // Phone is normalized to the DZ "+213 …" convention on write (DzPhone).
         $this->assertDatabaseHas('clients', [
-            'first_name' => 'Amine', 'phone' => '0555123456', 'status' => 'active',
+            'first_name' => 'Amine', 'phone' => '+213 555 12 34 56', 'status' => 'active',
         ]);
     }
 
