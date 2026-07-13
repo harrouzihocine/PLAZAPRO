@@ -57,6 +57,7 @@ class PublicConfigController extends Controller
             ],
             'stats' => $this->stats(),
             'hero' => $this->hero($value('website_hero_media_ids'), $value('website_hero_media_id')),
+            'about_media' => $this->aboutMedia($value('website_about_media_ids')),
             'form_token' => FormToken::issue(),
         ]]);
     }
@@ -142,6 +143,45 @@ class PublicConfigController extends Controller
         }
 
         return ['type' => 'slideshow', 'slides' => $slides->all()];
+    }
+
+    /**
+     * The Who-we-are photo mosaic, curated in Settings → Website: up to four
+     * ordered photo ids from the about library. Same contract as the hero —
+     * every id is re-checked against PublicMediaGate so a stale or private
+     * pick silently drops out; an empty result lets the site fall back to
+     * featured-project covers.
+     *
+     * @return list<array{image_url: string, thumb_url: ?string}>
+     */
+    private function aboutMedia(?string $ids): array
+    {
+        $picked = collect(explode(',', $ids ?? ''))
+            ->map(fn ($id) => (int) trim($id))
+            ->filter()
+            ->take(4);
+
+        if ($picked->isEmpty()) {
+            return [];
+        }
+
+        $media = Media::query()->with('mediable')->whereIn('id', $picked)->get()->keyBy('id');
+
+        return $picked
+            ->map(fn (int $id) => $media[$id] ?? null)
+            ->filter(fn (?Media $m) => PublicMediaGate::allows($m) && $m->type === MediaType::Photo)
+            ->map(function (Media $m) {
+                $v = $m->updated_at ? '?v='.$m->updated_at->getTimestamp() : '';
+
+                return [
+                    'image_url' => route('public.media.file', $m->id, false).$v,
+                    'thumb_url' => $m->thumb_path !== null
+                        ? route('public.media.thumb', $m->id, false).$v
+                        : null,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /** Headline numbers for the landing hero — published inventory only. */

@@ -6,14 +6,23 @@ import { websiteSpaceApi } from '@/features/settings/api'
 import { confirmAction, toastError } from '@/composables/useConfirm'
 import { t } from '@/i18n'
 
-// The landing-hero library: the owner uploads photos/videos that belong to the
-// SITE (not to a project) and ticks what the hero shows. Selection order = the
-// slideshow order; picking a video makes it THE hero (a video plays alone).
-// The selected ids live in the website_hero_media_ids app setting — the parent
-// owns saving; this component owns the library and the picking.
+// A site media library: the owner uploads photos/videos that belong to the
+// SITE (not to a project) and ticks what a landing section shows. Selection
+// order = display order; picking a video makes it THE hero (a video plays
+// alone). `space-key` says which library this card manages ('hero' — the
+// landing hero — or 'about' — the Who-we-are mosaic). The selected ids live
+// in an app setting the parent owns saving; this component owns the library
+// and the picking.
 
 const props = defineProps({
   selectedIds: { type: Array, default: () => [] },
+  spaceKey: { type: String, default: 'hero' }, // 'hero' | 'about'
+  photosOnly: { type: Boolean, default: false },
+  maxSelected: { type: Number, default: 0 }, // 0 = unlimited
+  // Section-specific wording; defaults are the hero card's strings.
+  dropText: { type: String, default: null },
+  emptyText: { type: String, default: null },
+  hintText: { type: String, default: null },
 })
 
 const emit = defineEmits(['update:selectedIds'])
@@ -32,9 +41,12 @@ const thumbUrl = (item) => item.thumb_url
 async function load() {
   loading.value = true
   try {
-    spaceId.value ??= (await websiteSpaceApi.get()).id
+    if (spaceId.value === null) {
+      const spaces = await websiteSpaceApi.get()
+      spaceId.value = props.spaceKey === 'about' ? spaces.about_id : spaces.id
+    }
     const all = await mediaApi.list('website', spaceId.value)
-    items.value = all.filter((m) => m.type === 'photo' || m.type === 'video')
+    items.value = all.filter((m) => m.type === 'photo' || (!props.photosOnly && m.type === 'video'))
   } catch {
     toastError(t('settings.heroLibraryLoadFailed'))
   } finally {
@@ -59,7 +71,9 @@ watch(
 onBeforeUnmount(() => clearInterval(pollTimer))
 
 async function uploadFiles(files) {
-  const media = files.filter((f) => f.type.startsWith('image/') || f.type.startsWith('video/'))
+  const media = files.filter(
+    (f) => f.type.startsWith('image/') || (!props.photosOnly && f.type.startsWith('video/')),
+  )
   if (!media.length || !spaceId.value) return
   uploading.value = true
   try {
@@ -87,7 +101,8 @@ function onDrop(e) {
 
 const selectionIndex = (id) => props.selectedIds.indexOf(id)
 
-// A video hero plays alone; photos stack into an ordered slideshow.
+// A video hero plays alone; photos stack in picking order, capped when the
+// section only has room for so many (further clicks are ignored).
 function toggle(item) {
   const current = props.selectedIds
   if (current.includes(item.id)) {
@@ -99,6 +114,7 @@ function toggle(item) {
     return
   }
   const photosOnly = current.filter((id) => items.value.find((m) => m.id === id)?.type !== 'video')
+  if (props.maxSelected > 0 && photosOnly.length >= props.maxSelected) return
   emit('update:selectedIds', [...photosOnly, item.id])
 }
 
@@ -120,7 +136,14 @@ async function remove(item) {
 
 <template>
   <div>
-    <input ref="fileInput" type="file" accept="image/*,video/*" multiple class="hidden" @change="onPick" />
+    <input
+      ref="fileInput"
+      type="file"
+      :accept="photosOnly ? 'image/*' : 'image/*,video/*'"
+      multiple
+      class="hidden"
+      @change="onPick"
+    />
 
     <!-- Upload zone -->
     <div
@@ -131,7 +154,7 @@ async function remove(item) {
       @drop.prevent="onDrop"
     >
       <i class="pi pi-cloud-upload me-1" aria-hidden="true" />
-      {{ $t('settings.heroLibraryDrop') }}
+      {{ dropText || $t('settings.heroLibraryDrop') }}
       <Button
         :label="$t('settings.heroLibraryUpload')"
         icon="pi pi-upload"
@@ -143,7 +166,7 @@ async function remove(item) {
     </div>
 
     <p v-if="loading" class="mt-3 text-sm text-mute">{{ $t('common.loading') }}</p>
-    <p v-else-if="!items.length" class="mt-3 text-xs text-mute">{{ $t('settings.heroLibraryEmpty') }}</p>
+    <p v-else-if="!items.length" class="mt-3 text-xs text-mute">{{ emptyText || $t('settings.heroLibraryEmpty') }}</p>
 
     <div v-else class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
       <div v-for="item in items" :key="item.id" class="group relative">
@@ -165,7 +188,7 @@ async function remove(item) {
             v-if="item.optimize_status === 'pending'"
             class="absolute bottom-1 start-1 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white"
           ><i class="pi pi-spin pi-spinner text-[9px]" aria-hidden="true" />{{ $t('media.optimizing') }}</span>
-          <!-- Selection order = slideshow order -->
+          <!-- Selection order = display order -->
           <span
             v-if="selectionIndex(item.id) !== -1"
             class="num absolute start-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-primary-500 text-xs font-bold text-primary-contrast"
@@ -182,6 +205,6 @@ async function remove(item) {
       </div>
     </div>
 
-    <p class="mt-2 text-xs text-mute">{{ $t('settings.heroLibraryHint') }}</p>
+    <p class="mt-2 text-xs text-mute">{{ hintText || $t('settings.heroLibraryHint') }}</p>
   </div>
 </template>

@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import Button from 'primevue/button'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
-import HeroLibraryManager from '@/features/settings/components/HeroLibraryManager.vue'
+import WebsiteLibraryManager from '@/features/settings/components/WebsiteLibraryManager.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import { toastError, toastSuccess } from '@/composables/useConfirm'
@@ -13,8 +13,8 @@ import { t } from '@/i18n'
 
 // Everything the public showcase (/plaza) presents about the company, on its
 // own page: contact channels (several numbers), social profiles, the
-// trilingual "about us" and the landing-hero library. Each card saves on its
-// own (partial PUTs, same pattern as GeneralView).
+// trilingual "about us" with its photo mosaic, and the landing-hero library.
+// Each card saves on its own (partial PUTs, same pattern as GeneralView).
 
 const loading = ref(true)
 
@@ -41,6 +41,10 @@ const about = ref({ en: '', fr: '', ar: '' })
 const aboutLang = ref('fr')
 const savingAbout = ref(false)
 
+// "Who we are" photo mosaic — empty selection = featured-project covers.
+const aboutMediaIds = ref([])
+const savingAboutPhotos = ref(false)
+
 // Landing hero
 const heroIds = ref([])
 const savingHero = ref(false)
@@ -62,6 +66,10 @@ async function load() {
       ar: settings.website_about_ar ?? '',
     }
     heroIds.value = (settings.website_hero_media_ids ?? '')
+      .split(',')
+      .map((id) => Number(id))
+      .filter(Boolean)
+    aboutMediaIds.value = (settings.website_about_media_ids ?? '')
       .split(',')
       .map((id) => Number(id))
       .filter(Boolean)
@@ -126,6 +134,20 @@ async function saveAbout() {
     toastError(e.response?.data?.message ?? t('settings.saveFailed'))
   } finally {
     savingAbout.value = false
+  }
+}
+
+async function saveAboutPhotos() {
+  savingAboutPhotos.value = true
+  try {
+    await appSettingsApi.save({
+      website_about_media_ids: aboutMediaIds.value.join(',') || null,
+    })
+    toastSuccess(t('settings.saved'))
+  } catch (e) {
+    toastError(e.response?.data?.message ?? t('settings.saveFailed'))
+  } finally {
+    savingAboutPhotos.value = false
   }
 }
 
@@ -252,6 +274,24 @@ async function saveHero() {
       </form>
     </SectionCard>
 
+    <!-- "Who we are" photos -->
+    <SectionCard :title="$t('settings.websiteAboutPhotosTitle')" icon="pi pi-images" class="mt-6">
+      <p v-if="loading" class="text-sm text-mute">{{ $t('common.loading') }}</p>
+      <div v-else class="max-w-xl space-y-4">
+        <p class="text-xs text-mute">{{ $t('settings.websiteAboutPhotosIntro') }}</p>
+        <WebsiteLibraryManager
+          v-model:selected-ids="aboutMediaIds"
+          space-key="about"
+          photos-only
+          :max-selected="4"
+          :drop-text="$t('settings.aboutLibraryDrop')"
+          :empty-text="$t('settings.aboutLibraryEmpty')"
+          :hint-text="$t('settings.aboutLibraryHint')"
+        />
+        <Button :label="$t('common.save')" icon="pi pi-check" :loading="savingAboutPhotos" @click="saveAboutPhotos" />
+      </div>
+    </SectionCard>
+
     <!-- Landing hero -->
     <SectionCard :title="$t('settings.websiteHeroTitle')" icon="pi pi-image" class="mt-6">
       <p v-if="loading" class="text-sm text-mute">{{ $t('common.loading') }}</p>
@@ -261,7 +301,7 @@ async function saveHero() {
           <i class="pi pi-info-circle me-1 text-primary-500" aria-hidden="true" />
           {{ $t('settings.websiteHeroLegacy') }}
         </p>
-        <HeroLibraryManager v-model:selected-ids="heroIds" />
+        <WebsiteLibraryManager v-model:selected-ids="heroIds" />
         <Button :label="$t('common.save')" icon="pi pi-check" :loading="savingHero" @click="saveHero" />
       </div>
     </SectionCard>

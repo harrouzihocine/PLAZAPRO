@@ -96,8 +96,9 @@ export const appSettingsApi = {
   },
 }
 
-// The public site's hero library anchor (Settings → Website drives the
-// standard media endpoints with mediableType 'website' + this id).
+// The public site's media library anchors — `id` (hero) and `about_id`
+// (Who-we-are mosaic). Settings → Website drives the standard media
+// endpoints with mediableType 'website' + one of these ids.
 export const websiteSpaceApi = {
   async get() {
     const { data } = await useApi().get('/website-space')

@@ -61,6 +61,10 @@ class AppSettingController extends Controller
         // hero library (photos → slideshow, a leading video → video hero).
         // Takes precedence over the legacy single id when non-empty.
         'website_hero_media_ids' => ['sometimes', 'nullable', 'string', 'max:400', 'regex:/^\d+(,\d+)*$/'],
+        // The Who-we-are mosaic on the landing page: ordered comma-separated
+        // photo ids from the about library (first pick renders wide). Empty =
+        // the section falls back to featured-project covers.
+        'website_about_media_ids' => ['sometimes', 'nullable', 'string', 'max:400', 'regex:/^\d+(,\d+)*$/'],
         // The dispatch GPS layer: site geofence radius (auto check-in/out),
         // how long an assignment may sit unaccepted / an arrival may run late
         // before the dispatchers are nudged, and breadcrumb retention.

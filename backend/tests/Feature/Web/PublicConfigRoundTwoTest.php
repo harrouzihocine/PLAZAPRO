@@ -8,6 +8,9 @@ use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Media;
 use App\Modules\Settings\Models\AppSetting;
 use App\Modules\Settings\Models\Commune;
+use App\Modules\Settings\Models\Permission;
+use App\Modules\Settings\Models\Role;
+use App\Modules\Settings\Models\User;
 use App\Modules\Web\Models\WebsiteSpace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -15,8 +18,8 @@ use Tests\TestCase;
 
 /**
  * Round-two config surface: the multi-number contact list, the extra social
- * links, the communes stat, the curated hero slideshow from the site's own
- * library, and the per-media publish switch end to end.
+ * links, the communes stat, the curated hero slideshow and Who-we-are mosaic
+ * from the site's own libraries, and the per-media publish switch end to end.
  */
 class PublicConfigRoundTwoTest extends TestCase
 {
@@ -96,6 +99,59 @@ class PublicConfigRoundTwoTest extends TestCase
         $hero = $this->getJson('/api/v1/public/config')->json('data.hero');
         $this->assertSame('video', $hero['type']);
         $this->assertNotEmpty($hero['video_url']);
+    }
+
+    public function test_about_library_photos_make_the_who_we_are_mosaic(): void
+    {
+        $space = WebsiteSpace::about();
+        $first = Media::factory()->create(['mediable_type' => 'website_space', 'mediable_id' => $space->id]);
+        $second = Media::factory()->create(['mediable_type' => 'website_space', 'mediable_id' => $space->id]);
+        $hiddenPick = Media::factory()->create([
+            'mediable_type' => 'website_space', 'mediable_id' => $space->id, 'is_public' => false,
+        ]);
+        $video = Media::factory()->create([
+            'mediable_type' => 'website_space', 'mediable_id' => $space->id,
+            'collection' => 'videos', 'type' => 'video', 'mime_type' => 'video/mp4',
+        ]);
+
+        // Owner order (second first) is preserved; the unticked pick and the
+        // video (the mosaic is photos-only) drop out.
+        AppSetting::set('website_about_media_ids', "{$second->id},{$first->id},{$hiddenPick->id},{$video->id}");
+
+        $about = $this->getJson('/api/v1/public/config')->json('data.about_media');
+        $this->assertCount(2, $about);
+        $this->assertStringContainsString("/{$second->id}/", $about[0]['image_url']);
+        $this->assertStringContainsString("/{$first->id}/", $about[1]['image_url']);
+    }
+
+    public function test_about_mosaic_is_empty_without_a_selection_and_capped_at_four(): void
+    {
+        $this->assertSame([], $this->getJson('/api/v1/public/config')->json('data.about_media'));
+
+        $space = WebsiteSpace::about();
+        $ids = Media::factory()->count(5)
+            ->create(['mediable_type' => 'website_space', 'mediable_id' => $space->id])
+            ->pluck('id');
+
+        AppSetting::set('website_about_media_ids', $ids->implode(','));
+        $this->assertCount(4, $this->getJson('/api/v1/public/config')->json('data.about_media'));
+    }
+
+    public function test_website_space_endpoint_hands_out_both_library_anchors(): void
+    {
+        $role = Role::factory()->create();
+        $role->permissions()->sync([
+            Permission::firstOrCreate(['slug' => 'settings.manage'], ['name' => 'settings.manage'])->id,
+        ]);
+
+        $data = $this->actingAs(User::factory()->create(['role_id' => $role->id]))
+            ->getJson('/api/v1/website-space')
+            ->assertOk()
+            ->json('data');
+
+        $this->assertSame(WebsiteSpace::hero()->id, $data['id']);
+        $this->assertSame(WebsiteSpace::about()->id, $data['about_id']);
+        $this->assertNotSame($data['id'], $data['about_id']);
     }
 
     public function test_unticked_media_leaves_the_project_payload_and_stops_streaming(): void

@@ -38,8 +38,8 @@ class MediaController extends Controller
     private const MEDIABLES = [
         'locations' => Location::class,
         'units' => Unit::class,
-        // The public site's own hero library — mediableId is the space's row id
-        // (the Settings UI gets it from GET /website-space).
+        // The public site's own libraries (hero, about) — mediableId is the
+        // space's row id (the Settings UI gets them from GET /website-space).
         'website' => WebsiteSpace::class,
     ];
 

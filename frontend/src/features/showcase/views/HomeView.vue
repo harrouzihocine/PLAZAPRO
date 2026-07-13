@@ -24,6 +24,22 @@ const featured = computed(() => projects.value.slice(0, 3))
 const aboutText = computed(() => pickLocalized(showcase.config?.about))
 const company = computed(() => showcase.company)
 
+// The "Who we are" mosaic: the photos curated in Settings → Website when the
+// owner picked some (first pick renders wide, so it gets the full-size file);
+// featured-project covers otherwise.
+const aboutPics = computed(() => {
+  const curated = (showcase.config?.about_media ?? []).map((m, i) => ({
+    key: `curated-${i}`,
+    src: i === 0 ? m.image_url : m.thumb_url || m.image_url,
+    alt: company.value.name || 'PLAZA PRO',
+  }))
+  if (curated.length) return curated
+  return featured.value
+    .filter((p) => p.cover)
+    .slice(0, 4)
+    .map((p) => ({ key: `project-${p.id}`, src: p.cover.thumb_url, alt: p.name }))
+})
+
 useSeoMeta(() => ({
   title: `${company.value.name || 'PLAZA PRO'} — ${t('showcase.seo.homeTitle')}`,
   description: aboutText.value || t('showcase.hero.subtitle'),
@@ -126,14 +142,14 @@ useSeoMeta(() => ({
 
         <div class="grid grid-cols-2 gap-4">
           <div
-            v-for="(project, i) in featured.filter((p) => p.cover).slice(0, 4)"
-            :key="project.id"
+            v-for="(pic, i) in aboutPics"
+            :key="pic.key"
             class="overflow-hidden rounded-2xl"
             :class="i === 0 ? 'col-span-2 aspect-[2/1]' : 'aspect-square'"
           >
             <img
-              :src="project.cover.thumb_url"
-              :alt="project.name"
+              :src="pic.src"
+              :alt="pic.alt"
               class="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
               loading="lazy"
             />
