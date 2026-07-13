@@ -210,6 +210,7 @@ export default {
     editProfile: 'Modifier le profil',
     notifications: 'Notifications',
     logOut: 'Se déconnecter',
+    sessions: 'Appareils connectés',
     changeLanguage: 'Changer de langue',
     updateAvailable: "Une nouvelle version{version} de l'application est disponible.",
     update: 'Mettre à jour',
@@ -1569,6 +1570,24 @@ export default {
   },
 
   // ── Profil personnel ─────────────────────────────────────────────────
+  sessions: {
+    title: 'Appareils connectés',
+    intro: 'Ces appareils sont connectés à votre compte. Terminez toute session que vous ne reconnaissez pas.',
+    thisDevice: 'Cet appareil',
+    lastActive: 'actif {when}',
+    plazaApp: 'Application PLAZA PRO',
+    unknownDevice: 'Appareil inconnu',
+    loadFailed: 'Impossible de charger vos sessions.',
+    end: 'Terminer la session',
+    endTitle: 'Terminer cette session ?',
+    endText: '{device} sera déconnecté immédiatement.',
+    ended: 'Session terminée.',
+    endFailed: 'Impossible de terminer cette session.',
+    endOthers: 'Déconnecter les autres appareils',
+    endOthersTitle: 'Déconnecter les autres appareils ?',
+    endOthersText: 'Tous les appareils sauf celui-ci seront déconnectés immédiatement.',
+    endedOthers: 'Tous les autres appareils ont été déconnectés.',
+  },
   profile: {
     updated: 'Profil mis à jour.',
     saveFailed: "Impossible d'enregistrer votre profil.",

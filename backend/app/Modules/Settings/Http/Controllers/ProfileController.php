@@ -6,6 +6,7 @@ namespace App\Modules\Settings\Http\Controllers;
 
 use App\Modules\Collaboration\Notifications\DomainNotification;
 use App\Modules\Settings\Actions\ProcessAvatar;
+use App\Modules\Settings\Actions\RevokeUserSessions;
 use App\Modules\Settings\Actions\UpdateProfile;
 use App\Modules\Settings\Http\Requests\UpdateProfileRequest;
 use App\Modules\Settings\Http\Requests\UploadAvatarRequest;
@@ -22,9 +23,19 @@ use Illuminate\Support\Facades\Storage;
  */
 class ProfileController extends Controller
 {
-    public function update(UpdateProfileRequest $request, UpdateProfile $action): UserResource
+    public function update(UpdateProfileRequest $request, UpdateProfile $action, RevokeUserSessions $revoke): UserResource
     {
         $user = $action->handle($request->user(), $request->validated());
+
+        // Changing the password force-ends every OTHER session — if it was
+        // changed because someone else may know it, they are out now.
+        if ($request->filled('password')) {
+            $revoke->except(
+                $user,
+                $request->hasSession() ? $request->session()->getId() : null,
+                refreshRecaller: $request->hasSession(),
+            );
+        }
 
         return new UserResource($user->load('role.permissions'));
     }

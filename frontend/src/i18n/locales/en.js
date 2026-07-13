@@ -211,6 +211,7 @@ export default {
     editProfile: 'Edit profile',
     notifications: 'Notifications',
     logOut: 'Log out',
+    sessions: 'Connected devices',
     changeLanguage: 'Change language',
     updateAvailable: 'A new version{version} of the app is out.',
     update: 'Update',
@@ -1570,6 +1571,24 @@ export default {
   },
 
   // ── Own profile ──────────────────────────────────────────────────────
+  sessions: {
+    title: 'Connected devices',
+    intro: 'These devices are signed in to your account. End any session you do not recognize.',
+    thisDevice: 'This device',
+    lastActive: 'active {when}',
+    plazaApp: 'PLAZA PRO app',
+    unknownDevice: 'Unknown device',
+    loadFailed: 'Could not load your sessions.',
+    end: 'End session',
+    endTitle: 'End this session?',
+    endText: '{device} will be signed out immediately.',
+    ended: 'Session ended.',
+    endFailed: 'Could not end that session.',
+    endOthers: 'Sign out other devices',
+    endOthersTitle: 'Sign out other devices?',
+    endOthersText: 'Every device except this one will be signed out immediately.',
+    endedOthers: 'All other devices were signed out.',
+  },
   profile: {
     updated: 'Profile updated.',
     saveFailed: 'Could not save your profile.',

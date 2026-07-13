@@ -50,6 +50,22 @@ export const authApi = {
     const { data } = await useApi().put('/me/locale', { locale })
     return data.data
   },
+
+  // Connected sessions: every device this account is signed in on. Sessions
+  // are addressed by sha256 hash — the raw id never leaves the server.
+  async sessions() {
+    const { data } = await useApi().get('/me/sessions')
+    return data.data
+  },
+
+  endSession(id) {
+    return useApi().delete(`/me/sessions/${id}`)
+  },
+
+  async endOtherSessions() {
+    const { data } = await useApi().delete('/me/other-sessions')
+    return data.data
+  },
 }
 
 // Scalar app-wide settings (e.g. the interest hold duration in hours).

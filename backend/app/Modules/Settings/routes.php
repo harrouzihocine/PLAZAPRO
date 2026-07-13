@@ -18,6 +18,7 @@ use App\Modules\Settings\Http\Controllers\DynamicListItemController;
 use App\Modules\Settings\Http\Controllers\PermissionController;
 use App\Modules\Settings\Http\Controllers\ProfileController;
 use App\Modules\Settings\Http\Controllers\RoleController;
+use App\Modules\Settings\Http\Controllers\SessionController;
 use App\Modules\Settings\Http\Controllers\UserController;
 use App\Modules\Settings\Http\Controllers\UserDraftController;
 use App\Modules\Settings\Http\Controllers\UserWorkloadController;
@@ -47,6 +48,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/me/push-prefs', [ProfileController::class, 'updatePushPrefs']);
     // UI language (en/fr/ar) — see SetLocale middleware + User::preferredLocale().
     Route::put('/me/locale', [ProfileController::class, 'updateLocale']);
+
+    // Connected sessions: every device this account is signed in on, with the
+    // power to force-end any of them. Sessions are addressed by sha256 — the
+    // raw id is the auth cookie itself and never leaves the server.
+    Route::get('/me/sessions', [SessionController::class, 'index']);
+    Route::delete('/me/sessions/{session}', [SessionController::class, 'destroy']);
+    Route::delete('/me/other-sessions', [SessionController::class, 'destroyOthers']);
 
     // Stream a user's avatar (shown app-wide). Any authed user; the file itself
     // stays on the private disk and is only reachable through this endpoint.

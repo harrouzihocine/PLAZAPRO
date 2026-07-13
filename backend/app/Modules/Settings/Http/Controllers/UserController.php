@@ -6,6 +6,7 @@ namespace App\Modules\Settings\Http\Controllers;
 
 use App\Modules\Settings\Actions\CancelUser;
 use App\Modules\Settings\Actions\CreateUser;
+use App\Modules\Settings\Actions\RevokeUserSessions;
 use App\Modules\Settings\Actions\SetUserActive;
 use App\Modules\Settings\Actions\UnlockUser;
 use App\Modules\Settings\Actions\UpdateUser;
@@ -134,9 +135,19 @@ class UserController extends Controller
         return new UserResource($action->handle($request->validated()));
     }
 
-    public function update(UpdateUserRequest $request, User $user, UpdateUser $action): UserResource
+    public function update(UpdateUserRequest $request, User $user, UpdateUser $action, RevokeUserSessions $revoke): UserResource
     {
-        return new UserResource($action->handle($user, $request->validated(), $request->user()));
+        $updated = $action->handle($user, $request->validated(), $request->user());
+
+        // An admin password reset force-ends the account's sessions everywhere —
+        // the point of a reset is locking out whoever held the old credential.
+        // When admins reset their OWN password, the session in hand survives.
+        if ($request->filled('password')) {
+            $isSelf = $user->is($request->user()) && $request->hasSession();
+            $revoke->except($user, $isSelf ? $request->session()->getId() : null, refreshRecaller: $isSelf);
+        }
+
+        return new UserResource($updated);
     }
 
     public function setActive(SetUserActiveRequest $request, User $user, SetUserActive $action): UserResource

@@ -210,6 +210,7 @@ export default {
     editProfile: 'تعديل الملف الشخصي',
     notifications: 'الإشعارات',
     logOut: 'تسجيل الخروج',
+    sessions: 'الأجهزة المتصلة',
     changeLanguage: 'تغيير اللغة',
     updateAvailable: 'إصدار جديد{version} من التطبيق متوفر.',
     update: 'تحديث',
@@ -1569,6 +1570,24 @@ export default {
   },
 
   // ── الملف الشخصي ─────────────────────────────────────────────────────
+  sessions: {
+    title: 'الأجهزة المتصلة',
+    intro: 'هذه الأجهزة مسجّلة الدخول إلى حسابك. أنهِ أي جلسة لا تعرفها.',
+    thisDevice: 'هذا الجهاز',
+    lastActive: 'نشط {when}',
+    plazaApp: 'تطبيق PLAZA PRO',
+    unknownDevice: 'جهاز غير معروف',
+    loadFailed: 'تعذّر تحميل الجلسات.',
+    end: 'إنهاء الجلسة',
+    endTitle: 'إنهاء هذه الجلسة؟',
+    endText: 'سيتم تسجيل خروج {device} فورًا.',
+    ended: 'تم إنهاء الجلسة.',
+    endFailed: 'تعذّر إنهاء هذه الجلسة.',
+    endOthers: 'تسجيل الخروج من الأجهزة الأخرى',
+    endOthersTitle: 'تسجيل الخروج من الأجهزة الأخرى؟',
+    endOthersText: 'سيتم تسجيل خروج جميع الأجهزة ما عدا هذا الجهاز فورًا.',
+    endedOthers: 'تم تسجيل الخروج من جميع الأجهزة الأخرى.',
+  },
   profile: {
     updated: 'حُدّث الملف الشخصي.',
     saveFailed: 'تعذّر حفظ ملفك الشخصي.',

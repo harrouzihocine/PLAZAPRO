@@ -28,6 +28,7 @@ import BrandLogo from '@/components/BrandLogo.vue'
 import UnitSoldCelebration from '@/features/inventory/components/UnitSoldCelebration.vue'
 import ProfileModal from '@/features/settings/components/ProfileModal.vue'
 import NotificationPrefsModal from '@/features/settings/components/NotificationPrefsModal.vue'
+import SessionsModal from '@/features/settings/components/SessionsModal.vue'
 import UpdateBanner from '@/components/shell/UpdateBanner.vue'
 import OfflineBanner from '@/features/offline/OfflineBanner.vue'
 import { useAnnouncementsStore } from '@/features/inventory/announcementsStore'
@@ -167,6 +168,7 @@ const userPanel = ref(null)
 const mobileNav = ref(false)
 const showProfile = ref(false)
 const showNotifPrefs = ref(false)
+const showSessions = ref(false)
 
 // APK, any screen still on drawer navigation (below lg — phones AND portrait
 // tablets): swipe left→right anywhere opens the nav drawer, right→left closes
@@ -186,6 +188,11 @@ function openProfile() {
 function openNotifPrefs() {
   userPanel.value?.hide()
   showNotifPrefs.value = true
+}
+
+function openSessions() {
+  userPanel.value?.hide()
+  showSessions.value = true
 }
 
 // Collapsed icon-rail preference survives reloads.
@@ -628,6 +635,15 @@ async function logout() {
                   @click="openNotifPrefs"
                 />
                 <Button
+:label="$t('shell.sessions')"
+                  icon="pi pi-desktop"
+                  severity="secondary"
+                  text
+                  size="small"
+                  class="w-full !justify-start"
+                  @click="openSessions"
+                />
+                <Button
 :label="$t('shell.logOut')"
                   icon="pi pi-sign-out"
                   severity="danger"
@@ -753,5 +769,6 @@ async function logout() {
 
     <!-- Per-category push toggles (account menu + the bell panel's gear). -->
     <NotificationPrefsModal v-if="showNotifPrefs" @close="showNotifPrefs = false" />
+    <SessionsModal v-if="showSessions" @close="showSessions = false" />
   </div>
 </template>
