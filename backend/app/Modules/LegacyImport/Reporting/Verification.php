@@ -254,13 +254,15 @@ class Verification
             ['versements', 'client_project_id', 'client_projects'], ['versements', 'unit_id', 'units'],
             ['versements', 'method_id', 'dynamic_list_items'], ['versements', 'recorded_by', 'users'],
             ['units', 'location_id', 'locations'],
-            ['media', 'mediable_id', 'locations'],
+            ['media', 'mediable_id', 'locations', ['mediable_type' => 'location']],
             ['client_project_viewers', 'client_project_id', 'client_projects'], ['client_project_viewers', 'user_id', 'users'],
         ];
         $broken = 0;
-        foreach ($fks as [$table, $column, $ref]) {
+        foreach ($fks as $fk) {
+            [$table, $column, $ref] = $fk;
             $broken += $this->ctx->target->table($table)
                 ->whereNotNull($column)
+                ->when(isset($fk[3]), fn ($q) => $q->where($fk[3]))
                 ->whereNotExists(fn ($q) => $q->selectRaw('1')->from($ref)->whereColumn("{$ref}.id", "{$table}.{$column}"))
                 ->count();
         }
