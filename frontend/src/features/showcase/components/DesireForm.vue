@@ -50,10 +50,13 @@ function itemLabel(item) {
   return item.labels?.[currentLocale()] || item.label
 }
 
+// `list` is the ref's array, already unwrapped by the template (top-level refs
+// unwrap in template expressions) — so mutate it directly, never `list.value`.
+// push/splice on the reactive array re-renders the chips and feeds submit/recap.
 function toggle(list, id) {
-  const i = list.value.indexOf(id)
-  if (i === -1) list.value.push(id)
-  else list.value.splice(i, 1)
+  const i = list.indexOf(id)
+  if (i === -1) list.push(id)
+  else list.splice(i, 1)
 }
 
 const wilayaOptions = computed(() => options.value?.wilayas ?? [])
