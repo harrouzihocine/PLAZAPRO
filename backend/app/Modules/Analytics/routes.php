@@ -30,9 +30,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware(['can:dashboard.view', 'can:reports.view'])->group(function () {
         Route::get('/analytics/source-roi', [ReportController::class, 'sourceRoi']);
         Route::get('/analytics/units', [ReportController::class, 'units']);
+    });
 
-        // Voice-of-Client feedback analytics: a development's logs mined into
-        // objections, demand, sentiment and next-best-action, plus a per-unit drill.
+    // Voice-of-Client feedback analytics: a development's logs mined into
+    // objections, demand, sentiment and next-best-action, plus a per-unit drill.
+    // Own grant (units.stats, shared with the project/unit statistics tabs) so
+    // it can be handed out without opening the whole reports area.
+    Route::middleware('can:units.stats')->group(function () {
         Route::get('/analytics/locations/{location}/feedback', [FeedbackController::class, 'location']);
         Route::get('/analytics/units/{unit}/feedback', [FeedbackController::class, 'unit']);
     });

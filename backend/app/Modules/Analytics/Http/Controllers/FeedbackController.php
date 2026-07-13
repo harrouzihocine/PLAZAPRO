@@ -13,8 +13,8 @@ use Illuminate\Routing\Controller;
 
 /**
  * The "Voice of Client" feedback analytics for a development (Location) or a single
- * unit drill-down. Read-only aggregates over the logs, gated behind dashboard.view +
- * reports.view (see routes.php). Thin: the queries live in BuildLocationFeedback.
+ * unit drill-down. Read-only aggregates over the logs, gated behind units.stats
+ * (see routes.php). Thin: the queries live in BuildLocationFeedback.
  */
 class FeedbackController extends Controller
 {

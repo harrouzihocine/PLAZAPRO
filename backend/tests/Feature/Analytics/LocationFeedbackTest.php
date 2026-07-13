@@ -76,7 +76,7 @@ class LocationFeedbackTest extends TestCase
         $otherProject = ClientProject::factory()->create(['location_id' => $other->id]);
         Call::factory()->create(['client_project_id' => $otherProject->id, 'objections' => [$price], 'called_at' => now()]);
 
-        Sanctum::actingAs($this->user(['dashboard.view', 'reports.view']));
+        Sanctum::actingAs($this->user(['dashboard.view', 'units.stats']));
 
         $data = $this->getJson("/api/v1/analytics/locations/{$location->id}/feedback")
             ->assertOk()->json('data');
@@ -109,7 +109,7 @@ class LocationFeedbackTest extends TestCase
         // A live project with no lost reason must not count.
         ClientProject::factory()->create(['location_id' => $location->id]);
 
-        Sanctum::actingAs($this->user(['dashboard.view', 'reports.view']));
+        Sanctum::actingAs($this->user(['dashboard.view', 'units.stats']));
 
         $data = $this->getJson("/api/v1/analytics/locations/{$location->id}/feedback")
             ->assertOk()->json('data');
@@ -133,7 +133,7 @@ class LocationFeedbackTest extends TestCase
             'client_project_id' => $project->id, 'unit_id' => $unit->id, 'objections' => [$price],
         ]);
 
-        Sanctum::actingAs($this->user(['dashboard.view', 'reports.view']));
+        Sanctum::actingAs($this->user(['dashboard.view', 'units.stats']));
 
         $data = $this->getJson("/api/v1/analytics/units/{$unit->id}/feedback")
             ->assertOk()->json('data');
@@ -155,7 +155,7 @@ class LocationFeedbackTest extends TestCase
         Call::factory()->create(['client_project_id' => $project->id, 'objections' => [$price], 'called_at' => now()->subDays(3)]);
         Call::factory()->create(['client_project_id' => $project->id, 'objections' => [$price], 'called_at' => now()->subDays(120)]);
 
-        Sanctum::actingAs($this->user(['dashboard.view', 'reports.view']));
+        Sanctum::actingAs($this->user(['dashboard.view', 'units.stats']));
 
         $data = $this->getJson("/api/v1/analytics/locations/{$location->id}/feedback?from=".now()->subDays(30)->toDateString().'&to='.now()->toDateString())
             ->assertOk()->json('data');
@@ -164,11 +164,22 @@ class LocationFeedbackTest extends TestCase
         $this->assertSame(1, $data['funnel']['calls']);
     }
 
-    public function test_feedback_requires_the_reports_permission(): void
+    public function test_feedback_requires_the_units_stats_permission(): void
     {
         $location = Location::factory()->create();
 
         Sanctum::actingAs($this->user(['dashboard.view']));
+
+        $this->getJson("/api/v1/analytics/locations/{$location->id}/feedback")->assertForbidden();
+    }
+
+    public function test_the_broad_reports_permission_alone_no_longer_opens_feedback(): void
+    {
+        // units.stats split off reports.view: the seeder backfills existing
+        // reports roles once, but the grant itself is now the only key.
+        $location = Location::factory()->create();
+
+        Sanctum::actingAs($this->user(['dashboard.view', 'reports.view']));
 
         $this->getJson("/api/v1/analytics/locations/{$location->id}/feedback")->assertForbidden();
     }

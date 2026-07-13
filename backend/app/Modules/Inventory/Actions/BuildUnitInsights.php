@@ -27,7 +27,29 @@ class BuildUnitInsights
     /**
      * @return array<string, mixed>
      */
-    public function handle(Unit $unit, bool $includePayments = true): array
+    public function handle(Unit $unit, bool $includeStats = true, bool $includePayments = true): array
+    {
+        $data = [];
+
+        if ($includeStats) {
+            $data['stats'] = $this->stats($unit);
+        }
+
+        if ($includePayments) {
+            $data['payments'] = $this->payments($unit);
+        }
+
+        return $data;
+    }
+
+    /**
+     * How the unit moves through the pipeline — commercial intelligence, gated
+     * per field (units.stats) because the route itself stays on units.view for
+     * the payments block.
+     *
+     * @return array<string, mixed>
+     */
+    private function stats(Unit $unit): array
     {
         $reservations = Reservation::query()->where('unit_id', $unit->id);
         $timesShortlisted = ShortlistItem::query()
@@ -36,31 +58,23 @@ class BuildUnitInsights
             ->count();
         $dealAppearances = DealItem::query()->where('unit_id', $unit->id)->count();
 
-        $data = [
-            'stats' => [
-                'sale_status' => $unit->sale_status?->value,
-                'price_semi_fini' => $unit->price_semi_fini,
-                'price_fini' => $unit->price_fini,
-                'area_sqm' => $unit->area_sqm,
-                'reservations' => (clone $reservations)->count(),
-                'has_active_hold' => (clone $reservations)->where('hold_status', 'active')->exists(),
-                // Distinct client projects holding it now — the "Interested N" counter.
-                'interested_count' => (clone $reservations)
-                    ->where('hold_status', 'active')
-                    ->whereNotNull('client_project_id')
-                    ->distinct()
-                    ->count('client_project_id'),
-                'reserved_expires_at' => $unit->reserved_expires_at?->toIso8601String(),
-                'times_shortlisted' => $timesShortlisted,
-                'deals' => $dealAppearances,
-            ],
+        return [
+            'sale_status' => $unit->sale_status?->value,
+            'price_semi_fini' => $unit->price_semi_fini,
+            'price_fini' => $unit->price_fini,
+            'area_sqm' => $unit->area_sqm,
+            'reservations' => (clone $reservations)->count(),
+            'has_active_hold' => (clone $reservations)->where('hold_status', 'active')->exists(),
+            // Distinct client projects holding it now — the "Interested N" counter.
+            'interested_count' => (clone $reservations)
+                ->where('hold_status', 'active')
+                ->whereNotNull('client_project_id')
+                ->distinct()
+                ->count('client_project_id'),
+            'reserved_expires_at' => $unit->reserved_expires_at?->toIso8601String(),
+            'times_shortlisted' => $timesShortlisted,
+            'deals' => $dealAppearances,
         ];
-
-        if ($includePayments) {
-            $data['payments'] = $this->payments($unit);
-        }
-
-        return $data;
     }
 
     /**

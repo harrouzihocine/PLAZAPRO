@@ -61,8 +61,9 @@ const canManage = auth.can('units.manage')
 const canManageProject = auth.can('locations.manage')
 const canMarkInterest = auth.can('units.interest')
 const showEditProject = ref(false)
-// Voice-of-Client analytics is manager-level commercial intelligence.
-const canSeeFeedback = auth.can('reports.view')
+// Performance statistics + Voice-of-Client analytics are commercial
+// intelligence behind their own grant (ticked per role in the role editor).
+const canSeeStats = auth.can('units.stats')
 
 const mapsUrl = computed(() => googleMapsUrl(locations.current ?? {}))
 
@@ -183,6 +184,9 @@ function load() {
   // so the page paints as soon as the slowest one returns, not their sum.
   locations.fetchOne(props.id)
   units.fetchForLocation(props.id)
+  // Insights feed the permission-gated Performance tab only — skip the call
+  // (it would 403) when the user can't see it.
+  if (!canSeeStats) return Promise.resolve()
   return locationsApi
     .insights(props.id)
     .then((data) => (insights.value = data))
@@ -452,10 +456,10 @@ async function remove(u) {
           <Tab value="overview"
             ><i class="pi pi-info-circle me-2" aria-hidden="true" />{{ $t('inventory.tabOverview') }}</Tab
           >
-          <Tab value="performance"
+          <Tab v-if="canSeeStats" value="performance"
             ><i class="pi pi-chart-line me-2" aria-hidden="true" />{{ $t('inventory.tabPerformance') }}</Tab
           >
-          <Tab v-if="canSeeFeedback" value="feedback"
+          <Tab v-if="canSeeStats" value="feedback"
             ><i class="pi pi-comments me-2" aria-hidden="true" />{{ $t('inventory.tabVoiceOfClient') }}</Tab
           >
           <Tab value="stacking"><i class="pi pi-table me-2" aria-hidden="true" />{{ $t('inventory.tabStacking') }}</Tab>
@@ -573,7 +577,7 @@ async function remove(u) {
           </TabPanel>
 
           <!-- ── Performance (funnel, pipeline, revenue) ── -->
-          <TabPanel value="performance">
+          <TabPanel v-if="canSeeStats" value="performance">
             <div v-if="insights" class="space-y-5">
               <SectionCard :title="$t('inventory.funnel')" icon="pi pi-filter">
                 <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -613,7 +617,7 @@ async function remove(u) {
           </TabPanel>
 
           <!-- ── Voice of Client (log-mined feedback analytics) ── -->
-          <TabPanel v-if="canSeeFeedback" value="feedback">
+          <TabPanel v-if="canSeeStats" value="feedback">
             <FeedbackPanel :id="props.id" scope="location" />
           </TabPanel>
 

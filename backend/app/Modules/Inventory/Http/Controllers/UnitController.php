@@ -143,9 +143,10 @@ class UnitController extends Controller
     /** Read-only stats + payments summary for the unit detail page. */
     public function insights(Request $request, Unit $unit, BuildUnitInsights $action): JsonResponse
     {
+        $canSeeStats = (bool) $request->user()?->can('units.stats');
         $canSeeMoney = (bool) $request->user()?->can('versements.view');
 
-        return response()->json(['data' => $action->handle($unit, $canSeeMoney)]);
+        return response()->json(['data' => $action->handle($unit, $canSeeStats, $canSeeMoney)]);
     }
 
     /**

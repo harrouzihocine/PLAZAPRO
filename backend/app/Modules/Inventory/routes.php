@@ -24,7 +24,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('can:units.view')->group(function () {
         Route::get('/locations', [LocationController::class, 'index']);
         Route::get('/locations/{location}', [LocationController::class, 'show']);
-        Route::get('/locations/{location}/insights', [LocationController::class, 'insights']);
 
         Route::get('/units', [UnitController::class, 'index']);
         // Before /units/{unit} so "export"/"import-template" never hit the model binding.
@@ -48,6 +47,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/media/{media}/slide/{page}', [MediaController::class, 'slide'])
             ->whereNumber('page')->name('media.slide');
         Route::get('/media/{media}/download', [MediaController::class, 'download'])->name('media.download');
+    });
+
+    // The project's performance/statistics tab — commercial intelligence
+    // (counts + revenue), gated by its own grant like the Voice-of-Client
+    // analytics it sits next to. The unit page's stats ride /units/{unit}/insights
+    // (units.view) with the stats block field-gated on the same permission.
+    Route::middleware('can:units.stats')->group(function () {
+        Route::get('/locations/{location}/insights', [LocationController::class, 'insights']);
     });
 
     // Location writes require the dedicated locations.manage permission.

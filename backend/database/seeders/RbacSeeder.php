@@ -43,8 +43,10 @@ class RbacSeeder extends Seeder
         // offboarding desk (also split from users.manage): review everything a
         // leaving user owns and hand their open work to a successor.
         'users.manage', 'users.unlock', 'users.transfer', 'roles.manage', 'settings.manage', 'audit.view', 'audit.export',
-        // Inventory
-        'locations.manage', 'units.view', 'units.interest', 'units.manage', 'media.manage',
+        // Inventory. units.stats gates the commercial-intelligence layer on the
+        // project (location) and unit pages: the performance/statistics tab and
+        // the Voice-of-Client analytics — grantable without the full reports area.
+        'locations.manage', 'units.view', 'units.stats', 'units.interest', 'units.manage', 'media.manage',
         // The reservations follow-up board, two tiers: open the page at all /
         // see every queue company-wide (without view_all it self-scopes to the
         // user's own clients and projects).
@@ -153,6 +155,7 @@ class RbacSeeder extends Seeder
         // Inventory
         'locations.manage' => 'Add and edit buildings, sites and their locations.',
         'units.view' => 'See apartments/units and their availability.',
+        'units.stats' => 'See the statistics and Voice of Client tabs on project and unit pages (performance counters, pipeline movement, log-mined feedback analytics).',
         'units.interest' => 'Mark a unit as Interested for a client (places a hold).',
         'units.manage' => 'Add, edit and change the status of units.',
         'media.manage' => 'Upload and manage photos and files on units and projects.',
@@ -279,6 +282,11 @@ class RbacSeeder extends Seeder
         // The KPI command center split from the tabular reports: every custom
         // role that could open analytics reports keeps the new board too.
         'analytics.kpi' => 'reports.view',
+        // Project/unit statistics + Voice of Client used to be manager-level
+        // (Voice of Client rode reports.view; the stats tab was open to all).
+        // Roles with the reports area keep both; everyone else now needs the
+        // grant ticked per role.
+        'units.stats' => 'reports.view',
         // The office-program week grid grew out of the upcoming-office-visits
         // section of the pipeline monitor; roles that saw it there keep the
         // dedicated page. Grant per-role to agents who plan office visits.
@@ -414,7 +422,7 @@ class RbacSeeder extends Seeder
             'calls.log', 'next_actions.plan',
             'visits.assign', 'visits.dispatch', 'visits.conduct', 'visits.propose',
             'tasks.manage', 'tasks.assign',
-            'units.view', 'units.interest', 'units.manage', 'media.manage',
+            'units.view', 'units.stats', 'units.interest', 'units.manage', 'media.manage',
             'reservations.view', 'reservations.view_all',
             'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
             'web.leads', 'web.stats',

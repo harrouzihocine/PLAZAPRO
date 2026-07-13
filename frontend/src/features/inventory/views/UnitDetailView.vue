@@ -38,8 +38,9 @@ const auth = useAuthStore()
 
 const insights = ref(null)
 const insightsError = ref(false)
-// Voice-of-Client analytics is manager-level commercial intelligence.
-const canSeeFeedback = auth.can('reports.view')
+// Pipeline statistics + Voice-of-Client analytics are commercial intelligence
+// behind their own grant; the backend also drops insights.stats without it.
+const canSeeStats = auth.can('units.stats')
 
 // One-line context under the sale status: how many projects hold it, or that a
 // deposit Reserved it.
@@ -152,8 +153,9 @@ useRefreshable(load) // pull-to-refresh (APK)
         {{ $t('inventory.unitInsightsFailed') }}
       </div>
 
-      <!-- How the unit has moved: interest holds, shortlists, deals -->
-      <div v-if="insights" class="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <!-- How the unit has moved: interest holds, shortlists, deals. The stats
+           block only exists in the response for units.stats holders. -->
+      <div v-if="insights?.stats" class="mb-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard
 :label="$t('inventory.interestHolds')"
           :value="insights.stats.reservations"
@@ -182,7 +184,7 @@ useRefreshable(load) // pull-to-refresh (APK)
         <TabList>
           <Tab value="overview">{{ $t('inventory.tabOverview') }}</Tab>
           <Tab v-if="insights?.payments" value="payments">{{ $t('nav.payments') }}</Tab>
-          <Tab v-if="canSeeFeedback" value="feedback">{{ $t('inventory.tabVoiceOfClient') }}</Tab>
+          <Tab v-if="canSeeStats" value="feedback">{{ $t('inventory.tabVoiceOfClient') }}</Tab>
           <Tab value="project-logs">{{ $t('inventory.projectLogs') }}</Tab>
           <Tab value="activity">{{ $t('inventory.tabActivity') }}</Tab>
         </TabList>
@@ -326,7 +328,7 @@ useRefreshable(load) // pull-to-refresh (APK)
           </TabPanel>
 
           <!-- Voice of Client for this unit: objections, sentiment, verbatims. -->
-          <TabPanel v-if="canSeeFeedback" value="feedback">
+          <TabPanel v-if="canSeeStats" value="feedback">
             <FeedbackPanel :id="props.id" scope="unit" />
           </TabPanel>
 
