@@ -6,9 +6,10 @@
     when a load fails with NOTHING cached yet (fresh install opened offline;
     once the service worker has installed once, offline boots never land here).
 
-    Self-healing: retries the app origin as soon as Android reports
-    connectivity back, on a slow poll while waiting, and on tap. Local file,
-    no CSP in the way — the inline script is fine.
+    Self-healing: probes every server origin (app → office → bare LAN IP) on
+    load, when Android reports connectivity back, on a slow poll, and on tap —
+    then navigates to the first door that answers. Local file, no CSP in the
+    way — the inline script is fine.
 
     Future "bundled assets" mode (store submission): point webDir at "dist",
     remove server.url, and switch the API/Echo base URLs to absolute — see
@@ -60,16 +61,62 @@
       <button type="button" onclick="retry()">Retry / Réessayer / إعادة المحاولة</button>
     </div>
     <script>
-      var HOME = 'https://app.plaza-pro.com/'
-      function retry() {
-        window.location.replace(HOME)
+      // Walk ALL the doors, never just app.* — on office Wi-Fi navigator.onLine
+      // is true even with the internet dead, so a blind retry of app.* loops
+      // this page forever while the LAN origins sit reachable (the "stuck on
+      // the blue screen" bug). Probe each origin's /up and navigate to the
+      // first that answers, by priority. Keep the list in sync with
+      // PlazaWebViewClient.java and frontend/src/utils/serverFailover.js.
+      var ORIGINS = [
+        'https://app.plaza-pro.com',
+        'https://office.plaza-pro.com',
+        'https://192.168.1.200',
+      ]
+      var PROBE_TIMEOUT_MS = 4000
+
+      // Opaque no-cors fetch: resolving at all proves TCP+TLS reached our
+      // server, which is all a local page can (and needs to) learn.
+      function probe(origin) {
+        return new Promise(function (resolve) {
+          var ctl = new AbortController()
+          var timer = setTimeout(function () {
+            ctl.abort()
+          }, PROBE_TIMEOUT_MS)
+          fetch(origin + '/up', { mode: 'no-cors', cache: 'no-store', signal: ctl.signal }).then(
+            function () {
+              clearTimeout(timer)
+              resolve(true)
+            },
+            function () {
+              clearTimeout(timer)
+              resolve(false)
+            }
+          )
+        })
       }
-      // The instant Android reports the link back, go home; poll as a backstop
-      // (navigator.onLine can lag behind real connectivity in the WebView).
+
+      var probing = false
+      function retry() {
+        if (probing) return
+        probing = true
+        Promise.all(ORIGINS.map(probe)).then(function (up) {
+          for (var i = 0; i < ORIGINS.length; i++) {
+            if (up[i]) {
+              // Leave `probing` latched: the page is navigating away, and a
+              // second replace() from the next tick would cancel this one.
+              window.location.replace(ORIGINS[i] + '/')
+              return
+            }
+          }
+          probing = false
+        })
+      }
+
+      // Knock immediately, the instant Android reports the link back, and on
+      // a slow poll as a backstop (navigator.onLine lags in the WebView).
       window.addEventListener('online', retry)
-      setInterval(function () {
-        if (navigator.onLine) retry()
-      }, 8000)
+      setInterval(retry, 8000)
+      retry()
     </script>
   </body>
 </html>

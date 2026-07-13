@@ -29,8 +29,9 @@ import { useNetworkStore } from '@/features/offline/networkStore'
 // login screen (docs/production-runbook.md recommends SESSION_DOMAIN=
 // .plaza-pro.com so app.* ↔ office.* share theirs; the bare IP never can).
 //
-// Keep ORIGINS in sync with the shell's PlazaWebViewClient.java — its twin
-// for the cold-boot case where no page (and no JS) could load at all.
+// Keep ORIGINS in sync with the shell's PlazaWebViewClient.java (cold-boot
+// walk, where no page could load at all) AND native-shell/index.html (the
+// shell's errorPath page, which walks the same doors when nothing answered).
 const ORIGINS = [
   'https://app.plaza-pro.com',
   'https://office.plaza-pro.com',

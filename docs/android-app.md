@@ -172,18 +172,29 @@ One backend, three doors, walked in priority order (v1.5.0+):
 | `https://office.plaza-pro.com` | LAN direct, Let's Encrypt cert | DNS (public record → LAN IP) |
 | `https://192.168.1.200` | LAN direct, private-CA cert | nothing — the no-internet door |
 
-Two cooperating halves, lists kept in sync:
+Three cooperating pieces, origin lists kept in sync:
 
-- **`PlazaWebViewClient.java`** (shell): a main-frame load error on one of the
-  origins loads the next — covers the cold boot with no service-worker cache,
-  where no JS can run. Both LAN hosts are in `capacitor.config.json`
-  `server.allowNavigation` so they stay inside the webview.
+- **`PlazaWebViewClient.java`** (shell): owns the cold boot, where no JS can
+  run yet. A main-frame failure on one of the origins — network error, 5xx,
+  or a load stalled 12 s with no progress — probes every door's `/up` in
+  parallel (4 s timeouts; the bare IP needs no DNS, so it answers even while
+  name resolution hangs) and navigates to the first that answers, by
+  priority. A probe reads the status, so a Cloudflare 502/521 ("edge up, app
+  down") never counts as a door. Both LAN hosts are in
+  `capacitor.config.json` `server.allowNavigation` so they stay inside the
+  webview.
+- **`native-shell/index.html`** (the branded "reconnecting" page Capacitor
+  shows as `errorPath` when nothing answered): walks the same three doors on
+  its retry loop and navigates to the first that responds. It must NEVER
+  blind-retry `app.*` alone — `navigator.onLine` is true on office Wi-Fi even
+  with the internet down, and exactly that loop once kept phones parked on
+  the blue screen forever (v2.2.1 fix).
 - **`frontend/src/utils/serverFailover.js`** (web layer, ships with deploys):
   when the network store flags offline, it probes the current origin's `/up`,
   then the others (opaque no-cors fetches), and hard-navigates to the first
   that answers. Same watcher walks a phone that left the building back to
-  `app.*` over mobile data. A slim banner (OfflineBanner.vue) shows while
-  parked on a LAN origin; cold starts always begin at `app.*`.
+  `app.*` over mobile data. The navbar ServerIndicator shows which door the
+  session is on; cold starts always begin at `app.*`.
 
 The bare-IP door works because public CAs can't issue for a private IP: the
 server presents a leaf signed by our own **LAN CA** (issue/renew:
