@@ -13,6 +13,7 @@ declare(strict_types=1);
 */
 
 use App\Modules\Collaboration\Http\Controllers\AttachmentController;
+use App\Modules\Collaboration\Http\Controllers\BroadcastController;
 use App\Modules\Collaboration\Http\Controllers\ConversationController;
 use App\Modules\Collaboration\Http\Controllers\DeviceTokenController;
 use App\Modules\Collaboration\Http\Controllers\MessageController;
@@ -34,6 +35,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/notifications/{id}/read', [NotificationController::class, 'read'])->middleware('idempotent');
         Route::post('/notifications/{id}/unread', [NotificationController::class, 'unread']);
     });
+
+    // Custom broadcast notifications: compose a message and send it to selected
+    // users / a role / everyone, plus the company-wide history. Composing and the
+    // history are gated by notifications.broadcast; the single-broadcast detail is
+    // open to any recipient (authorised in the controller) so they can read the
+    // message their bell notification opens.
+    Route::middleware('can:notifications.broadcast')->group(function () {
+        Route::get('/broadcasts', [BroadcastController::class, 'index']);
+        Route::post('/broadcasts', [BroadcastController::class, 'store'])->middleware('idempotent');
+    });
+    Route::get('/broadcasts/{broadcast}', [BroadcastController::class, 'show']);
 
     // Chat. Route entry is gated chat.use; per-conversation access is guarded by
     // participation in the controllers/requests (not via Gate, so the super-admin

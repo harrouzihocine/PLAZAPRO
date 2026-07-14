@@ -9,6 +9,7 @@ import { useNotificationsStore } from '@/features/collaboration/notificationsSto
 import { timeAgo } from '@/utils/format'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import NotificationPrefsModal from '@/features/settings/components/NotificationPrefsModal.vue'
+import BroadcastDetailModal from '@/features/broadcasts/components/BroadcastDetailModal.vue'
 
 // Bell + panel for the AppShell. Loads the latest notifications over HTTP and
 // keeps the unread badge live over Reverb. Clicking an item marks it read and
@@ -19,6 +20,8 @@ const router = useRouter()
 const { locale } = useI18n()
 const panel = ref(null)
 const showPrefs = ref(false)
+// A broadcast opens its full message in a modal (it carries no deep link).
+const broadcastId = ref(null)
 
 // The feed's title/body are rendered server-side in the reader's language, so
 // switching language must re-pull it (the request carries the new locale as
@@ -41,6 +44,11 @@ onMounted(async () => {
 async function activate(n) {
   await store.markRead(n.id)
   panel.value?.hide()
+  // A broadcast has no page to route to — open its message in a modal instead.
+  if (n.kind === 'broadcast') {
+    broadcastId.value = n.subject_id
+    return
+  }
   if (n.link) router.push(n.link)
 }
 
@@ -156,5 +164,6 @@ function onScroll(e) {
     </Popover>
 
     <NotificationPrefsModal v-if="showPrefs" @close="showPrefs = false" />
+    <BroadcastDetailModal v-if="broadcastId" :id="broadcastId" @close="broadcastId = null" />
   </div>
 </template>

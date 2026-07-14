@@ -261,4 +261,12 @@ return [
     ],
     'web_lead_about_general' => 'vos projets',
     'web_lead_about_desire' => 'un bien introuvable sur le site (demande de recherche)',
+
+    // Une diffusion rédigée par un utilisateur (notifications.broadcast). Le
+    // titre partagé ; le corps est le texte libre de l'expéditeur, rendu par
+    // destinataire (bodyI18n), d'où l'absence volontaire de clé `body`.
+    'broadcast' => [
+        'title' => 'Annonce',
+        'language_required' => 'Rédigez le message dans au moins une langue.',
+    ],
 ];

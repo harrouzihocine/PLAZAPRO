@@ -316,6 +316,7 @@ const SECTIONS = [
   {
     key: 'system',
     items: [
+      { to: '/broadcasts', labelKey: 'nav.broadcasts', icon: 'pi pi-megaphone', permission: 'notifications.broadcast' },
       { to: '/settings', labelKey: 'nav.settings', icon: 'pi pi-cog', permission: 'settings.manage' },
       // No permission: every user gets the install-the-app page.
       { to: '/install', labelKey: 'nav.mobileApp', icon: 'pi pi-mobile' },

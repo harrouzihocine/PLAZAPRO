@@ -112,6 +112,10 @@ class RbacSeeder extends Seeder
         //    (implies view).
         'chat.use', 'chat.view_project_chats', 'chat.participate_project_chats',
         'notifications.view', 'dashboard.view', 'reports.view',
+        // Compose a custom message (in any of en/fr/ar) and send it as a
+        // notification to one/many users, a whole role, or everyone — plus the
+        // company-wide history of what was sent (who read each one).
+        'notifications.broadcast',
         // The company-wide KPI command center: sales, inventory, hold engine,
         // pipeline, collections, agents, cancellations and profitability KPIs on
         // one filterable board. Wider than the tabular reports.view analytics.
@@ -150,6 +154,7 @@ class RbacSeeder extends Seeder
         // Settings / admin
         'users.manage' => 'Create, edit and deactivate staff accounts and set each person\'s role.',
         'users.unlock' => 'Unlock an account that was locked after too many failed sign-in attempts.',
+        'notifications.broadcast' => 'Write a custom message and send it as a notification to selected users, a whole role, or everyone — each recipient reads it in their own language. Includes the sent-broadcast history with read tracking.',
         'users.transfer' => 'Review everything a (leaving) user owns and hand their open work — clients, projects, planned actions, visits, tasks — to a successor.',
         'roles.manage' => 'Create roles and choose exactly what each role is allowed to do.',
         'settings.manage' => 'Edit workspace settings: dropdown lists, wilayas & communes, departments and general options.',
@@ -426,6 +431,7 @@ class RbacSeeder extends Seeder
         // contributor — untick participate to fall back to read-only view).
         $manager = [
             ...$this->baseline, ...$fullVisibility, 'reports.view', 'analytics.kpi', 'logs.view_all',
+            'notifications.broadcast',
             'oversight.clients', 'oversight.pipeline', 'oversight.deals', 'oversight.drafts',
             'oversight.archive', 'oversight.matches', 'oversight.office_program',
             'chat.view_project_chats', 'chat.participate_project_chats',

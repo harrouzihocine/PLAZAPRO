@@ -260,4 +260,11 @@ return [
     ],
     'web_lead_about_general' => 'مشاريعكم',
     'web_lead_about_desire' => 'سكن لم يجده على الموقع (طلب بحث)',
+
+    // إعلان يكتبه المستخدم (notifications.broadcast). العنوان المشترك؛ أما النص
+    // فهو نص المرسِل الحر، يُعرض لكل مستلم بلغته (bodyI18n)، لذا لا مفتاح `body`.
+    'broadcast' => [
+        'title' => 'إعلان',
+        'language_required' => 'اكتب الرسالة بلغة واحدة على الأقل.',
+    ],
 ];

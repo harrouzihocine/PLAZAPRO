@@ -269,4 +269,13 @@ return [
     ],
     'web_lead_about_general' => 'your projects',
     'web_lead_about_desire' => 'a home they could not find (desire request)',
+
+    // A human-authored broadcast (notifications.broadcast). The shared title;
+    // the body is the sender's free text, rendered per recipient (bodyI18n), so
+    // there is deliberately no `body` key here. `language_required` is the
+    // send-form validation message when no language was filled.
+    'broadcast' => [
+        'title' => 'Announcement',
+        'language_required' => 'Write the message in at least one language.',
+    ],
 ];

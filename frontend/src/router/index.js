@@ -179,6 +179,14 @@ const routes = [
         component: () => import('@/features/mobile/views/InstallAppView.vue'),
       },
       {
+        // Compose + send custom broadcast notifications and review the sent
+        // history (company-wide, with read tracking).
+        path: 'broadcasts',
+        name: 'broadcasts',
+        component: () => import('@/features/broadcasts/views/BroadcastsView.vue'),
+        meta: { permission: 'notifications.broadcast' },
+      },
+      {
         path: 'oversight/duplicates',
         name: 'oversight.duplicates',
         component: () => import('@/features/oversight/views/DuplicateRequestsView.vue'),

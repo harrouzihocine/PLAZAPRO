@@ -76,6 +76,12 @@ class DomainNotification extends Notification implements ShouldQueue
         // its first-contact companion is database+broadcast (a bell row with no
         // second tray ping). 'fcm' stays subject to the runtime gates in via().
         public ?array $channels = null,
+        // Free-text per-recipient body: a { 'en'|'fr'|'ar' => string } map for
+        // human-authored content that can't live in a lang file (broadcasts).
+        // When set it wins over `key`/`body` in resolvedBody(), rendered in the
+        // recipient's locale (app()->getLocale() during send) with a fallback to
+        // any filled language. The title still comes from `key` (a lang string).
+        public ?array $bodyI18n = null,
     ) {}
 
     /**
@@ -114,6 +120,18 @@ class DomainNotification extends Notification implements ShouldQueue
 
     private function resolvedBody(): string
     {
+        // Free-text broadcasts carry the message per language; render the
+        // recipient's locale (app locale during send), falling back to any
+        // filled one. Wins over a lang-file `key` body (broadcasts use `key`
+        // only for the shared "Announcement" title).
+        if ($this->bodyI18n !== null) {
+            return $this->bodyI18n[app()->getLocale()]
+                ?? $this->bodyI18n['en']
+                ?? $this->bodyI18n['fr']
+                ?? $this->bodyI18n['ar']
+                ?? (string) (reset($this->bodyI18n) ?: '');
+        }
+
         if ($this->key === null) {
             return $this->body;
         }
