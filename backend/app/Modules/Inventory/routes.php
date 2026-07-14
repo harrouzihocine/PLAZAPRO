@@ -63,6 +63,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/locations/{location}', [LocationController::class, 'update']);
         Route::post('/locations/{location}/archive', [LocationController::class, 'archive']);
         Route::post('/locations/{location}/reactivate', [LocationController::class, 'reactivate']);
+        // Park / un-park the whole project: hidden from selectors + greyed on the
+        // public site, but kept in management (reversible). Distinct from archive.
+        Route::post('/locations/{location}/unavailable', [LocationController::class, 'makeUnavailable']);
+        Route::post('/locations/{location}/available', [LocationController::class, 'makeAvailable']);
         Route::delete('/locations/{location}', [LocationController::class, 'destroy']);
     });
 
@@ -72,9 +76,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/locations/{location}/units', [UnitController::class, 'store']);
         Route::put('/units/{unit}', [UnitController::class, 'update']);
         Route::post('/units/{unit}/correct', [UnitController::class, 'correct']);
+        // Park / un-park a single unit off the market (hidden from selectors; reversible).
+        Route::post('/units/{unit}/unavailable', [UnitController::class, 'makeUnavailable']);
+        Route::post('/units/{unit}/available', [UnitController::class, 'makeAvailable']);
         Route::delete('/units/{unit}', [UnitController::class, 'destroy']);
-        // Fast bulk tools: multi-select cancel + the Excel edit round-trip.
+        // Fast bulk tools: multi-select cancel / park / un-park + the Excel edit round-trip.
         Route::post('/units/bulk-cancel', [UnitController::class, 'bulkCancel']);
+        Route::post('/units/bulk-unavailable', [UnitController::class, 'bulkUnavailable']);
+        Route::post('/units/bulk-available', [UnitController::class, 'bulkAvailable']);
         Route::post('/units/import', [UnitController::class, 'import']);
 
         Route::post('/locations/{location}/boxes', [BoxController::class, 'store']);

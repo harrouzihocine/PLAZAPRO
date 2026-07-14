@@ -43,6 +43,8 @@ class PublicProjectResource extends JsonResource
             'cover_media_id' => $this->whenLoaded('coverMedia', fn () => $this->coverMedia?->isActive() ? $this->coverMedia->id : null),
             'cover_focus_x' => (int) $this->cover_focus_x,
             'cover_focus_y' => (int) $this->cover_focus_y,
+            // Parked off the market: the site still shows the project, greyed.
+            'is_available' => (bool) $this->is_available,
             'show_prices' => (bool) $this->show_prices,
             'show_availability' => (bool) $this->show_availability,
             'media' => PublicMediaResource::collection($this->whenLoaded('media')),
@@ -73,6 +75,8 @@ class PublicProjectResource extends JsonResource
             'stack_floor' => $unit->stack_floor,
             'position' => $unit->position,
             'available' => $unit->sale_status === SaleStatus::Available,
+            // Parked by the promoteur — greyed on the elevation, not hidden.
+            'unavailable' => $unit->sale_status === SaleStatus::Unavailable,
             'finishes' => array_map(fn ($f) => $f->value, $unit->availableFinishes()),
             'price_semi_fini' => $this->show_prices ? $unit->price_semi_fini : null,
             'price_fini' => $this->show_prices ? $unit->price_fini : null,

@@ -11,6 +11,9 @@ const props = defineProps({
 
 const tagline = computed(() => pickLocalized(props.project.tagline))
 
+// Parked off the market: still listed, but greyed with an "unavailable" badge.
+const parked = computed(() => props.project.is_available === false)
+
 const coverStyle = computed(() => {
   const cover = props.project.cover
   if (!cover) return null
@@ -30,6 +33,7 @@ const coverStyle = computed(() => {
         :alt="project.name"
         :style="coverStyle"
         class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+        :class="parked ? 'grayscale' : ''"
         loading="lazy"
       />
       <div v-else class="flex h-full w-full items-center justify-center">
@@ -44,7 +48,14 @@ const coverStyle = computed(() => {
       >{{ project.type }}</span>
 
       <span
-        v-if="project.show_availability && project.available_count > 0"
+        v-if="parked"
+        class="absolute end-3 top-3 flex items-center gap-1 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm"
+      >
+        <i class="pi pi-eye-slash text-[10px]" aria-hidden="true" />
+        {{ $t('showcase.projects.unavailable') }}
+      </span>
+      <span
+        v-else-if="project.show_availability && project.available_count > 0"
         class="absolute end-3 top-3 rounded-full bg-primary-500 px-3 py-1 text-xs font-semibold text-primary-contrast"
       >{{ $t('showcase.projects.available', { n: project.available_count }) }}</span>
 

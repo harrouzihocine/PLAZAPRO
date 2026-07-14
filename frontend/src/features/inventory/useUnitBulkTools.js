@@ -49,6 +49,45 @@ export function useUnitBulkTools(units, exportParams = () => ({})) {
     }
   }
 
+  // Multi-select park / un-park. `unavailable` picks the direction; the summary
+  // names ineligible (held/sold or already-in-target) units that were skipped.
+  async function setSelectedAvailability(unavailable) {
+    const ids = selected.value.map((u) => u.id)
+    if (!ids.length) return
+    const ok = await confirmAction({
+      title: t(unavailable ? 'inventory.bulkUnavailableTitle' : 'inventory.bulkAvailableTitle', ids.length),
+      text: t(unavailable ? 'inventory.bulkUnavailableText' : 'inventory.bulkAvailableText'),
+      confirmText: t(unavailable ? 'inventory.makeUnavailableSelected' : 'inventory.restoreSelected'),
+      danger: unavailable,
+    })
+    if (!ok) return
+
+    try {
+      const { changed, skipped } = unavailable
+        ? await units.bulkUnavailable(ids)
+        : await units.bulkAvailable(ids)
+      selected.value = []
+      const countKey = unavailable ? 'inventory.bulkUnavailableCount' : 'inventory.bulkAvailableCount'
+      if (skipped.length) {
+        await alertMessage({
+          icon: 'warning',
+          title: t(countKey, changed),
+          text: t('inventory.bulkAvailabilitySkipped', {
+            count: skipped.length,
+            refs: skipped.map((s) => s.reference ?? `#${s.id}`).join(', '),
+          }),
+        })
+      } else {
+        toastSuccess(t(countKey, changed))
+      }
+    } catch {
+      /* surfaced via units.error */
+    }
+  }
+
+  const makeSelectedUnavailable = () => setSelectedAvailability(true)
+  const restoreSelected = () => setSelectedAvailability(false)
+
   function saveBlob(blob, filename) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -86,18 +125,29 @@ export function useUnitBulkTools(units, exportParams = () => ({})) {
     if (!file) return
 
     try {
-      const { created, updated, errors } = await units.importFile(file)
-      const summary = t('inventory.importSummary', { created, updated })
+      const { created, updated, archived = 0, skipped = [], errors } = await units.importFile(file)
+      // Report everything the import did: added / updated / archived (the sync
+      // prune), plus any live-sale units it kept instead of archiving.
+      const summary = t('inventory.importSummary', { created, updated, archived })
+      const skippedLine = skipped.length
+        ? '\n' +
+          t('inventory.importSkipped', {
+            count: skipped.length,
+            refs: skipped.map((s) => s.reference ?? `#${s.id}`).join(', '),
+          })
+        : ''
       if (errors.length) {
         const lines = errors
           .slice(0, 8)
           .map((e) => t('inventory.importErrorLine', { line: e.line, message: e.message }))
           .join('\n')
         await alertMessage({
-          icon: created + updated ? 'warning' : 'error',
+          icon: created + updated + archived ? 'warning' : 'error',
           title: t('inventory.importErrorsTitle', errors.length),
-          text: `${summary}\n${lines}${errors.length > 8 ? '\n…' : ''}`,
+          text: `${summary}${skippedLine}\n${lines}${errors.length > 8 ? '\n…' : ''}`,
         })
+      } else if (skipped.length) {
+        await alertMessage({ icon: 'info', title: summary, text: skippedLine.trim() })
       } else {
         toastSuccess(summary)
       }
@@ -113,6 +163,8 @@ export function useUnitBulkTools(units, exportParams = () => ({})) {
     downloadingTemplate,
     importInput,
     cancelSelected,
+    makeSelectedUnavailable,
+    restoreSelected,
     exportExcel,
     downloadTemplate,
     pickImportFile,

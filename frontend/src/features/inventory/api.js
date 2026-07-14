@@ -51,6 +51,17 @@ export const locationsApi = {
     return useApi().post(`/locations/${id}/reactivate`)
   },
 
+  // Park / un-park the whole project off the market (reversible; stays in management).
+  async makeUnavailable(id) {
+    const { data } = await useApi().post(`/locations/${id}/unavailable`)
+    return data.data
+  },
+
+  async makeAvailable(id) {
+    const { data } = await useApi().post(`/locations/${id}/available`)
+    return data.data
+  },
+
   cancel(id) {
     return useApi().delete(`/locations/${id}`)
   },
@@ -109,9 +120,31 @@ export const unitsApi = {
     return useApi().delete(`/units/${id}`)
   },
 
+  // Park / un-park a single unit off the market (reversible; hidden from selectors).
+  async makeUnavailable(id) {
+    const { data } = await useApi().post(`/units/${id}/unavailable`)
+    return data.data
+  },
+
+  async makeAvailable(id) {
+    const { data } = await useApi().post(`/units/${id}/available`)
+    return data.data
+  },
+
   // Multi-select cancel — returns { cancelled, skipped: [{ id, reference, reason }] }.
   async bulkCancel(ids, reason = null) {
     const { data } = await useApi().post('/units/bulk-cancel', { ids, reason })
+    return data.data
+  },
+
+  // Multi-select park / un-park — returns { changed, skipped: [{ id, reference, reason }] }.
+  async bulkUnavailable(ids) {
+    const { data } = await useApi().post('/units/bulk-unavailable', { ids })
+    return data.data
+  },
+
+  async bulkAvailable(ids) {
+    const { data } = await useApi().post('/units/bulk-available', { ids })
     return data.data
   },
 

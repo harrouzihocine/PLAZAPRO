@@ -120,7 +120,10 @@ class MatchDesireToInventory
                 ->from('units')
                 ->leftJoin('locations', 'locations.id', '=', 'units.location_id')
                 ->where('units.status', RecordStatus::Active->value)
-                ->where('units.sale_status', '!=', SaleStatus::Sold->value)
+                // Still purchasable: not sold and not parked off the market —
+                // neither the unit itself (unavailable) nor its whole project.
+                ->whereNotIn('units.sale_status', [SaleStatus::Sold->value, SaleStatus::Unavailable->value])
+                ->where('locations.is_available', true)
                 ->whereRaw('(desires.area_min IS NULL OR units.area_sqm >= desires.area_min)')
                 ->whereRaw('(desires.area_max IS NULL OR units.area_sqm <= desires.area_max)')
                 // Budget window: EITHER finish price may fit, but both bounds
@@ -167,7 +170,10 @@ class MatchDesireToInventory
 
         return Unit::query()
             ->active()
-            ->where('sale_status', '!=', SaleStatus::Sold->value)
+            // Still purchasable: not sold and not parked off the market — neither
+            // the unit itself (unavailable) nor its whole project (is_available).
+            ->whereNotIn('sale_status', [SaleStatus::Sold->value, SaleStatus::Unavailable->value])
+            ->whereHas('location', fn ($l) => $l->where('is_available', true))
             // Project type lives on the unit's project (location), not the unit.
             ->when($typeIds->isNotEmpty(), fn ($q) => $q->whereHas('location', fn ($l) => $l->whereIn('type_id', $typeIds)))
             ->when($roomNumberIds->isNotEmpty(), fn ($q) => $q->whereIn('room_number_id', $roomNumberIds))

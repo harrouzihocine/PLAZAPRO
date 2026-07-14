@@ -168,7 +168,7 @@ return [
     ],
     'units_imported' => [
         'title' => 'تم استيراد المخزون',
-        'body' => 'قام :user باستيراد وحدات من ملف — :created أُضيفت، :updated حُدِّثت.',
+        'body' => 'قام :user باستيراد وحدات من ملف — :created أُضيفت، :updated حُدِّثت، :archived أُرشِفت.',
     ],
     'box_updated' => [
         'title' => 'حُدّث الصندوق :box',
@@ -186,6 +186,7 @@ return [
         'interested' => 'مهتم بها',
         'reserved' => 'محجوزة',
         'available' => 'عادت إلى السوق',
+        'unavailable' => 'أصبحت غير متاحة',
     ],
     'chat_message' => [
         'title' => ':title',

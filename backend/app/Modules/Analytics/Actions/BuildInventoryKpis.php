@@ -30,15 +30,22 @@ class BuildInventoryKpis
         $status = $this->statusBreakdown($f);
         $total = array_sum($status);
         $sold = $status[SaleStatus::Sold->value] ?? 0;
-        $remaining = $total - $sold;
+        // Units parked off the market are not sellable stock — keep them out of
+        // the "remaining" pipeline and the sell-through denominator so they neither
+        // count as leftover inventory nor dilute the rate. (sold + remaining +
+        // unavailable = total, so the tiles still reconcile.)
+        $unavailable = $status[SaleStatus::Unavailable->value] ?? 0;
+        $offered = $total - $unavailable;
+        $remaining = $offered - $sold;
         $velocity = $this->velocity($f);
 
         return [
             'status_breakdown' => $status,
             'total_units' => $total,
             'sold_units' => $sold,
+            'unavailable_units' => $unavailable,
             'remaining_units' => $remaining,
-            'sell_through' => KpiMath::pct($sold, $total),
+            'sell_through' => KpiMath::pct($sold, $offered),
             'remaining_value' => $this->remainingValue($f),
             'velocity' => $velocity, // units sold / month, rolling 3-mo
             'months_to_sellout' => $velocity > 0 ? round($remaining / $velocity, 1) : null,

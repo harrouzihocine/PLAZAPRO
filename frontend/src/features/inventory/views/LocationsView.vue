@@ -92,6 +92,24 @@ async function remove(loc) {
   }
 }
 
+// Park / un-park the whole project off the market (reversible; stays listed, greyed).
+async function toggleAvailability(loc) {
+  const parking = loc.is_available !== false
+  if (
+    await confirmAction({
+      title: t(
+        parking ? 'inventory.makeProjectUnavailableTitle' : 'inventory.makeProjectAvailableTitle',
+        { name: loc.name },
+      ),
+      text: t(parking ? 'inventory.makeProjectUnavailableText' : 'inventory.makeProjectAvailableText'),
+      confirmText: t(parking ? 'inventory.makeProjectUnavailable' : 'inventory.makeProjectAvailable'),
+      danger: parking,
+    })
+  ) {
+    parking ? store.setUnavailable(loc.id) : store.setAvailable(loc.id)
+  }
+}
+
 function toggleArchived() {
   showArchived.value = !showArchived.value
   if (showArchived.value) store.loadArchived()
@@ -174,6 +192,7 @@ function toggleArchived() {
         :can-manage="canManage"
         @edit="openEdit"
         @archive="archive"
+        @toggle-availability="toggleAvailability"
         @remove="remove"
       />
     </div>

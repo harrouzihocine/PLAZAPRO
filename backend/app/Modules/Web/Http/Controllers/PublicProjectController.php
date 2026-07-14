@@ -44,7 +44,8 @@ class PublicProjectController extends Controller
                 ->selectRaw('MIN(LEAST(COALESCE(price_semi_fini, price_fini), COALESCE(price_fini, price_semi_fini)))')
                 ->whereColumn('units.location_id', 'locations.id')
                 ->where('units.status', RecordStatus::Active->value)
-                ->where('units.sale_status', '!=', SaleStatus::Sold->value),
+                // "From" quotes only purchasable stock — never a sold or parked unit.
+                ->whereNotIn('units.sale_status', [SaleStatus::Sold->value, SaleStatus::Unavailable->value]),
             ])
             ->orderBy('name')
             ->get();

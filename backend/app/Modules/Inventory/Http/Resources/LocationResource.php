@@ -58,6 +58,8 @@ class LocationResource extends JsonResource
             'cover_focus_y' => (int) $this->cover_focus_y,
             // Public-website controls (showcase visibility + marketing copy).
             'is_published' => (bool) $this->is_published,
+            // Off-market veil: false = parked (hidden from selectors, greyed publicly).
+            'is_available' => (bool) $this->is_available,
             'show_prices' => (bool) $this->show_prices,
             'show_availability' => (bool) $this->show_availability,
             'marketing_tagline' => $this->marketing_tagline,

@@ -27,7 +27,7 @@ class Location extends BaseModel
         'name', 'code', 'wilaya_id', 'commune_id', 'type_id', 'contract_type_id', 'address',
         'description', 'expected_delivery_date', 'gtm_priority', 'latitude', 'longitude',
         'cover_media_id', 'cover_focus_x', 'cover_focus_y',
-        'is_published', 'show_prices', 'show_availability',
+        'is_published', 'is_available', 'show_prices', 'show_availability',
         'marketing_tagline', 'marketing_description', 'construction_progress',
     ];
 
@@ -39,6 +39,7 @@ class Location extends BaseModel
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
             'is_published' => 'boolean',
+            'is_available' => 'boolean',
             'show_prices' => 'boolean',
             'show_availability' => 'boolean',
             'marketing_tagline' => 'array',
@@ -48,11 +49,23 @@ class Location extends BaseModel
 
     /**
      * Projects visible on the public showcase — the ONLY scope public
-     * endpoints may query through (active + explicitly published).
+     * endpoints may query through (active + explicitly published). NOTE: a
+     * project parked off the market (is_available = false) still passes here —
+     * the public site keeps showing it, greyed; only internal selectors hide it.
      */
     public function scopePublished($query)
     {
         return $query->active()->where('is_published', true);
+    }
+
+    /**
+     * Projects a user may pick in a selector: live and for sale. Parked projects
+     * (is_available = false) drop out so agents can't shortlist / deal against
+     * inventory the promoteur pulled from the market.
+     */
+    public function scopeSelectable($query)
+    {
+        return $query->active()->where('is_available', true);
     }
 
     /**

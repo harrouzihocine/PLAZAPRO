@@ -36,6 +36,10 @@ class PublicUnitResource extends JsonResource
             'stack_floor' => $this->stack_floor,
             'position' => $this->position,
             'available' => $this->sale_status === SaleStatus::Available,
+            // Parked off the market by the promoteur — the public site keeps
+            // showing it, greyed, rather than hiding it (distinct from a held/sold
+            // apartment, which also reads available:false).
+            'unavailable' => $this->sale_status === SaleStatus::Unavailable,
             'finishes' => array_map(fn ($f) => $f->value, $this->availableFinishes()),
             'price_semi_fini' => $project->show_prices ? $this->price_semi_fini : null,
             'price_fini' => $project->show_prices ? $this->price_fini : null,

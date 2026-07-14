@@ -17,6 +17,7 @@ return [
     'units_import_unknown_item' => 'Unknown value ":value".',
     'units_import_duplicate_reference' => 'Reference ":reference" already exists in this project.',
     'units_import_reason' => 'Excel import by :user',
+    'units_import_archived_reason' => 'Absent from the latest import',
     // The units .xlsx export / import template (sheet names + Guide sheet).
     'units_sheet_units' => 'Units',
     'units_sheet_guide' => 'Guide',

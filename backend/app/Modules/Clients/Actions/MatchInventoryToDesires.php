@@ -26,11 +26,19 @@ class MatchInventoryToDesires
      */
     public function handle(Unit $unit): Collection
     {
-        if ($unit->sale_status === SaleStatus::Sold) {
+        // A sold unit is gone; a parked (unavailable) one is deliberately off the
+        // market — neither should surface as a match to a waiting client.
+        if (in_array($unit->sale_status, [SaleStatus::Sold, SaleStatus::Unavailable], true)) {
             return collect();
         }
 
         $unit->loadMissing('location');
+
+        // A unit inside a project the promoteur parked is off the market too.
+        if ($unit->location !== null && ! $unit->location->is_available) {
+            return collect();
+        }
+
         $wilayaId = $unit->location?->wilaya_id;
         $communeId = $unit->location?->commune_id;
         // Project type and contract type are project (location) attributes the unit inherits.

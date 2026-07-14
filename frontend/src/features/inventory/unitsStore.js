@@ -150,12 +150,30 @@ export const useUnitsStore = defineStore('units', {
       return this.mutate(() => unitsApi.cancel(id))
     },
 
+    // Park / un-park a single unit off the market (reversible; hidden from selectors).
+    makeUnavailable(id) {
+      return this.mutate(() => unitsApi.makeUnavailable(id))
+    },
+
+    makeAvailable(id) {
+      return this.mutate(() => unitsApi.makeAvailable(id))
+    },
+
     // Multi-select cancel; resolves to the server's { cancelled, skipped } summary.
     bulkCancel(ids, reason = null) {
       return this.mutate(() => unitsApi.bulkCancel(ids, reason))
     },
 
-    // Excel import; resolves to { created, updated, errors } after refreshing.
+    // Multi-select park / un-park; resolves to the server's { changed, skipped } summary.
+    bulkUnavailable(ids) {
+      return this.mutate(() => unitsApi.bulkUnavailable(ids))
+    },
+
+    bulkAvailable(ids) {
+      return this.mutate(() => unitsApi.bulkAvailable(ids))
+    },
+
+    // Excel import; resolves to { created, updated, archived, skipped, errors } after refreshing.
     importFile(file) {
       return this.mutate(() => unitsApi.importFile(file))
     },

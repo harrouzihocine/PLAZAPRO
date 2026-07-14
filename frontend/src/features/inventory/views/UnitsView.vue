@@ -116,13 +116,15 @@ function currentFilterParams() {
   return params
 }
 
-// Row multi-select cancel + Excel export/template/import (shared with the project tab).
+// Row multi-select cancel / park / un-park + Excel export/template/import (shared with the project tab).
 const {
   selected,
   exporting,
   downloadingTemplate,
   importInput,
   cancelSelected,
+  makeSelectedUnavailable,
+  restoreSelected,
   exportExcel,
   downloadTemplate,
   pickImportFile,
@@ -139,6 +141,7 @@ const statusOptions = computed(() => [
   { value: 'interested', label: t('status.interested') },
   { value: 'reserved', label: t('status.reserved') },
   { value: 'sold', label: t('status.sold') },
+  { value: 'unavailable', label: t('status.unavailable') },
 ])
 // GTM priority filter options (shared source of truth).
 const priorityOptions = computed(() => gtmPriorityOptions())
@@ -354,6 +357,23 @@ async function removeUnit(u) {
     units.cancel(u.id)
   }
 }
+
+// Park an available unit off the market, or bring a parked one back.
+async function toggleUnavailable(u) {
+  const parking = u.sale_status !== 'unavailable'
+  if (
+    await confirmAction({
+      title: t(parking ? 'inventory.makeUnitUnavailableTitle' : 'inventory.makeUnitAvailableTitle', {
+        ref: u.reference,
+      }),
+      text: t(parking ? 'inventory.makeUnitUnavailableText' : 'inventory.makeUnitAvailableText'),
+      confirmText: t(parking ? 'inventory.makeUnitUnavailable' : 'inventory.makeUnitAvailable'),
+      danger: parking,
+    })
+  ) {
+    parking ? units.makeUnavailable(u.id) : units.makeAvailable(u.id)
+  }
+}
 </script>
 
 <template>
@@ -382,6 +402,7 @@ async function removeUnit(u) {
         <Button
           v-if="canManage"
           :label="$t('inventory.importExcel')"
+          :title="$t('inventory.importSyncHint')"
           icon="pi pi-upload"
           severity="secondary"
           outlined
@@ -527,6 +548,24 @@ async function removeUnit(u) {
             {{ $t('inventory.selectedCount', selected.length) }}
           </span>
           <Button
+            :label="$t('inventory.makeUnavailableSelected')"
+            icon="pi pi-eye-slash"
+            severity="secondary"
+            outlined
+            size="small"
+            :loading="units.saving"
+            @click="makeSelectedUnavailable"
+          />
+          <Button
+            :label="$t('inventory.restoreSelected')"
+            icon="pi pi-check-circle"
+            severity="secondary"
+            outlined
+            size="small"
+            :loading="units.saving"
+            @click="restoreSelected"
+          />
+          <Button
             :label="$t('inventory.cancelSelected')"
             icon="pi pi-ban"
             severity="danger"
@@ -625,7 +664,7 @@ async function removeUnit(u) {
             <span v-else class="text-mute">—</span>
           </template>
         </Column>
-        <Column v-if="canManage" header="" class="w-36">
+        <Column v-if="canManage" header="" class="w-44">
           <template #body="{ data }">
             <span class="flex justify-end gap-1" @click.stop>
               <Button
@@ -654,6 +693,22 @@ async function removeUnit(u) {
                 severity="secondary"
                 :aria-label="$t('inventory.duplicateUnit')"
                 @click="openDuplicate(data)"
+              />
+              <!-- Park / un-park off the market — only offered when actionable
+                   (available → park, unavailable → restore). -->
+              <Button
+                v-if="data.sale_status === 'available' || data.sale_status === 'unavailable'"
+                :icon="data.sale_status === 'unavailable' ? 'pi pi-check-circle' : 'pi pi-eye-slash'"
+                text
+                rounded
+                size="small"
+                severity="secondary"
+                :aria-label="
+                  data.sale_status === 'unavailable'
+                    ? $t('inventory.makeUnitAvailableAria')
+                    : $t('inventory.makeUnitUnavailableAria')
+                "
+                @click="toggleUnavailable(data)"
               />
               <Button
                 icon="pi pi-ban"

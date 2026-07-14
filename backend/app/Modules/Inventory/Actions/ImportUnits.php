@@ -29,6 +29,13 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
  * Valid rows apply, bad rows are skipped and reported with their line number.
  * No per-unit bells (see UnitsImported); created/repriced units still dispatch
  * UnitRepriced so the targeted desire-matching runs.
+ *
+ * The file is also a SNAPSHOT: in every project it addresses by id (an edited
+ * export), any active unit the file no longer lists is archived (reversible),
+ * so "removed from the file" means "removed from the market". Only safe units
+ * (available / unavailable) are archived — a live sale (interested / reserved /
+ * sold) is reported back, never silently pulled. A pure template/append file
+ * (no ids) is an "add", not a "replace", and prunes nothing.
  */
 class ImportUnits
 {
@@ -47,7 +54,7 @@ class ImportUnits
     private array $takenRefs = [];
 
     /**
-     * @return array{created: int, updated: int, errors: list<array{line: int, message: string}>}
+     * @return array{created: int, updated: int, archived: int, skipped: list<array{id: int, reference: ?string, reason: string}>, errors: list<array{line: int, message: string}>}
      */
     public function handle(User $user, UploadedFile $file): array
     {
@@ -55,12 +62,45 @@ class ImportUnits
         $updated = 0;
         $errors = [];
 
-        foreach ($this->rows($file) as [$line, $row]) {
+        // Read the whole file up front: the prune step needs to know the full set
+        // of unit ids the file keeps BEFORE it starts archiving what is missing.
+        $rows = iterator_to_array($this->rows($file));
+
+        // Which projects the file addresses as a full snapshot: those carrying at
+        // least one id-bearing row (an edited export). A pure template/append (no
+        // ids) is an "add", never a "replace", so it prunes nothing — the guard
+        // that stops a small add-file from wiping a project. seenByLocation maps
+        // each such project to the unit ids the file keeps (existing ids matched to
+        // their project, plus units created this run).
+        $fileIds = [];
+        foreach ($rows as [, $row]) {
+            if (($row['id'] ?? '') !== '') {
+                $fileIds[] = (int) $row['id'];
+            }
+        }
+
+        $seenByLocation = [];
+        Unit::query()
+            ->whereIn('id', array_values(array_unique($fileIds)))
+            ->get(['id', 'location_id'])
+            ->each(function (Unit $u) use (&$seenByLocation): void {
+                $seenByLocation[$u->location_id][$u->id] = true;
+            });
+        // Snapshot the prunable set now — before create rows add fresh projects.
+        $prunableLocations = array_keys($seenByLocation);
+
+        foreach ($rows as [$line, $row]) {
             try {
                 if (($row['id'] ?? '') !== '') {
-                    $updated += $this->updateRow($user, $row) ? 1 : 0;
+                    [$unit, $didChange] = $this->updateRow($user, $row);
+                    $updated += $didChange ? 1 : 0;
+                    // A price change supersedes the row (new active id) — track the
+                    // resulting unit so the prune never archives the fresh version.
+                    $seenByLocation[$unit->location_id][$unit->id] = true;
                 } else {
-                    $this->createRow($row);
+                    $unit = $this->createRow($row);
+                    // A unit created this run must survive its project's prune.
+                    $seenByLocation[$unit->location_id][$unit->id] = true;
                     $created++;
                 }
             } catch (\Throwable $e) {
@@ -68,11 +108,56 @@ class ImportUnits
             }
         }
 
-        if ($created + $updated > 0) {
-            UnitsImported::dispatch($user, $created, $updated);
+        [$archived, $skipped] = $this->pruneMissing($prunableLocations, $seenByLocation);
+
+        if ($created + $updated + $archived > 0) {
+            UnitsImported::dispatch($user, $created, $updated, $archived);
         }
 
-        return ['created' => $created, 'updated' => $updated, 'errors' => $errors];
+        return [
+            'created' => $created,
+            'updated' => $updated,
+            'archived' => $archived,
+            'skipped' => $skipped,
+            'errors' => $errors,
+        ];
+    }
+
+    /**
+     * Snapshot sync: in every project the file addressed by id, archive the active
+     * units it no longer lists — but only safe ones (available / unavailable).
+     * A unit carrying a live sale (interested / reserved / sold) is never silently
+     * pulled; it is reported back so the operator sees what the file left behind.
+     * Archiving is reversible (Cancellable) — nothing is destroyed.
+     *
+     * @param  list<int>  $locationIds
+     * @param  array<int, array<int, true>>  $seenByLocation
+     * @return array{0: int, 1: list<array{id: int, reference: ?string, reason: string}>}
+     */
+    private function pruneMissing(array $locationIds, array $seenByLocation): array
+    {
+        $archived = 0;
+        $skipped = [];
+
+        foreach ($locationIds as $locationId) {
+            $keep = array_keys($seenByLocation[$locationId] ?? []);
+
+            $missing = Unit::query()->active()
+                ->where('location_id', $locationId)
+                ->when($keep !== [], fn ($q) => $q->whereNotIn('id', $keep))
+                ->get();
+
+            foreach ($missing as $unit) {
+                if (in_array($unit->sale_status, [SaleStatus::Available, SaleStatus::Unavailable], true)) {
+                    $unit->archive(__('app.units_import_archived_reason'));
+                    $archived++;
+                } else {
+                    $skipped[] = ['id' => $unit->id, 'reference' => $unit->reference, 'reason' => 'has_active_sale'];
+                }
+            }
+        }
+
+        return [$archived, $skipped];
     }
 
     /**
@@ -172,8 +257,12 @@ class ImportUnits
         return $row;
     }
 
-    /** @return bool whether anything actually changed */
-    private function updateRow(User $user, array $row): bool
+    /**
+     * @return array{0: Unit, 1: bool} the resulting active unit (the superseded
+     *                                  replacement after a price change) and
+     *                                  whether anything actually changed
+     */
+    private function updateRow(User $user, array $row): array
     {
         $unit = Unit::query()->active()->find((int) $row['id']);
         throw_if($unit === null, new \RuntimeException(__('app.units_import_unknown_id', ['id' => $row['id']])));
@@ -217,7 +306,7 @@ class ImportUnits
             $changed = true;
         }
 
-        return $changed;
+        return [$unit, $changed];
     }
 
     /**
@@ -242,7 +331,7 @@ class ImportUnits
         return $prices;
     }
 
-    private function createRow(array $row): void
+    private function createRow(array $row): Unit
     {
         $location = $this->resolveLocation($row);
         $prices = $this->pricesFrom($row);
@@ -273,6 +362,8 @@ class ImportUnits
 
         // Targeted desire-matching only — no team-wide "new unit" bell per row.
         UnitRepriced::dispatch($unit);
+
+        return $unit;
     }
 
     /**

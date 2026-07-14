@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\Notification;
 
 /**
  * A CSV unit import landed: ONE summary bell for the whole team ("N added, M
- * updated by X") instead of a per-unit announcement flood. Runs on the queue.
+ * updated, K archived by X") instead of a per-unit announcement flood — the
+ * archived count covers the snapshot sync (units the file dropped). Runs on the queue.
  */
 class AnnounceUnitsImported implements ShouldQueue
 {
@@ -31,6 +32,7 @@ class AnnounceUnitsImported implements ShouldQueue
                 'user' => $event->user->name,
                 'created' => $event->created,
                 'updated' => $event->updated,
+                'archived' => $event->archived,
             ],
             link: '/inventory/units',
         ));

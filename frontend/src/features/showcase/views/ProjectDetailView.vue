@@ -121,6 +121,14 @@ useSeoMeta(() => ({
             {{ project.type }}
           </p>
           <h1 class="mt-2 text-3xl font-bold text-white sm:text-5xl">{{ project.name }}</h1>
+          <!-- Parked off the market: the page still loads, but says so up front. -->
+          <span
+            v-if="project.is_available === false"
+            class="mt-3 inline-flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1 text-sm font-medium text-white backdrop-blur-sm"
+          >
+            <i class="pi pi-eye-slash text-xs" aria-hidden="true" />
+            {{ $t('showcase.projects.unavailable') }}
+          </span>
           <p v-if="tagline" class="mt-3 max-w-2xl text-lg text-white/85">{{ tagline }}</p>
 
           <div class="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/80">

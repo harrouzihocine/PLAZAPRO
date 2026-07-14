@@ -11,6 +11,8 @@ const META = {
   // Reserved — a deposit-backed, off-market lock; stronger than interested.
   reserved: { severity: 'contrast', icon: 'pi pi-lock' },
   sold: { severity: 'info', icon: 'pi pi-flag-fill' },
+  // Unavailable — the promoteur parked the unit off the market (grey, reversible).
+  unavailable: { severity: 'secondary', icon: 'pi pi-eye-slash' },
   blocked: { severity: 'danger', icon: 'pi pi-ban' },
 
   // deal-pipeline stages

@@ -12,7 +12,7 @@ defineProps({
   loc: { type: Object, required: true },
   canManage: { type: Boolean, default: false },
 })
-defineEmits(['edit', 'archive', 'remove'])
+defineEmits(['edit', 'archive', 'toggle-availability', 'remove'])
 </script>
 
 <template>
@@ -48,6 +48,14 @@ defineEmits(['edit', 'archive', 'remove'])
       >
         <i class="pi pi-globe text-[10px]" aria-hidden="true" />
         {{ $t('inventory.websitePublished') }}
+      </span>
+      <!-- Parked off the market (still managed here). -->
+      <span
+        v-if="loc.is_available === false"
+        class="absolute start-2 bottom-2 flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm"
+      >
+        <i class="pi pi-eye-slash text-[10px]" aria-hidden="true" />
+        {{ $t('inventory.projectUnavailableBadge') }}
       </span>
     </div>
 
@@ -89,6 +97,19 @@ defineEmits(['edit', 'archive', 'remove'])
           severity="secondary"
           :aria-label="$t('inventory.editProject')"
           @click.prevent="$emit('edit', loc)"
+        />
+        <Button
+          :icon="loc.is_available === false ? 'pi pi-check-circle' : 'pi pi-eye-slash'"
+          text
+          rounded
+          size="small"
+          severity="secondary"
+          :aria-label="
+            loc.is_available === false
+              ? $t('inventory.makeProjectAvailable')
+              : $t('inventory.makeProjectUnavailable')
+          "
+          @click.prevent="$emit('toggle-availability', loc)"
         />
         <Button
           icon="pi pi-inbox"

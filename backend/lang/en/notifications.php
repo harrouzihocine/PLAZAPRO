@@ -170,7 +170,7 @@ return [
     ],
     'units_imported' => [
         'title' => 'Inventory imported',
-        'body' => ':user imported units from a file — :created added, :updated updated.',
+        'body' => ':user imported units from a file — :created added, :updated updated, :archived archived.',
     ],
     'box_updated' => [
         'title' => 'Box :box updated',
@@ -188,6 +188,7 @@ return [
         'interested' => 'interested',
         'reserved' => 'reserved',
         'available' => 'back on the market',
+        'unavailable' => 'made unavailable',
     ],
     'chat_message' => [
         'title' => ':title',

@@ -105,6 +105,20 @@ export const useLocationsStore = defineStore('locations', {
       return this.loadArchived()
     },
 
+    // Park / un-park the whole project off the market (reversible; stays in
+    // management, greyed on the public site). Keeps the open detail record in sync.
+    async setUnavailable(id) {
+      const result = await this.mutate(() => locationsApi.makeUnavailable(id))
+      if (this.current?.id === id) this.current = result
+      return result
+    },
+
+    async setAvailable(id) {
+      const result = await this.mutate(() => locationsApi.makeAvailable(id))
+      if (this.current?.id === id) this.current = result
+      return result
+    },
+
     // Remove = terminal: cancels the project and everything inside it (kept + audited).
     cancel(id) {
       return this.mutate(() => locationsApi.cancel(id))

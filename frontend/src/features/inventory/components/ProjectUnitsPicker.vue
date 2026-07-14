@@ -87,7 +87,8 @@ const crossProject = computed(() => !locationId.value && hasUnitFilters.value)
 // The refinements narrow the PROJECT list itself (unit_* params): only projects
 // with at least one purchasable unit matching them stay in the dropdown.
 async function loadLocations() {
-  const params = {}
+  // selectable: drop projects the promoteur parked off the market (is_available=false).
+  const params = { selectable: 1 }
   if (filters.room_number_id.length) params.unit_room_number_id = filters.room_number_id
   if (filters.floor_id.length) params.unit_floor_id = filters.floor_id
   for (const k of ['min_price', 'max_price', 'min_area', 'max_area']) {
@@ -133,8 +134,9 @@ async function loadCandidates() {
   try {
     // Interested / reserved units can still be shortlisted and held as backups
     // ("2nd place") — only a sold unit is off the table. Boxes stay single-tenant
-    // (available only).
-    const params = { sale_status: ['available', 'interested', 'reserved'] }
+    // (available only). selectable: also hide units of a parked project (the
+    // sale_status list already excludes unit-level `unavailable`).
+    const params = { sale_status: ['available', 'interested', 'reserved'], selectable: 1 }
     if (locationId.value) params.location_id = locationId.value
     for (const [k, v] of Object.entries(filters)) {
       if (Array.isArray(v) ? v.length : v !== '' && v != null) params[k] = v

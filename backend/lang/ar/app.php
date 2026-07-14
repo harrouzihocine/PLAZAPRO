@@ -16,6 +16,7 @@ return [
     'units_import_unknown_item' => 'القيمة «:value» غير معروفة.',
     'units_import_duplicate_reference' => 'المرجع «:reference» موجود بالفعل في هذا المشروع.',
     'units_import_reason' => 'استيراد Excel بواسطة :user',
+    'units_import_archived_reason' => 'غير موجودة في آخر استيراد',
     // تصدير الوحدات بصيغة xlsx. / نموذج الاستيراد (أسماء الأوراق + ورقة الدليل).
     'units_sheet_units' => 'الوحدات',
     'units_sheet_guide' => 'الدليل',

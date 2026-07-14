@@ -31,6 +31,8 @@ class ReserveUnit
             $fresh = Unit::whereKey($unit->getKey())->lockForUpdate()->firstOrFail();
 
             abort_if($fresh->sale_status === SaleStatus::Sold, 422, 'Unit is already sold.');
+            // A unit parked off the market cannot be held — reactivate it first.
+            abort_if($fresh->sale_status === SaleStatus::Unavailable, 422, 'Unit is not available for sale.');
 
             // Backups are ACROSS projects — one project never holds the same unit
             // twice (a second deal on it would just duplicate its own hold).

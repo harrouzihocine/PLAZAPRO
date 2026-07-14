@@ -34,6 +34,15 @@ function update(field, value) {
   emit('update:modelValue', { ...props.modelValue, [field]: value })
 }
 
+// Preferred-site options: hide projects parked off the market, but keep any the
+// desire already picked (so editing an older desire never silently drops one).
+const siteOptions = computed(() => {
+  const picked = new Set(props.modelValue.location_ids ?? [])
+  return locations.items
+    .filter((l) => l.is_available !== false || picked.has(l.id))
+    .map((l) => ({ value: l.id, label: l.name }))
+})
+
 // A USER wilaya change prunes picked communes down to the wilayas still
 // selected (the option list is about to shrink); programmatic fills (loading a
 // saved desire) go through the watcher below, which only loads the commune
@@ -89,7 +98,7 @@ const communeOptions = computed(() =>
       :label="$t('desire.preferredSites')"
       :placeholder="$t('desire.anySite')"
       :model-value="modelValue.location_ids ?? []"
-      :options="locations.items.map((l) => ({ value: l.id, label: l.name }))"
+      :options="siteOptions"
       @update:model-value="(v) => update('location_ids', v)"
     />
     <BaseMultiSelect

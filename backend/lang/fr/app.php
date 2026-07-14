@@ -16,6 +16,7 @@ return [
     'units_import_unknown_item' => 'Valeur « :value » inconnue.',
     'units_import_duplicate_reference' => 'La référence « :reference » existe déjà dans ce projet.',
     'units_import_reason' => 'Import Excel par :user',
+    'units_import_archived_reason' => 'Absente du dernier import',
     // L’export .xlsx des unités / le modèle d’import (noms d’onglets + onglet Guide).
     'units_sheet_units' => 'Unités',
     'units_sheet_guide' => 'Guide',

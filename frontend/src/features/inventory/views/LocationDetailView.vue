@@ -145,6 +145,8 @@ const {
   downloadingTemplate,
   importInput,
   cancelSelected,
+  makeSelectedUnavailable,
+  restoreSelected,
   exportExcel,
   downloadTemplate,
   pickImportFile,
@@ -330,6 +332,43 @@ async function remove(u) {
     units.cancel(u.id)
   }
 }
+
+// Park an available unit off the market, or bring a parked one back.
+async function toggleUnavailable(u) {
+  const parking = u.sale_status !== 'unavailable'
+  if (
+    await confirmAction({
+      title: t(parking ? 'inventory.makeUnitUnavailableTitle' : 'inventory.makeUnitAvailableTitle', {
+        ref: u.reference,
+      }),
+      text: t(parking ? 'inventory.makeUnitUnavailableText' : 'inventory.makeUnitAvailableText'),
+      confirmText: t(parking ? 'inventory.makeUnitUnavailable' : 'inventory.makeUnitAvailable'),
+      danger: parking,
+    })
+  ) {
+    parking ? units.makeUnavailable(u.id) : units.makeAvailable(u.id)
+  }
+}
+
+// Park the whole project off the market, or bring it back.
+async function toggleProjectAvailability() {
+  const p = locations.current
+  if (!p) return
+  const parking = p.is_available !== false
+  if (
+    await confirmAction({
+      title: t(
+        parking ? 'inventory.makeProjectUnavailableTitle' : 'inventory.makeProjectAvailableTitle',
+        { name: p.name },
+      ),
+      text: t(parking ? 'inventory.makeProjectUnavailableText' : 'inventory.makeProjectAvailableText'),
+      confirmText: t(parking ? 'inventory.makeProjectUnavailable' : 'inventory.makeProjectAvailable'),
+      danger: parking,
+    })
+  ) {
+    parking ? locations.setUnavailable(p.id) : locations.setAvailable(p.id)
+  }
+}
 </script>
 
 <template>
@@ -371,6 +410,12 @@ async function remove(u) {
             :priority="locations.current.gtm_priority"
           />
           <StatusTag :value="locations.current.status" />
+          <!-- Parked off the market (still managed here, tagged). -->
+          <StatusTag
+            v-if="locations.current.is_available === false"
+            value="unavailable"
+            :label="$t('inventory.projectUnavailableBadge')"
+          />
         </template>
         <template #subtitle>
           <span class="num">{{ locations.current.code }}</span>
@@ -390,6 +435,20 @@ async function remove(u) {
             outlined
             size="small"
             @click="showEditProject = true"
+          />
+          <Button
+            v-if="canManageProject"
+            :label="
+              locations.current.is_available === false
+                ? $t('inventory.makeProjectAvailable')
+                : $t('inventory.makeProjectUnavailable')
+            "
+            :icon="locations.current.is_available === false ? 'pi pi-check-circle' : 'pi pi-eye-slash'"
+            severity="secondary"
+            outlined
+            size="small"
+            :loading="locations.saving"
+            @click="toggleProjectAvailability"
           />
           <template v-if="!isNative">
             <Button
@@ -414,6 +473,7 @@ async function remove(u) {
             <Button
               v-if="canManage"
               :label="$t('inventory.importExcel')"
+              :title="$t('inventory.importSyncHint')"
               icon="pi pi-upload"
               severity="secondary"
               outlined
@@ -692,6 +752,24 @@ async function remove(u) {
                   {{ $t('inventory.selectedCount', selected.length) }}
                 </span>
                 <Button
+                  :label="$t('inventory.makeUnavailableSelected')"
+                  icon="pi pi-eye-slash"
+                  severity="secondary"
+                  outlined
+                  size="small"
+                  :loading="units.saving"
+                  @click="makeSelectedUnavailable"
+                />
+                <Button
+                  :label="$t('inventory.restoreSelected')"
+                  icon="pi pi-check-circle"
+                  severity="secondary"
+                  outlined
+                  size="small"
+                  :loading="units.saving"
+                  @click="restoreSelected"
+                />
+                <Button
                   :label="$t('inventory.cancelSelected')"
                   icon="pi pi-ban"
                   severity="danger"
@@ -760,7 +838,7 @@ async function remove(u) {
                     <span v-else class="text-mute">—</span>
                   </template>
                 </Column>
-                <Column v-if="canManage" header="" class="w-36">
+                <Column v-if="canManage" header="" class="w-44">
                   <template #body="{ data }">
                     <span class="flex justify-end gap-1">
                       <Button
@@ -789,6 +867,21 @@ async function remove(u) {
                         severity="secondary"
                         :aria-label="$t('inventory.duplicateUnit')"
                         @click="openDuplicate(data)"
+                      />
+                      <!-- Park / un-park off the market — only when actionable. -->
+                      <Button
+                        v-if="data.sale_status === 'available' || data.sale_status === 'unavailable'"
+                        :icon="data.sale_status === 'unavailable' ? 'pi pi-check-circle' : 'pi pi-eye-slash'"
+                        text
+                        rounded
+                        size="small"
+                        severity="secondary"
+                        :aria-label="
+                          data.sale_status === 'unavailable'
+                            ? $t('inventory.makeUnitAvailableAria')
+                            : $t('inventory.makeUnitUnavailableAria')
+                        "
+                        @click="toggleUnavailable(data)"
                       />
                       <Button
                         icon="pi pi-ban"

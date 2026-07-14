@@ -8,6 +8,8 @@ use App\Modules\Inventory\Actions\ArchiveLocation;
 use App\Modules\Inventory\Actions\BuildLocationInsights;
 use App\Modules\Inventory\Actions\CancelLocation;
 use App\Modules\Inventory\Actions\CreateLocation;
+use App\Modules\Inventory\Actions\MakeLocationAvailable;
+use App\Modules\Inventory\Actions\MakeLocationUnavailable;
 use App\Modules\Inventory\Actions\ReactivateLocation;
 use App\Modules\Inventory\Actions\UpdateLocation;
 use App\Modules\Inventory\Http\Requests\StoreLocationRequest;
@@ -49,6 +51,10 @@ class LocationController extends Controller
             ->with(['wilaya', 'commune', 'type', 'contractType', 'paymentMethods'])
             ->when($status === 'archived', fn ($q) => $q->archived())
             ->when(! in_array($status, ['archived', 'all'], true), fn ($q) => $q->active())
+            // Selector mode (the property pickers / desire preferred-sites): drop
+            // projects the promoteur parked off the market. Management lists omit
+            // `selectable`, so they still show them (tagged, for un-parking).
+            ->when($request->boolean('selectable'), fn ($q) => $q->where('is_available', true))
             ->when($request->filled('wilaya_id'), fn ($q) => $q->where('wilaya_id', $request->query('wilaya_id')))
             ->when($request->filled('commune_id'), fn ($q) => $q->where('commune_id', $request->query('commune_id')))
             ->when($request->filled('priority'), fn ($q) => $q->where('gtm_priority', $request->query('priority')))
@@ -58,7 +64,8 @@ class LocationController extends Controller
             ))
             ->when($hasUnitFilters, fn ($q) => $q->whereHas('units', fn ($u) => $u
                 ->active()
-                ->where('sale_status', '!=', SaleStatus::Sold->value)
+                // "Has a purchasable unit": neither sold nor parked off the market.
+                ->whereNotIn('sale_status', [SaleStatus::Sold->value, SaleStatus::Unavailable->value])
                 ->when($unitRoomIds !== [], fn ($w) => $w->whereIn('room_number_id', $unitRoomIds))
                 ->when($unitFloorIds !== [], fn ($w) => $w->whereIn('floor_id', $unitFloorIds))
                 // Either finish price may satisfy the window — but both bounds
@@ -123,6 +130,18 @@ class LocationController extends Controller
 
     /** Bring an archived project (and the inventory archived with it) back to active. */
     public function reactivate(Location $location, ReactivateLocation $action): LocationResource
+    {
+        return new LocationResource($action->handle($location)->load(['wilaya', 'commune', 'type', 'contractType', 'paymentMethods']));
+    }
+
+    /** Park the project off the market: hidden from selectors + greyed publicly (reversible). */
+    public function makeUnavailable(Location $location, MakeLocationUnavailable $action): LocationResource
+    {
+        return new LocationResource($action->handle($location)->load(['wilaya', 'commune', 'type', 'contractType', 'paymentMethods']));
+    }
+
+    /** Bring a parked project back to the market. */
+    public function makeAvailable(Location $location, MakeLocationAvailable $action): LocationResource
     {
         return new LocationResource($action->handle($location)->load(['wilaya', 'commune', 'type', 'contractType', 'paymentMethods']));
     }

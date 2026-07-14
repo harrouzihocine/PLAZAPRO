@@ -33,6 +33,8 @@ class PublicProjectSummaryResource extends JsonResource
             'expected_delivery_date' => $this->expected_delivery_date?->toDateString(),
             'construction_progress' => $this->construction_progress,
             'cover' => $this->coverThumb(),
+            // Parked off the market: the card still lists, greyed with a badge.
+            'is_available' => (bool) $this->is_available,
             'show_prices' => (bool) $this->show_prices,
             'show_availability' => (bool) $this->show_availability,
             'price_from' => $this->show_prices ? $this->price_from : null,

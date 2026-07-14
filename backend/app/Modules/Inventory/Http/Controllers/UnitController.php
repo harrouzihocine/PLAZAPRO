@@ -7,12 +7,17 @@ namespace App\Modules\Inventory\Http\Controllers;
 use App\Modules\Inventory\Actions\BuildUnitInsights;
 use App\Modules\Inventory\Actions\BuildUnitProjectLogs;
 use App\Modules\Inventory\Actions\BulkCancelUnits;
+use App\Modules\Inventory\Actions\BulkSetUnitsAvailability;
 use App\Modules\Inventory\Actions\CancelUnit;
 use App\Modules\Inventory\Actions\CorrectUnit;
 use App\Modules\Inventory\Actions\CreateUnit;
 use App\Modules\Inventory\Actions\ImportUnits;
+use App\Modules\Inventory\Actions\MakeUnitAvailable;
+use App\Modules\Inventory\Actions\MakeUnitUnavailable;
 use App\Modules\Inventory\Actions\UpdateUnit;
+use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Http\Requests\BulkCancelUnitsRequest;
+use App\Modules\Inventory\Http\Requests\BulkSetUnitsAvailabilityRequest;
 use App\Modules\Inventory\Http\Requests\CorrectUnitRequest;
 use App\Modules\Inventory\Http\Requests\ImportUnitsRequest;
 use App\Modules\Inventory\Http\Requests\StoreUnitRequest;
@@ -66,6 +71,13 @@ class UnitController extends Controller
         return Unit::query()
             ->with(['roomNumber', 'floor', 'location.wilaya', 'location.commune', 'location.type', 'location.contractType', 'paymentMethods', 'location.paymentMethods', 'activeReservations:id,unit_id,client_project_id'])
             ->when($request->query('status') !== 'all', fn ($q) => $q->active())
+            // Selector mode (the property pickers): hide inventory parked off the
+            // market — a unit made unavailable, or any unit of a project the
+            // promoteur marked unavailable. Management browses omit `selectable`,
+            // so they still show (and can un-park) everything.
+            ->when($request->boolean('selectable'), fn ($q) => $q
+                ->where('sale_status', '!=', SaleStatus::Unavailable->value)
+                ->whereHas('location', fn ($l) => $l->where('is_available', true)))
             ->when($request->filled('search'), fn ($q) => $q->where('reference', 'like', '%'.trim((string) $request->query('search')).'%'))
             ->when($request->filled('location_id'), fn ($q) => $q->where('location_id', $request->query('location_id')))
             ->when($asList('room_number_id'), fn ($q, $ids) => $q->whereIn('room_number_id', $ids))
@@ -193,5 +205,29 @@ class UnitController extends Controller
         );
 
         return response()->json(['data' => $result]);
+    }
+
+    /** Park a unit off the market (hidden from selectors; reversible). */
+    public function makeUnavailable(Unit $unit, MakeUnitUnavailable $action): UnitResource
+    {
+        return new UnitResource($action->handle($unit)->load(['roomNumber', 'floor', 'paymentMethods', 'location.paymentMethods']));
+    }
+
+    /** Bring a parked unit back to the market. */
+    public function makeAvailable(Unit $unit, MakeUnitAvailable $action): UnitResource
+    {
+        return new UnitResource($action->handle($unit)->load(['roomNumber', 'floor', 'paymentMethods', 'location.paymentMethods']));
+    }
+
+    /** Multi-select park: eligible (available) units go unavailable, the rest reported back. */
+    public function bulkUnavailable(BulkSetUnitsAvailabilityRequest $request, BulkSetUnitsAvailability $action): JsonResponse
+    {
+        return response()->json(['data' => $action->handle($request->validated('ids'), true)]);
+    }
+
+    /** Multi-select un-park: eligible (unavailable) units go available, the rest reported back. */
+    public function bulkAvailable(BulkSetUnitsAvailabilityRequest $request, BulkSetUnitsAvailability $action): JsonResponse
+    {
+        return response()->json(['data' => $action->handle($request->validated('ids'), false)]);
     }
 }

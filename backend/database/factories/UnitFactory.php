@@ -58,4 +58,10 @@ class UnitFactory extends Factory
     {
         return $this->state(fn () => ['sale_status' => SaleStatus::Sold->value]);
     }
+
+    /** Parked off the market by the promoteur (reversible). */
+    public function unavailable(): static
+    {
+        return $this->state(fn () => ['sale_status' => SaleStatus::Unavailable->value]);
+    }
 }

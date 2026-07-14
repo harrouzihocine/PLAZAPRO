@@ -25,6 +25,7 @@ class AnnounceUnitStatusChange implements ShouldQueue
         'interested' => 'interested',
         'reserved' => 'reserved',
         'available' => 'back on the market',
+        'unavailable' => 'made unavailable',
     ];
 
     public function handle(UnitStatusChanged $event): void

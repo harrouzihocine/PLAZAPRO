@@ -168,7 +168,7 @@ return [
     ],
     'units_imported' => [
         'title' => 'Inventaire importé',
-        'body' => ':user a importé des unités depuis un fichier — :created ajoutées, :updated mises à jour.',
+        'body' => ':user a importé des unités depuis un fichier — :created ajoutées, :updated mises à jour, :archived archivées.',
     ],
     'box_updated' => [
         'title' => 'Box :box mis à jour',
@@ -186,6 +186,7 @@ return [
         'interested' => 'intéressé',
         'reserved' => 'réservée',
         'available' => 'de retour sur le marché',
+        'unavailable' => 'rendue indisponible',
     ],
     'chat_message' => [
         'title' => ':title',

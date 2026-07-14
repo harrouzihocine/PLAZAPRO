@@ -22,6 +22,10 @@ const { t } = useI18n()
 const GROUND_RE = /rdc|rez|ground|أرضي|ارضي/i
 const BASEMENT_RE = /sous[- ]?sol|basement|قبو/i
 
+// Only show the "Unavailable" legend entry when the elevation actually has a
+// parked unit — keeps the legend clean for the common all-available/sold case.
+const hasUnavailable = computed(() => props.units.some((u) => u.unavailable))
+
 // Floor number: stacking data when the CRM has it, else a best-effort read of
 // the localized floor label ("RDC" → 0, "Sous-sol 1" → -1, "3e étage" → 3).
 // Units with neither stay off the elevation (the UnitExplorer below always
@@ -74,6 +78,12 @@ const blocks = computed(() => {
     })
 })
 
+function unitStatusLabel(unit) {
+  if (unit.available) return t('showcase.units.statusAvailable')
+  // Parked off the market by the promoteur — greyed, distinct from a red "sold".
+  return unit.unavailable ? t('showcase.grid.unavailable') : t('showcase.grid.sold')
+}
+
 function cellTitle(unit) {
   return [
     unit.reference,
@@ -83,7 +93,7 @@ function cellTitle(unit) {
     props.showPrices && (unit.price_semi_fini || unit.price_fini)
       ? formatMoney(unit.price_semi_fini ?? unit.price_fini)
       : null,
-    unit.available ? t('showcase.units.statusAvailable') : t('showcase.grid.sold'),
+    unitStatusLabel(unit),
   ].filter(Boolean).join(' · ')
 }
 </script>
@@ -106,6 +116,9 @@ function cellTitle(unit) {
         <span class="flex items-center gap-1.5">
           <!-- Solid bg-danger: the token is a plain CSS var, /opacity modifiers compile to nothing -->
           <span class="h-3 w-3 rounded bg-danger" aria-hidden="true" />{{ $t('showcase.grid.sold') }}
+        </span>
+        <span v-if="hasUnavailable" class="flex items-center gap-1.5">
+          <span class="h-3 w-3 rounded bg-surface-300 dark:bg-surface-700" aria-hidden="true" />{{ $t('showcase.grid.unavailable') }}
         </span>
       </div>
     </div>
@@ -164,6 +177,20 @@ function cellTitle(unit) {
                           {{ Number(unit.area_sqm) }} m²
                         </span>
                       </RouterLink>
+
+                      <!-- Unavailable: parked off the market — greyed, non-clickable -->
+                      <span
+                        v-else-if="unit.unavailable"
+                        class="flex h-10 min-w-14 shrink-0 flex-col items-center justify-center rounded-lg bg-surface-200 px-2 text-mute dark:bg-surface-800 sm:h-11 sm:min-w-16"
+                        :title="cellTitle(unit)"
+                      >
+                        <span class="text-[11px] font-bold leading-tight">
+                          {{ unit.rooms || unit.reference || '·' }}
+                        </span>
+                        <span class="text-[9px] font-semibold uppercase leading-tight tracking-wide">
+                          {{ $t('showcase.grid.unavailable') }}
+                        </span>
+                      </span>
 
                       <!-- Sold: stays on the facade, in red -->
                       <span
