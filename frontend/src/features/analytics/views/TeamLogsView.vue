@@ -236,6 +236,7 @@ useAutoFilter(
                   v-if="row.client_id && row.client_phone"
                   :client-id="row.client_id"
                   :phone="row.client_phone"
+                  :client-name="row.client"
                   class="mt-0.5 block text-xs text-mute"
                 />
               </td>

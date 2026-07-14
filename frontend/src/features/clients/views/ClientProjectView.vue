@@ -312,7 +312,11 @@ async function submitDirectDeal() {
                  when the viewer may see details (view-details gate), so its
                  presence is the guard — no extra permission check needed. -->
             <template v-if="store.current?.phone">
-              <ClientContactInline :client-id="id" :phone="store.current.phone" />
+              <ClientContactInline
+                :client-id="id"
+                :phone="store.current.phone"
+                :client-name="store.current.full_name"
+              />
               <span class="text-mute" aria-hidden="true">·</span>
             </template>
             <span>{{ $t('clients.projectN', { n: project.id }) }}</span>
