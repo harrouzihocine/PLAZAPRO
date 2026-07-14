@@ -18,6 +18,7 @@ class CreateUnit
         $attributes = Arr::only($data, [
             'reference', 'room_number_id', 'floor_id', 'area_sqm',
             'price_semi_fini', 'price_fini', 'sale_status', 'block', 'stack_floor', 'position', 'gtm_priority',
+            'payment_methods_overridden', 'note',
         ]);
 
         // A new unit starts available at medium GTM priority unless explicitly
@@ -27,6 +28,11 @@ class CreateUnit
         $attributes['gtm_priority'] ??= GtmPriority::Medium->value;
 
         $unit = $location->units()->create($attributes);
+
+        // Its own payment options only matter when it overrides the project's.
+        if (! empty($data['payment_methods_overridden'])) {
+            $unit->paymentMethods()->sync($data['payment_method_ids'] ?? []);
+        }
 
         // Alert agents whose clients' desires this unit matches (Collaboration
         // listens and runs the reverse desire-match; Phase 5).

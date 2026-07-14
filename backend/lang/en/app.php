@@ -20,7 +20,7 @@ return [
     // The units .xlsx export / import template (sheet names + Guide sheet).
     'units_sheet_units' => 'Units',
     'units_sheet_guide' => 'Guide',
-    'units_guide_note' => 'Each row is one unit. Replace the grey example rows with your data, then import the file on the Units page. Leave "reference" empty to auto-generate it. Rows carrying an "id" column (from an export) update that unit instead of creating a new one; sale status is never changed by an import.',
+    'units_guide_note' => 'Each row is one unit. Replace the grey example rows with your data, then import the file on the Units page. References are generated automatically. Rows carrying an "id" column (from an export) update that unit instead of creating a new one; sale status is never changed by an import.',
     'units_guide_column' => 'Column',
     'units_guide_required' => 'Required',
     'units_guide_description' => 'Description',
@@ -41,7 +41,10 @@ return [
     'units_guide_block' => 'Building block / entrance.',
     'units_guide_stack_floor' => 'Floor number used by the stacking plan.',
     'units_guide_position' => 'Position on the floor (stacking plan).',
+    'units_guide_payment_methods' => 'Payment options for this unit. Leave empty to inherit the project\'s; list options (comma-separated) to override for this unit (e.g. cash-only).',
+    'units_guide_unit_note' => 'Free-text note shown wherever the unit appears.',
     'units_example_project' => 'Example project — replace me',
+    'units_example_note' => 'Corner unit, extra storage',
 
     // Media share (WhatsApp send-to-client)
     'media_share_bad_items' => 'Some selected items can no longer be shared (removed, or not photos/videos/plans).',

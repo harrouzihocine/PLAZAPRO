@@ -28,17 +28,24 @@ class UnitsWorkbook
     public const EXPORT_COLUMNS = [
         'id', 'location_id', 'project', 'wilaya', 'commune', 'reference', 'rooms', 'floor',
         'area_sqm', 'price_semi_fini', 'price_fini', 'sale_status', 'gtm_priority', 'block', 'stack_floor', 'position',
+        'payment_methods', 'note',
     ];
 
-    /** The creation-oriented template header (no ids / lifecycle columns). */
+    /**
+     * The creation-oriented template header (no ids / lifecycle columns). No
+     * `reference` column — it is always auto-generated; a reference is still
+     * honoured on import when present (e.g. a re-imported export).
+     */
     public const TEMPLATE_COLUMNS = [
-        'project', 'reference', 'rooms', 'floor', 'area_sqm',
+        'project', 'rooms', 'floor', 'area_sqm',
         'price_semi_fini', 'price_fini', 'gtm_priority', 'block', 'stack_floor', 'position',
+        'payment_methods', 'note',
     ];
 
     /** Columns whose values must stay text (block "05" is not the number 5). */
     private const TEXT_COLUMNS = [
         'project', 'wilaya', 'commune', 'reference', 'rooms', 'floor', 'sale_status', 'gtm_priority', 'block',
+        'payment_methods', 'note',
     ];
 
     private const PRICE_FORMAT = '#,##0';
@@ -71,6 +78,8 @@ class UnitsWorkbook
                 'block' => $unit->block,
                 'stack_floor' => $unit->stack_floor,
                 'position' => $unit->position,
+                'payment_methods' => $this->paymentMethodsCell($unit),
+                'note' => $unit->note,
             ]);
         }
 
@@ -90,6 +99,7 @@ class UnitsWorkbook
     {
         $rooms = $this->listLabels('room_numbers');
         $floors = $this->listLabels('floors');
+        $payments = $this->listLabels('project_payment_methods');
         $projects = Location::query()->active()->orderBy('name')->pluck('name');
 
         $spreadsheet = new Spreadsheet;
@@ -100,16 +110,19 @@ class UnitsWorkbook
 
         $exampleProject = __('app.units_example_project');
         $examples = [
-            // Full row: every column filled, reference left blank → auto-generated.
+            // Full row: every column filled; the reference auto-generates, and a
+            // blank payment_methods inherits the project's options.
             ['project' => $exampleProject, 'rooms' => $rooms->first() ?? 'F3', 'floor' => $floors->first() ?? '1',
                 'area_sqm' => 85.5, 'price_semi_fini' => 12500000, 'price_fini' => 14200000,
-                'gtm_priority' => GtmPriority::High->value, 'block' => 'A', 'stack_floor' => 2, 'position' => 5],
+                'gtm_priority' => GtmPriority::High->value, 'block' => 'A', 'stack_floor' => 2, 'position' => 5,
+                'note' => __('app.units_example_note')],
             // Minimal row: a project and one price is enough.
             ['project' => $exampleProject, 'rooms' => $rooms->get(1) ?? $rooms->first() ?? 'F2',
                 'price_semi_fini' => 9800000],
-            // Explicit reference, finished price only.
-            ['project' => $exampleProject, 'reference' => 'BLD-A-01',
-                'area_sqm' => 110, 'price_fini' => 18000000, 'gtm_priority' => GtmPriority::Low->value, 'block' => 'B'],
+            // Finished price only, with a per-unit payment override (e.g. cash-only).
+            ['project' => $exampleProject,
+                'area_sqm' => 110, 'price_fini' => 18000000, 'gtm_priority' => GtmPriority::Low->value, 'block' => 'B',
+                'payment_methods' => $payments->first() ?? ''],
         ];
 
         $row = 2;
@@ -122,7 +135,7 @@ class UnitsWorkbook
 
         $this->finishSheet($units, count(self::TEMPLATE_COLUMNS));
 
-        $this->writeGuide($spreadsheet->createSheet(), $projects, $rooms, $floors);
+        $this->writeGuide($spreadsheet->createSheet(), $projects, $rooms, $floors, $payments);
         $spreadsheet->setActiveSheetIndex(0);
 
         return $spreadsheet;
@@ -132,8 +145,9 @@ class UnitsWorkbook
      * @param Collection<int, string> $projects
      * @param Collection<int, string> $rooms
      * @param Collection<int, string> $floors
+     * @param Collection<int, string> $payments
      */
-    private function writeGuide(Worksheet $sheet, Collection $projects, Collection $rooms, Collection $floors): void
+    private function writeGuide(Worksheet $sheet, Collection $projects, Collection $rooms, Collection $floors, Collection $payments): void
     {
         $sheet->setTitle(__('app.units_sheet_guide'));
         if (app()->getLocale() === 'ar') {
@@ -161,7 +175,6 @@ class UnitsWorkbook
 
         $rows = [
             ['project', $yes, __('app.units_guide_project'), $this->joined($projects)],
-            ['reference', $no, __('app.units_guide_reference'), __('app.units_guide_auto')],
             ['rooms', $no, __('app.units_guide_rooms'), $this->joined($rooms)],
             ['floor', $no, __('app.units_guide_floor'), $this->joined($floors)],
             ['area_sqm', $no, __('app.units_guide_area_sqm'), __('app.units_guide_number')],
@@ -171,6 +184,8 @@ class UnitsWorkbook
             ['block', $no, __('app.units_guide_block'), ''],
             ['stack_floor', $no, __('app.units_guide_stack_floor'), __('app.units_guide_number')],
             ['position', $no, __('app.units_guide_position'), __('app.units_guide_number')],
+            ['payment_methods', $no, __('app.units_guide_payment_methods'), $this->joined($payments)],
+            ['note', $no, __('app.units_guide_unit_note'), ''],
         ];
 
         foreach ($rows as $i => $cells) {
@@ -239,6 +254,21 @@ class UnitsWorkbook
         for ($i = 1; $i <= $columns; $i++) {
             $sheet->getColumnDimensionByColumn($i)->setAutoSize(true);
         }
+    }
+
+    /**
+     * The payment_methods export cell for a unit: blank when it inherits the
+     * project's options, else its own overriding set as comma-separated base
+     * labels. Blank round-trips as "still inheriting"; a list re-imports as an
+     * override — so an untouched export never silently pins inherited units.
+     */
+    private function paymentMethodsCell(Unit $unit): string
+    {
+        if (! $unit->payment_methods_overridden) {
+            return '';
+        }
+
+        return $unit->paymentMethods->map(fn (DynamicListItem $m) => $m->label)->implode(', ');
     }
 
     /** @return Collection<int, string> base labels of a dynamic list, in configured order */

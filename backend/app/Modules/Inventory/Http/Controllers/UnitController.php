@@ -64,7 +64,7 @@ class UnitController extends Controller
         ));
 
         return Unit::query()
-            ->with(['roomNumber', 'floor', 'location.wilaya', 'location.commune', 'location.type', 'location.contractType', 'activeReservations:id,unit_id,client_project_id'])
+            ->with(['roomNumber', 'floor', 'location.wilaya', 'location.commune', 'location.type', 'location.contractType', 'paymentMethods', 'location.paymentMethods', 'activeReservations:id,unit_id,client_project_id'])
             ->when($request->query('status') !== 'all', fn ($q) => $q->active())
             ->when($request->filled('search'), fn ($q) => $q->where('reference', 'like', '%'.trim((string) $request->query('search')).'%'))
             ->when($request->filled('location_id'), fn ($q) => $q->where('location_id', $request->query('location_id')))
@@ -137,7 +137,7 @@ class UnitController extends Controller
 
     public function show(Unit $unit): UnitResource
     {
-        return new UnitResource($unit->load(['roomNumber', 'floor', 'location.wilaya', 'location.commune', 'location.type', 'location.contractType']));
+        return new UnitResource($unit->load(['roomNumber', 'floor', 'location.wilaya', 'location.commune', 'location.type', 'location.contractType', 'paymentMethods', 'location.paymentMethods']));
     }
 
     /** Read-only stats + payments summary for the unit detail page. */
@@ -160,17 +160,17 @@ class UnitController extends Controller
 
     public function store(StoreUnitRequest $request, Location $location, CreateUnit $action): UnitResource
     {
-        return new UnitResource($action->handle($location, $request->validated())->load(['roomNumber', 'floor']));
+        return new UnitResource($action->handle($location, $request->validated())->load(['roomNumber', 'floor', 'paymentMethods', 'location.paymentMethods']));
     }
 
     public function update(UpdateUnitRequest $request, Unit $unit, UpdateUnit $action): UnitResource
     {
-        return new UnitResource($action->handle($unit, $request->validated())->load(['roomNumber', 'floor']));
+        return new UnitResource($action->handle($unit, $request->validated())->load(['roomNumber', 'floor', 'paymentMethods', 'location.paymentMethods']));
     }
 
     public function correct(CorrectUnitRequest $request, Unit $unit, CorrectUnit $action): JsonResponse
     {
-        $corrected = $action->handle($unit, $request->validated())->load(['roomNumber', 'floor']);
+        $corrected = $action->handle($unit, $request->validated())->load(['roomNumber', 'floor', 'paymentMethods', 'location.paymentMethods']);
 
         // The superseded replacement is a freshly-inserted row; a JsonResource
         // would otherwise auto-send 201. A correction is a 200 from the client's view.

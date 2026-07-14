@@ -225,7 +225,29 @@ useRefreshable(load) // pull-to-refresh (APK)
                       <dt class="text-xs text-mute">{{ $t('clients.created') }}</dt>
                       <dd class="mt-0.5 text-ink">{{ formatDate(units.current.created_at) }}</dd>
                     </div>
+                    <div
+                      v-if="units.current.payment_methods?.length"
+                      class="col-span-2 sm:col-span-3"
+                    >
+                      <dt class="text-xs text-mute">
+                        {{ $t('inventory.paymentMethods') }}
+                        <span v-if="units.current.payment_methods_overridden" class="text-primary-600 dark:text-primary-400">
+                          · {{ $t('inventory.paymentMethodsCustom') }}
+                        </span>
+                      </dt>
+                      <dd class="mt-1 flex flex-wrap gap-1">
+                        <span
+                          v-for="m in units.current.payment_methods"
+                          :key="m.id"
+                          class="inline-flex items-center rounded-full bg-highlight px-2 py-0.5 text-xs text-ink"
+                        >{{ m.label }}</span>
+                      </dd>
+                    </div>
                   </dl>
+                  <div v-if="units.current.note" class="mt-3 border-t border-line pt-3">
+                    <dt class="text-xs text-mute">{{ $t('inventory.note') }}</dt>
+                    <p class="mt-0.5 whitespace-pre-line text-sm text-ink">{{ units.current.note }}</p>
+                  </div>
                 </SectionCard>
               </div>
 

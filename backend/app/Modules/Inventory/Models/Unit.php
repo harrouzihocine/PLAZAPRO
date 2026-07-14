@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Models;
 
+use App\Core\Concerns\HasVersions;
 use App\Core\Models\BaseModel;
 use App\Modules\Clients\Models\ClientProject;
 use App\Modules\Inventory\Enums\FinishType;
@@ -15,6 +16,7 @@ use App\Modules\Settings\Models\DynamicListItem;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -34,10 +36,15 @@ class Unit extends BaseModel
 {
     use HasFactory;
 
+    use HasVersions {
+        supersedeWith as baseSupersedeWith;
+    }
+
     protected $fillable = [
         'location_id', 'reference', 'room_number_id', 'floor_id', 'area_sqm',
         'price_semi_fini', 'price_fini', 'sale_status', 'reserved_expires_at',
         'reserved_project_id', 'block', 'stack_floor', 'position', 'gtm_priority',
+        'payment_methods_overridden', 'note',
     ];
 
     protected function casts(): array
@@ -49,6 +56,7 @@ class Unit extends BaseModel
             'sale_status' => SaleStatus::class,
             'reserved_expires_at' => 'datetime',
             'gtm_priority' => GtmPriority::class,
+            'payment_methods_overridden' => 'boolean',
         ]);
     }
 
@@ -99,6 +107,59 @@ class Unit extends BaseModel
     public function location(): BelongsTo
     {
         return $this->belongsTo(Location::class);
+    }
+
+    /**
+     * This unit's OWN offered payment / financing options — only authoritative
+     * when `payment_methods_overridden` is true (else the unit inherits its
+     * project's). Same `project_payment_methods` dynamic-list items the project
+     * draws from; mirrors Location::paymentMethods.
+     */
+    public function paymentMethods(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            DynamicListItem::class,
+            'unit_payment_methods',
+            'unit_id',
+            'dynamic_list_item_id',
+        )->withTimestamps();
+    }
+
+    /**
+     * The payment options actually offered on this unit: its own set when it
+     * overrides, otherwise the project's. Callers that render this should have
+     * `paymentMethods` (and, for the inherited case, `location.paymentMethods`)
+     * eager-loaded to avoid an N+1.
+     *
+     * @return SupportCollection<int, DynamicListItem>
+     */
+    public function effectivePaymentMethods(): SupportCollection
+    {
+        $methods = $this->payment_methods_overridden
+            ? $this->paymentMethods
+            : ($this->location?->paymentMethods ?? collect());
+
+        return $methods->toBase();
+    }
+
+    /**
+     * A price/status correction replicate()s the row but not its pivots — carry
+     * the per-unit payment-method override onto the new version so a correction
+     * never silently drops a unit's own (e.g. cash-only) options. The boolean
+     * flag rides along as a plain column.
+     */
+    public function supersedeWith(array $attributes, string $reason): static
+    {
+        $overridden = $this->payment_methods_overridden;
+        $ids = $overridden ? $this->paymentMethods->pluck('id')->all() : [];
+
+        $replacement = $this->baseSupersedeWith($attributes, $reason);
+
+        if ($overridden) {
+            $replacement->paymentMethods()->sync($ids);
+        }
+
+        return $replacement;
     }
 
     /** Number of rooms (a `room_numbers` dynamic-list item), e.g. F2 / F3. */

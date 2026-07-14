@@ -19,7 +19,7 @@ return [
     // L’export .xlsx des unités / le modèle d’import (noms d’onglets + onglet Guide).
     'units_sheet_units' => 'Unités',
     'units_sheet_guide' => 'Guide',
-    'units_guide_note' => 'Chaque ligne est une unité. Remplacez les lignes d’exemple grises par vos données, puis importez le fichier depuis la page Unités. Laissez « reference » vide pour la générer automatiquement. Les lignes portant une colonne « id » (issues d’un export) mettent à jour l’unité au lieu d’en créer une ; le statut de vente n’est jamais modifié par un import.',
+    'units_guide_note' => 'Chaque ligne est une unité. Remplacez les lignes d’exemple grises par vos données, puis importez le fichier depuis la page Unités. Les références sont générées automatiquement. Les lignes portant une colonne « id » (issues d’un export) mettent à jour l’unité au lieu d’en créer une ; le statut de vente n’est jamais modifié par un import.',
     'units_guide_column' => 'Colonne',
     'units_guide_required' => 'Obligatoire',
     'units_guide_description' => 'Description',
@@ -40,7 +40,10 @@ return [
     'units_guide_block' => 'Bloc / entrée du bâtiment.',
     'units_guide_stack_floor' => 'Numéro d’étage utilisé par le plan d’empilement.',
     'units_guide_position' => 'Position sur l’étage (plan d’empilement).',
+    'units_guide_payment_methods' => 'Modes de paiement de ce lot. Laissez vide pour hériter de ceux du projet ; listez des modes (séparés par des virgules) pour personnaliser ce lot (ex. paiement comptant uniquement).',
+    'units_guide_unit_note' => 'Note en texte libre affichée partout où le lot apparaît.',
     'units_example_project' => 'Projet exemple — à remplacer',
+    'units_example_note' => 'Lot d’angle, rangement supplémentaire',
 
     // Partage de médias (envoi WhatsApp au client)
     'media_share_bad_items' => 'Certains éléments sélectionnés ne peuvent plus être partagés (supprimés, ou ni photos/vidéos/plans).',

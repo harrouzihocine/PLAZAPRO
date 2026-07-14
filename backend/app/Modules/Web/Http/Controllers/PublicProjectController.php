@@ -86,11 +86,11 @@ class PublicProjectController extends Controller
     {
         $location = Location::query()->published()
             ->where('show_availability', true)
-            ->with(['wilaya:id,code,name', 'commune:id,wilaya_id,name'])
+            ->with(['wilaya:id,code,name', 'commune:id,wilaya_id,name', 'paymentMethods'])
             ->findOrFail($id);
 
         $unit = $location->units()->active()
-            ->with(['roomNumber', 'floor'])
+            ->with(['roomNumber', 'floor', 'paymentMethods'])
             ->findOrFail($unitId);
 
         $unit->load([

@@ -42,6 +42,12 @@ class UpdateUnitRequest extends FormRequest
             'stack_floor' => ['sometimes', 'nullable', 'integer'],
             'position' => ['sometimes', 'nullable', 'integer'],
             'gtm_priority' => ['sometimes', new Enum(GtmPriority::class)],
+            // Payment options: off = inherit the project's, on = the unit's own
+            // set below (`project_payment_methods` items — e.g. cash-only).
+            'payment_methods_overridden' => ['sometimes', 'boolean'],
+            'payment_method_ids' => ['sometimes', 'nullable', 'array'],
+            'payment_method_ids.*' => ['integer', 'exists:dynamic_list_items,id'],
+            'note' => ['sometimes', 'nullable', 'string', 'max:5000'],
         ];
     }
 }

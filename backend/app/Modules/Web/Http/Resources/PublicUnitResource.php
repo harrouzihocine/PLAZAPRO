@@ -39,6 +39,10 @@ class PublicUnitResource extends JsonResource
             'finishes' => array_map(fn ($f) => $f->value, $this->availableFinishes()),
             'price_semi_fini' => $project->show_prices ? $this->price_semi_fini : null,
             'price_fini' => $project->show_prices ? $this->price_fini : null,
+            // The payment options actually offered here (the unit's own when it
+            // overrides, else the project's) — same public shape as the project.
+            'payment_methods' => $this->effectivePaymentMethods()
+                ->map(fn ($m) => ['id' => $m->id, 'label' => $m->localizedLabel()])->all(),
             'media' => PublicMediaResource::collection($this->whenLoaded('media')),
             // Just enough of the parent for the breadcrumb + hero context.
             'project' => [

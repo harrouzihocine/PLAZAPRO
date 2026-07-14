@@ -214,6 +214,19 @@ useSeoMeta(() => ({
             </template>
             <p v-else class="text-sm font-medium text-mute">{{ $t('showcase.projects.priceOnRequest') }}</p>
 
+            <!-- Payment options offered here (the unit's own when it overrides
+                 the project, else the project's). -->
+            <div v-if="unit.payment_methods?.length" class="border-t border-line pt-4">
+              <h4 class="text-sm font-semibold text-ink">{{ $t('showcase.project.paymentMethods') }}</h4>
+              <div class="mt-2.5 flex flex-wrap gap-2">
+                <span
+                  v-for="method in unit.payment_methods"
+                  :key="method.id"
+                  class="rounded-full bg-primary-500/10 px-3 py-1 text-xs font-medium text-primary-600 dark:text-primary-400"
+                >{{ method.label }}</span>
+              </div>
+            </div>
+
             <Button
               :label="unit.available ? $t('showcase.units.interested') : $t('showcase.project.askInfo')"
               icon="pi pi-send"

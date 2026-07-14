@@ -11,9 +11,12 @@ import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
+import ToggleSwitch from 'primevue/toggleswitch'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
+import BaseMultiSelect from '@/components/base/BaseMultiSelect.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import MoneyInput from '@/components/base/MoneyInput.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import SectionCard from '@/components/ui/SectionCard.vue'
@@ -54,6 +57,9 @@ const units = useUnitsStore()
 const auth = useAuthStore()
 const { items: roomNumbers } = useDynamicList('room_numbers')
 const { items: floors } = useDynamicList('floors')
+// Financing / payment options — the same list the project draws from; a unit
+// may override its project's set (e.g. cash-only).
+const { items: projectPaymentMethods } = useDynamicList('project_payment_methods')
 
 const canManage = auth.can('units.manage')
 // Editing the project (name, location, website settings…) is its own grant,
@@ -118,8 +124,15 @@ const blank = {
   stack_floor: '',
   position: '',
   gtm_priority: 'medium',
+  payment_methods_overridden: false,
+  payment_method_ids: [],
+  note: '',
 }
 const form = reactive({ ...blank })
+
+// The project's own offered options — shown as the inherited default when the
+// unit doesn't override, and as chips for context.
+const inheritedPaymentMethods = computed(() => locations.current?.payment_methods ?? [])
 const mode = ref(null) // 'create' | 'duplicate' | 'edit' | 'correct' | null
 const editingId = ref(null)
 const correction = reactive({ price_semi_fini: '', price_fini: '', sale_status: '', reason: '' })
@@ -196,7 +209,7 @@ onMounted(load)
 useRefreshable(load) // pull-to-refresh (APK)
 
 function openCreate() {
-  Object.assign(form, blank)
+  Object.assign(form, structuredClone(blank))
   editingId.value = null
   refAuto.value = true
   mode.value = 'create'
@@ -217,6 +230,9 @@ function openDuplicate(u) {
     stack_floor: u.stack_floor ?? '',
     position: u.position ?? '',
     gtm_priority: u.gtm_priority ?? 'medium',
+    payment_methods_overridden: !!u.payment_methods_overridden,
+    payment_method_ids: [...(u.payment_method_ids ?? [])],
+    note: u.note ?? '',
   })
   editingId.value = null
   refAuto.value = true
@@ -236,6 +252,9 @@ function openEdit(u) {
     stack_floor: u.stack_floor ?? '',
     position: u.position ?? '',
     gtm_priority: u.gtm_priority ?? 'medium',
+    payment_methods_overridden: !!u.payment_methods_overridden,
+    payment_method_ids: [...(u.payment_method_ids ?? [])],
+    note: u.note ?? '',
   })
   editingId.value = u.id
   mode.value = 'edit'
@@ -264,6 +283,10 @@ async function submit() {
     stack_floor: num(form.stack_floor),
     position: num(form.position),
     gtm_priority: form.gtm_priority,
+    // Payment options: only send the own set when overriding, else inherit.
+    payment_methods_overridden: form.payment_methods_overridden,
+    payment_method_ids: form.payment_methods_overridden ? form.payment_method_ids : [],
+    note: form.note.trim() || null,
   }
   try {
     if (mode.value === 'edit') {
@@ -872,6 +895,37 @@ async function remove(u) {
             :options="gtmPriorityOptions()"
           />
         </div>
+
+        <!-- Payment options: inherit the project's, or override for this unit
+             (e.g. cash-only). -->
+        <div class="rounded-xl border border-line p-3">
+          <label class="flex items-center justify-between gap-3 text-sm font-medium text-ink">
+            {{ $t('inventory.paymentMethodsOverride') }}
+            <ToggleSwitch v-model="form.payment_methods_overridden" />
+          </label>
+          <BaseMultiSelect
+            v-if="form.payment_methods_overridden"
+            v-model="form.payment_method_ids"
+            class="mt-3"
+            :label="$t('inventory.paymentMethodsOffered')"
+            :placeholder="$t('common.none')"
+            :options="projectPaymentMethods.map((m) => ({ value: m.id, label: itemLabel(m) }))"
+          />
+          <p v-else class="mt-2 flex flex-wrap items-center gap-1 text-xs text-mute">
+            <span>{{ $t('inventory.paymentMethodsInherited') }}:</span>
+            <template v-if="inheritedPaymentMethods.length">
+              <span
+                v-for="m in inheritedPaymentMethods"
+                :key="m.id"
+                class="inline-flex items-center rounded-full bg-highlight px-2 py-0.5 text-ink"
+              >{{ m.label }}</span>
+            </template>
+            <template v-else>—</template>
+          </p>
+        </div>
+
+        <BaseTextarea v-model="form.note" :label="$t('inventory.note')" :rows="2" />
+
         <p class="text-xs text-mute">
           {{ mode === 'edit' ? $t('inventory.useCorrectHint') : $t('inventory.refAutoHint') }}
           <template v-if="mode !== 'edit'"> {{ $t('inventory.atLeastOnePrice') }}</template>

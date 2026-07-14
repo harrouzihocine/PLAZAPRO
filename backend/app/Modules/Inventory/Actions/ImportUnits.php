@@ -32,13 +32,16 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
  */
 class ImportUnits
 {
-    /** Spec columns importable as-is (the finish prices and reference are special-cased). */
-    private const SPEC_COLUMNS = ['area_sqm', 'block', 'stack_floor', 'position', 'gtm_priority'];
+    /** Spec columns importable as-is (the finish prices, reference and payment methods are special-cased). */
+    private const SPEC_COLUMNS = ['area_sqm', 'block', 'stack_floor', 'position', 'gtm_priority', 'note'];
 
     /** @var Collection<string, DynamicListItem>|null label/value (lowercased) → item */
     private ?Collection $rooms = null;
 
     private ?Collection $floors = null;
+
+    /** @var Collection<string, DynamicListItem>|null project_payment_methods lookup */
+    private ?Collection $paymentMethods = null;
 
     /** @var array<int, array<string, true>> refs taken per location during THIS import */
     private array $takenRefs = [];
@@ -182,9 +185,19 @@ class ImportUnits
             $specs['reference'] = $row['reference'];
         }
 
+        $paymentMethods = $this->paymentMethodsFrom($row);
+        if ($paymentMethods !== null) {
+            $specs['payment_methods_overridden'] = $paymentMethods['overridden'];
+        }
+
         $unit->fill($specs);
         $changed = $unit->isDirty();
         $unit->save();
+
+        if ($paymentMethods !== null) {
+            $sync = $unit->paymentMethods()->sync($paymentMethods['overridden'] ? $paymentMethods['ids'] : []);
+            $changed = $changed || $sync['attached'] !== [] || $sync['detached'] !== [];
+        }
 
         // A price change is a correction: version it exactly like /correct does.
         // Both finish prices in ONE supersede so a row edit stays a single version.
@@ -245,14 +258,56 @@ class ImportUnits
         }
         $this->takenRefs[$location->id][mb_strtolower($reference)] = true;
 
+        $paymentMethods = $this->paymentMethodsFrom($row);
+
         $unit = $location->units()->create($specs + $prices + [
             'reference' => $reference,
             'sale_status' => SaleStatus::Available->value,
             'gtm_priority' => $specs['gtm_priority'] ?? GtmPriority::Medium->value,
+            'payment_methods_overridden' => $paymentMethods['overridden'] ?? false,
         ]);
+
+        if ($paymentMethods !== null && $paymentMethods['overridden']) {
+            $unit->paymentMethods()->sync($paymentMethods['ids']);
+        }
 
         // Targeted desire-matching only — no team-wide "new unit" bell per row.
         UnitRepriced::dispatch($unit);
+    }
+
+    /**
+     * The payment-method override a row carries. Returns null when the column is
+     * absent (leave the unit's setting untouched); an empty cell means "inherit
+     * the project's" (override off); a list (comma / ; / | / newline separated)
+     * of `project_payment_methods` labels means the unit overrides with its own.
+     *
+     * @return array{overridden: bool, ids: list<int>}|null
+     */
+    private function paymentMethodsFrom(array $row): ?array
+    {
+        if (! array_key_exists('payment_methods', $row)) {
+            return null;
+        }
+
+        $cell = trim($row['payment_methods']);
+        if ($cell === '') {
+            return ['overridden' => false, 'ids' => []];
+        }
+
+        $lookup = $this->paymentMethods ??= $this->listLookup('project_payment_methods');
+
+        $ids = [];
+        foreach (preg_split('/[,;|\n]+/', $cell) as $part) {
+            $part = trim((string) $part);
+            if ($part === '') {
+                continue;
+            }
+            $item = $lookup->get(mb_strtolower($part));
+            throw_if($item === null, new \RuntimeException(__('app.units_import_unknown_item', ['value' => $part])));
+            $ids[] = $item->id;
+        }
+
+        return ['overridden' => true, 'ids' => array_values(array_unique($ids))];
     }
 
     /** @return array<string, mixed> validated spec attributes present in the row */

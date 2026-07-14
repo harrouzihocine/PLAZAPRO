@@ -55,6 +55,22 @@ class UnitResource extends JsonResource
             'block' => $this->block,
             'stack_floor' => $this->stack_floor,
             'position' => $this->position,
+            // Free-text remark shown wherever the unit's details appear.
+            'note' => $this->note,
+            // Payment options. `payment_methods_overridden` + `payment_method_ids`
+            // drive the edit form (the unit's OWN set); `payment_methods` is the
+            // effective list actually offered (own when overriding, else the
+            // project's) for read views. Only present when eager-loaded.
+            'payment_methods_overridden' => (bool) $this->payment_methods_overridden,
+            'payment_method_ids' => $this->whenLoaded(
+                'paymentMethods',
+                fn () => $this->paymentMethods->pluck('id')->all(),
+            ),
+            'payment_methods' => $this->whenLoaded(
+                'paymentMethods',
+                fn () => $this->effectivePaymentMethods()
+                    ->map(fn ($m) => ['id' => $m->id, 'label' => $m->localizedLabel()])->all(),
+            ),
             'status' => $this->status?->value,
             'supersedes_id' => $this->supersedes_id,
             'created_at' => $this->created_at,
