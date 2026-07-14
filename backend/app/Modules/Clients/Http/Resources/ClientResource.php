@@ -45,6 +45,18 @@ class ClientResource extends JsonResource
             'birth_date' => $this->when($canSeeDetails, $this->birth_date?->toDateString()),
             'birth_place' => $this->when($canSeeDetails, $this->birth_place),
             'address' => $this->when($canSeeDetails, $this->address),
+            // Wilaya + commune of residence (optional).
+            'wilaya_id' => $this->when($canSeeDetails, $this->wilaya_id),
+            'commune_id' => $this->when($canSeeDetails, $this->commune_id),
+            'wilaya' => $this->when($canSeeDetails, fn () => $this->whenLoaded('wilaya', fn () => $this->wilaya ? [
+                'id' => $this->wilaya->id,
+                'code' => $this->wilaya->code,
+                'name' => $this->wilaya->name,
+            ] : null)),
+            'commune' => $this->when($canSeeDetails, fn () => $this->whenLoaded('commune', fn () => $this->commune ? [
+                'id' => $this->commune->id,
+                'name' => $this->commune->name,
+            ] : null)),
             // Workflow gate: a client's first entity is a call — until one exists the
             // FE hides deals/desire/visits behind a "log the first call" CTA.
             'has_calls' => $this->when(isset($this->calls_exists), fn () => (bool) $this->calls_exists),

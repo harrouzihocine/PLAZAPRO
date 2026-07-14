@@ -7,8 +7,10 @@ namespace App\Modules\Clients\Models;
 use App\Core\Models\BaseModel;
 use App\Modules\Pipeline\Enums\VisitType;
 use App\Modules\Pipeline\Models\Call;
+use App\Modules\Settings\Models\Commune;
 use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\User;
+use App\Modules\Settings\Models\Wilaya;
 use App\Support\DzPhone;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -33,6 +35,7 @@ class Client extends BaseModel
         'source_id', 'rating_id', 'referrer_name', 'referrer_phone',
         'assigned_agent_id', 'notes',
         'id_documents', 'id_number', 'birth_date', 'birth_place', 'address',
+        'wilaya_id', 'commune_id',
     ];
 
     /** Shown wherever a client has no captured name yet. */
@@ -188,6 +191,18 @@ class Client extends BaseModel
     public function assignedAgent(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_agent_id');
+    }
+
+    /** Wilaya of residence (optional). */
+    public function wilaya(): BelongsTo
+    {
+        return $this->belongsTo(Wilaya::class);
+    }
+
+    /** Commune of residence (optional; belongs to the chosen wilaya). */
+    public function commune(): BelongsTo
+    {
+        return $this->belongsTo(Commune::class);
     }
 
     /** The user who created this client (set on create; back-office visibility only). */

@@ -31,7 +31,14 @@ export const useClientsStore = defineStore('clients', {
     matches: [],
     timeline: { calls: [], visits: [], next_actions: [], next_action_history: [] },
     timelineProjectId: null,
-    filters: { assigned_agent_id: '', source_id: '', rating_id: '', search: '' },
+    filters: {
+      assigned_agent_id: '',
+      source_id: '',
+      rating_id: '',
+      wilaya_id: '',
+      commune_id: '',
+      search: '',
+    },
     page: 1, // current page (server-side pagination)
     rows: 25, // page size
     total: 0, // total matching rows (drives the paginator)

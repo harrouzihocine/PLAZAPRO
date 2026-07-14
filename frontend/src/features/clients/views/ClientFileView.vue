@@ -292,7 +292,9 @@ async function submitNewProject(callPayload) {
                 store.current.id_number ||
                 store.current.birth_date ||
                 store.current.birth_place ||
-                store.current.address)
+                store.current.address ||
+                store.current.wilaya ||
+                store.current.commune)
             "
             :title="$t('clients.identityCard')"
             icon="pi pi-id-card"
@@ -327,6 +329,18 @@ async function submitNewProject(callPayload) {
                   <template v-if="store.current.birth_place">
                     — {{ store.current.birth_place }}</template
                   >
+                </dd>
+              </div>
+              <div
+                v-if="store.current.wilaya || store.current.commune"
+                class="flex justify-between gap-2"
+              >
+                <dt class="text-mute">{{ $t('geo.wilaya') }}</dt>
+                <dd class="text-end text-ink">
+                  {{ store.current.wilaya?.name ?? '—' }}
+                  <span v-if="store.current.commune" class="block text-xs text-mute">
+                    {{ store.current.commune.name }}
+                  </span>
                 </dd>
               </div>
               <div v-if="store.current.address" class="flex justify-between gap-2">

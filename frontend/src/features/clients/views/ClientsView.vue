@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRefreshable } from '@/composables/useRefreshRegistry'
 import { useRouter } from 'vue-router'
 import Avatar from 'primevue/avatar'
@@ -21,6 +21,7 @@ import SendToPhoneButton from '@/features/clients/components/SendToPhoneButton.v
 import { formatPhone } from '@/data/countryCodes'
 import { useAutoFilter } from '@/composables/useAutoFilter'
 import { useDynamicList } from '@/composables/useDynamicList'
+import { useWilayas, useCommunes } from '@/composables/useGeography'
 import { useClientsStore } from '@/features/clients/clientsStore'
 import { useAuthStore } from '@/features/settings/store'
 import { confirmAction } from '@/composables/useConfirm'
@@ -32,6 +33,20 @@ const auth = useAuthStore()
 const router = useRouter()
 const { items: sources } = useDynamicList('sources')
 const { items: ratings } = useDynamicList('client_ratings')
+// Wilaya + dependent commune filters (single-select, matching the toolbar).
+const { wilayas } = useWilayas()
+const { communes: filterCommunes, load: loadFilterCommunes } = useCommunes()
+
+// The commune filter cascades from the chosen wilaya: reload its communes and
+// drop a stale commune when the wilaya changes (the auto-filter watcher below
+// picks the change up and refetches — no extra request here).
+watch(
+  () => store.filters.wilaya_id,
+  (id, prev) => {
+    if (prev !== undefined && id !== prev) store.filters.commune_id = ''
+    loadFilterCommunes(id)
+  },
+)
 
 const canCreate = computed(() => auth.can('clients.create'))
 // Editing a client's info (clients.edit) and cancelling one (clients.cancel)
@@ -102,7 +117,14 @@ const hasFilters = computed(() => Object.values(store.filters).some((v) => v !==
 
 function resetFilters() {
   // The auto-filter watcher picks the change up and refetches.
-  store.filters = { assigned_agent_id: '', source_id: '', rating_id: '', search: '' }
+  store.filters = {
+    assigned_agent_id: '',
+    source_id: '',
+    rating_id: '',
+    wilaya_id: '',
+    commune_id: '',
+    search: '',
+  }
 }
 
 function openFile(event) {
@@ -168,6 +190,22 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
             class="w-full sm:w-40"
             :options="ratings.map((r) => ({ value: r.id, label: r.label }))"
           />
+          <BaseSelect
+            v-if="canSeeDetails"
+            v-model="store.filters.wilaya_id"
+            :placeholder="$t('inventory.allWilayas')"
+            :aria-label="$t('inventory.filterByWilaya')"
+            class="w-full sm:w-44"
+            :options="wilayas.map((w) => ({ value: w.id, label: `${w.code} · ${w.name}` }))"
+          />
+          <BaseSelect
+            v-if="canSeeDetails && store.filters.wilaya_id"
+            v-model="store.filters.commune_id"
+            :placeholder="$t('inventory.allCommunes')"
+            :aria-label="$t('inventory.filterByCommune')"
+            class="w-full sm:w-44"
+            :options="filterCommunes.map((c) => ({ value: c.id, label: c.name }))"
+          />
           <Button
             v-if="hasFilters"
             icon="pi pi-filter-slash"
@@ -218,6 +256,13 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
                   severity="secondary"
                 />
                 <Tag v-if="item.rating" :value="item.rating.label" severity="secondary" />
+              </p>
+              <p
+                v-if="canSeeDetails && item.wilaya"
+                class="mt-1 truncate text-xs text-mute"
+              >
+                <i class="pi pi-map-marker text-[10px]" aria-hidden="true" />
+                {{ item.wilaya.name }}<template v-if="item.commune"> · {{ item.commune.name }}</template>
               </p>
               <p v-if="canSeeOwnership" class="mt-1 truncate text-xs text-mute">
                 <i class="pi pi-user text-[10px]" aria-hidden="true" />
@@ -327,6 +372,16 @@ const whatsappLink = (phone) => `https://wa.me/${(phone ?? '').replace(/\D/g, ''
         <Column v-if="canSeeDetails" :header="$t('clients.rating')">
           <template #body="{ data }">
             <span v-if="data.rating" class="text-ink">{{ data.rating.label }}</span>
+            <span v-else class="text-mute">—</span>
+          </template>
+        </Column>
+
+        <Column v-if="canSeeDetails" :header="$t('geo.wilaya')">
+          <template #body="{ data }">
+            <span v-if="data.wilaya" class="text-ink">
+              {{ data.wilaya.name }}
+              <span v-if="data.commune" class="block text-xs text-mute">{{ data.commune.name }}</span>
+            </span>
             <span v-else class="text-mute">—</span>
           </template>
         </Column>

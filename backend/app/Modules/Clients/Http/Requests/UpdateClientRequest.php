@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Clients\Http\Requests;
 
 use App\Modules\Clients\Enums\IdDocumentType;
+use App\Modules\Settings\Http\Requests\Concerns\ValidatesCommuneBelongsToWilaya;
 use App\Modules\Settings\Rules\CanFollowUpClient;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Enum;
 
@@ -16,6 +18,8 @@ use Illuminate\Validation\Rules\Enum;
  */
 class UpdateClientRequest extends FormRequest
 {
+    use ValidatesCommuneBelongsToWilaya;
+
     public function authorize(): bool
     {
         return (bool) $this->user()?->can('clients.edit');
@@ -54,6 +58,15 @@ class UpdateClientRequest extends FormRequest
             'birth_date' => ['sometimes', 'nullable', 'date', 'before_or_equal:today'],
             'birth_place' => ['sometimes', 'nullable', 'string', 'max:255'],
             'address' => ['sometimes', 'nullable', 'string', 'max:500'],
+            // Wilaya + commune of residence (optional); the commune must belong
+            // to its wilaya — enforced in withValidator().
+            'wilaya_id' => ['sometimes', 'nullable', 'integer', 'exists:wilayas,id'],
+            'commune_id' => ['sometimes', 'nullable', 'integer', 'exists:communes,id'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $this->validateCommuneMatchesWilaya($validator);
     }
 }

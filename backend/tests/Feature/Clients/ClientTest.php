@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Tests\Feature\Clients;
 
 use App\Modules\Clients\Models\Client;
+use App\Modules\Settings\Models\Commune;
 use App\Modules\Settings\Models\Permission;
 use App\Modules\Settings\Models\Role;
 use App\Modules\Settings\Models\User;
+use App\Modules\Settings\Models\Wilaya;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -66,6 +68,43 @@ class ClientTest extends TestCase
         $this->assertDatabaseHas('clients', [
             'first_name' => 'Amine', 'phone' => '+213 555 12 34 56', 'status' => 'active',
         ]);
+    }
+
+    public function test_client_carries_an_optional_wilaya_and_commune_of_residence(): void
+    {
+        $wilaya = Wilaya::factory()->create(['code' => '16', 'name' => 'Alger']);
+        $commune = Commune::factory()->create(['wilaya_id' => $wilaya->id, 'name' => 'Hydra']);
+        Sanctum::actingAs($this->manager());
+
+        $created = $this->postJson('/api/v1/clients', [
+            'phone' => '0555999888',
+            'wilaya_id' => $wilaya->id,
+            'commune_id' => $commune->id,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.wilaya.name', 'Alger')
+            ->assertJsonPath('data.commune.name', 'Hydra')
+            ->json('data.id');
+
+        $this->assertDatabaseHas('clients', [
+            'id' => $created, 'wilaya_id' => $wilaya->id, 'commune_id' => $commune->id,
+        ]);
+    }
+
+    public function test_a_commune_must_belong_to_the_chosen_wilaya(): void
+    {
+        $wilaya = Wilaya::factory()->create();
+        $otherWilaya = Wilaya::factory()->create();
+        $foreignCommune = Commune::factory()->create(['wilaya_id' => $otherWilaya->id]);
+        Sanctum::actingAs($this->manager());
+
+        $this->postJson('/api/v1/clients', [
+            'phone' => '0555111222',
+            'wilaya_id' => $wilaya->id,
+            'commune_id' => $foreignCommune->id,
+        ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrorFor('commune_id');
     }
 
     public function test_a_client_can_be_assigned_to_a_sales_agent(): void
@@ -155,6 +194,27 @@ class ClientTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.first_name', 'Nadia');
+    }
+
+    public function test_index_filters_by_wilaya_and_commune(): void
+    {
+        $alger = Wilaya::factory()->create(['code' => '16', 'name' => 'Alger']);
+        $hydra = Commune::factory()->create(['wilaya_id' => $alger->id, 'name' => 'Hydra']);
+        $oran = Wilaya::factory()->create(['code' => '31', 'name' => 'Oran']);
+
+        Client::factory()->create(['first_name' => 'Wilaya', 'wilaya_id' => $alger->id, 'commune_id' => $hydra->id]);
+        Client::factory()->create(['first_name' => 'Elsewhere', 'wilaya_id' => $oran->id]);
+        Sanctum::actingAs($this->manager());
+
+        $this->getJson("/api/v1/clients?wilaya_id={$alger->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.first_name', 'Wilaya');
+
+        $this->getJson("/api/v1/clients?commune_id={$hydra->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.commune.name', 'Hydra');
     }
 
     public function test_name_search_matches_the_full_name_in_any_word_order(): void

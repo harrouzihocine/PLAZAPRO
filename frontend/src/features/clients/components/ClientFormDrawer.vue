@@ -8,6 +8,7 @@ import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import DuplicateNoticeModal from '@/features/clients/components/DuplicateNoticeModal.vue'
 import { useDynamicList, itemLabel } from '@/composables/useDynamicList'
+import { useWilayas, useCommunes } from '@/composables/useGeography'
 import { useClientsStore } from '@/features/clients/clientsStore'
 import { useAuthStore } from '@/features/settings/store'
 import { t, isRTL } from '@/i18n'
@@ -26,6 +27,9 @@ const store = useClientsStore()
 const auth = useAuthStore()
 const { items: sources } = useDynamicList('sources')
 const { items: ratings } = useDynamicList('client_ratings')
+// Wilaya + commune of residence (optional), cascading like the project form.
+const { wilayas } = useWilayas()
+const { communes: formCommunes, load: loadFormCommunes } = useCommunes()
 
 // Assigning a follow-up agent is back-office-only (clients.manage).
 const canSeeOwnership = computed(() => auth.can('clients.manage'))
@@ -52,6 +56,8 @@ const emptyForm = () => ({
   birth_date: '',
   birth_place: '',
   address: '',
+  wilaya_id: '',
+  commune_id: '',
 })
 const form = reactive(emptyForm())
 const showIdentity = ref(false)
@@ -101,7 +107,12 @@ watch(
       birth_date: c?.birth_date ?? '',
       birth_place: c?.birth_place ?? '',
       address: c?.address ?? '',
+      wilaya_id: c?.wilaya_id ?? c?.wilaya?.id ?? '',
+      commune_id: c?.commune_id ?? c?.commune?.id ?? '',
     })
+    // Load the dependent commune list for the client's saved wilaya (keeps the
+    // saved commune selected — a user-driven change clears it via onWilayaChange).
+    loadFormCommunes(form.wilaya_id)
     // Open the identity section when it already holds something.
     showIdentity.value = Boolean(
       c &&
@@ -109,11 +120,20 @@ watch(
           c.id_number ||
           c.birth_date ||
           c.birth_place ||
-          c.address),
+          c.address ||
+          c.wilaya_id ||
+          c.wilaya),
     )
   },
   { immediate: true },
 )
+
+// Cascade on a USER wilaya change: drop the old commune and reload the list.
+function onWilayaChange(id) {
+  form.wilaya_id = id
+  form.commune_id = ''
+  loadFormCommunes(id)
+}
 
 // The referrer inputs appear only when the picked source IS the referral one.
 const isReferral = computed(
@@ -149,6 +169,9 @@ async function save() {
     birth_date: form.birth_date || null,
     birth_place: form.birth_place.trim() || null,
     address: form.address.trim() || null,
+    wilaya_id: form.wilaya_id || null,
+    // A commune is meaningless without its wilaya — drop it if the wilaya is unset.
+    commune_id: (form.wilaya_id && form.commune_id) || null,
   }
   try {
     const saved = props.client
@@ -166,7 +189,9 @@ async function save() {
     if (serverErrors) {
       Object.assign(errors, serverErrors)
       if (
-        ['id_number', 'birth_date', 'birth_place', 'address'].some((k) => errors[k]) ||
+        ['id_number', 'birth_date', 'birth_place', 'address', 'wilaya_id', 'commune_id'].some(
+          (k) => errors[k],
+        ) ||
         Object.keys(errors).some((k) => k.startsWith('id_documents'))
       ) {
         showIdentity.value = true
@@ -301,6 +326,25 @@ const duplicateNotice = ref(null)
           <div class="grid grid-cols-2 gap-3">
             <BaseInput v-model="form.birth_date" :label="$t('clients.birthDate')" type="date" :error="fieldError('birth_date')" />
             <BaseInput v-model="form.birth_place" :label="$t('clients.birthPlace')" capitalize :error="fieldError('birth_place')" />
+          </div>
+          <!-- Wilaya + commune of residence (optional), cascading. -->
+          <div class="grid grid-cols-2 gap-3">
+            <BaseSelect
+              :model-value="form.wilaya_id"
+              :label="$t('geo.wilaya')"
+              :placeholder="$t('common.none')"
+              :options="wilayas.map((w) => ({ value: w.id, label: `${w.code} · ${w.name}` }))"
+              :error="fieldError('wilaya_id')"
+              @update:model-value="onWilayaChange"
+            />
+            <BaseSelect
+              v-model="form.commune_id"
+              :label="$t('geo.commune')"
+              :placeholder="$t('common.none')"
+              :disabled="!form.wilaya_id"
+              :options="formCommunes.map((c) => ({ value: c.id, label: c.name }))"
+              :error="fieldError('commune_id')"
+            />
           </div>
           <BaseInput v-model="form.address" :label="$t('common.address')" :error="fieldError('address')" />
         </div>

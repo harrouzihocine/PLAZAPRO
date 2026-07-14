@@ -31,12 +31,14 @@ class ClientController extends Controller
         $clients = Client::query()
             // clients.view_all: without it, only own (created / assigned) clients.
             ->visibleTo($request->user())
-            ->with(['source', 'rating', 'assignedAgent', 'creator'])
+            ->with(['source', 'rating', 'assignedAgent', 'creator', 'wilaya', 'commune'])
             ->withExists(['calls' => fn ($q) => $q->active()])
             ->when($request->query('status') !== 'all', fn ($q) => $q->active())
             ->when($request->filled('assigned_agent_id'), fn ($q) => $q->where('assigned_agent_id', $request->integer('assigned_agent_id')))
             ->when($request->filled('source_id'), fn ($q) => $q->where('source_id', $request->integer('source_id')))
             ->when($request->filled('rating_id'), fn ($q) => $q->where('rating_id', $request->integer('rating_id')))
+            ->when($request->filled('wilaya_id'), fn ($q) => $q->where('wilaya_id', $request->integer('wilaya_id')))
+            ->when($request->filled('commune_id'), fn ($q) => $q->where('commune_id', $request->integer('commune_id')))
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = trim((string) $request->query('search'));
                 // Phone match is format-agnostic: compare digits only and ignore the
@@ -91,7 +93,7 @@ class ClientController extends Controller
         );
 
         return new ClientResource(
-            $client->load(['source', 'rating', 'assignedAgent', 'creator'])
+            $client->load(['source', 'rating', 'assignedAgent', 'creator', 'wilaya', 'commune'])
                 ->loadExists(['calls' => fn ($q) => $q->active()]),
         );
     }
@@ -128,7 +130,7 @@ class ClientController extends Controller
         }
 
         $client = $action->handle($request->validated())
-            ->load(['source', 'rating', 'assignedAgent', 'creator']);
+            ->load(['source', 'rating', 'assignedAgent', 'creator', 'wilaya', 'commune']);
 
         return (new ClientResource($client))->response()->setStatusCode(201);
     }
@@ -136,7 +138,7 @@ class ClientController extends Controller
     public function update(UpdateClientRequest $request, Client $client, UpdateClient $action): ClientResource
     {
         return new ClientResource(
-            $action->handle($client, $request->validated())->load(['source', 'rating', 'assignedAgent', 'creator']),
+            $action->handle($client, $request->validated())->load(['source', 'rating', 'assignedAgent', 'creator', 'wilaya', 'commune']),
         );
     }
 
