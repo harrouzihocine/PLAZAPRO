@@ -9,6 +9,7 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import FilterPanel from '@/components/ui/FilterPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import ClientContactInline from '@/features/clients/components/ClientContactInline.vue'
 import { analyticsApi } from '@/features/analytics/api'
 import { staffApi } from '@/features/clients/api'
 import { useAutoFilter } from '@/composables/useAutoFilter'
@@ -229,6 +230,14 @@ useAutoFilter(
                   {{ row.client ?? '—' }}
                 </RouterLink>
                 <span v-else>{{ row.client ?? '—' }}</span>
+                <!-- One-tap call / WhatsApp — phone only rides rows for
+                     clients.view_details holders (see BuildTeamLogs). -->
+                <ClientContactInline
+                  v-if="row.client_id && row.client_phone"
+                  :client-id="row.client_id"
+                  :phone="row.client_phone"
+                  class="mt-0.5 block text-xs text-mute"
+                />
               </td>
               <td class="py-2.5 pe-4 text-mute">{{ row.detail ?? '—' }}</td>
             </tr>

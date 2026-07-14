@@ -12,6 +12,7 @@ import SectionCard from '@/components/ui/SectionCard.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ActivityTimeline from '@/components/ui/ActivityTimeline.vue'
+import ClientContactInline from '@/features/clients/components/ClientContactInline.vue'
 import DealPanel from '@/features/clients/components/DealPanel.vue'
 import DesireFields from '@/features/clients/components/DesireFields.vue'
 import { desireForm as makeDesireForm, desirePayload } from '@/features/clients/desire'
@@ -306,7 +307,14 @@ async function submitDirectDeal() {
           <StatusTag v-if="isClosed && project.status !== 'archived'" :value="project.status" />
         </template>
         <template #subtitle>
-          <span class="flex flex-wrap items-center gap-x-2">
+          <span class="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <!-- Client phone + one-tap call / WhatsApp. `phone` is present only
+                 when the viewer may see details (view-details gate), so its
+                 presence is the guard — no extra permission check needed. -->
+            <template v-if="store.current?.phone">
+              <ClientContactInline :client-id="id" :phone="store.current.phone" />
+              <span class="text-mute" aria-hidden="true">·</span>
+            </template>
             <span>{{ $t('clients.projectN', { n: project.id }) }}</span>
             <span v-if="project.location?.name && project.unit">· {{ project.location.name }}</span>
             <span v-if="project.total_price" class="num font-medium text-ink">

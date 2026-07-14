@@ -33,11 +33,20 @@ class BuildTeamLogs
     private const PER_PAGE = 50;
 
     /**
+     * Whether the caller may see client contact details (clients.view_details).
+     * Gates the client phone in each row — the call/WhatsApp affordance on the
+     * feed. Off by default so a leak is a fail-closed omission, never exposure.
+     */
+    private bool $withPhone = false;
+
+    /**
      * @param  array<string, mixed>  $filters
      * @return array{summary: array<string, int>, data: array<int, array<string, mixed>>, meta: array<string, int>}
      */
     public function handle(array $filters): array
     {
+        $this->withPhone = (bool) ($filters['can_view_details'] ?? false);
+
         $userId = isset($filters['user_id']) && $filters['user_id'] !== '' ? (int) $filters['user_id'] : null;
         $type = $filters['type'] ?? null;
         $mode = in_array($filters['mode'] ?? null, ['upcoming', 'all'], true) ? $filters['mode'] : 'logged';
@@ -84,7 +93,7 @@ class BuildTeamLogs
                 ->when($userId, fn ($q) => $q->where('agent_id', $userId))
                 ->when($from, fn ($q) => $q->where('called_at', '>=', $from))
                 ->when($to, fn ($q) => $q->where('called_at', '<=', $to))
-                ->with(['agent:id,name', 'client:id,first_name,last_name'])
+                ->with(['agent:id,name', 'client:id,first_name,last_name,phone'])
                 ->latest('called_at')->limit(self::SCAN_CAP)->get()
                 ->map(fn (Call $c) => [
                     'id' => 'call-'.$c->id,
@@ -92,6 +101,8 @@ class BuildTeamLogs
                     'at' => $c->called_at,
                     'user' => $c->agent?->name,
                     'client' => $c->client?->full_name,
+                    'client_id' => $c->client_id,
+                    'client_phone' => $this->withPhone ? $c->client?->phone : null,
                     'detail' => ucfirst($c->direction->value),
                     'link' => $this->projectLink($c->client_id, $c->client_project_id),
                     'planned' => false,
@@ -119,7 +130,7 @@ class BuildTeamLogs
             ->when($to, fn ($q) => $q->where('due_at', '<=', $to))
             ->with([
                 'assignedTo:id,name',
-                'subject' => fn (MorphTo $m) => $m->morphWith([ClientProject::class => ['client:id,first_name,last_name']]),
+                'subject' => fn (MorphTo $m) => $m->morphWith([ClientProject::class => ['client:id,first_name,last_name,phone']]),
             ])
             ->orderBy('due_at')->limit(self::SCAN_CAP)->get()
             ->map(fn (NextAction $a) => [
@@ -128,6 +139,8 @@ class BuildTeamLogs
                 'at' => $a->due_at,
                 'user' => $a->assignedTo?->name,
                 'client' => $this->clientNameOf($a->subject),
+                'client_id' => $this->clientIdOf($a->subject),
+                'client_phone' => $this->withPhone ? $this->clientPhoneOf($a->subject) : null,
                 // No free text on a NextAction — `planned` (the chip) and the
                 // kind already say everything this row knows.
                 'detail' => null,
@@ -163,7 +176,7 @@ class BuildTeamLogs
             ->when($userId, fn ($q) => $q->where('agent_id', $userId))
             ->when($from, fn ($q) => $q->where($dateCol, '>=', $from))
             ->when($to, fn ($q) => $q->where($dateCol, '<=', $to))
-            ->with(['agent:id,name', 'client:id,first_name,last_name', 'unit:id,reference'])
+            ->with(['agent:id,name', 'client:id,first_name,last_name,phone', 'unit:id,reference'])
             ->orderByDesc($dateCol)->limit(self::SCAN_CAP)->get()
             ->map(fn (Visit $v) => [
                 'id' => 'visit-'.$v->id,
@@ -171,6 +184,8 @@ class BuildTeamLogs
                 'at' => $v->{$dateCol},
                 'user' => $v->agent?->name,
                 'client' => $v->client?->full_name,
+                'client_id' => $v->client_id,
+                'client_phone' => $this->withPhone ? $v->client?->phone : null,
                 'detail' => $v->unit?->reference,
                 'link' => $this->projectLink($v->client_id, $v->client_project_id),
                 'planned' => ! $onlyCompleted,
@@ -235,6 +250,24 @@ class BuildTeamLogs
         }
 
         return $subject?->full_name ?? null;
+    }
+
+    private function clientIdOf(?object $subject): ?int
+    {
+        if ($subject instanceof ClientProject) {
+            return $subject->client_id;
+        }
+
+        return $subject?->getKey();
+    }
+
+    private function clientPhoneOf(?object $subject): ?string
+    {
+        if ($subject instanceof ClientProject) {
+            return $subject->client?->phone;
+        }
+
+        return $subject->phone ?? null;
     }
 
     private function subjectLink(?object $subject): ?string

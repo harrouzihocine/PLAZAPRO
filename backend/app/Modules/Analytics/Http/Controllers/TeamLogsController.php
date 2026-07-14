@@ -27,6 +27,10 @@ class TeamLogsController extends Controller
             $filters['user_id'] = $user->id;
         }
 
+        // Client phone rides each row only for clients.view_details holders — it
+        // powers the call/WhatsApp affordance in the feed (fail-closed otherwise).
+        $filters['can_view_details'] = (bool) $user->can('clients.view_details');
+
         return response()->json($action->handle($filters));
     }
 }
