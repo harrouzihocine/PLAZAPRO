@@ -10,11 +10,23 @@ defineProps({
   fini: { type: [String, Number, null], default: null },
   // Cards lay the two offers on one line; table cells stack them.
   inline: { type: Boolean, default: false },
+  // The API masked the prices (sold unit, viewer lacks units.sold_price) —
+  // show an honest lock, not a dash that reads like "no price set".
+  masked: { type: Boolean, default: false },
 })
 </script>
 
 <template>
   <span
+    v-if="masked"
+    class="inline-flex items-center gap-1.5 text-mute"
+    :title="$t('inventory.priceHiddenHint')"
+  >
+    <i class="pi pi-lock text-xs" aria-hidden="true" />
+    <span class="text-sm">{{ $t('inventory.priceHidden') }}</span>
+  </span>
+  <span
+    v-else
     :class="inline ? 'inline-flex flex-wrap items-center gap-x-3 gap-y-0.5' : 'flex flex-col gap-0.5'"
   >
     <span v-if="semiFini != null" class="num flex items-center gap-1.5 whitespace-nowrap">

@@ -163,4 +163,26 @@ class UnitAvailabilityTest extends TestCase
         $this->assertTrue($allIds->contains($parkedUnit->id));
         $this->assertTrue($allIds->contains($unitInParkedProject->id));
     }
+
+    public function test_non_managers_never_see_parked_stock_in_any_browse(): void
+    {
+        $liveProject = Location::factory()->create();
+        $parkedProject = Location::factory()->create(['is_available' => false]);
+
+        $available = Unit::factory()->create(['location_id' => $liveProject->id]);
+        $parkedUnit = Unit::factory()->unavailable()->create(['location_id' => $liveProject->id]);
+        // The project veil hides EVERY unit inside it, whatever its own state.
+        $availableInParkedProject = Unit::factory()->create(['location_id' => $parkedProject->id]);
+        $soldInParkedProject = Unit::factory()->sold()->create(['location_id' => $parkedProject->id]);
+
+        // units.view only — no manage grant, so the plain browse (the Units
+        // table) applies the parked veil exactly like the selectors do.
+        Sanctum::actingAs($this->userWithPermissions(['units.view']));
+
+        $ids = collect($this->getJson('/api/v1/units')->assertOk()->json('data'))->pluck('id');
+        $this->assertTrue($ids->contains($available->id));
+        $this->assertFalse($ids->contains($parkedUnit->id));
+        $this->assertFalse($ids->contains($availableInParkedProject->id));
+        $this->assertFalse($ids->contains($soldInParkedProject->id));
+    }
 }

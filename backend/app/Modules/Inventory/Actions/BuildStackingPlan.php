@@ -6,6 +6,7 @@ namespace App\Modules\Inventory\Actions;
 
 use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Models\Location;
+use App\Modules\Settings\Models\User;
 
 /**
  * Build the visual stacking plan for a location: its active units grouped by
@@ -18,7 +19,7 @@ class BuildStackingPlan
     /**
      * @return list<array{block: string, floors: list<array{floor: int|null, units: list<array<string, mixed>>}>}>
      */
-    public function handle(Location $location): array
+    public function handle(Location $location, ?User $viewer = null): array
     {
         $units = $location->units()
             ->active()
@@ -43,8 +44,9 @@ class BuildStackingPlan
                             'id' => $unit->id,
                             'reference' => $unit->reference,
                             'sale_status' => $unit->sale_status?->value,
-                            // Compact grid: one number — semi-fini first.
-                            'price' => $unit->displayPrice(),
+                            // Compact grid: one number — semi-fini first. Sold
+                            // prices are privileged (units.sold_price).
+                            'price' => $unit->pricesVisibleTo($viewer) ? $unit->displayPrice() : null,
                             'position' => $unit->position,
                             'reservation_id' => $unit->activeReservation?->id,
                             // Interest-hold countdown, or the deposit

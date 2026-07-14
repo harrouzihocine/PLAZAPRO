@@ -401,6 +401,8 @@ export default {
     price: 'السعر',
     priceSemiFini: 'السعر (نصف جاهزة)',
     priceFini: 'السعر (جاهزة)',
+    priceHidden: 'السعر مخفي',
+    priceHiddenHint: 'هذه الوحدة مُباعة — فقط المستخدمون المصرّح لهم يمكنهم رؤية سعرها.',
     finishSemiFini: 'نصف جاهزة',
     finishFini: 'جاهزة',
     finishSemiShort: 'نصف',

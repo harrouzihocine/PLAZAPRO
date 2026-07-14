@@ -74,6 +74,28 @@ class PublicUnitTest extends TestCase
         $this->assertNull($response->json('data.price_fini'));
     }
 
+    public function test_a_sold_units_price_is_never_public_even_when_the_project_shows_prices(): void
+    {
+        $unit = $this->publishedUnit(
+            ['show_prices' => true],
+            ['price_semi_fini' => 4000000, 'price_fini' => 5000000, 'sale_status' => 'sold'],
+        );
+
+        // The unit's own page: gone from the market, price withheld.
+        $page = $this->getJson("/api/v1/public/projects/{$unit->location_id}/units/{$unit->id}")->assertOk();
+        $this->assertFalse($page->json('data.available'));
+        $this->assertNull($page->json('data.price_semi_fini'));
+        $this->assertNull($page->json('data.price_fini'));
+
+        // The availability grid embedded in the project payload: same veil,
+        // while a free unit on the same project keeps its price.
+        $free = Unit::factory()->for($unit->location)->create(['price_semi_fini' => 3000000]);
+        $grid = collect($this->getJson("/api/v1/public/projects/{$unit->location_id}")->assertOk()->json('data.units'))
+            ->keyBy('id');
+        $this->assertNull($grid[$unit->id]['price_semi_fini']);
+        $this->assertNotNull($grid[$free->id]['price_semi_fini']);
+    }
+
     public function test_the_gallery_carries_only_public_active_media_of_public_collections(): void
     {
         $unit = $this->publishedUnit();

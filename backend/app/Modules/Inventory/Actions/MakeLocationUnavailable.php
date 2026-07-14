@@ -7,10 +7,13 @@ namespace App\Modules\Inventory\Actions;
 use App\Modules\Inventory\Models\Location;
 
 /**
- * Park a whole project off the market: set is_available = false. The project
- * vanishes from every internal selector (property pickers, cross-project sweeps,
- * desire matching) and shows greyed on the public site, but stays in the
- * inventory management list (tagged) with every unit's own sale_status intact.
+ * Park a whole project off the market: set is_available = false. The project —
+ * and with it every unit inside — vanishes from every internal selector
+ * (property pickers, cross-project sweeps, desire matching) AND from every
+ * browse list, table, search and export for users without units.manage /
+ * locations.manage (ParkedInventory). It shows greyed on the public site and
+ * stays in the managers' inventory list (tagged) with every unit's own
+ * sale_status intact.
  *
  * Always allowed — parking touches nothing but the veil flag, so reserved / sold
  * units inside it keep their state and reappear untouched when the project is

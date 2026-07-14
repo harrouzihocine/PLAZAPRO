@@ -25,6 +25,7 @@ use App\Modules\Inventory\Http\Requests\UpdateUnitRequest;
 use App\Modules\Inventory\Http\Resources\UnitResource;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
+use App\Modules\Inventory\Support\ParkedInventory;
 use App\Modules\Inventory\Support\UnitsWorkbook;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -71,11 +72,13 @@ class UnitController extends Controller
         return Unit::query()
             ->with(['roomNumber', 'floor', 'location.wilaya', 'location.commune', 'location.type', 'location.contractType', 'paymentMethods', 'location.paymentMethods', 'activeReservations:id,unit_id,client_project_id'])
             ->when($request->query('status') !== 'all', fn ($q) => $q->active())
-            // Selector mode (the property pickers): hide inventory parked off the
-            // market — a unit made unavailable, or any unit of a project the
-            // promoteur marked unavailable. Management browses omit `selectable`,
-            // so they still show (and can un-park) everything.
-            ->when($request->boolean('selectable'), fn ($q) => $q
+            // Parked stock — a unit made unavailable, or ANY unit of a project the
+            // promoteur marked unavailable — is hidden in selector mode (the
+            // property pickers) and, since the project-wide veil must hide the
+            // whole building everywhere, from every list for users who can't
+            // manage inventory. Managers' browses (no `selectable`) keep showing
+            // it (tagged) so they can un-park; see ParkedInventory.
+            ->when($request->boolean('selectable') || ! ParkedInventory::visibleTo($request->user()), fn ($q) => $q
                 ->where('sale_status', '!=', SaleStatus::Unavailable->value)
                 ->whereHas('location', fn ($l) => $l->where('is_available', true)))
             ->when($request->filled('search'), fn ($q) => $q->where('reference', 'like', '%'.trim((string) $request->query('search')).'%'))
@@ -116,7 +119,12 @@ class UnitController extends Controller
     public function export(Request $request, UnitsWorkbook $workbook): StreamedResponse
     {
         return $this->xlsxDownload(
-            $workbook->export($this->filteredQuery($request)->get()),
+            $workbook->export(
+                $this->filteredQuery($request)->get(),
+                // Sold prices leave as blank cells for viewers without the
+                // grant — blank round-trips as "leave untouched" on import.
+                maskSoldPrices: ! $request->user()?->can('units.sold_price'),
+            ),
             'units-'.now()->format('Y-m-d-Hi').'.xlsx',
         );
     }
@@ -158,7 +166,13 @@ class UnitController extends Controller
         $canSeeStats = (bool) $request->user()?->can('units.stats');
         $canSeeMoney = (bool) $request->user()?->can('versements.view');
 
-        return response()->json(['data' => $action->handle($unit, $canSeeStats, $canSeeMoney)]);
+        return response()->json(['data' => $action->handle(
+            $unit,
+            $canSeeStats,
+            $canSeeMoney,
+            // Sold prices are their own grant — even a stats holder may lack it.
+            $unit->pricesVisibleTo($request->user()),
+        )]);
     }
 
     /**

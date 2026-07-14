@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Support;
 
 use App\Modules\Inventory\Enums\GtmPriority;
+use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Settings\Models\DynamicListItem;
@@ -50,8 +51,13 @@ class UnitsWorkbook
 
     private const PRICE_FORMAT = '#,##0';
 
-    /** @param Collection<int, Unit> $units */
-    public function export(Collection $units): Spreadsheet
+    /**
+     * @param Collection<int, Unit> $units
+     * @param bool $maskSoldPrices blank the price cells of sold rows (viewer
+     *                             lacks units.sold_price); blank re-imports as
+     *                             "leave untouched", so the trip stays lossless
+     */
+    public function export(Collection $units, bool $maskSoldPrices = false): Spreadsheet
     {
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
@@ -61,6 +67,7 @@ class UnitsWorkbook
 
         $row = 2;
         foreach ($units as $unit) {
+            $hidePrices = $maskSoldPrices && $unit->sale_status === SaleStatus::Sold;
             $this->writeRow($sheet, $row++, self::EXPORT_COLUMNS, [
                 'id' => $unit->id,
                 'location_id' => $unit->location_id,
@@ -71,8 +78,8 @@ class UnitsWorkbook
                 'rooms' => $unit->roomNumber?->label,
                 'floor' => $unit->floor?->label,
                 'area_sqm' => $unit->area_sqm,
-                'price_semi_fini' => $unit->price_semi_fini,
-                'price_fini' => $unit->price_fini,
+                'price_semi_fini' => $hidePrices ? null : $unit->price_semi_fini,
+                'price_fini' => $hidePrices ? null : $unit->price_fini,
                 'sale_status' => $unit->sale_status?->value,
                 'gtm_priority' => $unit->gtm_priority?->value,
                 'block' => $unit->block,

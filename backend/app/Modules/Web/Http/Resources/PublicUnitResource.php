@@ -41,8 +41,10 @@ class PublicUnitResource extends JsonResource
             // apartment, which also reads available:false).
             'unavailable' => $this->sale_status === SaleStatus::Unavailable,
             'finishes' => array_map(fn ($f) => $f->value, $this->availableFinishes()),
-            'price_semi_fini' => $project->show_prices ? $this->price_semi_fini : null,
-            'price_fini' => $project->show_prices ? $this->price_fini : null,
+            // Prices only when the project opted in — and never for a sold unit
+            // (Unit::pricesVisibleTo; anonymous visitors hold no grant).
+            'price_semi_fini' => $project->show_prices && $this->pricesVisibleTo(null) ? $this->price_semi_fini : null,
+            'price_fini' => $project->show_prices && $this->pricesVisibleTo(null) ? $this->price_fini : null,
             // The payment options actually offered here (the unit's own when it
             // overrides, else the project's) — same public shape as the project.
             'payment_methods' => $this->effectivePaymentMethods()

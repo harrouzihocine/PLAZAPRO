@@ -13,6 +13,7 @@ use App\Modules\Inventory\Enums\HoldStatus;
 use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Events\UnitStatusChanged;
 use App\Modules\Settings\Models\DynamicListItem;
+use App\Modules\Settings\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -88,6 +89,28 @@ class Unit extends BaseModel
     public function displayPrice(): ?string
     {
         return $this->price_semi_fini ?? $this->price_fini;
+    }
+
+    /**
+     * May $viewer see this unit's asking prices? Free stock is open to anyone
+     * who can view inventory — but once the unit is SOLD its price becomes
+     * privileged (units.sold_price): what a gone apartment listed at is
+     * commercial intelligence, not something every seller keeps quoting.
+     * A null viewer (the public site) never sees a sold price. THE single
+     * rule — every surface that prints a unit price (resources, stacking,
+     * insights, exports, public pages) must go through it.
+     */
+    public function pricesVisibleTo(?User $viewer): bool
+    {
+        if ($this->sale_status !== SaleStatus::Sold) {
+            return true;
+        }
+
+        // List views call this per row for the same viewer — pin the role's
+        // grants in memory once so each check stays query-free.
+        $viewer?->role?->loadMissing('permissions');
+
+        return (bool) $viewer?->can('units.sold_price');
     }
 
     /**

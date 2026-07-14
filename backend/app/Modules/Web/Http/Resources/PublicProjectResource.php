@@ -78,8 +78,11 @@ class PublicProjectResource extends JsonResource
             // Parked by the promoteur — greyed on the elevation, not hidden.
             'unavailable' => $unit->sale_status === SaleStatus::Unavailable,
             'finishes' => array_map(fn ($f) => $f->value, $unit->availableFinishes()),
-            'price_semi_fini' => $this->show_prices ? $unit->price_semi_fini : null,
-            'price_fini' => $this->show_prices ? $unit->price_fini : null,
+            // Prices only when the project opted in — and never for a sold
+            // unit: its price is privileged even inside the CRM
+            // (Unit::pricesVisibleTo; anonymous visitors hold no grant).
+            'price_semi_fini' => $this->show_prices && $unit->pricesVisibleTo(null) ? $unit->price_semi_fini : null,
+            'price_fini' => $this->show_prices && $unit->pricesVisibleTo(null) ? $unit->price_fini : null,
         ];
     }
 }

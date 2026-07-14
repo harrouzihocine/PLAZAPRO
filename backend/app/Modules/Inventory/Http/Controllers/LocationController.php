@@ -17,6 +17,7 @@ use App\Modules\Inventory\Http\Requests\UpdateLocationRequest;
 use App\Modules\Inventory\Enums\SaleStatus;
 use App\Modules\Inventory\Http\Resources\LocationResource;
 use App\Modules\Inventory\Models\Location;
+use App\Modules\Inventory\Support\ParkedInventory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -51,10 +52,12 @@ class LocationController extends Controller
             ->with(['wilaya', 'commune', 'type', 'contractType', 'paymentMethods'])
             ->when($status === 'archived', fn ($q) => $q->archived())
             ->when(! in_array($status, ['archived', 'all'], true), fn ($q) => $q->active())
-            // Selector mode (the property pickers / desire preferred-sites): drop
-            // projects the promoteur parked off the market. Management lists omit
-            // `selectable`, so they still show them (tagged, for un-parking).
-            ->when($request->boolean('selectable'), fn ($q) => $q->where('is_available', true))
+            // Projects parked off the market drop out in selector mode (the
+            // property pickers / desire preferred-sites) and from every list for
+            // users who can't manage inventory — the veil means "the team can't
+            // see this project or its units anywhere". Managers' lists (no
+            // `selectable`) keep them, tagged, for un-parking; see ParkedInventory.
+            ->when($request->boolean('selectable') || ! ParkedInventory::visibleTo($request->user()), fn ($q) => $q->where('is_available', true))
             ->when($request->filled('wilaya_id'), fn ($q) => $q->where('wilaya_id', $request->query('wilaya_id')))
             ->when($request->filled('commune_id'), fn ($q) => $q->where('commune_id', $request->query('commune_id')))
             ->when($request->filled('priority'), fn ($q) => $q->where('gtm_priority', $request->query('priority')))

@@ -88,4 +88,28 @@ class LocationAvailabilityTest extends TestCase
         $all = collect($this->getJson('/api/v1/locations')->assertOk()->json('data'))->pluck('id');
         $this->assertTrue($all->contains($parked->id));
     }
+
+    public function test_non_managers_never_see_parked_projects_in_the_default_list(): void
+    {
+        $live = Location::factory()->create();
+        $parked = Location::factory()->create(['is_available' => false]);
+
+        // units.view only — neither locations.manage nor units.manage, so even
+        // the default (non-selector) list veils the parked project.
+        Sanctum::actingAs($this->userWithPermissions(['units.view']));
+
+        $ids = collect($this->getJson('/api/v1/locations')->assertOk()->json('data'))->pluck('id');
+        $this->assertTrue($ids->contains($live->id));
+        $this->assertFalse($ids->contains($parked->id));
+    }
+
+    public function test_a_units_manager_without_locations_manage_still_sees_parked_stock(): void
+    {
+        $parked = Location::factory()->create(['is_available' => false]);
+
+        Sanctum::actingAs($this->userWithPermissions(['units.view', 'units.manage']));
+
+        $ids = collect($this->getJson('/api/v1/locations')->assertOk()->json('data'))->pluck('id');
+        $this->assertTrue($ids->contains($parked->id));
+    }
 }

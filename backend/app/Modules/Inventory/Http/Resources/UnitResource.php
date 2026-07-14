@@ -15,6 +15,10 @@ class UnitResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        // A sold unit's asking price is privileged (units.sold_price) — masked
+        // here so EVERY consumer (tables, detail page, pickers, search) obeys.
+        $pricesVisible = $this->pricesVisibleTo($request->user());
+
         return [
             'id' => $this->id,
             'location_id' => $this->location_id,
@@ -43,8 +47,11 @@ class UnitResource extends JsonResource
             'area_sqm' => $this->area_sqm,
             // Finish-level prices: semi-fini and/or fini — at least one is set.
             // What the unit can be offered as is derived from which are non-null.
-            'price_semi_fini' => $this->price_semi_fini,
-            'price_fini' => $this->price_fini,
+            // Both come back null (`prices_masked`) when the viewer may not see
+            // a sold unit's price — the UI shows a lock, never a fake blank.
+            'price_semi_fini' => $pricesVisible ? $this->price_semi_fini : null,
+            'price_fini' => $pricesVisible ? $this->price_fini : null,
+            'prices_masked' => ! $pricesVisible,
             'sale_status' => $this->sale_status?->value,
             // How many distinct client projects hold this unit — the "Interested
             // N" counter. Reserved adds its deposit timer + holder project id.

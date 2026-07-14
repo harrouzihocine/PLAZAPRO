@@ -46,7 +46,9 @@ class RbacSeeder extends Seeder
         // Inventory. units.stats gates the commercial-intelligence layer on the
         // project (location) and unit pages: the performance/statistics tab and
         // the Voice-of-Client analytics — grantable without the full reports area.
-        'locations.manage', 'units.view', 'units.stats', 'units.interest', 'units.manage', 'media.manage',
+        // units.sold_price: once a unit is sold, its asking price is masked
+        // everywhere for anyone without this grant.
+        'locations.manage', 'units.view', 'units.stats', 'units.interest', 'units.manage', 'units.sold_price', 'media.manage',
         // The reservations follow-up board, two tiers: open the page at all /
         // see every queue company-wide (without view_all it self-scopes to the
         // user's own clients and projects).
@@ -159,6 +161,7 @@ class RbacSeeder extends Seeder
         'units.stats' => 'See the statistics and Voice of Client tabs on project and unit pages (performance counters, pipeline movement, log-mined feedback analytics).',
         'units.interest' => 'Mark a unit as Interested for a client (places a hold).',
         'units.manage' => 'Add, edit and change the status of units.',
+        'units.sold_price' => 'See the asking price of a unit after it is sold. Without it, a sold unit\'s prices are hidden everywhere (tables, unit page, building plan, Excel export).',
         'media.manage' => 'Upload and manage photos and files on units and projects.',
         'reservations.view' => 'Open the Reservations follow-up board — the waiting line on each reserved or held unit. Without "see all", it shows only queues involving your own clients and projects.',
         'reservations.view_all' => 'See every reservation queue company-wide on the Reservations board, not just the ones involving your own clients and projects.',
@@ -293,6 +296,10 @@ class RbacSeeder extends Seeder
         // Roles with the reports area keep both; everyone else now needs the
         // grant ticked per role.
         'units.stats' => 'reports.view',
+        // Sold-unit prices used to be visible to anyone with units.view; the
+        // veil starts at the inventory desk that sets prices — the owner widens
+        // per role from there.
+        'units.sold_price' => 'units.manage',
         // The office-program week grid grew out of the upcoming-office-visits
         // section of the pipeline monitor; roles that saw it there keep the
         // dedicated page. Grant per-role to agents who plan office visits.
@@ -428,7 +435,7 @@ class RbacSeeder extends Seeder
             'calls.log', 'next_actions.plan',
             'visits.assign', 'visits.dispatch', 'visits.conduct', 'visits.propose',
             'tasks.manage', 'tasks.assign',
-            'units.view', 'units.stats', 'units.interest', 'units.manage', 'media.manage',
+            'units.view', 'units.stats', 'units.interest', 'units.manage', 'units.sold_price', 'media.manage',
             'reservations.view', 'reservations.view_all',
             'versements.view', 'versements.record', 'versements.cancel', 'documents.generate',
             'web.leads', 'web.stats',

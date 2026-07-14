@@ -43,6 +43,9 @@ const { wilayas } = useWilayas()
 const { load: loadCommunes } = useCommunes()
 
 const canManage = auth.can('units.manage')
+// Who still sees parked (unavailable) stock: the same grants that un-park it.
+// For everyone else the API hides it, so the filter option would be dead weight.
+const canSeeParked = canManage || auth.can('locations.manage')
 
 // Android-shell phones swap the table for tappable cards (NativeList below);
 // manage actions live on the unit page / bigger screens there.
@@ -141,7 +144,7 @@ const statusOptions = computed(() => [
   { value: 'interested', label: t('status.interested') },
   { value: 'reserved', label: t('status.reserved') },
   { value: 'sold', label: t('status.sold') },
-  { value: 'unavailable', label: t('status.unavailable') },
+  ...(canSeeParked ? [{ value: 'unavailable', label: t('status.unavailable') }] : []),
 ])
 // GTM priority filter options (shared source of truth).
 const priorityOptions = computed(() => gtmPriorityOptions())
@@ -525,7 +528,12 @@ async function toggleUnavailable(u) {
           </p>
           <!-- Labeled facts — bare "· 1 · 1 ·" numbers read as noise on a card. -->
           <div class="mt-1.5 text-sm text-ink">
-            <FinishPrices :semi-fini="item.price_semi_fini" :fini="item.price_fini" inline />
+            <FinishPrices
+              :semi-fini="item.price_semi_fini"
+              :fini="item.price_fini"
+              :masked="item.prices_masked"
+              inline
+            />
             <span class="num text-mute">
               <template v-if="roomsLabel(item.room_number)"> · {{ roomsLabel(item.room_number) }}</template>
               <template v-if="floorLabel(item.floor)"> · {{ floorLabel(item.floor) }}</template>
@@ -650,7 +658,11 @@ async function toggleUnavailable(u) {
         </Column>
         <Column :header="$t('inventory.price')">
           <template #body="{ data }">
-            <FinishPrices :semi-fini="data.price_semi_fini" :fini="data.price_fini" />
+            <FinishPrices
+              :semi-fini="data.price_semi_fini"
+              :fini="data.price_fini"
+              :masked="data.prices_masked"
+            />
           </template>
         </Column>
         <Column :header="$t('common.status')">

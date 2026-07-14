@@ -27,12 +27,12 @@ class BuildUnitInsights
     /**
      * @return array<string, mixed>
      */
-    public function handle(Unit $unit, bool $includeStats = true, bool $includePayments = true): array
+    public function handle(Unit $unit, bool $includeStats = true, bool $includePayments = true, bool $includePrices = true): array
     {
         $data = [];
 
         if ($includeStats) {
-            $data['stats'] = $this->stats($unit);
+            $data['stats'] = $this->stats($unit, $includePrices);
         }
 
         if ($includePayments) {
@@ -49,7 +49,7 @@ class BuildUnitInsights
      *
      * @return array<string, mixed>
      */
-    private function stats(Unit $unit): array
+    private function stats(Unit $unit, bool $includePrices): array
     {
         $reservations = Reservation::query()->where('unit_id', $unit->id);
         $timesShortlisted = ShortlistItem::query()
@@ -60,8 +60,9 @@ class BuildUnitInsights
 
         return [
             'sale_status' => $unit->sale_status?->value,
-            'price_semi_fini' => $unit->price_semi_fini,
-            'price_fini' => $unit->price_fini,
+            // Nulled when the caller says the viewer may not see a sold price.
+            'price_semi_fini' => $includePrices ? $unit->price_semi_fini : null,
+            'price_fini' => $includePrices ? $unit->price_fini : null,
             'area_sqm' => $unit->area_sqm,
             'reservations' => (clone $reservations)->count(),
             'has_active_hold' => (clone $reservations)->where('hold_status', 'active')->exists(),

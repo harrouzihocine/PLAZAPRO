@@ -402,6 +402,8 @@ export default {
     price: 'Price',
     priceSemiFini: 'Price (semi-finished)',
     priceFini: 'Price (finished)',
+    priceHidden: 'Price hidden',
+    priceHiddenHint: 'This unit is sold — only authorized users can see its price.',
     finishSemiFini: 'Semi-finished',
     finishFini: 'Finished',
     finishSemiShort: 'Semi',

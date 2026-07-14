@@ -824,7 +824,11 @@ async function toggleProjectAvailability() {
                 </Column>
                 <Column :header="$t('inventory.price')">
                   <template #body="{ data }">
-                    <FinishPrices :semi-fini="data.price_semi_fini" :fini="data.price_fini" />
+                    <FinishPrices
+                      :semi-fini="data.price_semi_fini"
+                      :fini="data.price_fini"
+                      :masked="data.prices_masked"
+                    />
                   </template>
                 </Column>
                 <Column :header="$t('common.status')">

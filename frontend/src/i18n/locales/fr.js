@@ -401,6 +401,8 @@ export default {
     price: 'Prix',
     priceSemiFini: 'Prix (semi-fini)',
     priceFini: 'Prix (fini)',
+    priceHidden: 'Prix masqué',
+    priceHiddenHint: 'Cette unité est vendue — seuls les utilisateurs autorisés peuvent voir son prix.',
     finishSemiFini: 'Semi-fini',
     finishFini: 'Fini',
     finishSemiShort: 'Semi',

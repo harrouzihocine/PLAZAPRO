@@ -121,6 +121,15 @@ useRefreshable(load) // pull-to-refresh (APK)
 
       <!-- The numbers a seller quotes first -->
       <div class="mb-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <!-- Sold + no units.sold_price: the API nulled both prices — say so
+             honestly instead of silently dropping the price cards. -->
+        <StatCard
+          v-if="units.current.prices_masked"
+          :label="$t('inventory.price')"
+          :value="$t('inventory.priceHidden')"
+          icon="pi pi-lock"
+          :hint="$t('inventory.priceHiddenHint')"
+        />
         <StatCard
           v-if="units.current.price_semi_fini != null"
           :label="$t('inventory.priceSemiFini')"
