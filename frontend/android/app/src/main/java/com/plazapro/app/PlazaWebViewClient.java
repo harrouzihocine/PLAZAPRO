@@ -46,10 +46,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * never blind-retry app.* alone, because navigator.onLine is true on office
  * Wi-Fi even with the internet down (the "stuck on the blue screen" bug).
  *
- * This class only covers the no-page-at-all case. Once ANY page is running,
- * the web layer's own failover (frontend/src/utils/serverFailover.js) handles
- * mid-session outages. Keep the origin list in sync in all THREE places:
- * here, serverFailover.js, and native-shell/index.html.
+ * COLD BOOT is the load we do NOT get to watch from the start: Capacitor's
+ * Bridge fires webView.loadUrl(server.url) from inside super.onCreate, on its
+ * OWN default client, before MainActivity swaps this one in — so our
+ * onPageStarted never fires for that first navigation, and if app.* hangs the
+ * only callback we would ever get is onReceivedError, minutes later, after the
+ * OS TCP timeout (that IS the "logo then a long blue screen" report). So
+ * MainActivity calls onShellCreated() right after installing us: we seed the
+ * boot origin and probe the doors immediately, jumping to a live LAN door in
+ * seconds instead of waiting the connection out on a blank splash.
+ *
+ * Once ANY page is running, the web layer's own failover
+ * (frontend/src/utils/serverFailover.js) also handles mid-session outages.
+ * Keep the origin list in sync in all THREE places: here, serverFailover.js,
+ * and native-shell/index.html.
  */
 class PlazaWebViewClient extends BridgeWebViewClient {
     static final String[] ORIGINS = {
@@ -58,11 +68,17 @@ class PlazaWebViewClient extends BridgeWebViewClient {
         "https://192.168.1.200",
     };
 
-    private static final int PROBE_TIMEOUT_MS = 4000;
+    private static final int PROBE_TIMEOUT_MS = 3000;
     /** Total time one walk may spend waiting on probes (they run in parallel). */
-    private static final long WALK_BUDGET_MS = 8000;
-    /** A main-frame load with no progress for this long is presumed hung. */
+    private static final long WALK_BUDGET_MS = 6000;
+    /** A running main-frame load with no progress for this long is presumed hung. */
     private static final long STALL_AFTER_MS = 12_000;
+    /**
+     * The cold-boot load is already in flight and un-watched, so it gets a
+     * tighter leash: if nothing has painted within this window we probe. A
+     * healthy app.* answers in well under a second on any live connection.
+     */
+    private static final long BOOT_STALL_MS = 6000;
 
     /**
      * Unbounded on purpose: a probe whose DNS lookup hangs holds its thread
@@ -74,13 +90,34 @@ class PlazaWebViewClient extends BridgeWebViewClient {
     private final Bridge bridge;
     private final AtomicBoolean walking = new AtomicBoolean(false);
 
-    /** Origin of the in-flight main-frame navigation (main thread only). */
-    private String currentNavOrigin;
+    /**
+     * Origin of the in-flight main-frame navigation (main thread only). Seeded
+     * to the boot origin because Capacitor started that load before we existed
+     * — without this, its eventual error looks like a stale nav and gets
+     * swallowed, and the app never recovers.
+     */
+    private String currentNavOrigin = ORIGINS[0];
+    /** True once a real page has painted; mid-session the web layer takes over. */
+    private boolean settled = false;
     private Runnable stallWatchdog;
 
     PlazaWebViewClient(Bridge bridge) {
         super(bridge);
         this.bridge = bridge;
+    }
+
+    /**
+     * Called by MainActivity immediately after this client is installed — i.e.
+     * right after Capacitor already kicked off the cold-boot load to app.* on
+     * its default client. Probe the doors now: if app.* is unreachable (office
+     * internet down — the whole reason the LAN doors exist), jump straight to a
+     * working one rather than staring at the splash until the OS gives up on
+     * the connection. If app.* answers, the probe changes nothing and the
+     * in-flight load is left to finish; a stall watchdog backs it up.
+     */
+    void onShellCreated(WebView view) {
+        startWalk(view, ORIGINS[0], true);
+        armStallWatchdog(view, BOOT_STALL_MS);
     }
 
     /**
@@ -123,8 +160,9 @@ class PlazaWebViewClient extends BridgeWebViewClient {
         super.onPageStarted(view, url, favicon);
         int idx = originIndex(url == null ? null : Uri.parse(url));
         currentNavOrigin = idx >= 0 ? ORIGINS[idx] : null;
+        settled = false;
         if (currentNavOrigin != null) {
-            armStallWatchdog(view);
+            armStallWatchdog(view, STALL_AFTER_MS);
         } else {
             cancelStallWatchdog(view);
         }
@@ -133,6 +171,8 @@ class PlazaWebViewClient extends BridgeWebViewClient {
     @Override
     public void onPageFinished(WebView view, String url) {
         super.onPageFinished(view, url);
+        // A real origin page painted: the web layer owns outages from here.
+        if (originIndex(url == null ? null : Uri.parse(url)) >= 0) settled = true;
         cancelStallWatchdog(view);
     }
 
@@ -177,10 +217,11 @@ class PlazaWebViewClient extends BridgeWebViewClient {
 
     /**
      * Probe every door in parallel, then (on the UI thread) navigate to the
-     * first that answered, by priority. `stalled` marks a watchdog-initiated
-     * walk over a still-in-flight load: that load is only uprooted for a door
-     * that provably answers while its own origin provably does not — a slow
-     * but alive connection is always left to finish.
+     * first that answered, by priority. `stalled` marks a walk over a load that
+     * has not yet failed (the boot probe, or the stall watchdog): that load is
+     * only uprooted for a door that provably answers while its own origin does
+     * not — a slow-but-alive connection, and the preferred app.* door, are
+     * always left to finish.
      */
     private void startWalk(WebView view, String fromOrigin, boolean stalled) {
         if (!walking.compareAndSet(false, true)) return;
@@ -209,8 +250,11 @@ class PlazaWebViewClient extends BridgeWebViewClient {
                 if (stalled && (dest == null || dest.equals(fromOrigin))) {
                     // Nothing better than what is already loading — leave the
                     // in-flight load alone and keep watching it.
-                    armStallWatchdog(view);
+                    armStallWatchdog(view, STALL_AFTER_MS);
                 } else if (dest != null) {
+                    // Claim the new origin now, before onPageStarted fires, so
+                    // the aborted old load's error is recognised as stale.
+                    currentNavOrigin = dest;
                     view.loadUrl(dest + "/");
                 } else {
                     // No door answered: branded "reconnecting" page (it keeps
@@ -221,19 +265,20 @@ class PlazaWebViewClient extends BridgeWebViewClient {
         });
     }
 
-    private void armStallWatchdog(WebView view) {
+    private void armStallWatchdog(WebView view, long delayMs) {
         cancelStallWatchdog(view);
         String origin = currentNavOrigin;
-        if (origin == null) return;
+        if (origin == null || settled) return;
         stallWatchdog = () -> {
             stallWatchdog = null;
+            if (settled) return;
             if (view.getProgress() >= 80) {
-                armStallWatchdog(view); // nearly there — never interrupt it
+                armStallWatchdog(view, STALL_AFTER_MS); // nearly there — never interrupt it
                 return;
             }
             startWalk(view, origin, true);
         };
-        view.postDelayed(stallWatchdog, STALL_AFTER_MS);
+        view.postDelayed(stallWatchdog, delayMs);
     }
 
     private void cancelStallWatchdog(WebView view) {

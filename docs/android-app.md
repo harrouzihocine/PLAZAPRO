@@ -175,14 +175,19 @@ One backend, three doors, walked in priority order (v1.5.0+):
 Three cooperating pieces, origin lists kept in sync:
 
 - **`PlazaWebViewClient.java`** (shell): owns the cold boot, where no JS can
-  run yet. A main-frame failure on one of the origins — network error, 5xx,
-  or a load stalled 12 s with no progress — probes every door's `/up` in
-  parallel (4 s timeouts; the bare IP needs no DNS, so it answers even while
-  name resolution hangs) and navigates to the first that answers, by
-  priority. A probe reads the status, so a Cloudflare 502/521 ("edge up, app
-  down") never counts as a door. Both LAN hosts are in
-  `capacitor.config.json` `server.allowNavigation` so they stay inside the
-  webview.
+  run yet. It probes every door's `/up` in parallel (3 s timeouts; the bare IP
+  needs no DNS, so it answers even while name resolution hangs) and navigates
+  to the first that answers, by priority. A probe reads the status, so a
+  Cloudflare 502/521 ("edge up, app down") never counts as a door. Triggers:
+  a main-frame error / 5xx, a load stalled 12 s with no progress, **and — the
+  v2.2.2 fix — the boot itself.** Capacitor fires the app.* load from inside
+  `super.onCreate` on its own client, before ours is installed, so we never
+  see that load start; `MainActivity` calls `onShellCreated()` right after,
+  which probes immediately and jumps to a live LAN door in ~3 s instead of
+  waiting out the OS-level TCP timeout (30–120 s) on a blank splash — the
+  "logo, then a long blue screen" bug when the office internet is down. Both
+  LAN hosts are in `capacitor.config.json` `server.allowNavigation` so they
+  stay inside the webview.
 - **`native-shell/index.html`** (the branded "reconnecting" page Capacitor
   shows as `errorPath` when nothing answered): walks the same three doors on
   its retry loop and navigates to the first that responds. It must NEVER

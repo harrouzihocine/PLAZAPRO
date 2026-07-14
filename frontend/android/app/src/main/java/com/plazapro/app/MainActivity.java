@@ -76,7 +76,12 @@ public class MainActivity extends BridgeActivity {
 
         // Cold-boot LAN failover: replace Capacitor's client with our subclass
         // (same behavior + main-frame-error fallback to the office origins).
-        webView.setWebViewClient(new PlazaWebViewClient(getBridge()));
+        // Capacitor already fired the load to app.* from super.onCreate above,
+        // on its own client — onShellCreated hands that in-flight boot load to
+        // us so a dead app.* is detected in seconds, not an OS TCP timeout.
+        PlazaWebViewClient webViewClient = new PlazaWebViewClient(getBridge());
+        webView.setWebViewClient(webViewClient);
+        webViewClient.onShellCreated(webView);
 
         PlazaPush.createChannels(this);
         requestNotificationPermission();
