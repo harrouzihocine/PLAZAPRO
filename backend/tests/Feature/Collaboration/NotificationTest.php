@@ -60,6 +60,30 @@ class NotificationTest extends TestCase
             ->assertJsonPath('unread_count', 1);
     }
 
+    public function test_a_keyed_notification_renders_in_the_readers_current_language(): void
+    {
+        $me = $this->userWithPermissions(['notifications.view']);
+        $me->notify(new DomainNotification(
+            kind: 'work_transferred',
+            key: 'work_transferred',
+            params: ['from' => 'Sofiane', 'count' => 3],
+        ));
+
+        Sanctum::actingAs($me);
+
+        // One stored row, re-rendered per the request's Accept-Language: a user
+        // who switches language re-reads the whole feed in the new one instead
+        // of it freezing in whatever it was sent in.
+        $this->getJson('/api/v1/notifications', ['Accept-Language' => 'en'])
+            ->assertJsonPath('data.0.title', "Sofiane's open work was handed to you");
+
+        $this->getJson('/api/v1/notifications', ['Accept-Language' => 'fr'])
+            ->assertJsonPath('data.0.title', 'Le travail ouvert de Sofiane vous a été confié');
+
+        $this->getJson('/api/v1/notifications', ['Accept-Language' => 'ar'])
+            ->assertJsonPath('data.0.title', 'سُلّم إليك العمل المفتوح لـ Sofiane');
+    }
+
     public function test_the_feed_hides_chat_message_rows_from_the_list_and_the_count(): void
     {
         $me = $this->userWithPermissions(['notifications.view']);

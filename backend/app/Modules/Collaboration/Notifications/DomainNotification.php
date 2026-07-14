@@ -78,17 +78,38 @@ class DomainNotification extends Notification implements ShouldQueue
         public ?array $channels = null,
     ) {}
 
-    private function resolvedParams(): array
+    /**
+     * Render a keyed notification's title/body in the CURRENT app locale from
+     * its key + params. Shared by two moments: send time (below, in the
+     * recipient's preferredLocale) and read time (NotificationResource, in the
+     * request's Accept-Language), so a user who switches language re-reads the
+     * whole stored feed in the new one instead of it freezing in whatever it
+     * was sent in. Params starting with '@' are themselves translation keys
+     * resolved in the same locale (visit types, digest groups). `body` is null
+     * when the key has no body template (title-only notifications).
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{title: string, body: ?string}
+     */
+    public static function localize(string $key, array $params): array
     {
-        return array_map(
+        $resolved = array_map(
             fn ($v) => is_string($v) && str_starts_with($v, '@') ? __(substr($v, 1)) : $v,
-            $this->params,
+            $params,
         );
+
+        $bodyKey = "notifications.{$key}.body";
+        $body = __($bodyKey, $resolved);
+
+        return [
+            'title' => __("notifications.{$key}.title", $resolved),
+            'body' => $body === $bodyKey ? null : $body,
+        ];
     }
 
     private function resolvedTitle(): string
     {
-        return $this->key ? __("notifications.{$this->key}.title", $this->resolvedParams()) : $this->title;
+        return $this->key ? self::localize($this->key, $this->params)['title'] : $this->title;
     }
 
     private function resolvedBody(): string
@@ -97,10 +118,7 @@ class DomainNotification extends Notification implements ShouldQueue
             return $this->body;
         }
 
-        $key = "notifications.{$this->key}.body";
-        $body = __($key, $this->resolvedParams());
-
-        return $body === $key ? $this->body : $body;
+        return self::localize($this->key, $this->params)['body'] ?? $this->body;
     }
 
     /**
@@ -164,6 +182,13 @@ class DomainNotification extends Notification implements ShouldQueue
             'link' => $this->link,
             'subject_type' => $this->subjectType,
             'subject_id' => $this->subjectId,
+            // Keep the key + raw params alongside the send-time strings so the
+            // bell feed can RE-render this row in whatever language the reader
+            // is using now (NotificationResource), not just the one they had
+            // when it was sent. Only keyed notifications can move languages;
+            // free-text title/body ones fall back to the strings above.
+            'key' => $this->key,
+            'params' => $this->key ? $this->params : [],
         ];
     }
 

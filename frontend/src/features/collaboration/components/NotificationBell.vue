@@ -1,6 +1,7 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import Button from 'primevue/button'
 import Popover from 'primevue/popover'
 import { useAuthStore } from '@/features/settings/store'
@@ -15,8 +16,17 @@ import NotificationPrefsModal from '@/features/settings/components/NotificationP
 const auth = useAuthStore()
 const store = useNotificationsStore()
 const router = useRouter()
+const { locale } = useI18n()
 const panel = ref(null)
 const showPrefs = ref(false)
+
+// The feed's title/body are rendered server-side in the reader's language, so
+// switching language must re-pull it (the request carries the new locale as
+// Accept-Language). Covers every path that changes it — the switcher and the
+// profile-hydrate on login alike.
+watch(locale, () => {
+  store.fetch().catch(() => {})
+})
 
 function openPrefs() {
   panel.value?.hide()
