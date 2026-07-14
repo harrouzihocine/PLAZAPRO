@@ -13,6 +13,7 @@ import { useClientsStore } from '@/features/clients/clientsStore'
 import AddUnitVisitForm from '@/features/pipeline/components/AddUnitVisitForm.vue'
 import CallLogForm from '@/features/pipeline/components/CallLogForm.vue'
 import CompleteVisitForm from '@/features/pipeline/components/CompleteVisitForm.vue'
+import EditLogForm from '@/features/pipeline/components/EditLogForm.vue'
 import LogTimeline from '@/features/pipeline/components/LogTimeline.vue'
 import NextActionFields from '@/features/pipeline/components/NextActionFields.vue'
 import OfficeVisitInviteButton from '@/features/pipeline/components/OfficeVisitInviteButton.vue'
@@ -73,9 +74,43 @@ const canComplete = (visit) =>
 // person-by-person like the server does.
 const canAddUnitVisit = computed(() => !!props.projectId && auth.can('visits.propose'))
 
+// Editing a past log — each workflow its own grant (mirrors the server). A call
+// rapport → logs.edit_call; a visit rapport → logs.edit_visit, or a visit admin,
+// or the field agent fixing their OWN in-site log.
+const canEditCall = computed(() => auth.can('logs.edit_call') && !props.dispatchOnly)
+const canEditVisit = (visit) =>
+  auth.can('logs.edit_visit') ||
+  auth.can('visits.assign') ||
+  (visit.type === 'in_site' && visit.agent?.id === auth.user?.id && auth.can('visits.conduct'))
+const canEditEntry = (e) =>
+  e.data.status !== 'cancelled' &&
+  (e.kind === 'call' ? canEditCall.value : e.kind === 'visit' && canEditVisit(e.data))
+
+// A log that opened a deal cannot be edited freely: a deal carrying money / a
+// sale is locked for everyone; a still-waiting one can be edited only by someone
+// allowed to cancel it (the edit cancels it). Returns the tooltip key, or null.
+const canCancelDeal = computed(() => auth.can('logs.cancel_deal'))
+const editBlockReason = (e) => {
+  const deal = e.data.spawned_deal
+  if (!deal) return null
+  if (deal.locked) return t('pipeline.editDealLocked')
+  if (!canCancelDeal.value) return t('pipeline.editDealNoPerm')
+  return null
+}
+
 const showCall = ref(false)
 const showAddUnit = ref(false)
 const completing = ref(null) // the visit being completed (modal)
+const editingLog = ref(null) // the call/visit entry being edited (modal)
+
+// The open plan a log created — only when THIS log is the last one that owns it
+// (its source). Enables re-planning the follow-up from inside the log edit; the
+// server keeps exactly one open plan, so it is a correction of that plan.
+const planForEntry = (e) => {
+  const p = pending.value
+  if (!p || p.source_type !== e.kind || Number(p.source_id) !== Number(e.data.id)) return null
+  return p
+}
 
 const emptyNextAction = () => ({ type: 'call', due_date: '', due_time: '', assigned_to: '' })
 
@@ -261,6 +296,27 @@ async function submitAddUnit(payload) {
   await store.proposeInSiteVisit(props.clientId, props.projectId, payload)
   showAddUnit.value = false
   toastSuccess(payload.assigned_to ? t('pipeline.addedToAgentVisits') : t('pipeline.addedToPool'))
+  emit('changed')
+}
+
+function openEditLog(e) {
+  editingLog.value = e
+}
+
+// --- Edit a past log (call / visit) — a correction (cancel + new version) ---
+// The rapport edit goes first; the follow-up it created (if this is the last log)
+// is corrected in a second step — the plan id survives (the server only re-points
+// its source onto the new version). A still-waiting deal the log opened is
+// cancelled server-side; refresh the deal panel when one was involved.
+async function submitEditLog({ correction, planChange }) {
+  const e = editingLog.value
+  const plan = planChange ? planForEntry(e) : null
+  if (e.kind === 'call') await store.correctCall(props.clientId, e.data.id, correction)
+  else await store.correctVisit(props.clientId, e.data.id, correction)
+  if (plan && planChange) await store.correctNextAction(props.clientId, plan.id, planChange)
+  editingLog.value = null
+  if (e.data.spawned_deal && props.projectId) await store.loadDeals(props.projectId)
+  toastSuccess(t('pipeline.logUpdated'))
   emit('changed')
 }
 
@@ -512,6 +568,20 @@ async function submitEditNa() {
           outlined
           @click="completing = e.data"
         />
+        <!-- Edit the rapport (cancel + new version). Disabled when the deal this
+             log opened already has money/a sale on it — resolve the deal first. -->
+        <Button
+          v-if="canEditEntry(e)"
+          v-tooltip.top="editBlockReason(e)"
+          icon="pi pi-pencil"
+          size="small"
+          text
+          rounded
+          severity="secondary"
+          :aria-label="$t('pipeline.editLog')"
+          :disabled="!!editBlockReason(e)"
+          @click="openEditLog(e)"
+        />
       </template>
     </LogTimeline>
 
@@ -537,6 +607,24 @@ async function submitEditNa() {
         :saving="store.saving"
         @submit="submitAddUnit"
         @cancel="showAddUnit = false"
+      />
+    </BaseModal>
+
+    <!-- Edit a past log — correction (cancel + new version) + optional follow-up
+         re-plan; a still-waiting deal it opened is cancelled server-side. -->
+    <BaseModal
+      v-if="editingLog"
+      :title="editingLog.kind === 'call' ? $t('pipeline.editCall') : $t('pipeline.editVisit')"
+      @close="editingLog = null"
+    >
+      <EditLogForm
+        :key="`${editingLog.kind}-${editingLog.data.id}`"
+        :entry="editingLog"
+        :plan="planForEntry(editingLog)"
+        :field-agents="store.agents"
+        :saving="store.saving"
+        @submit="submitEditLog"
+        @cancel="editingLog = null"
       />
     </BaseModal>
 

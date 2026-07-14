@@ -155,7 +155,7 @@ class VisitMaterializationTest extends TestCase
     {
         $sales = $this->agent();
         $client = Client::factory()->create(['assigned_agent_id' => $sales->id]);
-        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log', 'logs.edit_next_action']));
 
         $this->postJson("/api/v1/clients/{$client->id}/calls", [
             'direction' => 'outbound',
@@ -179,7 +179,7 @@ class VisitMaterializationTest extends TestCase
     {
         $sales = $this->agent();
         $client = Client::factory()->create(['assigned_agent_id' => $sales->id]);
-        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log', 'logs.edit_next_action']));
 
         $this->postJson("/api/v1/clients/{$client->id}/calls", [
             'direction' => 'outbound',

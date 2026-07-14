@@ -6,6 +6,7 @@ namespace App\Modules\Pipeline\Http\Controllers;
 
 use App\Modules\Clients\Models\Client;
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Pipeline\Actions\ApplyLogCorrection;
 use App\Modules\Pipeline\Actions\CorrectCall;
 use App\Modules\Pipeline\Actions\LogCall;
 use App\Modules\Pipeline\Http\Requests\CorrectCallRequest;
@@ -61,14 +62,29 @@ class CallController extends Controller
     }
 
     /**
-     * Correct a call: cancels the original and returns the new version (201),
-     * keeping both in history with the reason (CorrectCall → supersedeWith).
+     * Correct a call: cancels the original and returns the new version, keeping
+     * both in history with the reason (CorrectCall → supersedeWith). If the call
+     * had opened a still-waiting deal it is cancelled with it (needs
+     * logs.cancel_deal); a deal with money/a sale on it blocks the edit. The
+     * open plan the call created follows the new version. (ApplyLogCorrection.)
      */
-    public function correct(CorrectCallRequest $request, Call $call, CorrectCall $action): CallResource
-    {
-        $new = $action->handle($call, $request->safe()->except('reason'), $request->validated('reason'))
-            ->load(['agent', 'outcome']);
+    public function correct(
+        CorrectCallRequest $request,
+        Call $call,
+        CorrectCall $action,
+        ApplyLogCorrection $apply,
+    ): CallResource {
+        $reason = $request->validated('reason');
 
-        return new CallResource($new);
+        $new = $apply->handle(
+            $request->user(),
+            $call->deal()->first(),
+            'call',
+            $call->id,
+            "Log edited — {$reason}",
+            fn () => $action->handle($call, $request->safe()->except('reason'), $reason),
+        );
+
+        return new CallResource($new->load(['agent', 'outcome']));
     }
 }

@@ -211,7 +211,7 @@ class ReviewRegressionTest extends TestCase
 
     public function test_correcting_into_an_in_site_plan_never_inherits_a_non_agent_assignee(): void
     {
-        $actor = $this->userWith(['clients.view', 'clients.view_all', 'calls.log']);
+        $actor = $this->userWith(['clients.view', 'clients.view_all', 'calls.log', 'logs.edit_next_action']);
         $backOffice = $this->userWith([], isAgent: false);
         $client = Client::factory()->create();
         $project = ClientProject::factory()->create(['client_id' => $client->id]);

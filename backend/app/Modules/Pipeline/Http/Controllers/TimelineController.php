@@ -57,12 +57,12 @@ class TimelineController extends Controller
         $calls = Call::query()
             ->where('client_id', $client->id)
             ->where($scoped)
-            ->with(['agent', 'outcome', 'supersedes'])->latest('called_at')->get();
+            ->with(['agent', 'outcome', 'supersedes', 'deal'])->latest('called_at')->get();
 
         $visits = Visit::query()
             ->where('client_id', $client->id)
             ->where($scoped)
-            ->with(['agent', 'unit.floor', 'unit.location', 'unit.location.type', 'outcome', 'supersedes'])->orderByDesc('scheduled_at')->get();
+            ->with(['agent', 'unit.floor', 'unit.location', 'unit.location.type', 'outcome', 'supersedes', 'deal'])->orderByDesc('scheduled_at')->get();
 
         // Only active pending actions — a superseded (cancelled) row keeps its
         // 'pending' state value but must not surface as the open action.

@@ -7,12 +7,14 @@ namespace App\Modules\Pipeline\Models;
 use App\Core\Models\BaseModel;
 use App\Modules\Clients\Models\Client;
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Clients\Models\Deal;
 use App\Modules\Inventory\Models\Unit;
 use App\Modules\Pipeline\Enums\VisitType;
 use App\Modules\Settings\Models\DynamicListItem;
 use App\Modules\Settings\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 /**
@@ -113,6 +115,12 @@ class Visit extends BaseModel
     public function nextAction(): BelongsTo
     {
         return $this->belongsTo(NextAction::class);
+    }
+
+    /** The deal this visit opened (provenance), if any — at most one active. */
+    public function deal(): HasOne
+    {
+        return $this->hasOne(Deal::class, 'visit_id')->active();
     }
 
     public function isCompleted(): bool

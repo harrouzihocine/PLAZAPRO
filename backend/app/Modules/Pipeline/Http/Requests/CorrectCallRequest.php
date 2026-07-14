@@ -16,7 +16,7 @@ class CorrectCallRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->can('calls.log');
+        return (bool) $this->user()?->can('logs.edit_call');
     }
 
     /**

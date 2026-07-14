@@ -267,7 +267,8 @@ class InteractionTest extends TestCase
     {
         $agent = $this->agent();
         $client = Client::factory()->create();
-        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+        // Logging needs calls.log; correcting the rapport is its own grant.
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log', 'logs.edit_call']));
 
         $callId = $this->postJson("/api/v1/clients/{$client->id}/calls", [
             'direction' => 'outbound',
@@ -293,7 +294,7 @@ class InteractionTest extends TestCase
         $fieldAgent = $this->agent();
         $client = Client::factory()->create(['assigned_agent_id' => $sales->id]);
         $unit = Unit::factory()->create();
-        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log', 'logs.edit_next_action']));
 
         // Qualify with a property so the deal + shortlist exist (an in-site plan
         // needs shortlisted units to materialize field visits from).
@@ -326,7 +327,7 @@ class InteractionTest extends TestCase
         $nonAgentSales = $this->userWithPermissions(['clients.view']); // role not is_agent
         $client = Client::factory()->create(['assigned_agent_id' => $nonAgentSales->id]);
         $unit = Unit::factory()->create();
-        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log']));
+        Sanctum::actingAs($this->userWithPermissions(['clients.view', 'calls.log', 'logs.edit_next_action']));
 
         $this->postJson("/api/v1/clients/{$client->id}/calls", [
             'direction' => 'outbound',

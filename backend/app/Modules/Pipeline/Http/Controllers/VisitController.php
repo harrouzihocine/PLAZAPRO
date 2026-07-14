@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Pipeline\Http\Controllers;
 
 use App\Modules\Clients\Models\ClientProject;
+use App\Modules\Pipeline\Actions\ApplyLogCorrection;
 use App\Modules\Pipeline\Actions\AssignVisit;
 use App\Modules\Pipeline\Actions\CompleteInteraction;
 use App\Modules\Pipeline\Actions\CorrectVisit;
@@ -109,13 +110,28 @@ class VisitController extends Controller
 
     /**
      * Correct a visit's details with a reason: cancels the original and returns the
-     * new version, keeping both in history (CorrectVisit → supersedeWith).
+     * new version, keeping both in history (CorrectVisit → supersedeWith). A
+     * still-waiting deal the visit opened is cancelled with it (needs
+     * logs.cancel_deal); a deal with money/a sale on it blocks the edit. The open
+     * plan the visit created follows the new version. (ApplyLogCorrection.)
      */
-    public function correct(CorrectVisitRequest $request, Visit $visit, CorrectVisit $action): VisitResource
-    {
-        return new VisitResource(
-            $action->handle($visit, $request->safe()->except('reason'), $request->validated('reason'))
-                ->load(['agent', 'unit', 'outcome']),
+    public function correct(
+        CorrectVisitRequest $request,
+        Visit $visit,
+        CorrectVisit $action,
+        ApplyLogCorrection $apply,
+    ): VisitResource {
+        $reason = $request->validated('reason');
+
+        $new = $apply->handle(
+            $request->user(),
+            $visit->deal()->first(),
+            'visit',
+            $visit->id,
+            "Log edited — {$reason}",
+            fn () => $action->handle($visit, $request->safe()->except('reason'), $reason),
         );
+
+        return new VisitResource($new->load(['agent', 'unit', 'outcome']));
     }
 }

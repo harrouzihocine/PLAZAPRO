@@ -38,15 +38,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // next-action form). Personal data only — no permission beyond being signed in.
     Route::get('/me/agenda', [NextActionController::class, 'agenda']);
 
-    // Logging a call may leave a next action. Corrections (call + next action)
-    // also run under calls.log — every edit is a cancel + new version, captured
-    // in history with a reason.
+    // Logging a call may leave a next action.
     Route::middleware('can:calls.log')->group(function () {
         // `idempotent`: queueable offline (X-Idempotency-Key) — a replay after a
         // lost response must not double-log the call.
         Route::post('/clients/{client}/calls', [CallController::class, 'store'])->middleware('idempotent');
-        Route::post('/calls/{call}/correct', [CallController::class, 'correct']);
-        Route::post('/next-actions/{nextAction}/correct', [NextActionController::class, 'correct']);
 
         // Click-to-call: the web app pushes a client's number to the agent's
         // phone; the shell reports the dial; the log prompt closes the loop.
@@ -54,6 +50,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/call-requests/{callRequest}/dialed', [CallRequestController::class, 'dialed']);
         Route::post('/call-requests/{callRequest}/close', [CallRequestController::class, 'close']);
     });
+
+    // Editing a past log — a correction is a cancel + new version, kept in
+    // history with a reason. Each workflow has its own grant, checked in the
+    // FormRequest (a call rapport → logs.edit_call, the next action it created →
+    // logs.edit_next_action), so no permission middleware here. Cancelling a
+    // still-waiting deal the log opened is gated (logs.cancel_deal) inside the
+    // controller, where the deal is known.
+    Route::post('/calls/{call}/correct', [CallController::class, 'correct']);
+    Route::post('/next-actions/{nextAction}/correct', [NextActionController::class, 'correct']);
 
     // Planning a standalone next action ("Plan next action") has its own grant,
     // split from calls.log so it can be handed out person-by-person.

@@ -25,7 +25,7 @@ class CorrectNextActionRequest extends FormRequest
     {
         $user = $this->user();
 
-        if ($user === null || ! $user->can('calls.log')) {
+        if ($user === null || ! $user->can('logs.edit_next_action')) {
             return false;
         }
 

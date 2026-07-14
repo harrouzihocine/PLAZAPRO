@@ -38,6 +38,7 @@ class ProductionSeeder extends Seeder
             WebStatsPermissionSeeder::class,
             UnitStatsPermissionSeeder::class,
             UnitSoldPricePermissionSeeder::class,
+            LogEditPermissionsSeeder::class,
         ]);
     }
 }

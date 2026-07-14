@@ -13,9 +13,10 @@ use Illuminate\Validation\Rules\Enum;
  * Correct a visit's details (type / unit / when / notes / checklist / outcome) with
  * a mandatory reason. Reassigning the agent stays with AssignVisit.
  *
- * Visit admins (visits.assign) may correct any visit; the assigned field agent may
- * also correct their OWN in-site logs (Phase-5 access rule) — the route carries no
- * permission middleware, this authorize() is the gate.
+ * The edit-visit grant (logs.edit_visit) or a visit admin (visits.assign) may
+ * correct any visit; the assigned field agent may also correct their OWN in-site
+ * logs (Phase-5 access rule) — the route carries no permission middleware, this
+ * authorize() is the gate.
  */
 class CorrectVisitRequest extends FormRequest
 {
@@ -27,7 +28,7 @@ class CorrectVisitRequest extends FormRequest
             return false;
         }
 
-        if ($user->can('visits.assign')) {
+        if ($user->can('logs.edit_visit') || $user->can('visits.assign')) {
             return true;
         }
 

@@ -6,6 +6,7 @@ namespace App\Modules\Clients\Models;
 
 use App\Core\Models\BaseModel;
 use App\Modules\Clients\Enums\DealState;
+use App\Modules\Payments\Models\Versement;
 use App\Modules\Pipeline\Models\Call;
 use App\Modules\Pipeline\Models\Visit;
 use App\Modules\Settings\Models\User;
@@ -73,5 +74,40 @@ class Deal extends BaseModel
     public function boxItems(): HasMany
     {
         return $this->hasMany(DealItem::class)->whereNotNull('box_id');
+    }
+
+    /**
+     * "Only waiting, no action taken yet" — the state in which editing the log
+     * that opened the deal may cancel it (releasing the held apartments). True
+     * when the deal is still open, no apartment has been resolved (won/lost),
+     * and no payment/deposit has been recorded against its apartments. Any money
+     * or a sale makes it locked: the edit is refused for everyone until the deal
+     * is resolved by hand.
+     */
+    public function isJustWaiting(): bool
+    {
+        if ($this->state !== DealState::Open) {
+            return false;
+        }
+
+        $anyResolved = $this->unitItems()->active()
+            ->where('state', '!=', DealState::Open->value)
+            ->exists();
+
+        if ($anyResolved) {
+            return false;
+        }
+
+        $unitIds = $this->unitItems()->active()->pluck('unit_id')->filter()->all();
+
+        if ($unitIds === []) {
+            return true;
+        }
+
+        return ! Versement::query()->active()
+            ->where('client_project_id', $this->client_project_id)
+            ->whereIn('unit_id', $unitIds)
+            ->whereNull('refunded_at')
+            ->exists();
     }
 }

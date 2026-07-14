@@ -213,7 +213,9 @@ class FieldAgentVisibilityTest extends TestCase
 
     public function test_a_dispatched_field_agent_cannot_correct_the_projects_plan(): void
     {
-        $agent = $this->fieldAgentWith(['clients.view', 'calls.log']);
+        // Holds the edit grant — so the rejection is the dispatch-only-agent rule,
+        // not a missing permission.
+        $agent = $this->fieldAgentWith(['clients.view', 'calls.log', 'logs.edit_next_action']);
         $client = Client::factory()->create();
         $project = ClientProject::factory()->create(['client_id' => $client->id]);
         $this->dispatchTo($agent, $project);

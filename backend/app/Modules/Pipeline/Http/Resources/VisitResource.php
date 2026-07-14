@@ -35,6 +35,14 @@ class VisitResource extends JsonResource
             'edit_reason' => $this->whenLoaded('supersedes', fn () => $this->supersedes?->cancellation_reason),
             'supersedes_id' => $this->supersedes_id,
             'cancellation_reason' => $this->when($this->isCancelled(), fn () => $this->cancellation_reason),
+            // The deal this visit opened, if any (provenance) — the FE warns that
+            // editing the log will cancel a still-waiting deal, and disables the
+            // Edit button on a `locked` one (a payment or a sale on it).
+            'spawned_deal' => $this->whenLoaded('deal', fn () => $this->deal ? [
+                'id' => $this->deal->id,
+                'state' => $this->deal->state?->value,
+                'locked' => ! $this->deal->isJustWaiting(),
+            ] : null),
             'agent' => $this->whenLoaded('agent', fn () => $this->agent ? [
                 'id' => $this->agent->id,
                 'name' => $this->agent->name,
